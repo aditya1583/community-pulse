@@ -27,42 +27,63 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+    // Load saved city from localStorage (client only)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const savedCity = localStorage.getItem("cp-city");
+    if (savedCity) {
+      setCity(savedCity);
+    }
+  }, []);
+
+  // Save city whenever it changes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!city) return;
+    localStorage.setItem("cp-city", city);
+  }, [city]);
+
+
   // Load pulses from Supabase when city changes
   useEffect(() => {
-    const fetchPulses = async () => {
-      setLoading(true);
-      setErrorMsg(null);
+  const fetchPulses = async () => {
+    setLoading(true);
+    setErrorMsg(null);
 
-      const { data, error } = await supabase
-        .from("pulses")
-        .select("*")
-        .eq("city", city)
-        .order("created_at", { ascending: false });
+    // Clear old city’s pulses so UI doesn’t show stale data
+    setPulses([]);
 
-      if (error) {
-        console.error("Error fetching pulses:", error.message);
-        setErrorMsg("Could not load pulses. Try again in a bit.");
-        setPulses([]);
-      } else if (data) {
-        const mapped = data.map((row: any) => ({
-          id: row.id,
-          city: row.city,
-          mood: row.mood,
-          tag: row.tag,
-          message: row.message,
-          createdAt: new Date(row.created_at).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        }));
-        setPulses(mapped);
-      }
+    const { data, error } = await supabase
+      .from("pulses")
+      .select("*")
+      .eq("city", city)
+      .order("created_at", { ascending: false });
 
-      setLoading(false);
-    };
+    if (error) {
+      console.error("Error fetching pulses:", error.message);
+      setErrorMsg("Could not load pulses. Try again in a bit.");
+      setPulses([]);
+    } else if (data) {
+      const mapped = data.map((row: any) => ({
+        id: row.id,
+        city: row.city,
+        mood: row.mood,
+        tag: row.tag,
+        message: row.message,
+        createdAt: new Date(row.created_at).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      }));
+      setPulses(mapped);
+    }
 
-    fetchPulses();
-  }, [city]);
+    setLoading(false);
+  };
+
+  fetchPulses();
+}, [city]);
+
 
   const filteredPulses = pulses.filter(
     (p) => tagFilter === "All" || p.tag === tagFilter
