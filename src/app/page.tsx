@@ -279,3 +279,20 @@ export default function Home() {
     </div>
   );
 }
+
+<footer className="text-center text-xs text-slate-500 pt-10 pb-6">
+  <a href="/terms" className="hover:text-pink-400 mr-4">Terms</a>
+  <a href="/privacy" className="hover:text-pink-400">Privacy</a>
+  <div className="mt-10 text-center">
+  <div className="inline-block bg-slate-900/70 border border-slate-700 rounded-2xl px-4 py-3 max-w-xl">
+    <p className="text-[11px] text-slate-400 leading-relaxed">
+      <strong>Disclaimer:</strong> Community Pulse displays user-submitted content.
+      Posts may be inaccurate, incomplete, or misleading. Do not rely on this
+      information for safety, travel, emergency, or decision-making purposes.
+      All posts reflect the views of individual users, not the app’s creators.
+      By using this service, you agree that Community Pulse is not responsible
+      for any actions taken based on user content.
+    </p>
+  </div>
+</div>
+</footer>
