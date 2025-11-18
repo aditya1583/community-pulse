@@ -1,8 +1,19 @@
 "use client";
 
+
 import { useEffect, useState } from "react";
 //import { supabase } from "../../lib/supabaseClient";
 import { supabase } from "../../lib/supabaseClient";
+
+const MAX_MESSAGE_LENGTH = 240;
+
+// Replace these placeholders with your own list
+const BANNED_WORDS = ["badword1", "badword2", "badword3"];
+
+function isCleanMessage(text: string) {
+  const lowered = text.toLowerCase();
+  return !BANNED_WORDS.some((w) => lowered.includes(w));
+}
 
 
 type Pulse = {
@@ -11,15 +22,34 @@ type Pulse = {
   mood: string;
   tag: string;
   message: string;
+  author: string;
   createdAt: string;
 };
 
 const TAGS = ["All", "Traffic", "Weather", "Events", "General"];
 const MOODS = ["😊", "😐", "😢", "😡", "😴", "🤩"];
 
+function generateFunUsername() {
+  const moods = ["Chill", "Spicy", "Sleepy", "Curious", "Salty", "Hyper", "Zen", "Chaotic"];
+  const animals = ["Coyote", "Otter", "Panda", "Falcon", "Capybara", "Llama", "Raccoon", "Fox"];
+
+  const mood = moods[Math.floor(Math.random() * moods.length)];
+  const animal = animals[Math.floor(Math.random() * animals.length)];
+  const num = Math.floor(Math.random() * 90) + 10; // 10–99
+
+  return `${mood} ${animal} ${num}`;
+}
+
+
+
+
 export default function Home() {
   const [city, setCity] = useState("Austin");
   const [tagFilter, setTagFilter] = useState("All");
+
+  const [username, setUsername] = useState<string>("");
+  const [validationError, setValidationError] = useState<string | null>(null);
+
   const [mood, setMood] = useState("😊");
   const [tag, setTag] = useState("General");
   const [message, setMessage] = useState("");
@@ -42,6 +72,22 @@ export default function Home() {
     if (!city) return;
     localStorage.setItem("cp-city", city);
   }, [city]);
+
+  // Generate or load anonymous username
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const saved = localStorage.getItem("cp-username");
+    if (saved) {
+      setUsername(saved);
+      return;
+    }
+
+    const generated = generateFunUsername();
+    setUsername(generated);
+    localStorage.setItem("cp-username", generated);
+  }, []);
+
 
 
   // Load pulses from Supabase when city changes
@@ -70,6 +116,7 @@ export default function Home() {
         mood: row.mood,
         tag: row.tag,
         message: row.message,
+        author: row.author || "Anonymous",
         createdAt: new Date(row.created_at).toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
@@ -90,7 +137,16 @@ export default function Home() {
   );
 
   const handleAddPulse = async () => {
-    if (!message.trim()) return;
+    const trimmed = message.trim();
+    if (!trimmed) return;
+
+    if (!isCleanMessage(trimmed)) {
+      setValidationError("Pulse contains disallowed language.");
+      return;
+    }
+
+    setErrorMsg(null);
+    setValidationError(null);
 
     setErrorMsg(null);
 
@@ -101,7 +157,8 @@ export default function Home() {
           city,
           mood,
           tag,
-          message: message.trim(),
+          message: trimmed,
+          author: username || "Anonymous",
         },
       ])
       .select()
@@ -120,6 +177,7 @@ export default function Home() {
         mood: data.mood,
         tag: data.tag,
         message: data.message,
+        author: data.author || "Anonymous",
         createdAt: new Date(data.created_at).toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
@@ -213,15 +271,34 @@ export default function Home() {
           <div className="space-y-3">
             <textarea
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value.length > MAX_MESSAGE_LENGTH) return;
+                setMessage(value);
+                setValidationError(null);
+              }}
               rows={3}
               className="w-full rounded-2xl bg-slate-950/80 border border-slate-800 px-3 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent resize-none"
               placeholder="What’s the vibe right now? (e.g., 'Commute is smooth on 183, sunset looks insane.')"
             />
+              <div className="flex items-center justify-between text-[11px] mt-1">
+                <span className="text-slate-500">
+                  {message.length}/{MAX_MESSAGE_LENGTH}
+                </span>
+                {validationError && (
+                  <span className="text-red-400">
+                    {validationError}
+                  </span>
+                )}
+              </div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] text-slate-500">
-                Pulses are public. Keep it kind & useful.
+              Posting as{" "}
+              <span className="text-slate-200">
+                {username || "…"}
               </span>
+              . Pulses are public. Keep it kind & useful
+                </span>
               <button
                 onClick={handleAddPulse}
                 disabled={!message.trim() || loading}
@@ -288,9 +365,11 @@ export default function Home() {
                     {pulse.message}
                   </p>
                   <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
-                    <span>{pulse.city}</span>
-                    <span>{pulse.createdAt}</span>
-                  </div>
+                    <span>{pulse.author}</span>
+                    <span>
+                      {pulse.city} · {pulse.createdAt}
+                    </span>
+                    </div>
                 </div>
               </article>
             ))
