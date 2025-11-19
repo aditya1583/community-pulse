@@ -1,8 +1,9 @@
 "use client";
 
+// import { supabase } from "../../lib/supabaseClient";
+
 
 import { useEffect, useState } from "react";
-//import { supabase } from "../../lib/supabaseClient";
 import { supabase } from "../../lib/supabaseClient";
 
 const MAX_MESSAGE_LENGTH = 240;
@@ -15,6 +16,13 @@ function isCleanMessage(text: string) {
   return !BANNED_WORDS.some((w) => lowered.includes(w));
 }
 
+type WeatherInfo = {
+  temp: number;
+  feelsLike: number;
+  description: string;
+  icon: string;
+  cityName: string;
+};
 
 type Pulse = {
   id: number;
@@ -46,16 +54,150 @@ function generateFunUsername() {
 export default function Home() {
   const [city, setCity] = useState("Austin");
   const [tagFilter, setTagFilter] = useState("All");
-
   const [username, setUsername] = useState<string>("");
   const [validationError, setValidationError] = useState<string | null>(null);
-
   const [mood, setMood] = useState("😊");
   const [tag, setTag] = useState("General");
   const [message, setMessage] = useState("");
   const [pulses, setPulses] = useState<Pulse[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Traffic State 
+
+  const [trafficLevel, setTrafficLevel] = useState<"Light" | "Moderate" | "Heavy" | null>(null);
+  const [trafficLoading, setTrafficLoading] = useState(false);
+  const [trafficError, setTrafficError] = useState<string | null>(null);
+
+
+  //  Add state for summary + loading 
+
+  const [summary, setSummary] = useState<string | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  
+  //  Weather 
+
+  const [weather, setWeather] = useState<WeatherInfo | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherError, setWeatherError] = useState<string | null>(null);
+
+
+  // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+      // Auto-generate AI summary whenever city or pulses change
+  useEffect(() => {
+    if (pulses.length === 0) {
+      setSummary(null);
+      setSummaryError(null);
+      setSummaryLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const run = async () => {
+      try {
+        setSummaryLoading(true);
+        setSummaryError(null);
+
+        const res = await fetch("/api/summary", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            city,
+            pulses,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (cancelled) return;
+
+        if (!res.ok) {
+          setSummaryError(data.error || "Failed to get summary");
+          setSummary(null);
+          return;
+        }
+
+        setSummary(data.summary);
+      } catch (err) {
+        if (!cancelled) {
+          setSummaryError("Unable to summarize right now.");
+          setSummary(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setSummaryLoading(false);
+        }
+      }
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [city, pulses]);
+
+
+  // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+// FETCH WEATHER
+
+  // Fetch weather whenever city changes
+  useEffect(() => {
+    if (!city.trim()) {
+      setWeather(null);
+      setWeatherError(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const run = async () => {
+      try {
+        setWeatherLoading(true);
+        setWeatherError(null);
+
+        const res = await fetch("/api/weather", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ city }),
+        });
+
+        const data = await res.json();
+
+        if (cancelled) return;
+
+        if (!res.ok) {
+          setWeather(null);
+          setWeatherError(data.error || "Unable to load weather.");
+          return;
+        }
+
+        setWeather(data);
+      } catch (err) {
+        if (!cancelled) {
+          setWeather(null);
+          setWeatherError("Unable to load weather.");
+        }
+      } finally {
+        if (!cancelled) {
+          setWeatherLoading(false);
+        }
+      }
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [city]);
+
+
 
     // Load saved city from localStorage (client only)
   useEffect(() => {
@@ -131,6 +273,35 @@ export default function Home() {
   fetchPulses();
 }, [city]);
 
+// Fetch Traffic Snapshot whenever city or pulses change
+
+useEffect(() => {
+  if (!city) return;
+
+  const fetchTraffic = async () => {
+    try {
+      setTrafficLoading(true);
+      setTrafficError(null);
+
+      const res = await fetch(`/api/traffic?city=${encodeURIComponent(city)}`);
+
+      if (!res.ok) {
+        throw new Error("Failed to fetch traffic snapshot");
+      }
+
+      const data = await res.json();
+      setTrafficLevel(data.level);
+    } catch (err: any) {
+      console.error("Error fetching traffic:", err);
+      setTrafficError("Unable to load traffic right now.");
+      setTrafficLevel(null);
+    } finally {
+      setTrafficLoading(false);
+    }
+  };
+
+  fetchTraffic();
+}, [city, pulses.length]);
 
   const filteredPulses = pulses.filter(
     (p) => tagFilter === "All" || p.tag === tagFilter
@@ -219,6 +390,116 @@ export default function Home() {
             </div>
           </div>
         </header>
+
+        {/* Render a nice weather widget under the header */}
+        {/* Weather widget */}
+        <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-slate-400">
+              Weather in {weather?.cityName || city}
+            </p>
+            {weatherLoading ? (
+              <p className="text-sm text-slate-400 mt-1">
+                Fetching latest weather…
+              </p>
+            ) : weather ? (
+              <p className="text-sm text-slate-100 mt-1">
+                {Math.round(weather.temp)}°F
+                <span className="text-slate-400 text-xs ml-2">
+                  (feels like {Math.round(weather.feelsLike)}°F)
+                </span>
+                <span className="block text-xs text-slate-400 capitalize">
+                  {weather.description}
+                </span>
+              </p>
+            ) : weatherError ? (
+              <p className="text-xs text-red-400 mt-1">{weatherError}</p>
+            ) : (
+              <p className="text-xs text-slate-500 mt-1">
+                Weather data not available yet.
+              </p>
+            )}
+          </div>
+
+          {weather && (
+            <div className="flex flex-col items-end">
+              <span className="text-3xl">
+                {(() => {
+  const map: Record<string, string> = {
+              "01d": "☀️",
+              "01n": "🌕",
+              "02d": "🌤️",
+              "02n": "☁️🌙",
+              "03d": "⛅",
+              "03n": "☁️",
+              "04d": "☁️",
+              "04n": "☁️",
+              "09d": "🌧️",
+              "09n": "🌧️",
+              "10d": "🌦️",
+              "10n": "🌧️🌙",
+              "11d": "⛈️",
+              "11n": "🌩️",
+              "13d": "❄️",
+              "13n": "❄️🌙",
+              "50d": "🌫️",
+              "50n": "🌫️🌙"
+  };
+
+  return map[weather.icon] || "🌍";
+})()}
+              </span>
+              <span className="text-[11px] text-slate-500">
+                Powered by OpenWeather
+              </span>
+            </div>
+          )}
+        </section>
+
+<section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 flex items-center justify-between gap-3">
+  <div>
+    <p className="text-xs uppercase tracking-wide text-slate-400">
+      Traffic in {city}
+    </p>
+    {trafficLoading ? (
+      <p className="text-sm text-slate-400 mt-1">Estimating traffic…</p>
+    ) : trafficError ? (
+      <p className="text-xs text-red-400 mt-1">{trafficError}</p>
+    ) : trafficLevel ? (
+      <p className="text-sm text-slate-100 mt-1 flex items-center gap-2">
+        {trafficLevel === "Light" && (
+          <span className="inline-flex items-center gap-1">
+            <span className="text-lg">🟢</span>
+            <span>Light traffic</span>
+          </span>
+        )}
+        {trafficLevel === "Moderate" && (
+          <span className="inline-flex items-center gap-1">
+            <span className="text-lg">🟡</span>
+            <span>Moderate traffic</span>
+          </span>
+        )}
+        {trafficLevel === "Heavy" && (
+          <span className="inline-flex items-center gap-1">
+            <span className="text-lg">🔴</span>
+            <span>Heavy traffic</span>
+          </span>
+        )}
+      </p>
+    ) : (
+      <p className="text-xs text-slate-500 mt-1">
+        Not enough recent traffic pulses yet.
+      </p>
+    )}
+  </div>
+
+  <div className="text-[11px] text-slate-500 text-right max-w-[140px]">
+    Based on recent traffic-tagged pulses and time of day.
+  </div>
+</section>
+
+
+
 
         {/* New Pulse Card */}
         <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-lg p-4 sm:p-5 space-y-4">
@@ -315,6 +596,34 @@ export default function Home() {
             </p>
           )}
         </section>
+        
+          {/* AI Summary Section */}
+<div className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 space-y-3">
+  <div className="flex items-center justify-between">
+    <h2 className="text-sm font-medium text-slate-200">
+      AI Summary for {city}
+    </h2>
+    <span className="text-[11px] text-slate-400">
+      {summaryLoading
+        ? "Summarizing recent pulses…"
+        : "Auto-generated from recent pulses"}
+    </span>
+  </div>
+
+  {summaryError && (
+    <p className="text-xs text-red-400">{summaryError}</p>
+  )}
+
+  {summary ? (
+    <p className="text-sm text-slate-300 leading-relaxed bg-slate-950/60 border border-slate-800 rounded-2xl p-3">
+      {summary}
+    </p>
+  ) : !summaryLoading && pulses.length === 0 ? (
+    <p className="text-xs text-slate-500">
+      No pulses yet. Start posting to see an AI summary here.
+    </p>
+  ) : null}
+</div>
 
         {/* Filter chips */}
         <div className="flex flex-wrap gap-2">
