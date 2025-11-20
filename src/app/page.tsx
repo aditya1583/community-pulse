@@ -1,9 +1,6 @@
 "use client";
 
-// import { supabase } from "../../lib/supabaseClient";
-
-
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 
 const MAX_MESSAGE_LENGTH = 240;
@@ -34,12 +31,73 @@ type Pulse = {
   createdAt: string;
 };
 
+// Real-time Live Updates
+
+type DBPulse = {
+  id: number;
+  city: string;
+  mood: string;
+  tag: string;
+  message: string;
+  author: string;
+  created_at: string;
+};
+
+function mapDBPulseToPulse(row: DBPulse): Pulse {
+  return {
+    id: row.id,
+    city: row.city,
+    mood: row.mood,
+    tag: row.tag,
+    message: row.message,
+    author: row.author,
+    createdAt: row.created_at,
+  };
+}
+
+// EVENTS
+type EventItem = {
+  id: string;
+  title: string;
+  description?: string | null;
+  location?: string | null;
+  category?: string | null;
+  starts_at: string;
+  ends_at?: string | null;
+  is_sponsored?: boolean | null;
+};
+
+// CITY MOOD
+type MoodScore = {
+  mood: string;
+  count: number;
+  percent: number;
+};
+
 const TAGS = ["All", "Traffic", "Weather", "Events", "General"];
 const MOODS = ["😊", "😐", "😢", "😡", "😴", "🤩"];
 
 function generateFunUsername() {
-  const moods = ["Chill", "Spicy", "Sleepy", "Curious", "Salty", "Hyper", "Zen", "Chaotic"];
-  const animals = ["Coyote", "Otter", "Panda", "Falcon", "Capybara", "Llama", "Raccoon", "Fox"];
+  const moods = [
+    "Chill",
+    "Spicy",
+    "Sleepy",
+    "Curious",
+    "Salty",
+    "Hyper",
+    "Zen",
+    "Chaotic",
+  ];
+  const animals = [
+    "Coyote",
+    "Otter",
+    "Panda",
+    "Falcon",
+    "Capybara",
+    "Llama",
+    "Raccoon",
+    "Fox",
+  ];
 
   const mood = moods[Math.floor(Math.random() * moods.length)];
   const animal = animals[Math.floor(Math.random() * animals.length)];
@@ -48,10 +106,8 @@ function generateFunUsername() {
   return `${mood} ${animal} ${num}`;
 }
 
-
-
-
 export default function Home() {
+  // Core state
   const [city, setCity] = useState("Austin");
   const [tagFilter, setTagFilter] = useState("All");
   const [username, setUsername] = useState<string>("");
@@ -63,29 +119,43 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Traffic State 
+  // Events state
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventsError, setEventsError] = useState<string | null>(null);
 
-  const [trafficLevel, setTrafficLevel] = useState<"Light" | "Moderate" | "Heavy" | null>(null);
+  const [newEventTitle, setNewEventTitle] = useState("");
+  const [newEventLocation, setNewEventLocation] = useState("");
+  const [newEventTime, setNewEventTime] = useState(""); // datetime-local value
+  const [creatingEvent, setCreatingEvent] = useState(false);
+  const [eventCreateError, setEventCreateError] = useState<string | null>(null);
+
+  // Traffic
+  const [trafficLevel, setTrafficLevel] =
+    useState<"Light" | "Moderate" | "Heavy" | null>(null);
   const [trafficLoading, setTrafficLoading] = useState(false);
   const [trafficError, setTrafficError] = useState<string | null>(null);
 
-
-  //  Add state for summary + loading 
-
+  // Summary
   const [summary, setSummary] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
-  
-  //  Weather 
 
+  // Weather
   const [weather, setWeather] = useState<WeatherInfo | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherError, setWeatherError] = useState<string | null>(null);
 
+  // City Mood
+  const [cityMood, setCityMood] = useState<{
+    dominantMood: string | null;
+    scores: MoodScore[];
+    pulseCount: number;
+  } | null>(null);
+  const [cityMoodLoading, setCityMoodLoading] = useState(false);
+  const [cityMoodError, setCityMoodError] = useState<string | null>(null);
 
-  // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-      // Auto-generate AI summary whenever city or pulses change
+  // ========= AI SUMMARY =========
   useEffect(() => {
     if (pulses.length === 0) {
       setSummary(null);
@@ -140,13 +210,94 @@ export default function Home() {
     };
   }, [city, pulses]);
 
+  // Real-time feed
 
-  // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  useEffect(() => {
+  if (!city) return;
 
-// FETCH WEATHER
+  // Create a dedicated channel for this page
+  const channel = supabase
+    .channel("pulses-realtime")
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "pulses",
+        filter: `city=eq.${city}`,
+      },
+      (payload) => {
+        // payload.new is the row that was inserted
+        const row = payload.new as DBPulse;
 
-  // Fetch weather whenever city changes
+        // Safety: ignore if city doesn’t match for any reason
+        if (!row || row.city !== city) return;
+
+        const pulse = mapDBPulseToPulse(row);
+
+        // Prepend new pulse to the list
+        setPulses((prev) => {
+          // Avoid duplicates if we ever re-fetch
+          // const exists = prev.some((p) => p.id === pulse.id);
+          const exists = prev.some((p) => String(p.id) === String(pulse.id));
+          if (exists) return prev;
+
+          return [pulse, ...prev].sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() -
+              new Date(a.createdAt).getTime()
+          );
+        });
+      }
+    )
+    .subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        console.log("Subscribed to realtime pulses for", city);
+      }
+    });
+
+  // Cleanup when city changes or component unmounts
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [city, setPulses]);
+
+
+  // ========= CITY MOOD =========
+  useEffect(() => {
+    if (!city) return;
+
+    async function fetchCityMood() {
+      try {
+        setCityMoodLoading(true);
+        setCityMoodError(null);
+
+        const res = await fetch(
+          `/api/city-mood?city=${encodeURIComponent(city)}`
+        );
+        if (!res.ok) {
+          throw new Error("Failed to fetch city mood");
+        }
+
+        const data = await res.json();
+        setCityMood({
+          dominantMood: data.dominantMood,
+          scores: data.scores || [],
+          pulseCount: data.pulseCount || 0,
+        });
+      } catch (err: any) {
+        console.error("Error fetching city mood:", err);
+        setCityMoodError("Unable to load city mood right now.");
+        setCityMood(null);
+      } finally {
+        setCityMoodLoading(false);
+      }
+    }
+
+    fetchCityMood();
+  }, [city, pulses.length]);
+
+  // ========= WEATHER =========
   useEffect(() => {
     if (!city.trim()) {
       setWeather(null);
@@ -197,9 +348,48 @@ export default function Home() {
     };
   }, [city]);
 
+  // ========= EVENTS FETCH =========
+useEffect(() => {
+  if (!city) return;
+
+  async function fetchEvents() {
+    try {
+      setEventsLoading(true);
+      setEventsError(null);
+
+      const res = await fetch(`/api/events?city=${encodeURIComponent(city)}`);
+
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        // ignore JSON parse error
+      }
+
+      if (!res.ok) {
+        console.error("Events API returned error:", data);
+        setEventsError(
+          (data && data.error) || "Unable to load local events right now."
+        );
+        setEvents([]);
+        return;
+      }
+
+      setEvents((data && data.events) || []);
+    } catch (err: any) {
+      console.error("Error fetching events:", err);
+      setEventsError("Unable to load local events right now.");
+      setEvents([]);
+    } finally {
+      setEventsLoading(false);
+    }
+  }
+
+  fetchEvents();
+}, [city]);
 
 
-    // Load saved city from localStorage (client only)
+  // ========= LOCAL STORAGE: CITY =========
   useEffect(() => {
     if (typeof window === "undefined") return;
     const savedCity = localStorage.getItem("cp-city");
@@ -208,14 +398,13 @@ export default function Home() {
     }
   }, []);
 
-  // Save city whenever it changes
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!city) return;
     localStorage.setItem("cp-city", city);
   }, [city]);
 
-  // Generate or load anonymous username
+  // ========= LOCAL STORAGE: USERNAME =========
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -230,83 +419,133 @@ export default function Home() {
     localStorage.setItem("cp-username", generated);
   }, []);
 
-
-
-  // Load pulses from Supabase when city changes
+  // ========= PULSES FETCH =========
   useEffect(() => {
-  const fetchPulses = async () => {
-    setLoading(true);
-    setErrorMsg(null);
-
-    // Clear old city’s pulses so UI doesn’t show stale data
-    setPulses([]);
-
-    const { data, error } = await supabase
-      .from("pulses")
-      .select("*")
-      .eq("city", city)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("Error fetching pulses:", error.message);
-      setErrorMsg("Could not load pulses. Try again in a bit.");
+    const fetchPulses = async () => {
+      setLoading(true);
+      setErrorMsg(null);
       setPulses([]);
-    } else if (data) {
-      const mapped = data.map((row: any) => ({
-        id: row.id,
-        city: row.city,
-        mood: row.mood,
-        tag: row.tag,
-        message: row.message,
-        author: row.author || "Anonymous",
-        createdAt: new Date(row.created_at).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      }));
-      setPulses(mapped);
-    }
 
-    setLoading(false);
-  };
+      const { data, error } = await supabase
+        .from("pulses")
+        .select("*")
+        .eq("city", city)
+        .order("created_at", { ascending: false });
 
-  fetchPulses();
-}, [city]);
-
-// Fetch Traffic Snapshot whenever city or pulses change
-
-useEffect(() => {
-  if (!city) return;
-
-  const fetchTraffic = async () => {
-    try {
-      setTrafficLoading(true);
-      setTrafficError(null);
-
-      const res = await fetch(`/api/traffic?city=${encodeURIComponent(city)}`);
-
-      if (!res.ok) {
-        throw new Error("Failed to fetch traffic snapshot");
+      if (error) {
+        console.error("Error fetching pulses:", error.message);
+        setErrorMsg("Could not load pulses. Try again in a bit.");
+        setPulses([]);
+      } else if (data) {
+        const mapped = data.map((row: any) => ({
+          id: row.id,
+          city: row.city,
+          mood: row.mood,
+          tag: row.tag,
+          message: row.message,
+          author: row.author || "Anonymous",
+          createdAt: new Date(row.created_at).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        }));
+        setPulses(mapped);
       }
 
-      const data = await res.json();
-      setTrafficLevel(data.level);
-    } catch (err: any) {
-      console.error("Error fetching traffic:", err);
-      setTrafficError("Unable to load traffic right now.");
-      setTrafficLevel(null);
-    } finally {
-      setTrafficLoading(false);
+      setLoading(false);
+    };
+
+    if (city) {
+      fetchPulses();
     }
-  };
+  }, [city]);
 
-  fetchTraffic();
-}, [city, pulses.length]);
+  // ========= TRAFFIC =========
+  useEffect(() => {
+    if (!city) return;
 
+    const fetchTraffic = async () => {
+      try {
+        setTrafficLoading(true);
+        setTrafficError(null);
+
+        const res = await fetch(`/api/traffic?city=${encodeURIComponent(city)}`);
+
+        if (!res.ok) {
+          throw new Error("Failed to fetch traffic snapshot");
+        }
+
+        const data = await res.json();
+        setTrafficLevel(data.level);
+      } catch (err: any) {
+        console.error("Error fetching traffic:", err);
+        setTrafficError("Unable to load traffic right now.");
+        setTrafficLevel(null);
+      } finally {
+        setTrafficLoading(false);
+      }
+    };
+
+    fetchTraffic();
+  }, [city, pulses.length]);
+
+  // ========= CREATE EVENT HANDLER =========
+async function handleCreateEvent(e: React.FormEvent) {
+  e.preventDefault();
+  if (!city || !newEventTitle || !newEventTime) return;
+
+  try {
+    setCreatingEvent(true);
+    setEventCreateError(null);
+
+    const res = await fetch("/api/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        city,
+        title: newEventTitle,
+        location: newEventLocation,
+        starts_at: newEventTime,
+      }),
+    });
+
+    let data: any = null;
+    try {
+      data = await res.json();
+    } catch {
+      // If body is empty or not JSON, keep data = null
+    }
+
+    if (!res.ok) {
+      const msg =
+        (data && data.error) ||
+        `Failed to create event (status ${res.status})`;
+      throw new Error(msg);
+    }
+
+    if (data && data.event) {
+      setEvents((prev) => [data.event, ...prev]);
+    }
+
+    setNewEventTitle("");
+    setNewEventLocation("");
+    setNewEventTime("");
+  } catch (err: any) {
+    console.error("Error creating event:", err);
+    setEventCreateError(
+      err?.message || "Unable to create event right now."
+    );
+  } finally {
+    setCreatingEvent(false);
+  }
+}
+
+  // ========= FILTER PULSES =========
   const filteredPulses = pulses.filter(
     (p) => tagFilter === "All" || p.tag === tagFilter
   );
 
+  // ========= ADD PULSE =========
   const handleAddPulse = async () => {
     const trimmed = message.trim();
     if (!trimmed) return;
@@ -318,8 +557,6 @@ useEffect(() => {
 
     setErrorMsg(null);
     setValidationError(null);
-
-    setErrorMsg(null);
 
     const { data, error } = await supabase
       .from("pulses")
@@ -355,7 +592,7 @@ useEffect(() => {
         }),
       };
 
-      setPulses((prev) => [newPulse, ...prev]);
+      // setPulses((prev) => [newPulse, ...prev]);
       setMessage("");
     }
   };
@@ -371,7 +608,8 @@ useEffect(() => {
                 Community <span className="text-pink-400">Pulse</span>
               </h1>
               <p className="text-sm text-slate-300 mt-1">
-                Real-time vibes from your city. No doom scroll, just quick pulses.
+                Real-time vibes from your city. No doom scroll, just quick
+                pulses.
               </p>
             </div>
             <div className="flex flex-col sm:items-end gap-2">
@@ -391,7 +629,6 @@ useEffect(() => {
           </div>
         </header>
 
-        {/* Render a nice weather widget under the header */}
         {/* Weather widget */}
         <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 flex items-center justify-between gap-3">
           <div>
@@ -425,29 +662,29 @@ useEffect(() => {
             <div className="flex flex-col items-end">
               <span className="text-3xl">
                 {(() => {
-  const map: Record<string, string> = {
-              "01d": "☀️",
-              "01n": "🌕",
-              "02d": "🌤️",
-              "02n": "☁️🌙",
-              "03d": "⛅",
-              "03n": "☁️",
-              "04d": "☁️",
-              "04n": "☁️",
-              "09d": "🌧️",
-              "09n": "🌧️",
-              "10d": "🌦️",
-              "10n": "🌧️🌙",
-              "11d": "⛈️",
-              "11n": "🌩️",
-              "13d": "❄️",
-              "13n": "❄️🌙",
-              "50d": "🌫️",
-              "50n": "🌫️🌙"
-  };
+                  const map: Record<string, string> = {
+                    "01d": "☀️",
+                    "01n": "🌕",
+                    "02d": "🌤️",
+                    "02n": "☁️🌙",
+                    "03d": "⛅",
+                    "03n": "☁️",
+                    "04d": "☁️",
+                    "04n": "☁️",
+                    "09d": "🌧️",
+                    "09n": "🌧️",
+                    "10d": "🌦️",
+                    "10n": "🌧️🌙",
+                    "11d": "⛈️",
+                    "11n": "🌩️",
+                    "13d": "❄️",
+                    "13n": "❄️🌙",
+                    "50d": "🌫️",
+                    "50n": "🌫️🌙",
+                  };
 
-  return map[weather.icon] || "🌍";
-})()}
+                  return map[weather.icon] || "🌍";
+                })()}
               </span>
               <span className="text-[11px] text-slate-500">
                 Powered by OpenWeather
@@ -456,50 +693,217 @@ useEffect(() => {
           )}
         </section>
 
-<section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 flex items-center justify-between gap-3">
-  <div>
-    <p className="text-xs uppercase tracking-wide text-slate-400">
-      Traffic in {city}
-    </p>
-    {trafficLoading ? (
-      <p className="text-sm text-slate-400 mt-1">Estimating traffic…</p>
-    ) : trafficError ? (
-      <p className="text-xs text-red-400 mt-1">{trafficError}</p>
-    ) : trafficLevel ? (
-      <p className="text-sm text-slate-100 mt-1 flex items-center gap-2">
-        {trafficLevel === "Light" && (
-          <span className="inline-flex items-center gap-1">
-            <span className="text-lg">🟢</span>
-            <span>Light traffic</span>
-          </span>
-        )}
-        {trafficLevel === "Moderate" && (
-          <span className="inline-flex items-center gap-1">
-            <span className="text-lg">🟡</span>
-            <span>Moderate traffic</span>
-          </span>
-        )}
-        {trafficLevel === "Heavy" && (
-          <span className="inline-flex items-center gap-1">
-            <span className="text-lg">🔴</span>
-            <span>Heavy traffic</span>
-          </span>
-        )}
-      </p>
-    ) : (
-      <p className="text-xs text-slate-500 mt-1">
-        Not enough recent traffic pulses yet.
-      </p>
-    )}
-  </div>
+        {/* Local Events + Create Event */}
+        {/* <section className="mt-6 rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-semibold text-slate-100">
+              Local events in {city || "your city"}
+            </h2>
+            <span className="text-[10px] text-slate-500">Next 7 days</span>
+          </div> */}
 
-  <div className="text-[11px] text-slate-500 text-right max-w-[140px]">
-    Based on recent traffic-tagged pulses and time of day.
-  </div>
-</section>
+          {/* Create Event (MVP) */}
+          {/* <form
+            onSubmit={handleCreateEvent}
+            className="space-y-2 mb-4 rounded-2xl bg-slate-950/70 border border-slate-800 p-3"
+          >
+            <h3 className="text-xs font-semibold text-slate-200 mb-1">
+              Create a local event (demo)
+            </h3>
+            <input
+              className="w-full rounded-xl bg-slate-950/80 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+              placeholder="Event title (e.g., Live jazz at SoCo)"
+              value={newEventTitle}
+              onChange={(e) => setNewEventTitle(e.target.value)}
+            />
+            <input
+              className="w-full rounded-xl bg-slate-950/80 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+              placeholder="Location (e.g., South Congress Ave, Austin, TX)"
+              value={newEventLocation}
+              onChange={(e) => setNewEventLocation(e.target.value)}
+            />
+            <input
+              type="datetime-local"
+              className="w-full rounded-xl bg-slate-950/80 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+              value={newEventTime}
+              onChange={(e) => setNewEventTime(e.target.value)}
+            />
+            {eventCreateError && (
+              <p className="text-xs text-red-400">{eventCreateError}</p>
+            )}
+            <button
+              type="submit"
+              disabled={creatingEvent}
+              className="text-xs px-3 py-1.5 rounded-full bg-pink-500 text-white hover:bg-pink-400 disabled:opacity-50"
+            >
+              {creatingEvent ? "Creating…" : "Post event"}
+            </button>
+            <p className="text-[10px] text-slate-500 mt-1">
+              Demo only – events are not verified or sponsored yet.
+            </p>
+          </form>
 
+          {eventsLoading ? (
+            <p className="text-sm text-slate-400">Finding events…</p>
+          ) : eventsError ? (
+            <p className="text-sm text-red-400">{eventsError}</p>
+          ) : events.length === 0 ? (
+            <p className="text-sm text-slate-400">
+              No upcoming events yet. Someone should start one 😉
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {events.map((ev) => {
+                const start = new Date(ev.starts_at);
+                const timeStr = start.toLocaleString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                });
 
+                const mapsUrl = ev.location
+                  ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                      ev.location
+                    )}`
+                  : null;
 
+                return (
+                  <button
+                    key={ev.id}
+                    type="button"
+                    onClick={() => {
+                      if (mapsUrl) window.open(mapsUrl, "_blank");
+                    }}
+                    className="w-full flex justify-between items-start rounded-2xl bg-slate-950/70 border border-slate-800 px-3 py-2 text-left hover:border-pink-500/60 hover:shadow-pink-500/20 transition"
+                  >
+                    <div>
+                      <p className="text-sm text-slate-100 font-medium">
+                        {ev.title}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {timeStr}
+                        {ev.location ? ` · ${ev.location}` : ""}
+                      </p>
+                      {ev.description && (
+                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                          {ev.description}
+                        </p>
+                      )}
+                    </div>
+                    {ev.category && (
+                      <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-300 border border-pink-500/30">
+                        {ev.category}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </section> */}
+
+        {/* City Mood Meter */}
+        <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 mt-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-slate-400">
+                City mood in {city || "your city"}
+              </p>
+
+              {cityMoodLoading ? (
+                <p className="text-sm text-slate-400 mt-1">
+                  Reading the vibes…
+                </p>
+              ) : cityMoodError ? (
+                <p className="text-sm text-red-400 mt-1">{cityMoodError}</p>
+              ) : !cityMood || cityMood.pulseCount === 0 ? (
+                <p className="text-sm text-slate-400 mt-1">
+                  Not enough recent pulses to read the mood.
+                </p>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-100 mt-1 flex items-center gap-2">
+                    <span className="text-xl">
+                      {cityMood.dominantMood || "😐"}
+                    </span>
+                    <span>
+                      Dominant mood from{" "}
+                      <span className="font-semibold">
+                        {cityMood.pulseCount}
+                      </span>{" "}
+                      recent pulses.
+                    </span>
+                  </p>
+
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {cityMood.scores.map((item) => (
+                      <div
+                        key={item.mood}
+                        className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-full bg-slate-950/60 border border-slate-700/60"
+                      >
+                        <span className="text-sm">{item.mood}</span>
+                        <span className="text-slate-300">
+                          {item.percent}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="text-[10px] text-slate-500 text-right max-w-[140px]">
+              Based on recent moods posted in this city over the last few hours.
+            </div>
+          </div>
+        </section>
+
+        {/* Traffic snapshot widget */}
+        <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 flex items-center justify-between gap-3 mt-3">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-slate-400">
+              Traffic in {city || "your city"}
+            </p>
+
+            {trafficLoading ? (
+              <p className="text-sm text-slate-400 mt-1">
+                Estimating traffic…
+              </p>
+            ) : trafficError ? (
+              <p className="text-sm text-red-400 mt-1">{trafficError}</p>
+            ) : trafficLevel ? (
+              <p className="text-sm text-slate-100 mt-1 flex items-center gap-2">
+                {trafficLevel === "Light" && (
+                  <span className="inline-flex items-center gap-1">
+                    <span className="text-lg">🟢</span>
+                    <span>Light traffic</span>
+                  </span>
+                )}
+                {trafficLevel === "Moderate" && (
+                  <span className="inline-flex items-center gap-1">
+                    <span className="text-lg">🟡</span>
+                    <span>Moderate traffic</span>
+                  </span>
+                )}
+                {trafficLevel === "Heavy" && (
+                  <span className="inline-flex items-center gap-1">
+                    <span className="text-lg">🔴</span>
+                    <span>Heavy traffic</span>
+                  </span>
+                )}
+              </p>
+            ) : (
+              <p className="text-sm text-slate-400 mt-1">
+                Not enough recent data yet.
+              </p>
+            )}
+          </div>
+
+          <div className="text-[10px] text-slate-500 text-right max-w-[140px]">
+            Based on recent posts about traffic and time of day.
+          </div>
+        </section>
 
         {/* New Pulse Card */}
         <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-lg p-4 sm:p-5 space-y-4">
@@ -523,7 +927,9 @@ useEffect(() => {
                     key={m}
                     onClick={() => setMood(m)}
                     className={`text-lg px-1.5 rounded-2xl transition ${
-                      mood === m ? "bg-slate-800 scale-110" : "opacity-70 hover:opacity-100"
+                      mood === m
+                        ? "bg-slate-800 scale-110"
+                        : "opacity-70 hover:opacity-100"
                     }`}
                   >
                     {m}
@@ -562,24 +968,22 @@ useEffect(() => {
               className="w-full rounded-2xl bg-slate-950/80 border border-slate-800 px-3 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent resize-none"
               placeholder="What’s the vibe right now? (e.g., 'Commute is smooth on 183, sunset looks insane.')"
             />
-              <div className="flex items-center justify-between text-[11px] mt-1">
-                <span className="text-slate-500">
-                  {message.length}/{MAX_MESSAGE_LENGTH}
-                </span>
-                {validationError && (
-                  <span className="text-red-400">
-                    {validationError}
-                  </span>
-                )}
-              </div>
+            <div className="flex items-center justify-between text-[11px] mt-1">
+              <span className="text-slate-500">
+                {message.length}/{MAX_MESSAGE_LENGTH}
+              </span>
+              {validationError && (
+                <span className="text-red-400">{validationError}</span>
+              )}
+            </div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] text-slate-500">
-              Posting as{" "}
-              <span className="text-slate-200">
-                {username || "…"}
-              </span>
-              . Pulses are public. Keep it kind & useful
+                Posting as{" "}
+                <span className="text-slate-200">
+                  {username || "…"}
                 </span>
+                . Pulses are public. Keep it kind & useful.
+              </span>
               <button
                 onClick={handleAddPulse}
                 disabled={!message.trim() || loading}
@@ -596,34 +1000,34 @@ useEffect(() => {
             </p>
           )}
         </section>
-        
-          {/* AI Summary Section */}
-<div className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 space-y-3">
-  <div className="flex items-center justify-between">
-    <h2 className="text-sm font-medium text-slate-200">
-      AI Summary for {city}
-    </h2>
-    <span className="text-[11px] text-slate-400">
-      {summaryLoading
-        ? "Summarizing recent pulses…"
-        : "Auto-generated from recent pulses"}
-    </span>
-  </div>
 
-  {summaryError && (
-    <p className="text-xs text-red-400">{summaryError}</p>
-  )}
+        {/* AI Summary Section */}
+        <div className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium text-slate-200">
+              AI Summary for {city}
+            </h2>
+            <span className="text-[11px] text-slate-400">
+              {summaryLoading
+                ? "Summarizing recent pulses…"
+                : "Auto-generated from recent pulses"}
+            </span>
+          </div>
 
-  {summary ? (
-    <p className="text-sm text-slate-300 leading-relaxed bg-slate-950/60 border border-slate-800 rounded-2xl p-3">
-      {summary}
-    </p>
-  ) : !summaryLoading && pulses.length === 0 ? (
-    <p className="text-xs text-slate-500">
-      No pulses yet. Start posting to see an AI summary here.
-    </p>
-  ) : null}
-</div>
+          {summaryError && (
+            <p className="text-xs text-red-400">{summaryError}</p>
+          )}
+
+          {summary ? (
+            <p className="text-sm text-slate-300 leading-relaxed bg-slate-950/60 border border-slate-800 rounded-2xl p-3">
+              {summary}
+            </p>
+          ) : !summaryLoading && pulses.length === 0 ? (
+            <p className="text-xs text-slate-500">
+              No pulses yet. Start posting to see an AI summary here.
+            </p>
+          ) : null}
+        </div>
 
         {/* Filter chips */}
         <div className="flex flex-wrap gap-2">
@@ -641,6 +1045,64 @@ useEffect(() => {
             </button>
           ))}
         </div>
+        
+        {/* Show upcoming events when "Events" tab is active */}
+          {tagFilter === "Events" && (
+            <div className="space-y-2 pb-4">
+              {events.length === 0 ? (
+                <p className="text-xs text-slate-500">
+                  No upcoming events yet for {city}. Create one above.
+                </p>
+              ) : (
+                events.map((ev) => {
+                  const start = new Date(ev.starts_at);
+                  const timeStr = start.toLocaleString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  });
+
+                  const mapsUrl = ev.location
+                    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                        ev.location
+                      )}`
+                    : null;
+
+                  return (
+                    <button
+                      key={ev.id}
+                      type="button"
+                      onClick={() => {
+                        if (mapsUrl) window.open(mapsUrl, "_blank");
+                      }}
+                      className="w-full flex justify-between items-start rounded-2xl bg-slate-950/70 border border-slate-800 px-3 py-2 text-left hover:border-pink-500/60 hover:shadow-pink-500/20 transition"
+                    >
+                      <div>
+                        <p className="text-sm text-slate-100 font-medium">
+                          {ev.title}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {timeStr}
+                          {ev.location ? ` · ${ev.location}` : ""}
+                        </p>
+                        {ev.description && (
+                          <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                            {ev.description}
+                          </p>
+                        )}
+                      </div>
+                      {ev.category && (
+                        <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-300 border border-pink-500/30">
+                          {ev.category}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          )}
 
         {/* Pulses list */}
         <section className="space-y-3 pb-12">
@@ -652,8 +1114,8 @@ useEffect(() => {
           ) : filteredPulses.length === 0 ? (
             <div className="rounded-3xl bg-slate-900/70 border border-dashed border-slate-700 px-4 py-10 text-center text-sm text-slate-400">
               No pulses yet for{" "}
-              <span className="font-semibold text-slate-100">{city}</span>.  
-              Be the first to set the vibe.
+              <span className="font-semibold text-slate-100">{city}</span>. Be
+              the first to set the vibe.
             </div>
           ) : (
             filteredPulses.map((pulse) => (
@@ -678,32 +1140,37 @@ useEffect(() => {
                     <span>
                       {pulse.city} · {pulse.createdAt}
                     </span>
-                    </div>
+                  </div>
                 </div>
               </article>
             ))
           )}
         </section>
+
         {/* Disclaimer */}
         <div className="mt-16 flex justify-center">
           <div className="inline-block bg-slate-900/70 border border-slate-700 rounded-2xl px-4 py-3 max-w-xl text-center">
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              <strong>Disclaimer:</strong> Community Pulse displays user-submitted content.
-              Posts may be inaccurate, incomplete, or misleading. Do not rely on this
-              information for safety, travel, emergency, or decision-making purposes.
-              All posts reflect the views of individual users, not the app’s creators.
-              By using this service, you agree that Community Pulse is not responsible
-              for any actions taken based on user content.
+              <strong>Disclaimer:</strong> Community Pulse displays
+              user-submitted content. Posts may be inaccurate, incomplete, or
+              misleading. Do not rely on this information for safety, travel,
+              emergency, or decision-making purposes. All posts reflect the
+              views of individual users, not the app’s creators. By using this
+              service, you agree that Community Pulse is not responsible for any
+              actions taken based on user content.
             </p>
           </div>
         </div>
 
         {/* Footer */}
         <footer className="text-center text-xs text-slate-500 pt-10 pb-6">
-          <a href="/terms" className="hover:text-pink-400 mr-4">Terms</a>
-          <a href="/privacy" className="hover:text-pink-400">Privacy</a>
+          <a href="/terms" className="hover:text-pink-400 mr-4">
+            Terms
+          </a>
+          <a href="/privacy" className="hover:text-pink-400">
+            Privacy
+          </a>
         </footer>
-
       </div>
     </div>
   );
