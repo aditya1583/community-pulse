@@ -32,6 +32,14 @@ type Pulse = {
   createdAt: string;
 };
 
+// GLOBAL POSTING STEAK
+
+type StreakInfo = {
+  currentStreak: number;
+  lastActiveDate: string | null;
+};
+
+
 // Saved Favorites
 type FavoritePulseId = number;
 
@@ -123,6 +131,12 @@ export default function Home() {
   // Auth + anon profile
   const [sessionUser, setSessionUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<{ anon_name: string } | null>(null);
+
+  // USER STREAK
+
+  const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
+  const [streakLoading, setStreakLoading] = useState(false);
+
 
   // Saved Favorites
   const [favoritePulseIds, setFavoritePulseIds] = useState<FavoritePulseId[]>(
@@ -380,6 +394,94 @@ useEffect(() => {
 
     loadUser();
   }, []);
+
+  // USER STREAK
+
+    useEffect(() => {
+    if (!sessionUser) {
+      setStreakInfo(null);
+      return;
+    }
+
+    async function loadStreak() {
+      try {
+        setStreakLoading(true);
+
+        // Grab up to 365 days of posts for this user
+        const { data, error } = await supabase
+          .from("pulses")
+          .select("created_at")
+          .eq("user_id", sessionUser.id)
+          .order("created_at", { ascending: false })
+          .limit(365);
+
+        if (error) {
+          console.error("Error loading streak data:", error);
+          return;
+        }
+
+        const rows = data || [];
+        if (rows.length === 0) {
+          setStreakInfo({ currentStreak: 0, lastActiveDate: null });
+          return;
+        }
+
+        // Convert to local YYYY-MM-DD strings & dedupe
+        const dateStrings = Array.from(
+          new Set(
+            rows.map((row: { created_at: string }) => {
+              const d = new Date(row.created_at);
+              // ISO-like local date (yyyy-mm-dd)
+              return d.toLocaleDateString("en-CA");
+            })
+          )
+        ).sort((a, b) => (a < b ? 1 : -1)); // newest first
+
+        const today = new Date();
+        const todayStr = today.toLocaleDateString("en-CA");
+
+        let streak = 0;
+        let offsetDays = 0;
+
+        function offsetDate(days: number) {
+          const d = new Date();
+          d.setDate(d.getDate() - days);
+          return d.toLocaleDateString("en-CA");
+        }
+
+        for (const dayStr of dateStrings) {
+          const expected = offsetDate(offsetDays);
+
+          if (dayStr === expected) {
+            streak += 1;
+            offsetDays += 1;
+          } else {
+            // If the very first day is yesterday (no post today)
+            if (streak === 0 && dayStr === offsetDate(1) && todayStr !== dayStr) {
+              streak = 1;
+              offsetDays = 2;
+            } else {
+              break;
+            }
+          }
+        }
+
+        const lastActive = dateStrings[0] ?? null;
+
+        setStreakInfo({
+          currentStreak: streak,
+          lastActiveDate: lastActive,
+        });
+      } catch (err) {
+        console.error("Unexpected error loading streak:", err);
+      } finally {
+        setStreakLoading(false);
+      }
+    }
+
+    loadStreak();
+  }, [sessionUser]);
+
 
   // ========= LOAD FAVORITES FOR USER =========
 useEffect(() => {
@@ -735,7 +837,17 @@ async function handleToggleFavorite(pulseId: number) {
           </button>
         ) : (
           <div className="flex items-center justify-end text-sm text-slate-400 ml-4 gap-2">
-            <span>{profile?.anon_name || "Loading..."}</span>
+            <div className="flex items-center gap-2">
+              <span>{displayName}</span>
+
+              {streakInfo && streakInfo.currentStreak > 0 && (
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-300 border border-orange-400/40 flex items-center gap-1">
+                  <span>🔥</span>
+                  <span>{streakInfo.currentStreak}-day streak</span>
+                </span>
+              )}
+            </div>
+
             <button
               onClick={async () => {
                 await supabase.auth.signOut();
@@ -749,33 +861,32 @@ async function handleToggleFavorite(pulseId: number) {
           </div>
         )}
 
-        <header className="rounded-3xl bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 p-[1px] shadow-lg">
-          <div className="rounded-3xl bg-slate-950/90 px-6 py-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-semibold tracking-tight">
-                Community <span className="text-pink-400">Pulse</span>
-              </h1>
-              <p className="text-sm text-slate-300 mt-1">
-                Real-time vibes from your city. No doom scroll, just quick
-                pulses.
-              </p>
-            </div>
-            <div className="flex flex-col sm:items-end gap-2">
-              <label className="text-xs text-slate-400 uppercase tracking-wide">
-                City
-              </label>
-              <input
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                className="w-full sm:w-40 rounded-2xl bg-slate-900 border border-slate-700 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
-                placeholder="City"
-              />
-              <span className="text-[11px] text-slate-500">
-                (We&apos;ll keep v1 single-city for now)
-              </span>
-            </div>
-          </div>
-        </header>
+<header className="rounded-3xl bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 p-[1px] shadow-lg">
+  <div className="rounded-3xl bg-slate-950/90 px-6 py-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    {/* Left side: title + tagline */}
+    <div>
+      <h1 className="text-3xl font-semibold tracking-tight">
+        Community <span className="text-pink-400">Pulse</span>
+      </h1>
+      <p className="text-sm text-slate-300 mt-1">
+        Real-time vibes from your city. No doom scroll, just quick pulses.
+      </p>
+    </div>
+
+    {/* Right side: city selector only */}
+    <div className="flex flex-col sm:items-end gap-2">
+      <label className="text-xs text-slate-400 uppercase tracking-wide">
+        City
+      </label>
+      <input
+        value={city}
+        onChange={(e) => setCity(e.target.value)}
+        className="w-full sm:w-40 rounded-2xl bg-slate-900 border border-slate-700 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+        placeholder="City"
+      />
+    </div>
+  </div>
+</header>
 
         {/* Weather widget */}
         <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 flex items-center justify-between gap-3">
