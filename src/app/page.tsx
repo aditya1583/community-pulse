@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
 
 const MAX_MESSAGE_LENGTH = 240;
@@ -31,8 +32,10 @@ type Pulse = {
   createdAt: string;
 };
 
-// Real-time Live Updates
+// Saved Favorites
+type FavoritePulseId = number;
 
+// Real-time Live Updates
 type DBPulse = {
   id: number;
   city: string;
@@ -116,6 +119,17 @@ export default function Home() {
   const [tag, setTag] = useState("General");
   const [message, setMessage] = useState("");
   const [pulses, setPulses] = useState<Pulse[]>([]);
+
+  // Auth + anon profile
+  const [sessionUser, setSessionUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<{ anon_name: string } | null>(null);
+
+  // Saved Favorites
+  const [favoritePulseIds, setFavoritePulseIds] = useState<FavoritePulseId[]>(
+    []
+  );
+  const [favoritesLoading, setFavoritesLoading] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -210,12 +224,10 @@ export default function Home() {
     };
   }, [city, pulses]);
 
-  // Real-time feed
-
-  useEffect(() => {
+  // ========= REAL-TIME FEED =========
+useEffect(() => {
   if (!city) return;
 
-  // Create a dedicated channel for this page
   const channel = supabase
     .channel("pulses-realtime")
     .on(
@@ -227,18 +239,12 @@ export default function Home() {
         filter: `city=eq.${city}`,
       },
       (payload) => {
-        // payload.new is the row that was inserted
         const row = payload.new as DBPulse;
-
-        // Safety: ignore if city doesn’t match for any reason
         if (!row || row.city !== city) return;
 
         const pulse = mapDBPulseToPulse(row);
 
-        // Prepend new pulse to the list
         setPulses((prev) => {
-          // Avoid duplicates if we ever re-fetch
-          // const exists = prev.some((p) => p.id === pulse.id);
           const exists = prev.some((p) => String(p.id) === String(pulse.id));
           if (exists) return prev;
 
@@ -250,17 +256,12 @@ export default function Home() {
         });
       }
     )
-    .subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        console.log("Subscribed to realtime pulses for", city);
-      }
-    });
+    .subscribe();
 
-  // Cleanup when city changes or component unmounts
   return () => {
     supabase.removeChannel(channel);
   };
-}, [city, setPulses]);
+}, [city, setPulses]);  // DO NOT CHANGE THIS
 
 
   // ========= CITY MOOD =========
@@ -348,46 +349,110 @@ export default function Home() {
     };
   }, [city]);
 
-  // ========= EVENTS FETCH =========
-useEffect(() => {
-  if (!city) return;
+  // ========= LOAD SESSION + PROFILE =========
+  useEffect(() => {
+    async function loadUser() {
+      const { data: auth } = await supabase.auth.getUser();
+      const user = auth.user;
+      setSessionUser(user);
 
-  async function fetchEvents() {
-    try {
-      setEventsLoading(true);
-      setEventsError(null);
+      if (!user) return;
 
-      const res = await fetch(`/api/events?city=${encodeURIComponent(city)}`);
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
 
-      let data: any = null;
-      try {
-        data = await res.json();
-      } catch {
-        // ignore JSON parse error
+      if (profileData) {
+        setProfile({ anon_name: profileData.anon_name });
+      } else {
+        const anon = generateFunUsername();
+
+        await supabase.from("profiles").insert({
+          id: user.id,
+          anon_name: anon,
+        });
+
+        setProfile({ anon_name: anon });
       }
-
-      if (!res.ok) {
-        console.error("Events API returned error:", data);
-        setEventsError(
-          (data && data.error) || "Unable to load local events right now."
-        );
-        setEvents([]);
-        return;
-      }
-
-      setEvents((data && data.events) || []);
-    } catch (err: any) {
-      console.error("Error fetching events:", err);
-      setEventsError("Unable to load local events right now.");
-      setEvents([]);
-    } finally {
-      setEventsLoading(false);
     }
-  }
 
-  fetchEvents();
-}, [city]);
+    loadUser();
+  }, []);
 
+  // ========= LOAD FAVORITES FOR USER =========
+  useEffect(() => {
+    if (!sessionUser) {
+      setFavoritePulseIds([]);
+      return;
+    }
+
+    async function loadFavorites() {
+      try {
+        setFavoritesLoading(true);
+
+        const { data, error } = await supabase
+          .from("favorites")
+          .select("pulse_id")
+          .eq("user_id", sessionUser.id);
+
+        if (error) {
+          console.error("Error loading favorites:", error);
+          return;
+        }
+
+        const ids = (data || []).map((row: { pulse_id: number }) => row.pulse_id);
+        setFavoritePulseIds(ids);
+      } catch (err) {
+        console.error("Unexpected error loading favorites:", err);
+      } finally {
+        setFavoritesLoading(false);
+      }
+    }
+
+    loadFavorites();
+  }, [sessionUser]);
+
+  // ========= EVENTS FETCH =========
+  useEffect(() => {
+    if (!city) return;
+
+    async function fetchEvents() {
+      try {
+        setEventsLoading(true);
+        setEventsError(null);
+
+        const res = await fetch(`/api/events?city=${encodeURIComponent(city)}`);
+
+        let data: any = null;
+        try {
+          data = await res.json();
+        } catch {
+          // ignore JSON parse error
+        }
+
+        if (!res.ok) {
+          console.error("Events API returned error:", data);
+          setEventsError(
+            (data && data.error) || "Unable to load local events right now."
+          );
+          setEvents([]);
+          return;
+        }
+
+        setEvents((data && data.events) || []);
+      } catch (err: any) {
+        console.error("Error fetching events:", err);
+        setEventsError("Unable to load local events right now.");
+        setEvents([]);
+      } finally {
+        setEventsLoading(false);
+      }
+    }
+
+    fetchEvents();
+  }, [city]);
 
   // ========= LOCAL STORAGE: CITY =========
   useEffect(() => {
@@ -404,7 +469,7 @@ useEffect(() => {
     localStorage.setItem("cp-city", city);
   }, [city]);
 
-  // ========= LOCAL STORAGE: USERNAME =========
+  // ========= LOCAL STORAGE: USERNAME (FALLBACK) =========
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -437,7 +502,7 @@ useEffect(() => {
         setErrorMsg("Could not load pulses. Try again in a bit.");
         setPulses([]);
       } else if (data) {
-        const mapped = data.map((row: any) => ({
+        const mapped: Pulse[] = data.map((row: any) => ({
           id: row.id,
           city: row.city,
           mood: row.mood,
@@ -490,55 +555,98 @@ useEffect(() => {
   }, [city, pulses.length]);
 
   // ========= CREATE EVENT HANDLER =========
-async function handleCreateEvent(e: React.FormEvent) {
-  e.preventDefault();
-  if (!city || !newEventTitle || !newEventTime) return;
+  async function handleCreateEvent(e: React.FormEvent) {
+    e.preventDefault();
+    if (!city || !newEventTitle || !newEventTime) return;
 
-  try {
-    setCreatingEvent(true);
-    setEventCreateError(null);
-
-    const res = await fetch("/api/events", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        city,
-        title: newEventTitle,
-        location: newEventLocation,
-        starts_at: newEventTime,
-      }),
-    });
-
-    let data: any = null;
     try {
-      data = await res.json();
-    } catch {
-      // If body is empty or not JSON, keep data = null
-    }
+      setCreatingEvent(true);
+      setEventCreateError(null);
 
-    if (!res.ok) {
-      const msg =
-        (data && data.error) ||
-        `Failed to create event (status ${res.status})`;
-      throw new Error(msg);
-    }
+      const res = await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          city,
+          title: newEventTitle,
+          location: newEventLocation,
+          starts_at: newEventTime,
+        }),
+      });
 
-    if (data && data.event) {
-      setEvents((prev) => [data.event, ...prev]);
-    }
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        // If body is empty or not JSON, keep data = null
+      }
 
-    setNewEventTitle("");
-    setNewEventLocation("");
-    setNewEventTime("");
-  } catch (err: any) {
-    console.error("Error creating event:", err);
-    setEventCreateError(
-      err?.message || "Unable to create event right now."
-    );
-  } finally {
-    setCreatingEvent(false);
+      if (!res.ok) {
+        const msg =
+          (data && data.error) ||
+          `Failed to create event (status ${res.status})`;
+        throw new Error(msg);
+      }
+
+      if (data && data.event) {
+        setEvents((prev) => [data.event, ...prev]);
+      }
+
+      setNewEventTitle("");
+      setNewEventLocation("");
+      setNewEventTime("");
+    } catch (err: any) {
+      console.error("Error creating event:", err);
+      setEventCreateError(
+        err?.message || "Unable to create event right now."
+      );
+    } finally {
+      setCreatingEvent(false);
+    }
   }
-}
+
+  // ========= FAVORITES TOGGLE HANDLER =========
+  async function handleToggleFavorite(pulseId: number) {
+    if (!sessionUser) {
+      alert("Sign in to save favorites.");
+      return;
+    }
+
+    const alreadyFav = favoritePulseIds.includes(pulseId);
+
+    try {
+      if (alreadyFav) {
+        const { error } = await supabase
+          .from("favorites")
+          .delete()
+          .eq("user_id", sessionUser.id)
+          .eq("pulse_id", pulseId);
+
+        if (error) {
+          console.error("Error removing favorite:", error);
+          return;
+        }
+
+        setFavoritePulseIds((prev) => prev.filter((id) => id !== pulseId));
+      } else {
+        const { error } = await supabase.from("favorites").insert({
+          user_id: sessionUser.id,
+          pulse_id: pulseId,
+        });
+
+        if (error) {
+          console.error("Error adding favorite:", error);
+          return;
+        }
+
+        setFavoritePulseIds((prev) =>
+          prev.includes(pulseId) ? prev : [...prev, pulseId]
+        );
+      }
+    } catch (err) {
+      console.error("Unexpected error toggling favorite:", err);
+    }
+  }
 
   // ========= FILTER PULSES =========
   const filteredPulses = pulses.filter(
@@ -558,6 +666,8 @@ async function handleCreateEvent(e: React.FormEvent) {
     setErrorMsg(null);
     setValidationError(null);
 
+    const authorName = profile?.anon_name || username || "Anonymous";
+
     const { data, error } = await supabase
       .from("pulses")
       .insert([
@@ -566,7 +676,8 @@ async function handleCreateEvent(e: React.FormEvent) {
           mood,
           tag,
           message: trimmed,
-          author: username || "Anonymous",
+          author: authorName,
+          user_id: sessionUser?.id ?? null,
         },
       ])
       .select()
@@ -579,28 +690,56 @@ async function handleCreateEvent(e: React.FormEvent) {
     }
 
     if (data) {
-      const newPulse: Pulse = {
-        id: data.id,
-        city: data.city,
-        mood: data.mood,
-        tag: data.tag,
-        message: data.message,
-        author: data.author || "Anonymous",
-        createdAt: new Date(data.created_at).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      };
-
-      // setPulses((prev) => [newPulse, ...prev]);
+      // Realtime listener will add it to the list
       setMessage("");
     }
   };
+
+  const displayName = profile?.anon_name || username || "…";
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 flex justify-center px-4 py-6">
       <div className="w-full max-w-4xl space-y-6">
         {/* Header */}
+
+        {!sessionUser ? (
+          <button
+            onClick={async () => {
+              const email = prompt("Enter your email for a magic link:");
+              if (!email) return;
+
+              const { error } = await supabase.auth.signInWithOtp({ email });
+
+              if (error) {
+                console.error("Error sending magic link:", error);
+                alert(
+                  error.message ||
+                    "Could not send magic link. Please try again in a bit."
+                );
+              } else {
+                alert("Magic link sent! Check your inbox.");
+              }
+            }}
+            className="text-sm text-pink-300 underline hover:text-pink-200 ml-4"
+          >
+            Sign in
+          </button>
+        ) : (
+          <div className="flex items-center justify-end text-sm text-slate-400 ml-4 gap-2">
+            <span>{profile?.anon_name || "Loading..."}</span>
+            <button
+              onClick={async () => {
+                await supabase.auth.signOut();
+                setSessionUser(null);
+                setProfile(null);
+              }}
+              className="text-xs text-slate-500 hover:text-pink-300 underline"
+            >
+              Log out
+            </button>
+          </div>
+        )}
+
         <header className="rounded-3xl bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 p-[1px] shadow-lg">
           <div className="rounded-3xl bg-slate-950/90 px-6 py-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -692,116 +831,6 @@ async function handleCreateEvent(e: React.FormEvent) {
             </div>
           )}
         </section>
-
-        {/* Local Events + Create Event */}
-        {/* <section className="mt-6 rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-sm font-semibold text-slate-100">
-              Local events in {city || "your city"}
-            </h2>
-            <span className="text-[10px] text-slate-500">Next 7 days</span>
-          </div> */}
-
-          {/* Create Event (MVP) */}
-          {/* <form
-            onSubmit={handleCreateEvent}
-            className="space-y-2 mb-4 rounded-2xl bg-slate-950/70 border border-slate-800 p-3"
-          >
-            <h3 className="text-xs font-semibold text-slate-200 mb-1">
-              Create a local event (demo)
-            </h3>
-            <input
-              className="w-full rounded-xl bg-slate-950/80 border border-slate-700 px-3 py-2 text-sm text-slate-100"
-              placeholder="Event title (e.g., Live jazz at SoCo)"
-              value={newEventTitle}
-              onChange={(e) => setNewEventTitle(e.target.value)}
-            />
-            <input
-              className="w-full rounded-xl bg-slate-950/80 border border-slate-700 px-3 py-2 text-sm text-slate-100"
-              placeholder="Location (e.g., South Congress Ave, Austin, TX)"
-              value={newEventLocation}
-              onChange={(e) => setNewEventLocation(e.target.value)}
-            />
-            <input
-              type="datetime-local"
-              className="w-full rounded-xl bg-slate-950/80 border border-slate-700 px-3 py-2 text-sm text-slate-100"
-              value={newEventTime}
-              onChange={(e) => setNewEventTime(e.target.value)}
-            />
-            {eventCreateError && (
-              <p className="text-xs text-red-400">{eventCreateError}</p>
-            )}
-            <button
-              type="submit"
-              disabled={creatingEvent}
-              className="text-xs px-3 py-1.5 rounded-full bg-pink-500 text-white hover:bg-pink-400 disabled:opacity-50"
-            >
-              {creatingEvent ? "Creating…" : "Post event"}
-            </button>
-            <p className="text-[10px] text-slate-500 mt-1">
-              Demo only – events are not verified or sponsored yet.
-            </p>
-          </form>
-
-          {eventsLoading ? (
-            <p className="text-sm text-slate-400">Finding events…</p>
-          ) : eventsError ? (
-            <p className="text-sm text-red-400">{eventsError}</p>
-          ) : events.length === 0 ? (
-            <p className="text-sm text-slate-400">
-              No upcoming events yet. Someone should start one 😉
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {events.map((ev) => {
-                const start = new Date(ev.starts_at);
-                const timeStr = start.toLocaleString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  hour: "numeric",
-                  minute: "2-digit",
-                });
-
-                const mapsUrl = ev.location
-                  ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                      ev.location
-                    )}`
-                  : null;
-
-                return (
-                  <button
-                    key={ev.id}
-                    type="button"
-                    onClick={() => {
-                      if (mapsUrl) window.open(mapsUrl, "_blank");
-                    }}
-                    className="w-full flex justify-between items-start rounded-2xl bg-slate-950/70 border border-slate-800 px-3 py-2 text-left hover:border-pink-500/60 hover:shadow-pink-500/20 transition"
-                  >
-                    <div>
-                      <p className="text-sm text-slate-100 font-medium">
-                        {ev.title}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        {timeStr}
-                        {ev.location ? ` · ${ev.location}` : ""}
-                      </p>
-                      {ev.description && (
-                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-                          {ev.description}
-                        </p>
-                      )}
-                    </div>
-                    {ev.category && (
-                      <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-300 border border-pink-500/30">
-                        {ev.category}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </section> */}
 
         {/* City Mood Meter */}
         <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 mt-3">
@@ -979,10 +1008,8 @@ async function handleCreateEvent(e: React.FormEvent) {
             <div className="flex items-center justify-between">
               <span className="text-[11px] text-slate-500">
                 Posting as{" "}
-                <span className="text-slate-200">
-                  {username || "…"}
-                </span>
-                . Pulses are public. Keep it kind & useful.
+                <span className="text-slate-200">{displayName}</span>. Pulses
+                are public. Keep it kind & useful.
               </span>
               <button
                 onClick={handleAddPulse}
@@ -993,7 +1020,6 @@ async function handleCreateEvent(e: React.FormEvent) {
               </button>
             </div>
           </div>
-
           {errorMsg && (
             <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/40 rounded-2xl px-3 py-2 mt-1">
               {errorMsg}
@@ -1045,64 +1071,64 @@ async function handleCreateEvent(e: React.FormEvent) {
             </button>
           ))}
         </div>
-        
+
         {/* Show upcoming events when "Events" tab is active */}
-          {tagFilter === "Events" && (
-            <div className="space-y-2 pb-4">
-              {events.length === 0 ? (
-                <p className="text-xs text-slate-500">
-                  No upcoming events yet for {city}. Create one above.
-                </p>
-              ) : (
-                events.map((ev) => {
-                  const start = new Date(ev.starts_at);
-                  const timeStr = start.toLocaleString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    hour: "numeric",
-                    minute: "2-digit",
-                  });
+        {tagFilter === "Events" && (
+          <div className="space-y-2 pb-4">
+            {events.length === 0 ? (
+              <p className="text-xs text-slate-500">
+                No upcoming events yet for {city}. Create one above.
+              </p>
+            ) : (
+              events.map((ev) => {
+                const start = new Date(ev.starts_at);
+                const timeStr = start.toLocaleString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                });
 
-                  const mapsUrl = ev.location
-                    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                        ev.location
-                      )}`
-                    : null;
+                const mapsUrl = ev.location
+                  ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                      ev.location
+                    )}`
+                  : null;
 
-                  return (
-                    <button
-                      key={ev.id}
-                      type="button"
-                      onClick={() => {
-                        if (mapsUrl) window.open(mapsUrl, "_blank");
-                      }}
-                      className="w-full flex justify-between items-start rounded-2xl bg-slate-950/70 border border-slate-800 px-3 py-2 text-left hover:border-pink-500/60 hover:shadow-pink-500/20 transition"
-                    >
-                      <div>
-                        <p className="text-sm text-slate-100 font-medium">
-                          {ev.title}
+                return (
+                  <button
+                    key={ev.id}
+                    type="button"
+                    onClick={() => {
+                      if (mapsUrl) window.open(mapsUrl, "_blank");
+                    }}
+                    className="w-full flex justify-between items-start rounded-2xl bg-slate-950/70 border border-slate-800 px-3 py-2 text-left hover:border-pink-500/60 hover:shadow-pink-500/20 transition"
+                  >
+                    <div>
+                      <p className="text-sm text-slate-100 font-medium">
+                        {ev.title}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {timeStr}
+                        {ev.location ? ` · ${ev.location}` : ""}
+                      </p>
+                      {ev.description && (
+                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                          {ev.description}
                         </p>
-                        <p className="text-xs text-slate-400">
-                          {timeStr}
-                          {ev.location ? ` · ${ev.location}` : ""}
-                        </p>
-                        {ev.description && (
-                          <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-                            {ev.description}
-                          </p>
-                        )}
-                      </div>
-                      {ev.category && (
-                        <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-300 border border-pink-500/30">
-                          {ev.category}
-                        </span>
                       )}
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          )}
+                    </div>
+                    {ev.category && (
+                      <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-300 border border-pink-500/30">
+                        {ev.category}
+                      </span>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        )}
 
         {/* Pulses list */}
         <section className="space-y-3 pb-12">
@@ -1135,11 +1161,26 @@ async function handleCreateEvent(e: React.FormEvent) {
                   <p className="text-sm text-slate-100 leading-snug">
                     {pulse.message}
                   </p>
+
                   <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
-                    <span>{pulse.author}</span>
-                    <span>
-                      {pulse.city} · {pulse.createdAt}
-                    </span>
+                    <span className="text-slate-300">{pulse.author}</span>
+
+                    <div className="flex items-center gap-3">
+                      {/* Favorite star */}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleFavorite(pulse.id)}
+                        className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-yellow-300 transition"
+                      >
+                        <span className="text-base leading-none">
+                          {favoritePulseIds.includes(pulse.id) ? "★" : "☆"}
+                        </span>
+                      </button>
+
+                      <span>
+                        {pulse.city} · {pulse.createdAt}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </article>
