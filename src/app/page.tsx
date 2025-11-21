@@ -382,37 +382,43 @@ useEffect(() => {
   }, []);
 
   // ========= LOAD FAVORITES FOR USER =========
-  useEffect(() => {
-    if (!sessionUser) {
-      setFavoritePulseIds([]);
-      return;
-    }
+useEffect(() => {
+  // derive a stable userId for this effect run
+  const userId = sessionUser?.id;
 
-    async function loadFavorites() {
-      try {
-        setFavoritesLoading(true);
+  // If not logged in, clear favorites
+  if (!userId) {
+    setFavoritePulseIds([]);
+    return;
+  }
 
-        const { data, error } = await supabase
-          .from("favorites")
-          .select("pulse_id")
-          .eq("user_id", sessionUser.id);
+  async function loadFavorites() {
+    try {
+      setFavoritesLoading(true);
 
-        if (error) {
-          console.error("Error loading favorites:", error);
-          return;
-        }
+      const { data, error } = await supabase
+        .from("favorites")
+        .select("pulse_id")
+        .eq("user_id", userId); // use userId, not sessionUser.id
 
-        const ids = (data || []).map((row: { pulse_id: number }) => row.pulse_id);
-        setFavoritePulseIds(ids);
-      } catch (err) {
-        console.error("Unexpected error loading favorites:", err);
-      } finally {
-        setFavoritesLoading(false);
+      if (error) {
+        console.error("Error loading favorites:", error);
+        return;
       }
-    }
 
-    loadFavorites();
-  }, [sessionUser]);
+      const ids = (data || []).map(
+        (row: { pulse_id: number }) => row.pulse_id
+      );
+      setFavoritePulseIds(ids);
+    } catch (err) {
+      console.error("Unexpected error loading favorites:", err);
+    } finally {
+      setFavoritesLoading(false);
+    }
+  }
+
+  loadFavorites();
+}, [sessionUser]);
 
   // ========= EVENTS FETCH =========
   useEffect(() => {
@@ -606,47 +612,50 @@ useEffect(() => {
   }
 
   // ========= FAVORITES TOGGLE HANDLER =========
-  async function handleToggleFavorite(pulseId: number) {
-    if (!sessionUser) {
-      alert("Sign in to save favorites.");
-      return;
-    }
-
-    const alreadyFav = favoritePulseIds.includes(pulseId);
-
-    try {
-      if (alreadyFav) {
-        const { error } = await supabase
-          .from("favorites")
-          .delete()
-          .eq("user_id", sessionUser.id)
-          .eq("pulse_id", pulseId);
-
-        if (error) {
-          console.error("Error removing favorite:", error);
-          return;
-        }
-
-        setFavoritePulseIds((prev) => prev.filter((id) => id !== pulseId));
-      } else {
-        const { error } = await supabase.from("favorites").insert({
-          user_id: sessionUser.id,
-          pulse_id: pulseId,
-        });
-
-        if (error) {
-          console.error("Error adding favorite:", error);
-          return;
-        }
-
-        setFavoritePulseIds((prev) =>
-          prev.includes(pulseId) ? prev : [...prev, pulseId]
-        );
-      }
-    } catch (err) {
-      console.error("Unexpected error toggling favorite:", err);
-    }
+async function handleToggleFavorite(pulseId: number) {
+  // Capture userId once so TS knows it won't change in this function
+  const userId = sessionUser?.id;
+  if (!userId) {
+    alert("Sign in to save favorites.");
+    return;
   }
+
+  const alreadyFav = favoritePulseIds.includes(pulseId);
+
+  try {
+    if (alreadyFav) {
+      const { error } = await supabase
+        .from("favorites")
+        .delete()
+        .eq("user_id", userId)
+        .eq("pulse_id", pulseId);
+
+      if (error) {
+        console.error("Error removing favorite:", error);
+        return;
+      }
+
+      setFavoritePulseIds((prev) => prev.filter((id) => id !== pulseId));
+    } else {
+      const { error } = await supabase.from("favorites").insert({
+        user_id: userId,
+        pulse_id: pulseId,
+      });
+
+      if (error) {
+        console.error("Error adding favorite:", error);
+        return;
+      }
+
+      setFavoritePulseIds((prev) =>
+        prev.includes(pulseId) ? prev : [...prev, pulseId]
+      );
+    }
+  } catch (err) {
+    console.error("Unexpected error toggling favorite:", err);
+  }
+}
+
 
   // ========= FILTER PULSES =========
   const filteredPulses = pulses.filter(
