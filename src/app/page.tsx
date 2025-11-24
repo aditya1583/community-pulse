@@ -117,6 +117,13 @@ function generateFunUsername() {
   return `${mood} ${animal} ${num}`;
 }
 
+type Profile = {
+  anon_name: string;
+  name_locked?: boolean | null;
+};
+
+
+
 export default function Home() {
   // Core state
   const [city, setCity] = useState("Austin");
@@ -130,7 +137,9 @@ export default function Home() {
 
   // Auth + anon profile
   const [sessionUser, setSessionUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<{ anon_name: string } | null>(null);
+  // const [profile, setProfile] = useState<{ anon_name: string } | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+
 
   // USER STREAK
 
@@ -139,10 +148,19 @@ export default function Home() {
 
 
   // Saved Favorites
+    // Saved Favorites
   const [favoritePulseIds, setFavoritePulseIds] = useState<FavoritePulseId[]>(
     []
   );
   const [favoritesLoading, setFavoritesLoading] = useState(false);
+
+  // AI username generator / persona switcher
+  const [usernamePrompt, setUsernamePrompt] = useState("");
+  const [usernameGenerating, setUsernameGenerating] = useState(false);
+  const [usernameErrorMsg, setUsernameErrorMsg] = useState<string | null>(null);
+  const [showUsernameEditor, setShowUsernameEditor] = useState(false);
+  const [lastAnonName, setLastAnonName] = useState<string | null>(null);
+
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -364,7 +382,7 @@ useEffect(() => {
   }, [city]);
 
   // ========= LOAD SESSION + PROFILE =========
-  useEffect(() => {
+    useEffect(() => {
     async function loadUser() {
       const { data: auth } = await supabase.auth.getUser();
       const user = auth.user;
@@ -379,21 +397,29 @@ useEffect(() => {
         .single();
 
       if (profileData) {
-        setProfile({ anon_name: profileData.anon_name });
+        setProfile({
+          anon_name: profileData.anon_name,
+          name_locked: profileData.name_locked ?? false,
+        });
       } else {
         const anon = generateFunUsername();
 
         await supabase.from("profiles").insert({
           id: user.id,
           anon_name: anon,
+          name_locked: false,
         });
 
-        setProfile({ anon_name: anon });
+        setProfile({
+          anon_name: anon,
+          name_locked: false,
+        });
       }
     }
 
     loadUser();
   }, []);
+
 
   // USER STREAK
 useEffect(() => {
@@ -760,6 +786,133 @@ async function handleToggleFavorite(pulseId: number) {
   }
 }
 
+  async function handleLockUsername() {
+    if (!sessionUser || !profile) return;
+
+    try {
+      setUsernameGenerating(true);
+      setUsernameErrorMsg(null);
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ name_locked: true })
+        .eq("id", sessionUser.id);
+
+      if (error) {
+        console.error("Error locking username:", error);
+        setUsernameErrorMsg("Could not lock name right now. Try again.");
+        return;
+      }
+
+      setProfile((prev) =>
+        prev ? { ...prev, name_locked: true } : prev
+      );
+    } catch (err) {
+      console.error("Unexpected error locking username:", err);
+      setUsernameErrorMsg("Could not lock name right now.");
+    } finally {
+      setUsernameGenerating(false);
+    }
+  }
+
+
+
+  // ========= AI USERNAME GENERATOR HANDLERS =========
+  async function handleGenerateUsername() {
+  
+    const prompt = usernamePrompt.trim();
+    if (!sessionUser) return;
+
+    if (profile?.name_locked) {
+      setUsernameErrorMsg("Your anonymous name is locked and can't be changed.");
+      return;
+    }
+
+    const wordCount = prompt.split(/\s+/).filter(Boolean).length;
+    if (wordCount < 3) {
+      setUsernameErrorMsg("Use at least 3 words to describe your vibe.");
+      return;
+    }
+
+    try {
+      setUsernameGenerating(true);
+      setUsernameErrorMsg(null);
+
+      const res = await fetch("/api/username", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.username) {
+        throw new Error(data.error || "Could not generate username.");
+      }
+
+      const newName: string = data.username;
+
+      // Remember previous name so user can undo
+      setLastAnonName(profile?.anon_name || username || null);
+
+      const updatedProfileName = newName;
+
+      setProfile((prev) =>
+        prev
+          ? { ...prev, anon_name: updatedProfileName }
+          : { anon_name: updatedProfileName }
+      );
+      setUsername(updatedProfileName);
+
+      // Persist to Supabase profile
+      const userId = sessionUser.id;
+      const { error } = await supabase
+        .from("profiles")
+        .update({ anon_name: updatedProfileName })
+        .eq("id", userId);
+
+      if (error) {
+        console.error("Error updating profile anon_name:", error);
+      }
+    } catch (err: any) {
+      console.error("Error generating username:", err);
+      setUsernameErrorMsg(
+        err?.message || "Unable to generate a name right now."
+      );
+    } finally {
+      setUsernameGenerating(false);
+    }
+  }
+
+  async function handleRevertUsername() {
+    if (!sessionUser || !lastAnonName) return;
+
+    try {
+      setUsernameGenerating(true);
+      setUsernameErrorMsg(null);
+
+      setProfile((prev) =>
+        prev ? { ...prev, anon_name: lastAnonName } : { anon_name: lastAnonName }
+      );
+      setUsername(lastAnonName);
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ anon_name: lastAnonName })
+        .eq("id", sessionUser.id);
+
+      if (error) {
+        console.error("Error reverting anon_name:", error);
+      } else {
+        setLastAnonName(null);
+      }
+    } catch (err) {
+      console.error("Error reverting username:", err);
+      setUsernameErrorMsg("Unable to revert name right now.");
+    } finally {
+      setUsernameGenerating(false);
+    }
+  }
 
   // ========= FILTER PULSES =========
   const filteredPulses = pulses.filter(
@@ -839,27 +992,94 @@ async function handleToggleFavorite(pulseId: number) {
           </button>
         ) : (
           <div className="flex items-center justify-end text-sm text-slate-400 ml-4 gap-2">
-            <div className="flex items-center gap-2">
-              <span>{displayName}</span>
+            <div className="flex flex-col items-end gap-0.5">
+              <div className="flex items-center gap-2">
+                <span>{displayName}</span>
 
-              {streakInfo && streakInfo.currentStreak > 0 && (
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-300 border border-orange-400/40 flex items-center gap-1">
-                  <span>🔥</span>
-                  <span>{streakInfo.currentStreak}-day streak</span>
-                </span>
-              )}
+                {!profile?.name_locked ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowUsernameEditor((prev) => !prev)}
+                    className="text-[11px] px-2 py-0.5 rounded-full bg-slate-900/80 border border-slate-700 text-slate-300 hover:border-pink-400 hover:text-pink-300 transition"
+                  >
+                    🎲 Edit vibe name
+                  </button>
+                ) : (
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-900/80 border border-emerald-500/50 text-emerald-300 flex items-center gap-1">
+                    <span>🔒</span>
+                    <span>Username locked</span>
+                  </span>
+                )}
+
+              </div>
+
+              <button
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  setSessionUser(null);
+                  setProfile(null);
+                }}
+                className="text-[11px] text-slate-500 hover:text-pink-300 underline"
+              >
+                Log out
+              </button>
             </div>
+          </div>
+        )}
 
-            <button
-              onClick={async () => {
-                await supabase.auth.signOut();
-                setSessionUser(null);
-                setProfile(null);
-              }}
-              className="text-xs text-slate-500 hover:text-pink-300 underline"
-            >
-              Log out
-            </button>
+        {sessionUser && showUsernameEditor && (
+          <div className="mt-3 mx-4 rounded-2xl bg-slate-900/80 border border-slate-800 px-4 py-3 text-xs text-slate-200">
+            <p className="text-[11px] text-slate-300 mb-2">
+              Describe your vibe in <span className="font-semibold">3+ words</span>, and we&apos;ll craft a fun anonymous name for you.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+              <input
+                value={usernamePrompt}
+                onChange={(e) => setUsernamePrompt(e.target.value)}
+                placeholder="e.g. sleepy sarcastic overcaffeinated"
+                className="flex-1 rounded-2xl bg-slate-950/80 border border-slate-800 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+              />
+                            <div className="flex gap-2 items-center">
+                <button
+                  type="button"
+                  onClick={handleGenerateUsername}
+                  disabled={
+                    usernameGenerating ||
+                    profile?.name_locked ||
+                    usernamePrompt.trim().split(/\s+/).filter(Boolean).length < 3
+                  }
+                  className="inline-flex items-center gap-1 rounded-2xl bg-pink-500 px-3 py-1.5 text-[11px] font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                  <span>{usernameGenerating ? "Rolling…" : "Roll"}</span>
+                  <span>🎲</span>
+                </button>
+                {lastAnonName && lastAnonName !== displayName && !profile?.name_locked && (
+                  <button
+                    type="button"
+                    onClick={handleRevertUsername}
+                    className="text-[11px] text-slate-400 hover:text-slate-200 underline-offset-2 hover:underline"
+                  >
+                    Undo
+                  </button>
+                )}
+                {!profile?.name_locked && (
+                  <button
+                    type="button"
+                    onClick={handleLockUsername}
+                    className="text-[11px] px-2 py-1 rounded-2xl bg-emerald-500/15 border border-emerald-500/60 text-emerald-200 hover:bg-emerald-500/25 transition"
+                  >
+                    Lock this name
+                  </button>
+                )}
+              </div>
+
+            </div>
+            {usernameErrorMsg && (
+              <p className="mt-1 text-[11px] text-red-400">{usernameErrorMsg}</p>
+            )}
+            <p className="mt-1 text-[11px] text-slate-400">
+              Current name: <span className="text-slate-100">{displayName}</span>
+            </p>
           </div>
         )}
 
