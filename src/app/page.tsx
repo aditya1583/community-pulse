@@ -396,91 +396,93 @@ useEffect(() => {
   }, []);
 
   // USER STREAK
+useEffect(() => {
+  // capture userId once for this effect run
+  const userId = sessionUser?.id;
 
-    useEffect(() => {
-    if (!sessionUser) {
-      setStreakInfo(null);
-      return;
-    }
+  if (!userId) {
+    setStreakInfo(null);
+    return;
+  }
 
-    async function loadStreak() {
-      try {
-        setStreakLoading(true);
+  async function loadStreak() {
+    try {
+      setStreakLoading(true);
 
-        // Grab up to 365 days of posts for this user
-        const { data, error } = await supabase
-          .from("pulses")
-          .select("created_at")
-          .eq("user_id", sessionUser.id)
-          .order("created_at", { ascending: false })
-          .limit(365);
+      // Grab up to 365 days of posts for this user
+      const { data, error } = await supabase
+        .from("pulses")
+        .select("created_at")
+        .eq("user_id", userId) // ✅ use userId instead of sessionUser.id
+        .order("created_at", { ascending: false })
+        .limit(365);
 
-        if (error) {
-          console.error("Error loading streak data:", error);
-          return;
-        }
+      if (error) {
+        console.error("Error loading streak data:", error);
+        return;
+      }
 
-        const rows = data || [];
-        if (rows.length === 0) {
-          setStreakInfo({ currentStreak: 0, lastActiveDate: null });
-          return;
-        }
+      const rows = data || [];
+      if (rows.length === 0) {
+        setStreakInfo({ currentStreak: 0, lastActiveDate: null });
+        return;
+      }
 
-        // Convert to local YYYY-MM-DD strings & dedupe
-        const dateStrings = Array.from(
-          new Set(
-            rows.map((row: { created_at: string }) => {
-              const d = new Date(row.created_at);
-              // ISO-like local date (yyyy-mm-dd)
-              return d.toLocaleDateString("en-CA");
-            })
-          )
-        ).sort((a, b) => (a < b ? 1 : -1)); // newest first
+      // Convert to local YYYY-MM-DD strings & dedupe
+      const dateStrings = Array.from(
+        new Set(
+          rows.map((row: { created_at: string }) => {
+            const d = new Date(row.created_at);
+            // ISO-like local date (yyyy-mm-dd)
+            return d.toLocaleDateString("en-CA");
+          })
+        )
+      ).sort((a, b) => (a < b ? 1 : -1)); // newest first
 
-        const today = new Date();
-        const todayStr = today.toLocaleDateString("en-CA");
+      const today = new Date();
+      const todayStr = today.toLocaleDateString("en-CA");
 
-        let streak = 0;
-        let offsetDays = 0;
+      let streak = 0;
+      let offsetDays = 0;
 
-        function offsetDate(days: number) {
-          const d = new Date();
-          d.setDate(d.getDate() - days);
-          return d.toLocaleDateString("en-CA");
-        }
+      function offsetDate(days: number) {
+        const d = new Date();
+        d.setDate(d.getDate() - days);
+        return d.toLocaleDateString("en-CA");
+      }
 
-        for (const dayStr of dateStrings) {
-          const expected = offsetDate(offsetDays);
+      for (const dayStr of dateStrings) {
+        const expected = offsetDate(offsetDays);
 
-          if (dayStr === expected) {
-            streak += 1;
-            offsetDays += 1;
+        if (dayStr === expected) {
+          streak += 1;
+          offsetDays += 1;
+        } else {
+          if (streak === 0 && dayStr === offsetDate(1) && todayStr !== dayStr) {
+            streak = 1;
+            offsetDays = 2;
           } else {
-            // If the very first day is yesterday (no post today)
-            if (streak === 0 && dayStr === offsetDate(1) && todayStr !== dayStr) {
-              streak = 1;
-              offsetDays = 2;
-            } else {
-              break;
-            }
+            break;
           }
         }
-
-        const lastActive = dateStrings[0] ?? null;
-
-        setStreakInfo({
-          currentStreak: streak,
-          lastActiveDate: lastActive,
-        });
-      } catch (err) {
-        console.error("Unexpected error loading streak:", err);
-      } finally {
-        setStreakLoading(false);
       }
-    }
 
-    loadStreak();
-  }, [sessionUser]);
+      const lastActive = dateStrings[0] ?? null;
+
+      setStreakInfo({
+        currentStreak: streak,
+        lastActiveDate: lastActive,
+      });
+    } catch (err) {
+      console.error("Unexpected error loading streak:", err);
+    } finally {
+      setStreakLoading(false);
+    }
+  }
+
+  loadStreak();
+}, [sessionUser]);
+
 
 
   // ========= LOAD FAVORITES FOR USER =========
