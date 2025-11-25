@@ -1288,7 +1288,10 @@ async function handleToggleFavorite(pulseId: number) {
               Drop a <span className="text-pink-400">pulse</span>
             </h2>
             <div className="flex items-center gap-1 text-xs text-slate-400">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span
+                aria-label="Live updates"
+                className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"
+              />
               {loading ? "Loading…" : "Live board"}
             </div>
           </div>
