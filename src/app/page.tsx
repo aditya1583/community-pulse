@@ -127,6 +127,7 @@ type Profile = {
 export default function Home() {
   // Core state
   const [city, setCity] = useState("Austin");
+  const [isNightMode, setIsNightMode] = useState(false);
   const [tagFilter, setTagFilter] = useState("All");
   const [username, setUsername] = useState<string>("");
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -604,6 +605,19 @@ useEffect(() => {
     if (!city) return;
     localStorage.setItem("cp-city", city);
   }, [city]);
+
+  // ========= LOCAL TIME: NIGHT MODE INDICATOR =========
+  useEffect(() => {
+    const updateNightMode = () => {
+      const hour = new Date().getHours();
+      setIsNightMode(hour >= 20 || hour < 6);
+    };
+
+    updateNightMode();
+    const interval = setInterval(updateNightMode, 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // ========= LOCAL STORAGE: USERNAME (FALLBACK) =========
   useEffect(() => {
@@ -1102,9 +1116,17 @@ async function handleToggleFavorite(pulseId: number) {
 
     {/* Right side: city selector only */}
     <div className="flex flex-col sm:items-end gap-2">
-      <label className="text-xs text-slate-400 uppercase tracking-wide">
-        City
-      </label>
+      <div className="flex items-center justify-between gap-3 w-full sm:justify-end">
+        <label className="text-xs text-slate-400 uppercase tracking-wide">
+          City
+        </label>
+        {isNightMode && (
+          <div className="flex items-center gap-1 rounded-2xl border border-indigo-500/40 bg-indigo-500/10 px-2 py-1 text-xs text-indigo-100">
+            <span aria-hidden>🌙</span>
+            <span>Night mode</span>
+          </div>
+        )}
+      </div>
       <input
         value={city}
         onChange={(e) => setCity(e.target.value)}
