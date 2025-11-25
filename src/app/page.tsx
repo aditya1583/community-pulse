@@ -1087,8 +1087,13 @@ async function handleToggleFavorite(pulseId: number) {
   <div className="rounded-3xl bg-slate-950/90 px-6 py-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
     {/* Left side: title + tagline */}
     <div>
-      <h1 className="text-3xl font-semibold tracking-tight">
-        Community <span className="text-pink-400">Pulse</span>
+      <h1 className="text-3xl font-semibold tracking-tight flex flex-wrap items-center gap-2 sm:flex-nowrap">
+        <span>
+          Community <span className="text-pink-400">Pulse</span>
+        </span>
+        <span className="px-2 py-0.5 text-[10px] rounded-full bg-amber-500/20 text-amber-300 uppercase tracking-wide">
+          Beta
+        </span>
       </h1>
       <p className="text-sm text-slate-300 mt-1">
         Real-time vibes from your city. No doom scroll, just quick pulses.
