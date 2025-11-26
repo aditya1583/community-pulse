@@ -964,9 +964,10 @@ async function handleToggleFavorite(pulseId: number) {
   const displayName = profile?.anon_name || username || "…";
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 flex justify-center px-4 py-6">
-      <div className="w-full max-w-4xl space-y-6">
-        {/* Header */}
+    <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col">
+      <main className="flex-1 flex justify-center px-4 py-6">
+        <div className="w-full max-w-4xl space-y-6">
+          {/* Header */}
 
         {!sessionUser ? (
           <button
@@ -1535,31 +1536,36 @@ async function handleToggleFavorite(pulseId: number) {
           )}
         </section>
 
-        {/* Disclaimer */}
-        <div className="mt-16 flex justify-center">
-          <div className="inline-block bg-slate-900/70 border border-slate-700 rounded-2xl px-4 py-3 max-w-xl text-center">
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              <strong>Disclaimer:</strong> Community Pulse displays
-              user-submitted content. Posts may be inaccurate, incomplete, or
-              misleading. Do not rely on this information for safety, travel,
-              emergency, or decision-making purposes. All posts reflect the
-              views of individual users, not the app’s creators. By using this
-              service, you agree that Community Pulse is not responsible for any
-              actions taken based on user content.
-            </p>
+          {/* Disclaimer */}
+          <div className="mt-16 flex justify-center">
+            <div className="inline-block bg-slate-900/70 border border-slate-700 rounded-2xl px-4 py-3 max-w-xl text-center">
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                <strong>Disclaimer:</strong> Community Pulse displays
+                user-submitted content. Posts may be inaccurate, incomplete, or
+                misleading. Do not rely on this information for safety, travel,
+                emergency, or decision-making purposes. All posts reflect the
+                views of individual users, not the app’s creators. By using this
+                service, you agree that Community Pulse is not responsible for
+                any actions taken based on user content.
+              </p>
+            </div>
           </div>
         </div>
+      </main>
 
-        {/* Footer */}
-        <footer className="text-center text-xs text-slate-500 pt-10 pb-6">
-          <a href="/terms" className="hover:text-pink-400 mr-4">
-            Terms
-          </a>
-          <a href="/privacy" className="hover:text-pink-400">
-            Privacy
-          </a>
-        </footer>
-      </div>
+      <footer className="border-t border-slate-800/60 bg-slate-950">
+        <div className="max-w-4xl mx-auto px-4 py-6 text-[11px] text-slate-400 flex flex-col items-center gap-2 text-center sm:flex-row sm:justify-between sm:text-left">
+          <span>Community Pulse · v0.3 · Built for local vibes</span>
+          <div className="flex items-center gap-4">
+            <a href="/terms" className="hover:text-slate-200 transition-colors">
+              Terms
+            </a>
+            <a href="/privacy" className="hover:text-slate-200 transition-colors">
+              Privacy
+            </a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
