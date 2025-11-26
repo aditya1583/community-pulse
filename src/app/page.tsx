@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
 
@@ -66,18 +67,6 @@ function mapDBPulseToPulse(row: DBPulse): Pulse {
   };
 }
 
-// EVENTS
-type EventItem = {
-  id: string;
-  title: string;
-  description?: string | null;
-  location?: string | null;
-  category?: string | null;
-  starts_at: string;
-  ends_at?: string | null;
-  is_sponsored?: boolean | null;
-};
-
 // CITY MOOD
 type MoodScore = {
   mood: string;
@@ -85,7 +74,7 @@ type MoodScore = {
   percent: number;
 };
 
-const TAGS = ["All", "Traffic", "Weather", "Events", "General"];
+const TAGS = ["All", "Traffic", "Weather", "General"];
 const MOODS = ["😊", "😐", "😢", "😡", "😴", "🤩"];
 
 function generateFunUsername() {
@@ -164,17 +153,6 @@ export default function Home() {
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  // Events state
-  const [events, setEvents] = useState<EventItem[]>([]);
-  const [eventsLoading, setEventsLoading] = useState(false);
-  const [eventsError, setEventsError] = useState<string | null>(null);
-
-  const [newEventTitle, setNewEventTitle] = useState("");
-  const [newEventLocation, setNewEventLocation] = useState("");
-  const [newEventTime, setNewEventTime] = useState(""); // datetime-local value
-  const [creatingEvent, setCreatingEvent] = useState(false);
-  const [eventCreateError, setEventCreateError] = useState<string | null>(null);
 
   // Traffic
   const [trafficLevel, setTrafficLevel] =
@@ -550,46 +528,6 @@ useEffect(() => {
   loadFavorites();
 }, [sessionUser]);
 
-  // ========= EVENTS FETCH =========
-  useEffect(() => {
-    if (!city) return;
-
-    async function fetchEvents() {
-      try {
-        setEventsLoading(true);
-        setEventsError(null);
-
-        const res = await fetch(`/api/events?city=${encodeURIComponent(city)}`);
-
-        let data: any = null;
-        try {
-          data = await res.json();
-        } catch {
-          // ignore JSON parse error
-        }
-
-        if (!res.ok) {
-          console.error("Events API returned error:", data);
-          setEventsError(
-            (data && data.error) || "Unable to load local events right now."
-          );
-          setEvents([]);
-          return;
-        }
-
-        setEvents((data && data.events) || []);
-      } catch (err: any) {
-        console.error("Error fetching events:", err);
-        setEventsError("Unable to load local events right now.");
-        setEvents([]);
-      } finally {
-        setEventsLoading(false);
-      }
-    }
-
-    fetchEvents();
-  }, [city]);
-
   // ========= LOCAL STORAGE: CITY =========
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -689,57 +627,6 @@ useEffect(() => {
 
     fetchTraffic();
   }, [city, pulses.length]);
-
-  // ========= CREATE EVENT HANDLER =========
-  async function handleCreateEvent(e: React.FormEvent) {
-    e.preventDefault();
-    if (!city || !newEventTitle || !newEventTime) return;
-
-    try {
-      setCreatingEvent(true);
-      setEventCreateError(null);
-
-      const res = await fetch("/api/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          city,
-          title: newEventTitle,
-          location: newEventLocation,
-          starts_at: newEventTime,
-        }),
-      });
-
-      let data: any = null;
-      try {
-        data = await res.json();
-      } catch {
-        // If body is empty or not JSON, keep data = null
-      }
-
-      if (!res.ok) {
-        const msg =
-          (data && data.error) ||
-          `Failed to create event (status ${res.status})`;
-        throw new Error(msg);
-      }
-
-      if (data && data.event) {
-        setEvents((prev) => [data.event, ...prev]);
-      }
-
-      setNewEventTitle("");
-      setNewEventLocation("");
-      setNewEventTime("");
-    } catch (err: any) {
-      console.error("Error creating event:", err);
-      setEventCreateError(
-        err?.message || "Unable to create event right now."
-      );
-    } finally {
-      setCreatingEvent(false);
-    }
-  }
 
   // ========= FAVORITES TOGGLE HANDLER =========
 async function handleToggleFavorite(pulseId: number) {
@@ -1100,17 +987,28 @@ async function handleToggleFavorite(pulseId: number) {
       </p>
     </div>
 
-    {/* Right side: city selector only */}
-    <div className="flex flex-col sm:items-end gap-2">
-      <label className="text-xs text-slate-400 uppercase tracking-wide">
-        City
-      </label>
-      <input
-        value={city}
-        onChange={(e) => setCity(e.target.value)}
-        className="w-full sm:w-40 rounded-2xl bg-slate-900 border border-slate-700 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
-        placeholder="City"
-      />
+    {/* Right side: nav + city selector */}
+    <div className="flex flex-col sm:items-end gap-3 w-full sm:w-auto">
+      <div className="flex items-center gap-2 self-start sm:self-end">
+        <Link
+          href="/events"
+          className="inline-flex items-center gap-2 rounded-2xl bg-slate-100/10 border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-50 hover:bg-slate-100/20 transition"
+        >
+          <span>Events</span>
+          <span aria-hidden>→</span>
+        </Link>
+      </div>
+      <div className="flex flex-col sm:items-end gap-2 w-full sm:w-auto">
+        <label className="text-xs text-slate-400 uppercase tracking-wide">
+          City
+        </label>
+        <input
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
+          className="w-full sm:w-40 rounded-2xl bg-slate-900 border border-slate-700 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+          placeholder="City"
+        />
+      </div>
     </div>
   </div>
 </header>
@@ -1324,7 +1222,6 @@ async function handleToggleFavorite(pulseId: number) {
               >
                 <option>Traffic</option>
                 <option>Weather</option>
-                <option>Events</option>
                 <option>General</option>
               </select>
             </div>
@@ -1418,64 +1315,6 @@ async function handleToggleFavorite(pulseId: number) {
             </button>
           ))}
         </div>
-
-        {/* Show upcoming events when "Events" tab is active */}
-        {tagFilter === "Events" && (
-          <div className="space-y-2 pb-4">
-            {events.length === 0 ? (
-              <p className="text-xs text-slate-500">
-                No upcoming events yet for {city}. Create one above.
-              </p>
-            ) : (
-              events.map((ev) => {
-                const start = new Date(ev.starts_at);
-                const timeStr = start.toLocaleString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  hour: "numeric",
-                  minute: "2-digit",
-                });
-
-                const mapsUrl = ev.location
-                  ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                      ev.location
-                    )}`
-                  : null;
-
-                return (
-                  <button
-                    key={ev.id}
-                    type="button"
-                    onClick={() => {
-                      if (mapsUrl) window.open(mapsUrl, "_blank");
-                    }}
-                    className="w-full flex justify-between items-start rounded-2xl bg-slate-950/70 border border-slate-800 px-3 py-2 text-left hover:border-pink-500/60 hover:shadow-pink-500/20 transition"
-                  >
-                    <div>
-                      <p className="text-sm text-slate-100 font-medium">
-                        {ev.title}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        {timeStr}
-                        {ev.location ? ` · ${ev.location}` : ""}
-                      </p>
-                      {ev.description && (
-                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-                          {ev.description}
-                        </p>
-                      )}
-                    </div>
-                    {ev.category && (
-                      <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-300 border border-pink-500/30">
-                        {ev.category}
-                      </span>
-                    )}
-                  </button>
-                );
-              })
-            )}
-          </div>
-        )}
 
         {/* Pulses list */}
         <section className="space-y-3 pb-12">
