@@ -120,6 +120,7 @@ function generateFunUsername() {
 type Profile = {
   anon_name: string;
   name_locked?: boolean | null;
+  home_city?: string | null;
 };
 
 
@@ -139,6 +140,10 @@ export default function Home() {
   const [sessionUser, setSessionUser] = useState<User | null>(null);
   // const [profile, setProfile] = useState<{ anon_name: string } | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [homeCityInput, setHomeCityInput] = useState("");
+  const [homeCitySaving, setHomeCitySaving] = useState(false);
+  const [homeCityMessage, setHomeCityMessage] = useState<string | null>(null);
 
 
   // USER STREAK
@@ -382,7 +387,7 @@ useEffect(() => {
   }, [city]);
 
   // ========= LOAD SESSION + PROFILE =========
-    useEffect(() => {
+  useEffect(() => {
     async function loadUser() {
       const { data: auth } = await supabase.auth.getUser();
       const user = auth.user;
@@ -390,124 +395,155 @@ useEffect(() => {
 
       if (!user) return;
 
-      const { data: profileData } = await supabase
+      const { data: profileData, error: profileError } = await supabase
         .from("profiles")
-        .select("*")
+        .select("anon_name, name_locked, home_city")
         .eq("id", user.id)
         .single();
+
+      if (profileError && profileError.code !== "PGRST116") {
+        console.error("Error loading profile:", profileError);
+        return;
+      }
 
       if (profileData) {
         setProfile({
           anon_name: profileData.anon_name,
           name_locked: profileData.name_locked ?? false,
+          home_city: profileData.home_city ?? null,
         });
+        setHomeCityInput(profileData.home_city ?? "");
       } else {
         const anon = generateFunUsername();
 
-        await supabase.from("profiles").insert({
-          id: user.id,
-          anon_name: anon,
-          name_locked: false,
-        });
+        const { data: newProfile, error: insertError } = await supabase
+          .from("profiles")
+          .upsert({
+            id: user.id,
+            anon_name: anon,
+            name_locked: false,
+            home_city: null,
+          })
+          .select("anon_name, name_locked, home_city")
+          .single();
+
+        if (insertError) {
+          console.error("Error creating profile:", insertError);
+          return;
+        }
 
         setProfile({
-          anon_name: anon,
-          name_locked: false,
+          anon_name: newProfile?.anon_name ?? anon,
+          name_locked: newProfile?.name_locked ?? false,
+          home_city: newProfile?.home_city ?? null,
         });
+        setHomeCityInput(newProfile?.home_city ?? "");
       }
     }
 
     loadUser();
   }, []);
 
+  useEffect(() => {
+    if (profile?.home_city) {
+      setCity(profile.home_city);
+    }
+  }, [profile?.home_city]);
+
+  useEffect(() => {
+    if (profile) {
+      setHomeCityInput(profile.home_city ?? "");
+    }
+  }, [profile?.home_city, profile]);
+
 
   // USER STREAK
-useEffect(() => {
-  // capture userId once for this effect run
-  const userId = sessionUser?.id;
+  useEffect(() => {
+    // capture userId once for this effect run
+    const userId = sessionUser?.id;
 
-  if (!userId) {
-    setStreakInfo(null);
-    return;
-  }
+    if (!userId) {
+      setStreakInfo(null);
+      return;
+    }
 
-  async function loadStreak() {
-    try {
-      setStreakLoading(true);
+    async function loadStreak() {
+      try {
+        setStreakLoading(true);
 
-      // Grab up to 365 days of posts for this user
-      const { data, error } = await supabase
-        .from("pulses")
-        .select("created_at")
-        .eq("user_id", userId) // ✅ use userId instead of sessionUser.id
-        .order("created_at", { ascending: false })
-        .limit(365);
+        // Grab up to 365 days of posts for this user
+        const { data, error } = await supabase
+          .from("pulses")
+          .select("created_at")
+          .eq("user_id", userId) // ✅ use userId instead of sessionUser.id
+          .order("created_at", { ascending: false })
+          .limit(365);
 
-      if (error) {
-        console.error("Error loading streak data:", error);
-        return;
-      }
+        if (error) {
+          console.error("Error loading streak data:", error);
+          return;
+        }
 
-      const rows = data || [];
-      if (rows.length === 0) {
-        setStreakInfo({ currentStreak: 0, lastActiveDate: null });
-        return;
-      }
+        const rows = data || [];
+        if (rows.length === 0) {
+          setStreakInfo({ currentStreak: 0, lastActiveDate: null });
+          return;
+        }
 
-      // Convert to local YYYY-MM-DD strings & dedupe
-      const dateStrings = Array.from(
-        new Set(
-          rows.map((row: { created_at: string }) => {
-            const d = new Date(row.created_at);
-            // ISO-like local date (yyyy-mm-dd)
-            return d.toLocaleDateString("en-CA");
-          })
-        )
-      ).sort((a, b) => (a < b ? 1 : -1)); // newest first
+        // Convert to local YYYY-MM-DD strings & dedupe
+        const dateStrings = Array.from(
+          new Set(
+            rows.map((row: { created_at: string }) => {
+              const d = new Date(row.created_at);
+              // ISO-like local date (yyyy-mm-dd)
+              return d.toLocaleDateString("en-CA");
+            })
+          )
+        ).sort((a, b) => (a < b ? 1 : -1)); // newest first
 
-      const today = new Date();
-      const todayStr = today.toLocaleDateString("en-CA");
+        const today = new Date();
+        const todayStr = today.toLocaleDateString("en-CA");
 
-      let streak = 0;
-      let offsetDays = 0;
+        let streak = 0;
+        let offsetDays = 0;
 
-      function offsetDate(days: number) {
-        const d = new Date();
-        d.setDate(d.getDate() - days);
-        return d.toLocaleDateString("en-CA");
-      }
+        function offsetDate(days: number) {
+          const d = new Date();
+          d.setDate(d.getDate() - days);
+          return d.toLocaleDateString("en-CA");
+        }
 
-      for (const dayStr of dateStrings) {
-        const expected = offsetDate(offsetDays);
+        for (const dayStr of dateStrings) {
+          const expected = offsetDate(offsetDays);
 
-        if (dayStr === expected) {
-          streak += 1;
-          offsetDays += 1;
-        } else {
-          if (streak === 0 && dayStr === offsetDate(1) && todayStr !== dayStr) {
-            streak = 1;
-            offsetDays = 2;
+          if (dayStr === expected) {
+            streak += 1;
+            offsetDays += 1;
           } else {
-            break;
+            if (streak === 0 && dayStr === offsetDate(1) && todayStr !== dayStr) {
+              streak = 1;
+              offsetDays = 2;
+            } else {
+              break;
+            }
           }
         }
+
+        const lastActive = dateStrings[0] ?? null;
+
+        setStreakInfo({
+          currentStreak: streak,
+          lastActiveDate: lastActive,
+        });
+      } catch (err) {
+        console.error("Unexpected error loading streak:", err);
+      } finally {
+        setStreakLoading(false);
       }
-
-      const lastActive = dateStrings[0] ?? null;
-
-      setStreakInfo({
-        currentStreak: streak,
-        lastActiveDate: lastActive,
-      });
-    } catch (err) {
-      console.error("Unexpected error loading streak:", err);
-    } finally {
-      setStreakLoading(false);
     }
-  }
 
-  loadStreak();
-}, [sessionUser]);
+    loadStreak();
+  }, [sessionUser]);
 
 
 
@@ -815,6 +851,43 @@ async function handleToggleFavorite(pulseId: number) {
     }
   }
 
+  async function handleHomeCitySave() {
+    if (!sessionUser) return;
+
+    try {
+      setHomeCitySaving(true);
+      setHomeCityMessage(null);
+
+      const trimmedCity = homeCityInput.trim();
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ home_city: trimmedCity || null })
+        .eq("id", sessionUser.id);
+
+      if (error) {
+        console.error("Error updating home city:", error);
+        setHomeCityMessage("Could not save home city right now.");
+        return;
+      }
+
+      setProfile((prev) =>
+        prev ? { ...prev, home_city: trimmedCity || null } : prev
+      );
+
+      if (trimmedCity) {
+        setCity(trimmedCity);
+      }
+
+      setHomeCityMessage("Home city saved.");
+    } catch (err) {
+      console.error("Unexpected error saving home city:", err);
+      setHomeCityMessage("Could not save home city right now.");
+    } finally {
+      setHomeCitySaving(false);
+    }
+  }
+
 
 
   // ========= AI USERNAME GENERATOR HANDLERS =========
@@ -860,7 +933,7 @@ async function handleToggleFavorite(pulseId: number) {
       setProfile((prev) =>
         prev
           ? { ...prev, anon_name: updatedProfileName }
-          : { anon_name: updatedProfileName }
+          : { anon_name: updatedProfileName, home_city: null, name_locked: false }
       );
       setUsername(updatedProfileName);
 
@@ -892,7 +965,9 @@ async function handleToggleFavorite(pulseId: number) {
       setUsernameErrorMsg(null);
 
       setProfile((prev) =>
-        prev ? { ...prev, anon_name: lastAnonName } : { anon_name: lastAnonName }
+        prev
+          ? { ...prev, anon_name: lastAnonName }
+          : { anon_name: lastAnonName, home_city: null, name_locked: false }
       );
       setUsername(lastAnonName);
 
@@ -991,39 +1066,95 @@ async function handleToggleFavorite(pulseId: number) {
             Sign in
           </button>
         ) : (
-          <div className="flex items-center justify-end text-sm text-slate-400 ml-4 gap-2">
-            <div className="flex flex-col items-end gap-0.5">
-              <div className="flex items-center gap-2">
-                <span>{displayName}</span>
+          <div className="relative flex justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setShowProfileMenu((prev) => !prev);
+                setHomeCityMessage(null);
+              }}
+              className="flex items-center gap-3 rounded-full bg-slate-900/80 border border-slate-800 px-3 py-2 text-sm text-slate-100 hover:border-pink-400 transition"
+            >
+              <div className="flex flex-col items-end leading-tight">
+                <span className="font-medium">{displayName}</span>
+                <span className="text-[11px] text-slate-400">
+                  {profile?.home_city ? `Home: ${profile.home_city}` : "Set home city"}
+                </span>
+              </div>
+              <span className="text-xs text-slate-500">▾</span>
+            </button>
 
-                {!profile?.name_locked ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowUsernameEditor((prev) => !prev)}
-                    className="text-[11px] px-2 py-0.5 rounded-full bg-slate-900/80 border border-slate-700 text-slate-300 hover:border-pink-400 hover:text-pink-300 transition"
-                  >
-                    🎲 Edit vibe name
-                  </button>
-                ) : (
-                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-900/80 border border-emerald-500/50 text-emerald-300 flex items-center gap-1">
-                    <span>🔒</span>
-                    <span>Username locked</span>
-                  </span>
+            {showProfileMenu && (
+              <div className="absolute right-0 mt-2 w-80 rounded-2xl bg-slate-900/95 border border-slate-800 shadow-xl p-3 text-sm text-slate-100">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-[11px] text-slate-400 uppercase tracking-wide">
+                      Anon name
+                    </p>
+                    <p className="font-semibold leading-tight text-slate-50">
+                      {displayName}
+                    </p>
+                  </div>
+
+                  {!profile?.name_locked ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowUsernameEditor((prev) => !prev)}
+                      className="text-[11px] px-2 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-200 hover:border-pink-400 hover:text-pink-200 transition"
+                    >
+                      🎲 Edit vibe name
+                    </button>
+                  ) : (
+                    <span className="text-[11px] px-2 py-1 rounded-full bg-slate-900/80 border border-emerald-500/50 text-emerald-300 flex items-center gap-1">
+                      <span>🔒</span>
+                      <span>Username locked</span>
+                    </span>
+                  )}
+                </div>
+
+                {usernameErrorMsg && (
+                  <p className="mt-1 text-[11px] text-red-400">{usernameErrorMsg}</p>
                 )}
 
-              </div>
+                <div className="mt-4 space-y-1">
+                  <label className="text-[11px] uppercase tracking-wide text-slate-400">
+                    Home city
+                  </label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      value={homeCityInput}
+                      onChange={(e) => setHomeCityInput(e.target.value)}
+                      placeholder="e.g. Austin"
+                      className="flex-1 rounded-2xl bg-slate-950/80 border border-slate-800 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleHomeCitySave}
+                      disabled={homeCitySaving}
+                      className="text-[11px] px-3 py-1.5 rounded-2xl bg-pink-500 text-slate-950 font-semibold shadow-lg shadow-pink-500/30 hover:bg-pink-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {homeCitySaving ? "Saving…" : "Save"}
+                    </button>
+                  </div>
+                  {homeCityMessage && (
+                    <p className="text-[11px] text-slate-300">{homeCityMessage}</p>
+                  )}
+                </div>
 
-              <button
-                onClick={async () => {
-                  await supabase.auth.signOut();
-                  setSessionUser(null);
-                  setProfile(null);
-                }}
-                className="text-[11px] text-slate-500 hover:text-pink-300 underline"
-              >
-                Log out
-              </button>
-            </div>
+                <button
+                  onClick={async () => {
+                    await supabase.auth.signOut();
+                    setSessionUser(null);
+                    setProfile(null);
+                    setShowProfileMenu(false);
+                    setShowUsernameEditor(false);
+                  }}
+                  className="mt-4 text-[11px] text-slate-400 hover:text-pink-300 underline"
+                >
+                  Log out
+                </button>
+              </div>
+            )}
           </div>
         )}
 
