@@ -32,6 +32,15 @@ type Pulse = {
   createdAt: string;
 };
 
+type PulseOfDay = {
+  id: number;
+  mood: string;
+  tag: string;
+  message: string;
+  author: string;
+  createdAt: string;
+};
+
 // GLOBAL POSTING STEAK
 
 type StreakInfo = {
@@ -122,6 +131,23 @@ type Profile = {
   name_locked?: boolean | null;
 };
 
+function formatRelativeTime(dateString: string) {
+  const date = new Date(dateString);
+  const diffMs = Date.now() - date.getTime();
+
+  const seconds = Math.floor(diffMs / 1000);
+  if (seconds < 60) return "just now";
+
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min${minutes === 1 ? "" : "s"} ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hr${hours === 1 ? "" : "s"} ago`;
+
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
 
 
 export default function Home() {
@@ -134,6 +160,10 @@ export default function Home() {
   const [tag, setTag] = useState("General");
   const [message, setMessage] = useState("");
   const [pulses, setPulses] = useState<Pulse[]>([]);
+
+  const [pulseOfDay, setPulseOfDay] = useState<PulseOfDay | null>(null);
+  const [pulseOfDayLoading, setPulseOfDayLoading] = useState(false);
+  const [pulseOfDayError, setPulseOfDayError] = useState<string | null>(null);
 
   // Auth + anon profile
   const [sessionUser, setSessionUser] = useState<User | null>(null);
@@ -588,6 +618,69 @@ useEffect(() => {
     }
 
     fetchEvents();
+  }, [city]);
+
+  // ========= PULSE OF THE DAY =========
+  useEffect(() => {
+    if (!city) return;
+
+    let isMounted = true;
+    const controller = new AbortController();
+
+    const loadPulseOfDay = async () => {
+      try {
+        setPulseOfDayLoading(true);
+        setPulseOfDayError(null);
+        setPulseOfDay(null);
+
+        const res = await fetch(
+          `/api/pulse-of-day?city=${encodeURIComponent(city)}`,
+          { signal: controller.signal }
+        );
+
+        let data: { pulse?: PulseOfDay | null; error?: string } | null = null;
+        try {
+          data = await res.json();
+        } catch {
+          // ignore JSON parse error for empty bodies
+        }
+
+        if (!res.ok) {
+          if (res.status === 404 && isMounted) {
+            setPulseOfDay(null);
+            return;
+          }
+
+          throw new Error(
+            (data && data.error) || "Failed to fetch pulse of the day"
+          );
+        }
+
+        if (!isMounted) return;
+
+        setPulseOfDay((data && data.pulse) || null);
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
+
+        console.error("Error fetching pulse of the day:", err);
+
+        if (isMounted) {
+          setPulseOfDayError("Could not load pulse of the day.");
+          setPulseOfDay(null);
+        }
+      } finally {
+        if (isMounted) {
+          setPulseOfDayLoading(false);
+        }
+      }
+    };
+
+    loadPulseOfDay();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
   }, [city]);
 
   // ========= LOCAL STORAGE: CITY =========
@@ -1373,6 +1466,55 @@ async function handleToggleFavorite(pulseId: number) {
             </p>
           )}
         </section>
+
+        {/* Pulse of the Day */}
+        <div className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium text-slate-200">Pulse of the day</h2>
+            <span className="text-[11px] text-slate-400">
+              {pulseOfDayLoading
+                ? "Finding today’s standout pulse…"
+                : "Based on the last 24 hours"}
+            </span>
+          </div>
+
+          {pulseOfDayError && (
+            <p className="text-xs text-red-400">{pulseOfDayError}</p>
+          )}
+
+          {pulseOfDayLoading ? (
+            <div className="space-y-2">
+              <div className="h-3 rounded bg-slate-800 animate-pulse" />
+              <div className="h-3 rounded bg-slate-800 animate-pulse w-2/3" />
+            </div>
+          ) : pulseOfDay ? (
+            <div className="flex gap-3 items-start rounded-2xl bg-slate-950/70 border border-slate-800 px-3 py-3">
+              <div className="w-11 h-11 rounded-2xl bg-slate-900/80 flex items-center justify-center text-2xl">
+                {pulseOfDay.mood}
+              </div>
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center gap-2 flex-wrap text-xs text-slate-400">
+                  <span className="px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-200 border border-pink-500/40 text-[11px] uppercase tracking-wide">
+                    {pulseOfDay.tag}
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    {formatRelativeTime(pulseOfDay.createdAt)}
+                  </span>
+                </div>
+                <p className="text-sm text-slate-100 leading-relaxed">
+                  {pulseOfDay.message.length > 140
+                    ? `${pulseOfDay.message.slice(0, 140)}…`
+                    : pulseOfDay.message}
+                </p>
+                <p className="text-[11px] text-slate-400">— {pulseOfDay.author}</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-slate-500 bg-slate-950/60 border border-slate-800 rounded-2xl px-3 py-3">
+              No standout pulse yet today. Be the first!
+            </p>
+          )}
+        </div>
 
         {/* AI Summary Section */}
         <div className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 space-y-3">
