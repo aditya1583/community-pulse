@@ -187,6 +187,11 @@ export default function Home() {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
 
+  // Local news
+  const [localNews, setLocalNews] = useState<string[]>([]);
+  const [localNewsLoading, setLocalNewsLoading] = useState(false);
+  const [localNewsError, setLocalNewsError] = useState<string | null>(null);
+
   // Weather
   const [weather, setWeather] = useState<WeatherInfo | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
@@ -255,6 +260,51 @@ export default function Home() {
       cancelled = true;
     };
   }, [city, pulses]);
+
+  // ========= LOCAL NEWS =========
+  useEffect(() => {
+    if (!city) return;
+
+    let cancelled = false;
+
+    const run = async () => {
+      try {
+        setLocalNewsLoading(true);
+        setLocalNewsError(null);
+
+        const res = await fetch(
+          `/api/local-news?city=${encodeURIComponent(city)}`
+        );
+
+        const data = await res.json();
+
+        if (cancelled) return;
+
+        if (!res.ok) {
+          setLocalNewsError(data.error || "Failed to load local news");
+          setLocalNews([]);
+          return;
+        }
+
+        setLocalNews(Array.isArray(data.bullets) ? data.bullets : []);
+      } catch (err) {
+        if (!cancelled) {
+          setLocalNewsError("Unable to load local news right now.");
+          setLocalNews([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLocalNewsLoading(false);
+        }
+      }
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [city]);
 
   // ========= REAL-TIME FEED =========
 useEffect(() => {
@@ -1400,6 +1450,41 @@ async function handleToggleFavorite(pulseId: number) {
               No pulses yet. Start posting to see an AI summary here.
             </p>
           ) : null}
+        </div>
+
+        {/* Local news Section */}
+        <div className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium text-slate-200">Local news</h2>
+            <span className="text-[11px] text-slate-400">
+              {localNewsLoading
+                ? "Generating local headlines…"
+                : "AI-generated for this city"}
+            </span>
+          </div>
+
+          {localNewsError ? (
+            <p className="text-xs text-red-400">{localNewsError}</p>
+          ) : localNewsLoading ? (
+            <p className="text-xs text-slate-500">
+              Pulling together local news for {city}…
+            </p>
+          ) : localNews.length > 0 ? (
+            <ul className="space-y-2 bg-slate-950/60 border border-slate-800 rounded-2xl p-3 text-sm text-slate-300">
+              {localNews.map((item, idx) => (
+                <li key={`${item}-${idx}`} className="flex gap-2">
+                  <span className="text-pink-400 mt-1.5">•</span>
+                  <span className="leading-relaxed">{item}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-xs text-slate-500">
+              No local news available for {city} yet. Check back soon.
+            </p>
+          )}
+
+          <p className="text-[10px] text-slate-500">Generated, not fact-checked.</p>
         </div>
 
         {/* Filter chips */}
