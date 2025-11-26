@@ -85,6 +85,16 @@ type MoodScore = {
   percent: number;
 };
 
+type MoodForecast = {
+  label: string;
+  icon: string;
+  headline: string;
+  detail: string;
+  dominantMood: string | null;
+  windowHours: number;
+  totalPulses: number;
+};
+
 const TAGS = ["All", "Traffic", "Weather", "Events", "General"];
 const MOODS = ["😊", "😐", "😢", "😡", "😴", "🤩"];
 
@@ -200,6 +210,13 @@ export default function Home() {
   } | null>(null);
   const [cityMoodLoading, setCityMoodLoading] = useState(false);
   const [cityMoodError, setCityMoodError] = useState<string | null>(null);
+
+  // Mood forecast strip
+  const [moodForecast, setMoodForecast] = useState<MoodForecast | null>(null);
+  const [moodForecastLoading, setMoodForecastLoading] = useState(false);
+  const [moodForecastError, setMoodForecastError] = useState<string | null>(
+    null
+  );
 
   // ========= AI SUMMARY =========
   useEffect(() => {
@@ -328,6 +345,63 @@ useEffect(() => {
     }
 
     fetchCityMood();
+  }, [city, pulses.length]);
+
+  // ========= MOOD FORECAST =========
+  useEffect(() => {
+    if (!city) return;
+
+    let cancelled = false;
+
+    async function fetchMoodForecast() {
+      try {
+        setMoodForecastLoading(true);
+        setMoodForecastError(null);
+
+        const res = await fetch(
+          `/api/mood-forecast?city=${encodeURIComponent(city)}`
+        );
+        const data = await res.json();
+
+        if (cancelled) return;
+
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to load mood forecast");
+        }
+
+        if (!data.forecast) {
+          setMoodForecast(null);
+          return;
+        }
+
+        setMoodForecast({
+          label: data.forecast.label,
+          icon: data.forecast.icon,
+          headline: data.forecast.headline,
+          detail: data.forecast.detail,
+          dominantMood: data.forecast.dominantMood ?? null,
+          windowHours: data.windowHours || 3,
+          totalPulses: data.totalPulses || 0,
+        });
+      } catch (err: any) {
+        if (!cancelled) {
+          setMoodForecastError(
+            err?.message || "Unable to fetch mood forecast right now."
+          );
+          setMoodForecast(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setMoodForecastLoading(false);
+        }
+      }
+    }
+
+    fetchMoodForecast();
+
+    return () => {
+      cancelled = true;
+    };
   }, [city, pulses.length]);
 
   // ========= WEATHER =========
@@ -1114,6 +1188,36 @@ async function handleToggleFavorite(pulseId: number) {
     </div>
   </div>
 </header>
+
+        <section className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-slate-400">
+            <span>🧭</span>
+            <span>Mood forecast</span>
+          </div>
+          <div className="flex-1 text-sm text-slate-200 sm:flex sm:items-center sm:justify-between">
+            {moodForecastLoading ? (
+              <span className="text-slate-400 text-xs">Reading recent pulses…</span>
+            ) : moodForecastError ? (
+              <span className="text-slate-400 text-xs">{moodForecastError}</span>
+            ) : moodForecast ? (
+              <>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-base">{moodForecast.icon}</span>
+                  <span className="font-medium">{moodForecast.headline}</span>
+                  <span className="text-xs text-slate-400">{moodForecast.detail}</span>
+                </div>
+                <span className="text-[11px] text-slate-500 mt-1 sm:mt-0">
+                  Based on last {moodForecast.windowHours}h • {" "}
+                  {moodForecast.totalPulses} pulses
+                </span>
+              </>
+            ) : (
+              <span className="text-slate-400 text-xs">
+                Not enough recent pulses to forecast yet.
+              </span>
+            )}
+          </div>
+        </section>
 
         {/* Weather widget */}
         <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 flex items-center justify-between gap-3">
