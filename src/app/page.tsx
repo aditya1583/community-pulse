@@ -29,6 +29,7 @@ type Pulse = {
   tag: string;
   message: string;
   author: string;
+  userId: string | null;
   createdAt: string;
 };
 
@@ -51,6 +52,7 @@ type DBPulse = {
   tag: string;
   message: string;
   author: string;
+  user_id: string | null;
   created_at: string;
 };
 
@@ -62,7 +64,11 @@ function mapDBPulseToPulse(row: DBPulse): Pulse {
     tag: row.tag,
     message: row.message,
     author: row.author,
-    createdAt: row.created_at,
+    userId: row.user_id,
+    createdAt: new Date(row.created_at).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
   };
 }
 
@@ -122,6 +128,11 @@ type Profile = {
   name_locked?: boolean | null;
 };
 
+type ReputationLookup = {
+  byUserId: Record<string, number>;
+  byAuthor: Record<string, number>;
+};
+
 
 
 export default function Home() {
@@ -134,6 +145,11 @@ export default function Home() {
   const [tag, setTag] = useState("General");
   const [message, setMessage] = useState("");
   const [pulses, setPulses] = useState<Pulse[]>([]);
+  const [reputationLookup, setReputationLookup] = useState<ReputationLookup>({
+    byUserId: {},
+    byAuthor: {},
+  });
+  const [reputationRequestId, setReputationRequestId] = useState(0);
 
   // Auth + anon profile
   const [sessionUser, setSessionUser] = useState<User | null>(null);
@@ -605,6 +621,56 @@ useEffect(() => {
     localStorage.setItem("cp-city", city);
   }, [city]);
 
+  // ========= REPUTATION LOOKUP =========
+  useEffect(() => {
+    async function fetchReputationScores() {
+      if (pulses.length === 0) {
+        setReputationLookup({ byUserId: {}, byAuthor: {} });
+        return;
+      }
+
+      const userIds = Array.from(
+        new Set(pulses.map((p) => p.userId).filter(Boolean))
+      );
+      const authors = Array.from(
+        new Set(
+          pulses
+            .filter((p) => !p.userId)
+            .map((p) => p.author)
+            .filter(Boolean)
+        )
+      );
+
+      if (userIds.length === 0 && authors.length === 0) {
+        setReputationLookup({ byUserId: {}, byAuthor: {} });
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/reputation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userIds, authors }),
+        });
+
+        if (!res.ok) {
+          console.error("Failed to fetch reputation scores", await res.text());
+          return;
+        }
+
+        const data = await res.json();
+        setReputationLookup({
+          byUserId: data.byUserId || {},
+          byAuthor: data.byAuthor || {},
+        });
+      } catch (err) {
+        console.error("Unexpected error fetching reputation scores:", err);
+      }
+    }
+
+    fetchReputationScores();
+  }, [pulses, reputationRequestId]);
+
   // ========= LOCAL STORAGE: USERNAME (FALLBACK) =========
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -645,6 +711,7 @@ useEffect(() => {
           tag: row.tag,
           message: row.message,
           author: row.author || "Anonymous",
+          userId: row.user_id,
           createdAt: new Date(row.created_at).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
@@ -766,6 +833,7 @@ async function handleToggleFavorite(pulseId: number) {
       }
 
       setFavoritePulseIds((prev) => prev.filter((id) => id !== pulseId));
+      setReputationRequestId((prev) => prev + 1);
     } else {
       const { error } = await supabase.from("favorites").insert({
         user_id: userId,
@@ -780,6 +848,7 @@ async function handleToggleFavorite(pulseId: number) {
       setFavoritePulseIds((prev) =>
         prev.includes(pulseId) ? prev : [...prev, pulseId]
       );
+      setReputationRequestId((prev) => prev + 1);
     }
   } catch (err) {
     console.error("Unexpected error toggling favorite:", err);
@@ -961,7 +1030,26 @@ async function handleToggleFavorite(pulseId: number) {
     }
   };
 
+  function getPulseReputation(pulse: Pulse) {
+    const fromUserId = pulse.userId
+      ? reputationLookup.byUserId[pulse.userId]
+      : undefined;
+    const fromAuthor = reputationLookup.byAuthor[pulse.author];
+    const combined = fromUserId ?? fromAuthor ?? 0;
+    return Math.min(999, Math.max(0, combined));
+  }
+
   const displayName = profile?.anon_name || username || "…";
+
+  const currentUserReputation = Math.min(
+    999,
+    Math.max(
+      0,
+      (sessionUser?.id && reputationLookup.byUserId[sessionUser.id]) ||
+        reputationLookup.byAuthor[displayName] ||
+        0
+    )
+  );
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 flex justify-center px-4 py-6">
@@ -1010,6 +1098,10 @@ async function handleToggleFavorite(pulseId: number) {
                     <span>Username locked</span>
                   </span>
                 )}
+
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-900/80 border border-amber-500/40 text-amber-200">
+                  Reputation: {currentUserReputation}
+                </span>
 
               </div>
 
@@ -1510,7 +1602,12 @@ async function handleToggleFavorite(pulseId: number) {
                   </p>
 
                   <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
-                    <span className="text-slate-300">{pulse.author}</span>
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <span>{pulse.author}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-900/70 border border-amber-500/40 text-amber-200">
+                        Rep {getPulseReputation(pulse)}
+                      </span>
+                    </div>
 
                     <div className="flex items-center gap-3">
                       {/* Favorite star */}
