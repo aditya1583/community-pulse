@@ -1,18 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
+import { isCleanText } from "../../lib/contentFilter";
 
 const MAX_MESSAGE_LENGTH = 240;
-
-// Replace these placeholders with your own list
-const BANNED_WORDS = ["badword1", "badword2", "badword3"];
-
-function isCleanMessage(text: string) {
-  const lowered = text.toLowerCase();
-  return !BANNED_WORDS.some((w) => lowered.includes(w));
-}
 
 type WeatherInfo = {
   temp: number;
@@ -924,7 +918,7 @@ async function handleToggleFavorite(pulseId: number) {
     const trimmed = message.trim();
     if (!trimmed) return;
 
-    if (!isCleanMessage(trimmed)) {
+    if (!isCleanText(trimmed)) {
       setValidationError("Pulse contains disallowed language.");
       return;
     }
@@ -1102,6 +1096,12 @@ async function handleToggleFavorite(pulseId: number) {
 
     {/* Right side: city selector only */}
     <div className="flex flex-col sm:items-end gap-2">
+      <Link
+        href="/classifieds"
+        className="text-sm text-pink-200 hover:text-pink-100 underline underline-offset-4"
+      >
+        View classifieds
+      </Link>
       <label className="text-xs text-slate-400 uppercase tracking-wide">
         City
       </label>
