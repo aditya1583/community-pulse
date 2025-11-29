@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
 
@@ -145,6 +145,7 @@ export default function Home() {
 
   const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
   const [streakLoading, setStreakLoading] = useState(false);
+  const [userPulseCount, setUserPulseCount] = useState(0);
 
 
   // Saved Favorites
@@ -421,93 +422,96 @@ useEffect(() => {
   }, []);
 
 
-  // USER STREAK
-useEffect(() => {
-  // capture userId once for this effect run
+// USER STREAK
+const loadStreak = useCallback(async () => {
   const userId = sessionUser?.id;
 
   if (!userId) {
     setStreakInfo(null);
+    setUserPulseCount(0);
+    setStreakLoading(false);
     return;
   }
 
-  async function loadStreak() {
-    try {
-      setStreakLoading(true);
+  try {
+    setStreakLoading(true);
 
-      // Grab up to 365 days of posts for this user
-      const { data, error } = await supabase
-        .from("pulses")
-        .select("created_at")
-        .eq("user_id", userId) // ✅ use userId instead of sessionUser.id
-        .order("created_at", { ascending: false })
-        .limit(365);
+    // Grab up to 365 days of posts for this user
+    const { data, error, count } = await supabase
+      .from("pulses")
+      .select("created_at", { count: "exact" })
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(365);
 
-      if (error) {
-        console.error("Error loading streak data:", error);
-        return;
-      }
+    if (error) {
+      console.error("Error loading streak data:", error);
+      return;
+    }
 
-      const rows = data || [];
-      if (rows.length === 0) {
-        setStreakInfo({ currentStreak: 0, lastActiveDate: null });
-        return;
-      }
+    const rows = data || [];
+    setUserPulseCount(count ?? rows.length);
 
-      // Convert to local YYYY-MM-DD strings & dedupe
-      const dateStrings = Array.from(
-        new Set(
-          rows.map((row: { created_at: string }) => {
-            const d = new Date(row.created_at);
-            // ISO-like local date (yyyy-mm-dd)
-            return d.toLocaleDateString("en-CA");
-          })
-        )
-      ).sort((a, b) => (a < b ? 1 : -1)); // newest first
+    if (rows.length === 0) {
+      setStreakInfo({ currentStreak: 0, lastActiveDate: null });
+      return;
+    }
 
-      const today = new Date();
-      const todayStr = today.toLocaleDateString("en-CA");
+    // Convert to local YYYY-MM-DD strings & dedupe
+    const dateStrings = Array.from(
+      new Set(
+        rows.map((row: { created_at: string }) => {
+          const d = new Date(row.created_at);
+          // ISO-like local date (yyyy-mm-dd)
+          return d.toLocaleDateString("en-CA");
+        })
+      )
+    ).sort((a, b) => (a < b ? 1 : -1)); // newest first
 
-      let streak = 0;
-      let offsetDays = 0;
+    const today = new Date();
+    const todayStr = today.toLocaleDateString("en-CA");
 
-      function offsetDate(days: number) {
-        const d = new Date();
-        d.setDate(d.getDate() - days);
-        return d.toLocaleDateString("en-CA");
-      }
+    let streak = 0;
+    let offsetDays = 0;
 
-      for (const dayStr of dateStrings) {
-        const expected = offsetDate(offsetDays);
+    function offsetDate(days: number) {
+      const d = new Date();
+      d.setDate(d.getDate() - days);
+      return d.toLocaleDateString("en-CA");
+    }
 
-        if (dayStr === expected) {
-          streak += 1;
-          offsetDays += 1;
+    for (const dayStr of dateStrings) {
+      const expected = offsetDate(offsetDays);
+
+      if (dayStr === expected) {
+        streak += 1;
+        offsetDays += 1;
+      } else {
+        if (streak === 0 && dayStr === offsetDate(1) && todayStr !== dayStr) {
+          streak = 1;
+          offsetDays = 2;
         } else {
-          if (streak === 0 && dayStr === offsetDate(1) && todayStr !== dayStr) {
-            streak = 1;
-            offsetDays = 2;
-          } else {
-            break;
-          }
+          break;
         }
       }
-
-      const lastActive = dateStrings[0] ?? null;
-
-      setStreakInfo({
-        currentStreak: streak,
-        lastActiveDate: lastActive,
-      });
-    } catch (err) {
-      console.error("Unexpected error loading streak:", err);
-    } finally {
-      setStreakLoading(false);
     }
-  }
 
-  loadStreak();
+    const lastActive = dateStrings[0] ?? null;
+
+    setStreakInfo({
+      currentStreak: streak,
+      lastActiveDate: lastActive,
+    });
+  } catch (err) {
+    console.error("Unexpected error loading streak:", err);
+  } finally {
+    setStreakLoading(false);
+  }
 }, [sessionUser]);
+
+useEffect(() => {
+  loadStreak();
+}, [loadStreak]);
 
 
 
@@ -958,10 +962,39 @@ async function handleToggleFavorite(pulseId: number) {
     if (data) {
       // Realtime listener will add it to the list
       setMessage("");
+
+      if (sessionUser) {
+        await loadStreak();
+      }
     }
   };
 
   const displayName = profile?.anon_name || username || "…";
+  const currentStreak = streakInfo?.currentStreak ?? 0;
+  const streakLabel = streakLoading
+    ? "Checking streak…"
+    : !sessionUser
+      ? "Sign in to track streaks"
+      : currentStreak > 0
+        ? `Streak: ${currentStreak} day${currentStreak === 1 ? "" : "s"} 🔥`
+        : "Start a streak today!";
+
+  const badges = [
+    {
+      id: "first-pulse",
+      name: "First Pulse",
+      description: "Post 1 pulse",
+      unlocked: userPulseCount >= 1,
+    },
+    {
+      id: "steady-vibes",
+      name: "Steady Vibes",
+      description: "Maintain a 3-day streak",
+      unlocked: currentStreak >= 3,
+    },
+  ];
+
+  const unlockedBadges = badges.filter((b) => b.unlocked).length;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col">
@@ -1292,6 +1325,45 @@ async function handleToggleFavorite(pulseId: number) {
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               {loading ? "Loading…" : "Live board"}
             </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-2xl bg-slate-950/60 border border-slate-800 px-3 py-2">
+            <div className="text-xs sm:text-sm text-slate-200">{streakLabel}</div>
+
+            <details className="group text-xs text-slate-300 w-full sm:w-auto">
+              <summary className="flex items-center gap-2 cursor-pointer select-none list-none">
+                <span>Badges</span>
+                <span className="text-[10px] text-slate-400">
+                  ({unlockedBadges}/{badges.length})
+                </span>
+                <span className="text-sm">🏅</span>
+              </summary>
+
+              <div className="mt-2 flex flex-wrap gap-2">
+                {badges.map((badge) => (
+                  <div
+                    key={badge.id}
+                    className={`flex items-start gap-2 rounded-2xl border px-3 py-2 ${
+                      badge.unlocked
+                        ? "border-emerald-400/60 bg-emerald-500/10 text-emerald-100"
+                        : "border-slate-800 bg-slate-900/70 text-slate-300"
+                    }`}
+                  >
+                    <span className="text-lg">
+                      {badge.unlocked ? "✨" : "🔒"}
+                    </span>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-semibold text-slate-100">
+                        {badge.name}
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        {badge.description}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </details>
           </div>
 
           <div className="flex flex-wrap gap-3 items-center">
