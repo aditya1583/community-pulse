@@ -120,7 +120,6 @@ function generateFunUsername() {
 type Profile = {
   anon_name: string;
   name_locked?: boolean | null;
-  display_name?: string | null;
   home_city?: string | null;
 };
 
@@ -146,7 +145,6 @@ export default function Home() {
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authConfirm, setAuthConfirm] = useState("");
-  const [authDisplayName, setAuthDisplayName] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [authErrors, setAuthErrors] = useState<{
     email?: string;
@@ -401,7 +399,6 @@ useEffect(() => {
     setAuthEmail("");
     setAuthPassword("");
     setAuthConfirm("");
-    setAuthDisplayName("");
     setAuthErrors({});
   };
 
@@ -424,18 +421,16 @@ useEffect(() => {
   };
 
   const loadProfileForUser = useCallback(
-    async (user: User, opts?: { displayName?: string | null }) => {
+    async (user: User) => {
       try {
         const { data: profileData, error } = await supabase
           .from("profiles")
-          .select("*")
+          .select("anon_name, name_locked, home_city")
           .eq("id", user.id)
           .single();
 
         const anon = profileData?.anon_name || generateFunUsername();
         const nameLocked = profileData?.name_locked ?? false;
-        let displayNameValue =
-          profileData?.display_name ?? opts?.displayName ?? null;
         const homeCityValue = profileData?.home_city ?? null;
 
         if (error && error.code !== "PGRST116") {
@@ -448,14 +443,13 @@ useEffect(() => {
             id: user.id,
             anon_name: anon,
             name_locked: nameLocked,
-            display_name: displayNameValue,
             home_city: homeCityValue || city || null,
           };
 
           const { data: insertedProfile, error: insertError } = await supabase
             .from("profiles")
             .insert(insertPayload)
-            .select("anon_name, name_locked, display_name, home_city")
+            .select("anon_name, name_locked, home_city")
             .single();
 
           if (insertError) {
@@ -466,32 +460,11 @@ useEffect(() => {
             return;
           }
 
-          if (insertedProfile) {
-            displayNameValue = insertedProfile.display_name ?? displayNameValue;
-          }
-        } else if (
-          opts?.displayName &&
-          opts.displayName !== profileData.display_name
-        ) {
-          const { error: updateError } = await supabase
-            .from("profiles")
-            .update({ display_name: opts.displayName })
-            .eq("id", user.id);
-
-          if (updateError) {
-            console.error(
-              "Error updating display name:",
-              updateError?.message || updateError
-            );
-          } else {
-            displayNameValue = opts.displayName;
-          }
         }
 
         setProfile({
           anon_name: anon,
           name_locked: nameLocked,
-          display_name: displayNameValue,
           home_city: homeCityValue,
         });
         setUsername(anon);
@@ -601,9 +574,15 @@ useEffect(() => {
           setShowAuthModal(false);
         }
       } else {
+        const redirectTo =
+          typeof window !== "undefined"
+            ? `${window.location.origin}/`
+            : undefined;
+
         const { data, error } = await supabase.auth.signUp({
           email: authEmail.trim(),
           password: authPassword,
+          options: redirectTo ? { emailRedirectTo: redirectTo } : undefined,
         });
 
         if (error) {
@@ -622,15 +601,14 @@ useEffect(() => {
 
         if (user) {
           setSessionUser(user);
-          await loadProfileForUser(user, {
-            displayName: authDisplayName.trim() || null,
-          });
+          await loadProfileForUser(user);
           resetAuthForm();
           setShowAuthModal(false);
         } else {
           setAuthMode("signin");
           setAuthErrors({
-            general: "Account created. Please sign in to continue.",
+            general:
+              "Account created. Please check your email to confirm, then sign in.",
           });
         }
       }
@@ -1159,7 +1137,7 @@ async function handleToggleFavorite(pulseId: number) {
     setValidationError(null);
 
     const authorName =
-      profile?.display_name?.trim() || profile?.anon_name || username || "Anonymous";
+      profile?.anon_name || username || "Anonymous";
 
     const { data, error } = await supabase
       .from("pulses")
@@ -1193,7 +1171,7 @@ async function handleToggleFavorite(pulseId: number) {
   };
 
   const displayName =
-    profile?.display_name?.trim() || profile?.anon_name || username || "…";
+    profile?.anon_name || username || "…";
   const currentStreak = streakInfo?.currentStreak ?? 0;
   const streakLabel = streakLoading
     ? "Checking streak…"
@@ -1320,18 +1298,9 @@ async function handleToggleFavorite(pulseId: number) {
                     )}
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-xs uppercase tracking-wide text-slate-400">
-                      Display name (optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={authDisplayName}
-                      onChange={(e) => setAuthDisplayName(e.target.value)}
-                      className="w-full rounded-2xl bg-slate-900 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
-                      placeholder="How should we greet you?"
-                    />
-                  </div>
+                  <p className="text-xs text-slate-400">
+                    We&rsquo;ll give you a fun vibe-based username after you sign up.
+                  </p>
                 </>
               )}
 
