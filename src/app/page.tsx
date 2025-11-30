@@ -1608,36 +1608,22 @@ async function handleToggleFavorite(pulseId: number) {
           )}
         </section>
 
-          {/* Disclaimer */}
-          <div className="mt-16 flex justify-center">
-            <div className="inline-block bg-slate-900/70 border border-slate-700 rounded-2xl px-4 py-3 max-w-xl text-center">
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                <strong>Disclaimer:</strong> Community Pulse displays
-                user-submitted content. Posts may be inaccurate, incomplete, or
-                misleading. Do not rely on this information for safety, travel,
-                emergency, or decision-making purposes. All posts reflect the
-                views of individual users, not the app’s creators. By using this
-                service, you agree that Community Pulse is not responsible for
-                any actions taken based on user content.
-              </p>
-            </div>
+        {/* Disclaimer */}
+        <div className="mt-16 flex justify-center">
+          <div className="inline-block bg-slate-900/70 border border-slate-700 rounded-2xl px-4 py-3 max-w-xl text-center">
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              <strong>Disclaimer:</strong> Community Pulse displays user-submitted
+              content. Posts may be inaccurate, incomplete, or misleading. Do not
+              rely on this information for safety, travel, emergency, or
+              decision-making purposes. All posts reflect the views of individual
+              users, not the app’s creators. By using this service, you agree
+              that Community Pulse is not responsible for any actions taken based
+              on user content.
+            </p>
           </div>
         </div>
-      </main>
-
-      <footer className="border-t border-slate-800/60 bg-slate-950">
-        <div className="max-w-4xl mx-auto px-4 py-6 text-[11px] text-slate-400 flex flex-col items-center gap-2 text-center sm:flex-row sm:justify-between sm:text-left">
-          <span>Community Pulse · v0.3 · Built for local vibes</span>
-          <div className="flex items-center gap-4">
-            <a href="/terms" className="hover:text-slate-200 transition-colors">
-              Terms
-            </a>
-            <a href="/privacy" className="hover:text-slate-200 transition-colors">
-              Privacy
-            </a>
-          </div>
-        </div>
-      </footer>
-    </div>
+      </div>
+    </main>
+  </div>
   );
 }
