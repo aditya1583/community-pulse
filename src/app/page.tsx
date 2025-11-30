@@ -425,31 +425,30 @@ useEffect(() => {
       try {
         const { data: profileData, error } = await supabase
           .from("profiles")
-          .select("anon_name, name_locked, home_city")
+          .select("*")
           .eq("id", user.id)
-          .single();
+          .maybeSingle();
+
+        if (error && error.code !== "PGRST116") {
+          console.error("Error loading profile:", error?.message || error);
+          return;
+        }
 
         const anon = profileData?.anon_name || generateFunUsername();
         const nameLocked = profileData?.name_locked ?? false;
         const homeCityValue = profileData?.home_city ?? null;
 
-        if (error && error.code !== "PGRST116") {
-          console.error("Error loading profile:", error);
-          return;
-        }
-
         if (!profileData) {
           const insertPayload = {
             id: user.id,
             anon_name: anon,
-            name_locked: nameLocked,
             home_city: homeCityValue || city || null,
           };
 
           const { data: insertedProfile, error: insertError } = await supabase
             .from("profiles")
-            .insert(insertPayload)
-            .select("anon_name, name_locked, home_city")
+            .upsert(insertPayload, { onConflict: "id" })
+            .select("*")
             .single();
 
           if (insertError) {
@@ -460,6 +459,13 @@ useEffect(() => {
             return;
           }
 
+          setProfile({
+            anon_name: insertedProfile?.anon_name || anon,
+            name_locked: insertedProfile?.name_locked ?? false,
+            home_city: insertedProfile?.home_city ?? null,
+          });
+          setUsername(insertedProfile?.anon_name || anon);
+          return;
         }
 
         setProfile({
@@ -1128,6 +1134,12 @@ async function handleToggleFavorite(pulseId: number) {
     const trimmed = message.trim();
     if (!trimmed) return;
 
+    if (!sessionUser) {
+      setErrorMsg("Please sign in to post a pulse.");
+      setShowAuthModal(true);
+      return;
+    }
+
     if (!isCleanMessage(trimmed)) {
       setValidationError("Pulse contains disallowed language.");
       return;
@@ -1148,7 +1160,7 @@ async function handleToggleFavorite(pulseId: number) {
           tag,
           message: trimmed,
           author: authorName,
-          user_id: sessionUser?.id ?? null,
+          user_id: sessionUser.id,
         },
       ])
       .select()
@@ -1744,7 +1756,7 @@ async function handleToggleFavorite(pulseId: number) {
               </span>
               <button
                 onClick={handleAddPulse}
-                disabled={!message.trim() || loading}
+                disabled={!message.trim() || loading || !sessionUser}
                 className="inline-flex items-center gap-1 rounded-2xl bg-pink-500 px-4 py-1.5 text-xs font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
                 <span>Post pulse</span> <span>⚡</span>
