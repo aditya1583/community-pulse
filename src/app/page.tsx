@@ -440,6 +440,7 @@ useEffect(() => {
 
         if (error && error.code !== "PGRST116") {
           console.error("Error loading profile:", error);
+          return;
         }
 
         if (!profileData) {
@@ -453,10 +454,14 @@ useEffect(() => {
 
           const { error: insertError } = await supabase
             .from("profiles")
-            .upsert(insertPayload);
+            .upsert(insertPayload, { onConflict: "id" });
 
           if (insertError) {
-            console.error("Error creating profile:", insertError);
+            console.error(
+              "Error creating profile:",
+              insertError?.message || insertError
+            );
+            return;
           }
         } else if (
           opts?.displayName &&
@@ -468,7 +473,10 @@ useEffect(() => {
             .eq("id", user.id);
 
           if (updateError) {
-            console.error("Error updating display name:", updateError);
+            console.error(
+              "Error updating display name:",
+              updateError?.message || updateError
+            );
           } else {
             displayNameValue = opts.displayName;
           }
