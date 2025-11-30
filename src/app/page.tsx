@@ -120,6 +120,8 @@ function generateFunUsername() {
 type Profile = {
   anon_name: string;
   name_locked?: boolean | null;
+  display_name?: string | null;
+  home_city?: string | null;
 };
 
 
@@ -139,6 +141,19 @@ export default function Home() {
   const [sessionUser, setSessionUser] = useState<User | null>(null);
   // const [profile, setProfile] = useState<{ anon_name: string } | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authConfirm, setAuthConfirm] = useState("");
+  const [authDisplayName, setAuthDisplayName] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authErrors, setAuthErrors] = useState<{
+    email?: string;
+    password?: string;
+    confirm?: string;
+    general?: string;
+  }>({});
 
 
   // USER STREAK
@@ -382,8 +397,106 @@ useEffect(() => {
     };
   }, [city]);
 
+  const resetAuthForm = () => {
+    setAuthEmail("");
+    setAuthPassword("");
+    setAuthConfirm("");
+    setAuthDisplayName("");
+    setAuthErrors({});
+  };
+
+  const friendlyAuthError = (message: string) => {
+    const lower = message.toLowerCase();
+
+    if (lower.includes("invalid login credentials") || lower.includes("invalid email")) {
+      return "Wrong email or password.";
+    }
+
+    if (lower.includes("already registered")) {
+      return "Email is already registered.";
+    }
+
+    if (lower.includes("password") && lower.includes("least")) {
+      return "Password is too weak.";
+    }
+
+    return message || "Something went wrong. Please try again.";
+  };
+
+  const loadProfileForUser = useCallback(
+    async (user: User, opts?: { displayName?: string | null }) => {
+      try {
+        const { data: profileData, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+
+        const anon = profileData?.anon_name || generateFunUsername();
+        const nameLocked = profileData?.name_locked ?? false;
+        let displayNameValue =
+          profileData?.display_name ?? opts?.displayName ?? null;
+        const homeCityValue = profileData?.home_city ?? null;
+
+        if (error && error.code !== "PGRST116") {
+          console.error("Error loading profile:", error);
+        }
+
+        if (!profileData) {
+          const insertPayload = {
+            id: user.id,
+            anon_name: anon,
+            name_locked: nameLocked,
+            display_name: displayNameValue,
+            home_city: homeCityValue || city || null,
+          };
+
+          const { error: insertError } = await supabase
+            .from("profiles")
+            .upsert(insertPayload);
+
+          if (insertError) {
+            console.error("Error creating profile:", insertError);
+          }
+        } else if (
+          opts?.displayName &&
+          opts.displayName !== profileData.display_name
+        ) {
+          const { error: updateError } = await supabase
+            .from("profiles")
+            .update({ display_name: opts.displayName })
+            .eq("id", user.id);
+
+          if (updateError) {
+            console.error("Error updating display name:", updateError);
+          } else {
+            displayNameValue = opts.displayName;
+          }
+        }
+
+        setProfile({
+          anon_name: anon,
+          name_locked: nameLocked,
+          display_name: displayNameValue,
+          home_city: homeCityValue,
+        });
+        setUsername(anon);
+      } catch (err) {
+        console.error("Unexpected error loading profile:", err);
+      }
+    },
+    [city]
+  );
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setSessionUser(null);
+    setProfile(null);
+    setShowUsernameEditor(false);
+  };
+
   // ========= LOAD SESSION + PROFILE =========
-    useEffect(() => {
+  useEffect(() => {
     async function loadUser() {
       const { data: auth } = await supabase.auth.getUser();
       const user = auth.user;
@@ -391,35 +504,130 @@ useEffect(() => {
 
       if (!user) return;
 
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-      if (profileData) {
-        setProfile({
-          anon_name: profileData.anon_name,
-          name_locked: profileData.name_locked ?? false,
-        });
-      } else {
-        const anon = generateFunUsername();
-
-        await supabase.from("profiles").insert({
-          id: user.id,
-          anon_name: anon,
-          name_locked: false,
-        });
-
-        setProfile({
-          anon_name: anon,
-          name_locked: false,
-        });
-      }
+      await loadProfileForUser(user);
     }
 
     loadUser();
-  }, []);
+  }, [loadProfileForUser]);
+
+  useEffect(() => {
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        const user = session?.user ?? null;
+        setSessionUser(user);
+
+        if (user) {
+          await loadProfileForUser(user);
+        } else {
+          setProfile(null);
+        }
+      }
+    );
+
+    return () => listener.subscription.unsubscribe();
+  }, [loadProfileForUser]);
+
+
+  const handleAuthSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+
+    const errors: typeof authErrors = {};
+
+    if (!authEmail.trim()) {
+      errors.email = "Email is required.";
+    }
+
+    if (!authPassword.trim()) {
+      errors.password = "Password is required.";
+    }
+
+    if (authMode === "signup") {
+      if (authPassword.trim().length < 6) {
+        errors.password = "Password must be at least 6 characters.";
+      }
+
+      if (authPassword !== authConfirm) {
+        errors.confirm = "Passwords do not match.";
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setAuthErrors(errors);
+      return;
+    }
+
+    try {
+      setAuthLoading(true);
+      setAuthErrors({});
+
+      if (authMode === "signin") {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: authEmail.trim(),
+          password: authPassword,
+        });
+
+        if (error) {
+          const friendly = friendlyAuthError(error.message);
+          setAuthErrors(
+            friendly.toLowerCase().includes("password")
+              ? { password: friendly }
+              : friendly.toLowerCase().includes("email")
+                ? { email: friendly }
+                : { general: friendly }
+          );
+          return;
+        }
+
+        const user = data.user;
+
+        if (user) {
+          setSessionUser(user);
+          await loadProfileForUser(user);
+          resetAuthForm();
+          setShowAuthModal(false);
+        }
+      } else {
+        const { data, error } = await supabase.auth.signUp({
+          email: authEmail.trim(),
+          password: authPassword,
+        });
+
+        if (error) {
+          const friendly = friendlyAuthError(error.message);
+          setAuthErrors(
+            friendly.toLowerCase().includes("email")
+              ? { email: friendly }
+              : friendly.toLowerCase().includes("password")
+                ? { password: friendly }
+                : { general: friendly }
+          );
+          return;
+        }
+
+        const user = data.user;
+
+        if (user) {
+          setSessionUser(user);
+          await loadProfileForUser(user, {
+            displayName: authDisplayName.trim() || null,
+          });
+          resetAuthForm();
+          setShowAuthModal(false);
+        } else {
+          setAuthMode("signin");
+          setAuthErrors({
+            general: "Account created. Please sign in to continue.",
+          });
+        }
+      }
+    } catch (err: any) {
+      setAuthErrors({
+        general: err?.message || "Unable to complete request right now.",
+      });
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
 
 // USER STREAK
@@ -936,7 +1144,8 @@ async function handleToggleFavorite(pulseId: number) {
     setErrorMsg(null);
     setValidationError(null);
 
-    const authorName = profile?.anon_name || username || "Anonymous";
+    const authorName =
+      profile?.display_name?.trim() || profile?.anon_name || username || "Anonymous";
 
     const { data, error } = await supabase
       .from("pulses")
@@ -969,7 +1178,8 @@ async function handleToggleFavorite(pulseId: number) {
     }
   };
 
-  const displayName = profile?.anon_name || username || "…";
+  const displayName =
+    profile?.display_name?.trim() || profile?.anon_name || username || "…";
   const currentStreak = streakInfo?.currentStreak ?? 0;
   const streakLabel = streakLoading
     ? "Checking streak…"
@@ -998,156 +1208,274 @@ async function handleToggleFavorite(pulseId: number) {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col">
-      <main className="flex-1 flex justify-center px-4 py-6">
-        <div className="w-full max-w-4xl space-y-6">
-          {/* Header */}
-
-        {!sessionUser ? (
-          <button
-            onClick={async () => {
-              const email = prompt("Enter your email for a magic link:");
-              if (!email) return;
-
-              const { error } = await supabase.auth.signInWithOtp({ email });
-
-              if (error) {
-                console.error("Error sending magic link:", error);
-                alert(
-                  error.message ||
-                    "Could not send magic link. Please try again in a bit."
-                );
-              } else {
-                alert("Magic link sent! Check your inbox.");
-              }
-            }}
-            className="text-sm text-pink-300 underline hover:text-pink-200 ml-4"
-          >
-            Sign in
-          </button>
-        ) : (
-          <div className="flex items-center justify-end text-sm text-slate-400 ml-4 gap-2">
-            <div className="flex flex-col items-end gap-0.5">
-              <div className="flex items-center gap-2">
-                <span>{displayName}</span>
-
-                {!profile?.name_locked ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowUsernameEditor((prev) => !prev)}
-                    className="text-[11px] px-2 py-0.5 rounded-full bg-slate-900/80 border border-slate-700 text-slate-300 hover:border-pink-400 hover:text-pink-300 transition"
-                  >
-                    🎲 Edit vibe name
-                  </button>
-                ) : (
-                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-900/80 border border-emerald-500/50 text-emerald-300 flex items-center gap-1">
-                    <span>🔒</span>
-                    <span>Username locked</span>
-                  </span>
-                )}
-
+      {showAuthModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur">
+          <div className="w-full max-w-md rounded-3xl bg-slate-950 border border-slate-800 p-6 shadow-2xl shadow-pink-500/20">
+            <div className="flex items-center justify-between mb-4">
+              <div className="inline-flex rounded-full bg-slate-900 p-1 text-xs border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode("signin");
+                    setAuthErrors({});
+                  }}
+                  className={`px-3 py-1.5 rounded-full transition ${
+                    authMode === "signin"
+                      ? "bg-pink-500 text-slate-950 shadow shadow-pink-500/40"
+                      : "text-slate-300 hover:text-white"
+                  }`}
+                >
+                  Sign in
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode("signup");
+                    setAuthErrors({});
+                  }}
+                  className={`px-3 py-1.5 rounded-full transition ${
+                    authMode === "signup"
+                      ? "bg-pink-500 text-slate-950 shadow shadow-pink-500/40"
+                      : "text-slate-300 hover:text-white"
+                  }`}
+                >
+                  Create account
+                </button>
               </div>
 
               <button
-                onClick={async () => {
-                  await supabase.auth.signOut();
-                  setSessionUser(null);
-                  setProfile(null);
+                type="button"
+                onClick={() => {
+                  setShowAuthModal(false);
+                  resetAuthForm();
                 }}
-                className="text-[11px] text-slate-500 hover:text-pink-300 underline"
+                className="text-slate-400 hover:text-slate-200 text-lg"
               >
-                Log out
+                ×
               </button>
             </div>
-          </div>
-        )}
 
-        {sessionUser && showUsernameEditor && (
-          <div className="mt-3 mx-4 rounded-2xl bg-slate-900/80 border border-slate-800 px-4 py-3 text-xs text-slate-200">
-            <p className="text-[11px] text-slate-300 mb-2">
-              Describe your vibe in <span className="font-semibold">3+ words</span>, and we&apos;ll craft a fun anonymous name for you.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-              <input
-                value={usernamePrompt}
-                onChange={(e) => setUsernamePrompt(e.target.value)}
-                placeholder="e.g. sleepy sarcastic overcaffeinated"
-                className="flex-1 rounded-2xl bg-slate-950/80 border border-slate-800 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
-              />
-                            <div className="flex gap-2 items-center">
-                <button
-                  type="button"
-                  onClick={handleGenerateUsername}
-                  disabled={
-                    usernameGenerating ||
-                    profile?.name_locked ||
-                    usernamePrompt.trim().split(/\s+/).filter(Boolean).length < 3
-                  }
-                  className="inline-flex items-center gap-1 rounded-2xl bg-pink-500 px-3 py-1.5 text-[11px] font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                >
-                  <span>{usernameGenerating ? "Rolling…" : "Roll"}</span>
-                  <span>🎲</span>
-                </button>
-                {lastAnonName && lastAnonName !== displayName && !profile?.name_locked && (
-                  <button
-                    type="button"
-                    onClick={handleRevertUsername}
-                    className="text-[11px] text-slate-400 hover:text-slate-200 underline-offset-2 hover:underline"
-                  >
-                    Undo
-                  </button>
-                )}
-                {!profile?.name_locked && (
-                  <button
-                    type="button"
-                    onClick={handleLockUsername}
-                    className="text-[11px] px-2 py-1 rounded-2xl bg-emerald-500/15 border border-emerald-500/60 text-emerald-200 hover:bg-emerald-500/25 transition"
-                  >
-                    Lock this name
-                  </button>
+            <form onSubmit={handleAuthSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs uppercase tracking-wide text-slate-400">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  className="w-full rounded-2xl bg-slate-900 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+                  placeholder="you@example.com"
+                />
+                {authErrors.email && (
+                  <p className="text-xs text-red-400">{authErrors.email}</p>
                 )}
               </div>
 
-            </div>
-            {usernameErrorMsg && (
-              <p className="mt-1 text-[11px] text-red-400">{usernameErrorMsg}</p>
-            )}
-            <p className="mt-1 text-[11px] text-slate-400">
-              Current name: <span className="text-slate-100">{displayName}</span>
-            </p>
+              <div className="space-y-2">
+                <label className="text-xs uppercase tracking-wide text-slate-400">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  className="w-full rounded-2xl bg-slate-900 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+                  placeholder="••••••••"
+                />
+                {authErrors.password && (
+                  <p className="text-xs text-red-400">{authErrors.password}</p>
+                )}
+              </div>
+
+              {authMode === "signup" && (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-xs uppercase tracking-wide text-slate-400">
+                      Confirm password
+                    </label>
+                    <input
+                      type="password"
+                      value={authConfirm}
+                      onChange={(e) => setAuthConfirm(e.target.value)}
+                      className="w-full rounded-2xl bg-slate-900 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+                      placeholder="Repeat your password"
+                    />
+                    {authErrors.confirm && (
+                      <p className="text-xs text-red-400">{authErrors.confirm}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs uppercase tracking-wide text-slate-400">
+                      Display name (optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={authDisplayName}
+                      onChange={(e) => setAuthDisplayName(e.target.value)}
+                      className="w-full rounded-2xl bg-slate-900 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+                      placeholder="How should we greet you?"
+                    />
+                  </div>
+                </>
+              )}
+
+              {authErrors.general && (
+                <p className="text-xs text-red-400">{authErrors.general}</p>
+              )}
+
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-pink-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                {authLoading
+                  ? "One sec…"
+                  : authMode === "signin"
+                    ? "Sign in"
+                    : "Create account"}
+              </button>
+            </form>
           </div>
-        )}
+        </div>
+      )}
 
-<header className="rounded-3xl bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 p-[1px] shadow-lg">
-  <div className="rounded-3xl bg-slate-950/90 px-6 py-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-    {/* Left side: title + tagline */}
-    <div>
-      <h1 className="text-3xl font-semibold tracking-tight flex flex-wrap items-center gap-2 sm:flex-nowrap">
-        <span>
-          Community <span className="text-pink-400">Pulse</span>
-        </span>
-        <span className="px-2 py-0.5 text-[10px] rounded-full bg-amber-500/20 text-amber-300 uppercase tracking-wide">
-          Beta
-        </span>
-      </h1>
-      <p className="text-sm text-slate-300 mt-1">
-        Real-time vibes from your city. No doom scroll, just quick pulses.
-      </p>
-    </div>
+      <main className="flex-1 flex justify-center px-4 py-6">
+        <div className="w-full max-w-4xl space-y-6">
+          {/* Header */}
+          <header className="rounded-3xl bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 p-[1px] shadow-lg">
+            <div className="rounded-3xl bg-slate-950/90 px-6 py-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              {/* Left side: title + tagline */}
+              <div>
+                <h1 className="text-3xl font-semibold tracking-tight flex flex-wrap items-center gap-2 sm:flex-nowrap">
+                  <span>
+                    Community <span className="text-pink-400">Pulse</span>
+                  </span>
+                  <span className="px-2 py-0.5 text-[10px] rounded-full bg-amber-500/20 text-amber-300 uppercase tracking-wide">
+                    Beta
+                  </span>
+                </h1>
+                <p className="text-sm text-slate-300 mt-1">
+                  Real-time vibes from your city. No doom scroll, just quick pulses.
+                </p>
+              </div>
 
-    {/* Right side: city selector only */}
-    <div className="flex flex-col sm:items-end gap-2">
-      <label className="text-xs text-slate-400 uppercase tracking-wide">
-        City
-      </label>
-      <input
-        value={city}
-        onChange={(e) => setCity(e.target.value)}
-        className="w-full sm:w-40 rounded-2xl bg-slate-900 border border-slate-700 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
-        placeholder="City"
-      />
-    </div>
-  </div>
-</header>
+              {/* Right side: greeting, auth, city selector */}
+              <div className="flex flex-col sm:items-end gap-3 w-full sm:w-auto">
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <span className="text-sm text-slate-200">
+                    {sessionUser ? `Hi, ${displayName}` : "Hi there"}
+                  </span>
+                  {sessionUser ? (
+                    <>
+                      {!profile?.name_locked ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowUsernameEditor((prev) => !prev)}
+                          className="text-[11px] px-2 py-1 rounded-full bg-slate-900/80 border border-slate-700 text-slate-200 hover:border-pink-400 hover:text-pink-300 transition"
+                        >
+                          🎲 Edit vibe name
+                        </button>
+                      ) : (
+                        <span className="text-[11px] px-2 py-1 rounded-full bg-slate-900/80 border border-emerald-500/50 text-emerald-300 flex items-center gap-1">
+                          <span>🔒</span>
+                          <span>Username locked</span>
+                        </span>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={handleSignOut}
+                        className="text-[11px] px-3 py-1 rounded-full bg-slate-900/80 border border-slate-700 text-slate-200 hover:border-pink-400 hover:text-pink-300 transition"
+                      >
+                        Sign out
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode("signin");
+                        resetAuthForm();
+                        setShowAuthModal(true);
+                      }}
+                      className="text-[11px] px-3 py-1 rounded-full bg-pink-500 text-slate-950 shadow shadow-pink-500/40 hover:bg-pink-400 transition"
+                    >
+                      Sign in / Create account
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-col sm:items-end gap-1 w-full sm:w-52">
+                  <label className="text-xs text-slate-400 uppercase tracking-wide">
+                    Change city
+                  </label>
+                  <input
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    className="w-full rounded-2xl bg-slate-900 border border-slate-700 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+                    placeholder="City"
+                  />
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {sessionUser && showUsernameEditor && (
+            <div className="rounded-3xl bg-slate-900/80 border border-slate-800 px-4 py-3 text-xs text-slate-200">
+              <p className="text-[11px] text-slate-300 mb-2">
+                Describe your vibe in <span className="font-semibold">3+ words</span>, and we&apos;ll craft a fun anonymous name for you.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                <input
+                  value={usernamePrompt}
+                  onChange={(e) => setUsernamePrompt(e.target.value)}
+                  placeholder="e.g. sleepy sarcastic overcaffeinated"
+                  className="flex-1 rounded-2xl bg-slate-950/80 border border-slate-800 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+                />
+                <div className="flex gap-2 items-center">
+                  <button
+                    type="button"
+                    onClick={handleGenerateUsername}
+                    disabled={
+                      usernameGenerating ||
+                      profile?.name_locked ||
+                      usernamePrompt.trim().split(/\s+/).filter(Boolean).length < 3
+                    }
+                    className="inline-flex items-center gap-1 rounded-2xl bg-pink-500 px-3 py-1.5 text-[11px] font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    <span>{usernameGenerating ? "Rolling…" : "Roll"}</span>
+                    <span>🎲</span>
+                  </button>
+                  {lastAnonName && lastAnonName !== displayName && !profile?.name_locked && (
+                    <button
+                      type="button"
+                      onClick={handleRevertUsername}
+                      className="text-[11px] text-slate-400 hover:text-slate-200 underline-offset-2 hover:underline"
+                    >
+                      Undo
+                    </button>
+                  )}
+                  {!profile?.name_locked && (
+                    <button
+                      type="button"
+                      onClick={handleLockUsername}
+                      className="text-[11px] px-2 py-1 rounded-2xl bg-emerald-500/15 border border-emerald-500/60 text-emerald-200 hover:bg-emerald-500/25 transition"
+                    >
+                      Lock this name
+                    </button>
+                  )}
+                </div>
+              </div>
+              {usernameErrorMsg && (
+                <p className="mt-1 text-[11px] text-red-400">{usernameErrorMsg}</p>
+              )}
+              <p className="mt-1 text-[11px] text-slate-400">
+                Current name: <span className="text-slate-100">{displayName}</span>
+              </p>
+            </div>
+          )}
 
         {/* Weather widget */}
         <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 flex items-center justify-between gap-3">
