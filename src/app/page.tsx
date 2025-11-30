@@ -452,16 +452,22 @@ useEffect(() => {
             home_city: homeCityValue || city || null,
           };
 
-          const { error: insertError } = await supabase
+          const { data: insertedProfile, error: insertError } = await supabase
             .from("profiles")
-            .upsert(insertPayload, { onConflict: "id" });
+            .insert(insertPayload)
+            .select("anon_name, name_locked, display_name, home_city")
+            .single();
 
           if (insertError) {
             console.error(
               "Error creating profile:",
-              insertError?.message || insertError
+              insertError?.message || insertError || "Unknown error"
             );
             return;
+          }
+
+          if (insertedProfile) {
+            displayNameValue = insertedProfile.display_name ?? displayNameValue;
           }
         } else if (
           opts?.displayName &&
