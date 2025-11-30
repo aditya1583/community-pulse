@@ -120,7 +120,6 @@ function generateFunUsername() {
 type Profile = {
   anon_name: string;
   name_locked?: boolean | null;
-  home_city?: string | null;
 };
 
 
@@ -436,13 +435,11 @@ useEffect(() => {
 
         const anon = profileData?.anon_name || generateFunUsername();
         const nameLocked = profileData?.name_locked ?? false;
-        const homeCityValue = profileData?.home_city ?? null;
 
         if (!profileData) {
           const insertPayload = {
             id: user.id,
             anon_name: anon,
-            home_city: homeCityValue || city || null,
           };
 
           const { data: insertedProfile, error: insertError } = await supabase
@@ -462,7 +459,6 @@ useEffect(() => {
           setProfile({
             anon_name: insertedProfile?.anon_name || anon,
             name_locked: insertedProfile?.name_locked ?? false,
-            home_city: insertedProfile?.home_city ?? null,
           });
           setUsername(insertedProfile?.anon_name || anon);
           return;
@@ -471,7 +467,6 @@ useEffect(() => {
         setProfile({
           anon_name: anon,
           name_locked: nameLocked,
-          home_city: homeCityValue,
         });
         setUsername(anon);
       } catch (err) {
