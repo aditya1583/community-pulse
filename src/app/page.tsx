@@ -419,62 +419,92 @@ useEffect(() => {
     return message || "Something went wrong. Please try again.";
   };
 
-  const loadProfileForUser = useCallback(
-    async (user: User) => {
-      try {
-        const { data: profileData, error } = await supabase
+  const loadProfileForUser = useCallback(async (user: User) => {
+    const userId = user?.id;
+
+    if (!userId) {
+      console.warn("Tried to load profile without a valid user id.");
+      return;
+    }
+
+    try {
+      const { data: profileData, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (error && error.code !== "PGRST116") {
+        console.error("Error loading profile:", error?.message || error);
+        return;
+      }
+
+      const anon = profileData?.anon_name || generateFunUsername();
+      const nameLocked = profileData?.name_locked ?? false;
+
+      if (!profileData) {
+        const insertPayload = {
+          id: userId,
+          anon_name: anon,
+        };
+
+        const { data: insertedProfile, error: insertError } = await supabase
           .from("profiles")
+          .insert(insertPayload)
           .select("*")
-          .eq("id", user.id)
-          .maybeSingle();
+          .single();
 
-        if (error && error.code !== "PGRST116") {
-          console.error("Error loading profile:", error?.message || error);
-          return;
-        }
+        if (insertError) {
+          if (insertError.code === "23503") {
+            // Foreign key violation can happen if the auth user row is not yet visible;
+            // retry once after a short delay.
+            await new Promise((resolve) => setTimeout(resolve, 800));
+            const retry = await supabase
+              .from("profiles")
+              .insert(insertPayload)
+              .select("*")
+              .single();
 
-        const anon = profileData?.anon_name || generateFunUsername();
-        const nameLocked = profileData?.name_locked ?? false;
+            if (retry.error) {
+              console.error(
+                "Error creating profile after retry:",
+                retry.error?.message || retry.error
+              );
+              return;
+            }
 
-        if (!profileData) {
-          const insertPayload = {
-            id: user.id,
-            anon_name: anon,
-          };
-
-          const { data: insertedProfile, error: insertError } = await supabase
-            .from("profiles")
-            .upsert(insertPayload, { onConflict: "id" })
-            .select("*")
-            .single();
-
-          if (insertError) {
-            console.error(
-              "Error creating profile:",
-              insertError?.message || insertError || "Unknown error"
-            );
+            setProfile({
+              anon_name: retry.data?.anon_name || anon,
+              name_locked: retry.data?.name_locked ?? false,
+            });
+            setUsername(retry.data?.anon_name || anon);
             return;
           }
 
-          setProfile({
-            anon_name: insertedProfile?.anon_name || anon,
-            name_locked: insertedProfile?.name_locked ?? false,
-          });
-          setUsername(insertedProfile?.anon_name || anon);
+          console.error(
+            "Error creating profile:",
+            insertError?.message || insertError || "Unknown error"
+          );
           return;
         }
 
         setProfile({
-          anon_name: anon,
-          name_locked: nameLocked,
+          anon_name: insertedProfile?.anon_name || anon,
+          name_locked: insertedProfile?.name_locked ?? false,
         });
-        setUsername(anon);
-      } catch (err) {
-        console.error("Unexpected error loading profile:", err);
+        setUsername(insertedProfile?.anon_name || anon);
+        return;
       }
-    },
-    [city]
-  );
+
+      setProfile({
+        anon_name: anon,
+        name_locked: nameLocked,
+      });
+      setUsername(anon);
+    } catch (err) {
+      console.error("Unexpected error loading profile:", err);
+    }
+  }, []);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
