@@ -164,8 +164,10 @@ export default function Home() {
 
   // Auth form state
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
+  const [authPasswordConfirm, setAuthPasswordConfirm] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -817,23 +819,33 @@ async function handleToggleFavorite(pulseId: number) {
 
 
 
+  // ========= PASSWORD VALIDATION =========
+  function validatePassword(password: string): { valid: boolean; error?: string } {
+    if (password.length < 8) {
+      return { valid: false, error: "Password must be at least 8 characters" };
+    }
+
+    if (!/[a-z]/.test(password)) {
+      return { valid: false, error: "Password must contain at least one lowercase letter" };
+    }
+
+    if (!/[A-Z]/.test(password)) {
+      return { valid: false, error: "Password must contain at least one uppercase letter" };
+    }
+
+    if (!/[0-9]/.test(password)) {
+      return { valid: false, error: "Password must contain at least one number" };
+    }
+
+    return { valid: true };
+  }
+
   // ========= AUTH HANDLER =========
   async function handleAuth(e: React.FormEvent) {
     e.preventDefault();
 
     const email = authEmail.trim();
     const password = authPassword.trim();
-
-    // Validation
-    if (!email || !password) {
-      setAuthError("Please enter both email and password.");
-      return;
-    }
-
-    if (password.length < 8) {
-      setAuthError("Password must be at least 8 characters.");
-      return;
-    }
 
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -842,39 +854,100 @@ async function handleToggleFavorite(pulseId: number) {
       return;
     }
 
+    // Validation
+    if (!email || !password) {
+      setAuthError("Please enter both email and password.");
+      return;
+    }
+
     try {
       setAuthLoading(true);
       setAuthError(null);
 
-      // Try to sign in first
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      if (authMode === "signup") {
+        // ===== SIGN UP MODE =====
 
-      if (signInError) {
-        // If sign in fails with "Invalid login credentials", try sign up
-        if (signInError.message.includes("Invalid login credentials") ||
-            signInError.message.includes("Invalid")) {
+        // Validate password strength
+        const passwordValidation = validatePassword(password);
+        if (!passwordValidation.valid) {
+          setAuthError(passwordValidation.error || "Password does not meet requirements.");
+          setAuthLoading(false);
+          return;
+        }
 
-          // Attempt sign up
-          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-            email,
-            password,
+        // Check password confirmation
+        if (password !== authPasswordConfirm) {
+          setAuthError("Passwords do not match.");
+          setAuthLoading(false);
+          return;
+        }
+
+        // Attempt sign up
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+
+        if (signUpError) {
+          setAuthError(signUpError.message || "Could not create account. Please try again.");
+          return;
+        }
+
+        if (signUpData.user) {
+          setSessionUser(signUpData.user);
+
+          // Create profile with random username
+          const anon = generateFunUsername();
+          await supabase.from("profiles").insert({
+            id: signUpData.user.id,
+            anon_name: anon,
+            name_locked: false,
           });
 
-          if (signUpError) {
-            setAuthError(signUpError.message || "Could not create account. Please try again.");
-            return;
-          }
+          setProfile({
+            anon_name: anon,
+            name_locked: false,
+          });
 
-          if (signUpData.user) {
-            setSessionUser(signUpData.user);
+          // Clear form and close modal
+          setAuthEmail("");
+          setAuthPassword("");
+          setAuthPasswordConfirm("");
+          setShowAuthModal(false);
+        }
+      } else {
+        // ===== SIGN IN MODE =====
 
-            // Create profile with random username
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (signInError) {
+          setAuthError(signInError.message || "Invalid email or password.");
+          return;
+        }
+
+        if (signInData.user) {
+          setSessionUser(signInData.user);
+
+          // Load or create profile
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", signInData.user.id)
+            .single();
+
+          if (profileData) {
+            setProfile({
+              anon_name: profileData.anon_name,
+              name_locked: profileData.name_locked ?? false,
+            });
+          } else {
+            // Create profile if it doesn't exist (legacy users)
             const anon = generateFunUsername();
             await supabase.from("profiles").insert({
-              id: signUpData.user.id,
+              id: signInData.user.id,
               anon_name: anon,
               name_locked: false,
             });
@@ -883,52 +956,14 @@ async function handleToggleFavorite(pulseId: number) {
               anon_name: anon,
               name_locked: false,
             });
-
-            // Clear form
-            setAuthEmail("");
-            setAuthPassword("");
-            setShowAuthModal(false);
           }
-        } else {
-          setAuthError(signInError.message || "Could not sign in. Please try again.");
+
+          // Clear form and close modal
+          setAuthEmail("");
+          setAuthPassword("");
+          setAuthPasswordConfirm("");
+          setShowAuthModal(false);
         }
-        return;
-      }
-
-      if (signInData.user) {
-        setSessionUser(signInData.user);
-
-        // Load or create profile
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", signInData.user.id)
-          .single();
-
-        if (profileData) {
-          setProfile({
-            anon_name: profileData.anon_name,
-            name_locked: profileData.name_locked ?? false,
-          });
-        } else {
-          // Create profile if it doesn't exist
-          const anon = generateFunUsername();
-          await supabase.from("profiles").insert({
-            id: signInData.user.id,
-            anon_name: anon,
-            name_locked: false,
-          });
-
-          setProfile({
-            anon_name: anon,
-            name_locked: false,
-          });
-        }
-
-        // Clear form and close modal
-        setAuthEmail("");
-        setAuthPassword("");
-        setShowAuthModal(false);
       }
     } catch (err: any) {
       console.error("Auth error:", err);
@@ -1120,11 +1155,45 @@ async function handleToggleFavorite(pulseId: number) {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowAuthModal(false)}>
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-slate-100">Sign in / Create account</h2>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode("signin");
+                    setAuthError(null);
+                    setAuthPasswordConfirm("");
+                  }}
+                  className={`px-4 py-1.5 rounded-xl text-sm font-medium transition ${
+                    authMode === "signin"
+                      ? "bg-pink-500 text-slate-950"
+                      : "bg-slate-950/50 text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode("signup");
+                    setAuthError(null);
+                  }}
+                  className={`px-4 py-1.5 rounded-xl text-sm font-medium transition ${
+                    authMode === "signup"
+                      ? "bg-pink-500 text-slate-950"
+                      : "bg-slate-950/50 text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  Create Account
+                </button>
+              </div>
               <button
                 onClick={() => {
                   setShowAuthModal(false);
                   setAuthError(null);
+                  setAuthEmail("");
+                  setAuthPassword("");
+                  setAuthPasswordConfirm("");
+                  setAuthMode("signin");
                 }}
                 className="text-slate-400 hover:text-slate-200 text-2xl leading-none"
               >
@@ -1164,11 +1233,36 @@ async function handleToggleFavorite(pulseId: number) {
                     setAuthPassword(e.target.value);
                     setAuthError(null);
                   }}
-                  placeholder="Minimum 8 characters"
+                  placeholder={authMode === "signup" ? "Create a strong password" : "Enter your password"}
                   className="rounded-2xl bg-slate-950/80 border border-slate-800 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
                   disabled={authLoading}
                 />
+                {authMode === "signup" && (
+                  <p className="text-[10px] text-slate-500">
+                    Must be 8+ characters with uppercase, lowercase, and number
+                  </p>
+                )}
               </div>
+
+              {authMode === "signup" && (
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="auth-password-confirm" className="text-xs text-slate-400 uppercase tracking-wide">
+                    Confirm Password
+                  </label>
+                  <input
+                    id="auth-password-confirm"
+                    type="password"
+                    value={authPasswordConfirm}
+                    onChange={(e) => {
+                      setAuthPasswordConfirm(e.target.value);
+                      setAuthError(null);
+                    }}
+                    placeholder="Re-enter your password"
+                    className="rounded-2xl bg-slate-950/80 border border-slate-800 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+                    disabled={authLoading}
+                  />
+                </div>
+              )}
 
               {authError && (
                 <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/40 rounded-2xl px-3 py-2">
@@ -1181,11 +1275,13 @@ async function handleToggleFavorite(pulseId: number) {
                 disabled={authLoading}
                 className="w-full rounded-2xl bg-pink-500 px-4 py-2.5 text-sm font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
-                {authLoading ? "Please wait..." : "Sign in / Create account"}
+                {authLoading ? "Please wait..." : authMode === "signup" ? "Create Account" : "Sign In"}
               </button>
 
               <p className="text-[11px] text-slate-500 text-center">
-                Your password is securely encrypted. We&apos;ll assign you a fun anonymous username after you sign in.
+                {authMode === "signup"
+                  ? "We'll assign you a fun anonymous username after you create your account."
+                  : "Your password is securely encrypted."}
               </p>
             </form>
           </div>
