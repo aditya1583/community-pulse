@@ -162,6 +162,12 @@ export default function Home() {
   const [showUsernameEditor, setShowUsernameEditor] = useState(false);
   const [lastAnonName, setLastAnonName] = useState<string | null>(null);
 
+  // Auth form state
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -821,6 +827,127 @@ async function handleToggleFavorite(pulseId: number) {
 
 
 
+  // ========= AUTH HANDLER =========
+  async function handleAuth(e: React.FormEvent) {
+    e.preventDefault();
+
+    const email = authEmail.trim();
+    const password = authPassword.trim();
+
+    // Validation
+    if (!email || !password) {
+      setAuthError("Please enter both email and password.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setAuthError("Password must be at least 8 characters.");
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setAuthError("Please enter a valid email address.");
+      return;
+    }
+
+    try {
+      setAuthLoading(true);
+      setAuthError(null);
+
+      // Try to sign in first
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) {
+        // If sign in fails with "Invalid login credentials", try sign up
+        if (signInError.message.includes("Invalid login credentials") ||
+            signInError.message.includes("Invalid")) {
+
+          // Attempt sign up
+          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+            email,
+            password,
+          });
+
+          if (signUpError) {
+            setAuthError(signUpError.message || "Could not create account. Please try again.");
+            return;
+          }
+
+          if (signUpData.user) {
+            setSessionUser(signUpData.user);
+
+            // Create profile with random username
+            const anon = generateFunUsername();
+            await supabase.from("profiles").insert({
+              id: signUpData.user.id,
+              anon_name: anon,
+              name_locked: false,
+            });
+
+            setProfile({
+              anon_name: anon,
+              name_locked: false,
+            });
+
+            // Clear form
+            setAuthEmail("");
+            setAuthPassword("");
+
+            alert("Welcome! Your account has been created.");
+          }
+        } else {
+          setAuthError(signInError.message || "Could not sign in. Please try again.");
+        }
+        return;
+      }
+
+      if (signInData.user) {
+        setSessionUser(signInData.user);
+
+        // Load or create profile
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", signInData.user.id)
+          .single();
+
+        if (profileData) {
+          setProfile({
+            anon_name: profileData.anon_name,
+            name_locked: profileData.name_locked ?? false,
+          });
+        } else {
+          // Create profile if it doesn't exist
+          const anon = generateFunUsername();
+          await supabase.from("profiles").insert({
+            id: signInData.user.id,
+            anon_name: anon,
+            name_locked: false,
+          });
+
+          setProfile({
+            anon_name: anon,
+            name_locked: false,
+          });
+        }
+
+        // Clear form
+        setAuthEmail("");
+        setAuthPassword("");
+      }
+    } catch (err: any) {
+      console.error("Auth error:", err);
+      setAuthError(err?.message || "Something went wrong. Please try again.");
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
   // ========= AI USERNAME GENERATOR HANDLERS =========
   async function handleGenerateUsername() {
   
@@ -1003,27 +1130,63 @@ async function handleToggleFavorite(pulseId: number) {
           {/* Header */}
 
         {!sessionUser ? (
-          <button
-            onClick={async () => {
-              const email = prompt("Enter your email for a magic link:");
-              if (!email) return;
+          <div className="ml-4">
+            <form onSubmit={handleAuth} className="flex flex-col gap-3 bg-slate-900/80 border border-slate-800 rounded-2xl px-4 py-4 max-w-sm">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="auth-email" className="text-xs text-slate-400 uppercase tracking-wide">
+                  Email
+                </label>
+                <input
+                  id="auth-email"
+                  type="email"
+                  value={authEmail}
+                  onChange={(e) => {
+                    setAuthEmail(e.target.value);
+                    setAuthError(null);
+                  }}
+                  placeholder="you@example.com"
+                  className="rounded-2xl bg-slate-950/80 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+                  disabled={authLoading}
+                />
+              </div>
 
-              const { error } = await supabase.auth.signInWithOtp({ email });
+              <div className="flex flex-col gap-1">
+                <label htmlFor="auth-password" className="text-xs text-slate-400 uppercase tracking-wide">
+                  Password
+                </label>
+                <input
+                  id="auth-password"
+                  type="password"
+                  value={authPassword}
+                  onChange={(e) => {
+                    setAuthPassword(e.target.value);
+                    setAuthError(null);
+                  }}
+                  placeholder="••••••••"
+                  className="rounded-2xl bg-slate-950/80 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+                  disabled={authLoading}
+                />
+              </div>
 
-              if (error) {
-                console.error("Error sending magic link:", error);
-                alert(
-                  error.message ||
-                    "Could not send magic link. Please try again in a bit."
-                );
-              } else {
-                alert("Magic link sent! Check your inbox.");
-              }
-            }}
-            className="text-sm text-pink-300 underline hover:text-pink-200 ml-4"
-          >
-            Sign in
-          </button>
+              {authError && (
+                <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/40 rounded-2xl px-3 py-2">
+                  {authError}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="w-full rounded-2xl bg-pink-500 px-4 py-2 text-sm font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                {authLoading ? "Please wait..." : "Sign in / Create account"}
+              </button>
+
+              <p className="text-[11px] text-slate-500 text-center">
+                Your password is securely encrypted.
+              </p>
+            </form>
+          </div>
         ) : (
           <div className="flex items-center justify-end text-sm text-slate-400 ml-4 gap-2">
             <div className="flex flex-col items-end gap-0.5">
