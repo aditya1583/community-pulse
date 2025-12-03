@@ -163,6 +163,7 @@ export default function Home() {
   const [lastAnonName, setLastAnonName] = useState<string | null>(null);
 
   // Auth form state
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
@@ -615,20 +616,9 @@ useEffect(() => {
     localStorage.setItem("cp-city", city);
   }, [city]);
 
-  // ========= LOCAL STORAGE: USERNAME (FALLBACK) =========
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const saved = localStorage.getItem("cp-username");
-    if (saved) {
-      setUsername(saved);
-      return;
-    }
-
-    const generated = generateFunUsername();
-    setUsername(generated);
-    localStorage.setItem("cp-username", generated);
-  }, []);
+  // ========= LOCAL STORAGE: USERNAME (REMOVED - NOW REQUIRES AUTH) =========
+  // Username is now only assigned after authentication via profile
+  // No more localStorage fallback to prevent confusion
 
   // ========= PULSES FETCH =========
   useEffect(() => {
@@ -897,8 +887,7 @@ async function handleToggleFavorite(pulseId: number) {
             // Clear form
             setAuthEmail("");
             setAuthPassword("");
-
-            alert("Welcome! Your account has been created.");
+            setShowAuthModal(false);
           }
         } else {
           setAuthError(signInError.message || "Could not sign in. Please try again.");
@@ -936,9 +925,10 @@ async function handleToggleFavorite(pulseId: number) {
           });
         }
 
-        // Clear form
+        // Clear form and close modal
         setAuthEmail("");
         setAuthPassword("");
+        setShowAuthModal(false);
       }
     } catch (err: any) {
       console.error("Auth error:", err);
@@ -1125,14 +1115,25 @@ async function handleToggleFavorite(pulseId: number) {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col">
-      <main className="flex-1 flex justify-center px-4 py-6">
-        <div className="w-full max-w-4xl space-y-6">
-          {/* Header */}
+      {/* Auth Modal */}
+      {showAuthModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowAuthModal(false)}>
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-slate-100">Sign in / Create account</h2>
+              <button
+                onClick={() => {
+                  setShowAuthModal(false);
+                  setAuthError(null);
+                }}
+                className="text-slate-400 hover:text-slate-200 text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
 
-        {!sessionUser ? (
-          <div className="ml-4">
-            <form onSubmit={handleAuth} className="flex flex-col gap-3 bg-slate-900/80 border border-slate-800 rounded-2xl px-4 py-4 max-w-sm">
-              <div className="flex flex-col gap-1">
+            <form onSubmit={handleAuth} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
                 <label htmlFor="auth-email" className="text-xs text-slate-400 uppercase tracking-wide">
                   Email
                 </label>
@@ -1145,12 +1146,13 @@ async function handleToggleFavorite(pulseId: number) {
                     setAuthError(null);
                   }}
                   placeholder="you@example.com"
-                  className="rounded-2xl bg-slate-950/80 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+                  className="rounded-2xl bg-slate-950/80 border border-slate-800 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
                   disabled={authLoading}
+                  autoFocus
                 />
               </div>
 
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1.5">
                 <label htmlFor="auth-password" className="text-xs text-slate-400 uppercase tracking-wide">
                   Password
                 </label>
@@ -1162,8 +1164,8 @@ async function handleToggleFavorite(pulseId: number) {
                     setAuthPassword(e.target.value);
                     setAuthError(null);
                   }}
-                  placeholder="••••••••"
-                  className="rounded-2xl bg-slate-950/80 border border-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+                  placeholder="Minimum 8 characters"
+                  className="rounded-2xl bg-slate-950/80 border border-slate-800 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
                   disabled={authLoading}
                 />
               </div>
@@ -1177,15 +1179,30 @@ async function handleToggleFavorite(pulseId: number) {
               <button
                 type="submit"
                 disabled={authLoading}
-                className="w-full rounded-2xl bg-pink-500 px-4 py-2 text-sm font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                className="w-full rounded-2xl bg-pink-500 px-4 py-2.5 text-sm font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
                 {authLoading ? "Please wait..." : "Sign in / Create account"}
               </button>
 
               <p className="text-[11px] text-slate-500 text-center">
-                Your password is securely encrypted.
+                Your password is securely encrypted. We&apos;ll assign you a fun anonymous username after you sign in.
               </p>
             </form>
+          </div>
+        </div>
+      )}
+
+      <main className="flex-1 flex justify-center px-4 py-6">
+        <div className="w-full max-w-4xl space-y-6">
+          {/* Auth button in top right */}
+        {!sessionUser ? (
+          <div className="flex justify-end">
+            <button
+              onClick={() => setShowAuthModal(true)}
+              className="text-sm px-4 py-2 rounded-2xl bg-pink-500 text-slate-950 font-medium shadow-lg shadow-pink-500/30 hover:bg-pink-400 transition"
+            >
+              Sign in
+            </button>
           </div>
         ) : (
           <div className="flex items-center justify-end text-sm text-slate-400 ml-4 gap-2">
@@ -1529,80 +1546,97 @@ async function handleToggleFavorite(pulseId: number) {
             </details>
           </div>
 
-          <div className="flex flex-wrap gap-3 items-center">
-            {/* Mood picker */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">Mood</span>
-              <div className="flex gap-1.5 bg-slate-950/70 border border-slate-800 rounded-2xl px-2 py-1">
-                {MOODS.map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => setMood(m)}
-                    className={`text-lg px-1.5 rounded-2xl transition ${
-                      mood === m
-                        ? "bg-slate-800 scale-110"
-                        : "opacity-70 hover:opacity-100"
-                    }`}
-                  >
-                    {m}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Tag select */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">Tag</span>
-              <select
-                value={tag}
-                onChange={(e) => setTag(e.target.value)}
-                className="rounded-2xl bg-slate-950/70 border border-slate-800 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
-              >
-                <option>Traffic</option>
-                <option>Weather</option>
-                <option>Events</option>
-                <option>General</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Message input */}
-          <div className="space-y-3">
-            <textarea
-              value={message}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value.length > MAX_MESSAGE_LENGTH) return;
-                setMessage(value);
-                setValidationError(null);
-              }}
-              rows={3}
-              className="w-full rounded-2xl bg-slate-950/80 border border-slate-800 px-3 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent resize-none"
-              placeholder="What’s the vibe right now? (e.g., 'Commute is smooth on 183, sunset looks insane.')"
-            />
-            <div className="flex items-center justify-between text-[11px] mt-1">
-              <span className="text-slate-500">
-                {message.length}/{MAX_MESSAGE_LENGTH}
-              </span>
-              {validationError && (
-                <span className="text-red-400">{validationError}</span>
-              )}
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] text-slate-500">
-                Posting as{" "}
-                <span className="text-slate-200">{displayName}</span>. Pulses
-                are public. Keep it kind & useful.
-              </span>
+          {!sessionUser ? (
+            <div className="rounded-2xl bg-slate-950/60 border border-slate-800 px-4 py-8 text-center">
+              <p className="text-sm text-slate-300 mb-3">
+                Sign in to drop pulses and track your streak
+              </p>
               <button
-                onClick={handleAddPulse}
-                disabled={!message.trim() || loading}
-                className="inline-flex items-center gap-1 rounded-2xl bg-pink-500 px-4 py-1.5 text-xs font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                onClick={() => setShowAuthModal(true)}
+                className="inline-flex items-center gap-2 rounded-2xl bg-pink-500 px-5 py-2 text-sm font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 transition"
               >
-                <span>Post pulse</span> <span>⚡</span>
+                <span>Sign in to post</span>
+                <span>→</span>
               </button>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-3 items-center">
+                {/* Mood picker */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400">Mood</span>
+                  <div className="flex gap-1.5 bg-slate-950/70 border border-slate-800 rounded-2xl px-2 py-1">
+                    {MOODS.map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => setMood(m)}
+                        className={`text-lg px-1.5 rounded-2xl transition ${
+                          mood === m
+                            ? "bg-slate-800 scale-110"
+                            : "opacity-70 hover:opacity-100"
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tag select */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400">Tag</span>
+                  <select
+                    value={tag}
+                    onChange={(e) => setTag(e.target.value)}
+                    className="rounded-2xl bg-slate-950/70 border border-slate-800 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+                  >
+                    <option>Traffic</option>
+                    <option>Weather</option>
+                    <option>Events</option>
+                    <option>General</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Message input */}
+              <div className="space-y-3">
+                <textarea
+                  value={message}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value.length > MAX_MESSAGE_LENGTH) return;
+                    setMessage(value);
+                    setValidationError(null);
+                  }}
+                  rows={3}
+                  className="w-full rounded-2xl bg-slate-950/80 border border-slate-800 px-3 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent resize-none"
+                  placeholder="What's the vibe right now? (e.g., 'Commute is smooth on 183, sunset looks insane.')"
+                />
+                <div className="flex items-center justify-between text-[11px] mt-1">
+                  <span className="text-slate-500">
+                    {message.length}/{MAX_MESSAGE_LENGTH}
+                  </span>
+                  {validationError && (
+                    <span className="text-red-400">{validationError}</span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-slate-500">
+                    Posting as{" "}
+                    <span className="text-slate-200">{displayName}</span>. Pulses
+                    are public. Keep it kind & useful.
+                  </span>
+                  <button
+                    onClick={handleAddPulse}
+                    disabled={!message.trim() || loading}
+                    className="inline-flex items-center gap-1 rounded-2xl bg-pink-500 px-4 py-1.5 text-xs font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    <span>Post pulse</span> <span>⚡</span>
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
           {errorMsg && (
             <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/40 rounded-2xl px-3 py-2 mt-1">
               {errorMsg}
