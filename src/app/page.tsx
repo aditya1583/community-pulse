@@ -1149,171 +1149,128 @@ async function handleToggleFavorite(pulseId: number) {
   </div>
 </header>
 
-        {/* Weather widget */}
-        <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-400">
+        {/* Info widgets grid - Weather, Mood, Traffic */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Weather widget */}
+          <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 flex flex-col items-center justify-center text-center min-h-[120px]">
+            <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">
               Weather in {weather?.cityName || city}
             </p>
             {weatherLoading ? (
-              <p className="text-sm text-slate-400 mt-1">
-                Fetching latest weather…
-              </p>
+              <p className="text-sm text-slate-400">Fetching latest weather…</p>
             ) : weather ? (
-              <p className="text-sm text-slate-100 mt-1">
-                {Math.round(weather.temp)}°F
-                <span className="text-slate-400 text-xs ml-2">
-                  (feels like {Math.round(weather.feelsLike)}°F)
+              <>
+                <span className="text-4xl mb-2">
+                  {(() => {
+                    const map: Record<string, string> = {
+                      "01d": "☀️",
+                      "01n": "🌕",
+                      "02d": "🌤️",
+                      "02n": "☁️🌙",
+                      "03d": "⛅",
+                      "03n": "☁️",
+                      "04d": "☁️",
+                      "04n": "☁️",
+                      "09d": "🌧️",
+                      "09n": "🌧️",
+                      "10d": "🌦️",
+                      "10n": "🌧️🌙",
+                      "11d": "⛈️",
+                      "11n": "🌩️",
+                      "13d": "❄️",
+                      "13n": "❄️🌙",
+                      "50d": "🌫️",
+                      "50n": "🌫️🌙",
+                    };
+                    return map[weather.icon] || "🌍";
+                  })()}
                 </span>
-                <span className="block text-xs text-slate-400 capitalize">
+                <p className="text-lg text-slate-100 font-semibold">
+                  {Math.round(weather.temp)}°F
+                </p>
+                <p className="text-xs text-slate-400">
+                  Feels like {Math.round(weather.feelsLike)}°F
+                </p>
+                <p className="text-xs text-slate-400 capitalize mt-1">
                   {weather.description}
-                </span>
-              </p>
+                </p>
+              </>
             ) : weatherError ? (
-              <p className="text-xs text-red-400 mt-1">{weatherError}</p>
+              <p className="text-xs text-red-400">{weatherError}</p>
             ) : (
-              <p className="text-xs text-slate-500 mt-1">
-                Weather data not available yet.
-              </p>
+              <p className="text-xs text-slate-500">Weather data not available yet.</p>
             )}
-          </div>
+          </section>
 
-          {weather && (
-            <div className="flex flex-col items-end">
-              <span className="text-3xl">
-                {(() => {
-                  const map: Record<string, string> = {
-                    "01d": "☀️",
-                    "01n": "🌕",
-                    "02d": "🌤️",
-                    "02n": "☁️🌙",
-                    "03d": "⛅",
-                    "03n": "☁️",
-                    "04d": "☁️",
-                    "04n": "☁️",
-                    "09d": "🌧️",
-                    "09n": "🌧️",
-                    "10d": "🌦️",
-                    "10n": "🌧️🌙",
-                    "11d": "⛈️",
-                    "11n": "🌩️",
-                    "13d": "❄️",
-                    "13n": "❄️🌙",
-                    "50d": "🌫️",
-                    "50n": "🌫️🌙",
-                  };
-
-                  return map[weather.icon] || "🌍";
-                })()}
-              </span>
-              <span className="text-[11px] text-slate-500">
-                Powered by OpenWeather
-              </span>
-            </div>
-          )}
-        </section>
-
-        {/* City Mood Meter */}
-        <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 mt-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-slate-400">
-                City mood in {city || "your city"}
-              </p>
-
-              {cityMoodLoading ? (
-                <p className="text-sm text-slate-400 mt-1">
-                  Reading the vibes…
+          {/* City Mood Meter */}
+          <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 flex flex-col items-center justify-center text-center min-h-[120px]">
+            <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">
+              City mood in {city || "your city"}
+            </p>
+            {cityMoodLoading ? (
+              <p className="text-sm text-slate-400">Reading the vibes…</p>
+            ) : cityMoodError ? (
+              <p className="text-sm text-red-400">{cityMoodError}</p>
+            ) : !cityMood || cityMood.pulseCount === 0 ? (
+              <p className="text-sm text-slate-400">Not enough recent pulses to read the mood.</p>
+            ) : (
+              <>
+                <span className="text-4xl mb-2">
+                  {cityMood.dominantMood || "😐"}
+                </span>
+                <p className="text-sm text-slate-100">
+                  From <span className="font-semibold">{cityMood.pulseCount}</span> recent pulses
                 </p>
-              ) : cityMoodError ? (
-                <p className="text-sm text-red-400 mt-1">{cityMoodError}</p>
-              ) : !cityMood || cityMood.pulseCount === 0 ? (
-                <p className="text-sm text-slate-400 mt-1">
-                  Not enough recent pulses to read the mood.
-                </p>
-              ) : (
-                <>
-                  <p className="text-sm text-slate-100 mt-1 flex items-center gap-2">
-                    <span className="text-xl">
-                      {cityMood.dominantMood || "😐"}
-                    </span>
-                    <span>
-                      Dominant mood from{" "}
-                      <span className="font-semibold">
-                        {cityMood.pulseCount}
-                      </span>{" "}
-                      recent pulses.
-                    </span>
-                  </p>
+                <div className="mt-2 flex flex-wrap gap-1 justify-center">
+                  {cityMood.scores.slice(0, 3).map((item) => (
+                    <div
+                      key={item.mood}
+                      className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-slate-950/60 border border-slate-700/60"
+                    >
+                      <span className="text-xs">{item.mood}</span>
+                      <span className="text-slate-300">{item.percent}%</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
 
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {cityMood.scores.map((item) => (
-                      <div
-                        key={item.mood}
-                        className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-full bg-slate-950/60 border border-slate-700/60"
-                      >
-                        <span className="text-sm">{item.mood}</span>
-                        <span className="text-slate-300">
-                          {item.percent}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div className="text-[10px] text-slate-500 text-right max-w-[140px]">
-              Based on recent moods posted in this city over the last few hours.
-            </div>
-          </div>
-        </section>
-
-        {/* Traffic snapshot widget */}
-        <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 flex items-center justify-between gap-3 mt-3">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-400">
+          {/* Traffic snapshot widget */}
+          <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 flex flex-col items-center justify-center text-center min-h-[120px]">
+            <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">
               Traffic in {city || "your city"}
             </p>
-
             {trafficLoading ? (
-              <p className="text-sm text-slate-400 mt-1">
-                Estimating traffic…
-              </p>
+              <p className="text-sm text-slate-400">Estimating traffic…</p>
             ) : trafficError ? (
-              <p className="text-sm text-red-400 mt-1">{trafficError}</p>
+              <p className="text-sm text-red-400">{trafficError}</p>
             ) : trafficLevel ? (
-              <p className="text-sm text-slate-100 mt-1 flex items-center gap-2">
+              <>
                 {trafficLevel === "Light" && (
-                  <span className="inline-flex items-center gap-1">
-                    <span className="text-lg">🟢</span>
-                    <span>Light traffic</span>
-                  </span>
+                  <>
+                    <span className="text-4xl mb-2">🟢</span>
+                    <p className="text-lg text-slate-100 font-semibold">Light traffic</p>
+                  </>
                 )}
                 {trafficLevel === "Moderate" && (
-                  <span className="inline-flex items-center gap-1">
-                    <span className="text-lg">🟡</span>
-                    <span>Moderate traffic</span>
-                  </span>
+                  <>
+                    <span className="text-4xl mb-2">🟡</span>
+                    <p className="text-lg text-slate-100 font-semibold">Moderate traffic</p>
+                  </>
                 )}
                 {trafficLevel === "Heavy" && (
-                  <span className="inline-flex items-center gap-1">
-                    <span className="text-lg">🔴</span>
-                    <span>Heavy traffic</span>
-                  </span>
+                  <>
+                    <span className="text-4xl mb-2">🔴</span>
+                    <p className="text-lg text-slate-100 font-semibold">Heavy traffic</p>
+                  </>
                 )}
-              </p>
+              </>
             ) : (
-              <p className="text-sm text-slate-400 mt-1">
-                Not enough recent data yet.
-              </p>
+              <p className="text-sm text-slate-400">Not enough recent data yet.</p>
             )}
-          </div>
-
-          <div className="text-[10px] text-slate-500 text-right max-w-[140px]">
-            Based on recent posts about traffic and time of day.
-          </div>
-        </section>
+          </section>
+        </div>
 
         {/* New Pulse Card */}
         <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-lg p-4 sm:p-5 space-y-4">
