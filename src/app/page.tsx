@@ -162,6 +162,15 @@ export default function Home() {
   const [showUsernameEditor, setShowUsernameEditor] = useState(false);
   const [lastAnonName, setLastAnonName] = useState<string | null>(null);
 
+  // Auth form state
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authPasswordConfirm, setAuthPasswordConfirm] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -609,20 +618,9 @@ useEffect(() => {
     localStorage.setItem("cp-city", city);
   }, [city]);
 
-  // ========= LOCAL STORAGE: USERNAME (FALLBACK) =========
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const saved = localStorage.getItem("cp-username");
-    if (saved) {
-      setUsername(saved);
-      return;
-    }
-
-    const generated = generateFunUsername();
-    setUsername(generated);
-    localStorage.setItem("cp-username", generated);
-  }, []);
+  // ========= LOCAL STORAGE: USERNAME (REMOVED - NOW REQUIRES AUTH) =========
+  // Username is now only assigned after authentication via profile
+  // No more localStorage fallback to prevent confusion
 
   // ========= PULSES FETCH =========
   useEffect(() => {
@@ -821,6 +819,160 @@ async function handleToggleFavorite(pulseId: number) {
 
 
 
+  // ========= PASSWORD VALIDATION =========
+  function validatePassword(password: string): { valid: boolean; error?: string } {
+    if (password.length < 8) {
+      return { valid: false, error: "Password must be at least 8 characters" };
+    }
+
+    if (!/[a-z]/.test(password)) {
+      return { valid: false, error: "Password must contain at least one lowercase letter" };
+    }
+
+    if (!/[A-Z]/.test(password)) {
+      return { valid: false, error: "Password must contain at least one uppercase letter" };
+    }
+
+    if (!/[0-9]/.test(password)) {
+      return { valid: false, error: "Password must contain at least one number" };
+    }
+
+    return { valid: true };
+  }
+
+  // ========= AUTH HANDLER =========
+  async function handleAuth(e: React.FormEvent) {
+    e.preventDefault();
+
+    const email = authEmail.trim();
+    const password = authPassword.trim();
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setAuthError("Please enter a valid email address.");
+      return;
+    }
+
+    // Validation
+    if (!email || !password) {
+      setAuthError("Please enter both email and password.");
+      return;
+    }
+
+    try {
+      setAuthLoading(true);
+      setAuthError(null);
+
+      if (authMode === "signup") {
+        // ===== SIGN UP MODE =====
+
+        // Validate password strength
+        const passwordValidation = validatePassword(password);
+        if (!passwordValidation.valid) {
+          setAuthError(passwordValidation.error || "Password does not meet requirements.");
+          setAuthLoading(false);
+          return;
+        }
+
+        // Check password confirmation
+        if (password !== authPasswordConfirm) {
+          setAuthError("Passwords do not match.");
+          setAuthLoading(false);
+          return;
+        }
+
+        // Attempt sign up
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+
+        if (signUpError) {
+          setAuthError(signUpError.message || "Could not create account. Please try again.");
+          return;
+        }
+
+        if (signUpData.user) {
+          setSessionUser(signUpData.user);
+
+          // Create profile with random username
+          const anon = generateFunUsername();
+          await supabase.from("profiles").insert({
+            id: signUpData.user.id,
+            anon_name: anon,
+            name_locked: false,
+          });
+
+          setProfile({
+            anon_name: anon,
+            name_locked: false,
+          });
+
+          // Clear form and close modal
+          setAuthEmail("");
+          setAuthPassword("");
+          setAuthPasswordConfirm("");
+          setShowAuthModal(false);
+        }
+      } else {
+        // ===== SIGN IN MODE =====
+
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (signInError) {
+          setAuthError(signInError.message || "Invalid email or password.");
+          return;
+        }
+
+        if (signInData.user) {
+          setSessionUser(signInData.user);
+
+          // Load or create profile
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", signInData.user.id)
+            .single();
+
+          if (profileData) {
+            setProfile({
+              anon_name: profileData.anon_name,
+              name_locked: profileData.name_locked ?? false,
+            });
+          } else {
+            // Create profile if it doesn't exist (legacy users)
+            const anon = generateFunUsername();
+            await supabase.from("profiles").insert({
+              id: signInData.user.id,
+              anon_name: anon,
+              name_locked: false,
+            });
+
+            setProfile({
+              anon_name: anon,
+              name_locked: false,
+            });
+          }
+
+          // Clear form and close modal
+          setAuthEmail("");
+          setAuthPassword("");
+          setAuthPasswordConfirm("");
+          setShowAuthModal(false);
+        }
+      }
+    } catch (err: any) {
+      console.error("Auth error:", err);
+      setAuthError(err?.message || "Something went wrong. Please try again.");
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
   // ========= AI USERNAME GENERATOR HANDLERS =========
   async function handleGenerateUsername() {
   
@@ -998,32 +1150,156 @@ async function handleToggleFavorite(pulseId: number) {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col">
+      {/* Auth Modal */}
+      {showAuthModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowAuthModal(false)}>
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode("signin");
+                    setAuthError(null);
+                    setAuthPasswordConfirm("");
+                  }}
+                  className={`px-4 py-1.5 rounded-xl text-sm font-medium transition ${
+                    authMode === "signin"
+                      ? "bg-pink-500 text-slate-950"
+                      : "bg-slate-950/50 text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode("signup");
+                    setAuthError(null);
+                  }}
+                  className={`px-4 py-1.5 rounded-xl text-sm font-medium transition ${
+                    authMode === "signup"
+                      ? "bg-pink-500 text-slate-950"
+                      : "bg-slate-950/50 text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  Create Account
+                </button>
+              </div>
+              <button
+                onClick={() => {
+                  setShowAuthModal(false);
+                  setAuthError(null);
+                  setAuthEmail("");
+                  setAuthPassword("");
+                  setAuthPasswordConfirm("");
+                  setAuthMode("signin");
+                }}
+                className="text-slate-400 hover:text-slate-200 text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleAuth} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="auth-email" className="text-xs text-slate-400 uppercase tracking-wide">
+                  Email
+                </label>
+                <input
+                  id="auth-email"
+                  type="email"
+                  value={authEmail}
+                  onChange={(e) => {
+                    setAuthEmail(e.target.value);
+                    setAuthError(null);
+                  }}
+                  placeholder="you@example.com"
+                  className="rounded-2xl bg-slate-950/80 border border-slate-800 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+                  disabled={authLoading}
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="auth-password" className="text-xs text-slate-400 uppercase tracking-wide">
+                  Password
+                </label>
+                <input
+                  id="auth-password"
+                  type="password"
+                  value={authPassword}
+                  onChange={(e) => {
+                    setAuthPassword(e.target.value);
+                    setAuthError(null);
+                  }}
+                  placeholder={authMode === "signup" ? "Create a strong password" : "Enter your password"}
+                  className="rounded-2xl bg-slate-950/80 border border-slate-800 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+                  disabled={authLoading}
+                />
+                {authMode === "signup" && (
+                  <p className="text-[10px] text-slate-500">
+                    Must be 8+ characters with uppercase, lowercase, and number
+                  </p>
+                )}
+              </div>
+
+              {authMode === "signup" && (
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="auth-password-confirm" className="text-xs text-slate-400 uppercase tracking-wide">
+                    Confirm Password
+                  </label>
+                  <input
+                    id="auth-password-confirm"
+                    type="password"
+                    value={authPasswordConfirm}
+                    onChange={(e) => {
+                      setAuthPasswordConfirm(e.target.value);
+                      setAuthError(null);
+                    }}
+                    placeholder="Re-enter your password"
+                    className="rounded-2xl bg-slate-950/80 border border-slate-800 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+                    disabled={authLoading}
+                  />
+                </div>
+              )}
+
+              {authError && (
+                <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/40 rounded-2xl px-3 py-2">
+                  {authError}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="w-full rounded-2xl bg-pink-500 px-4 py-2.5 text-sm font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                {authLoading ? "Please wait..." : authMode === "signup" ? "Create Account" : "Sign In"}
+              </button>
+
+              <p className="text-[11px] text-slate-500 text-center">
+                {authMode === "signup"
+                  ? "We'll assign you a fun anonymous username after you create your account."
+                  : "Your password is securely encrypted."}
+              </p>
+            </form>
+          </div>
+        </div>
+      )}
+
       <main className="flex-1 flex justify-center px-4 py-6">
         <div className="w-full max-w-4xl space-y-6">
-          {/* Header */}
-
+          {/* Auth button in top right */}
         {!sessionUser ? (
-          <button
-            onClick={async () => {
-              const email = prompt("Enter your email for a magic link:");
-              if (!email) return;
-
-              const { error } = await supabase.auth.signInWithOtp({ email });
-
-              if (error) {
-                console.error("Error sending magic link:", error);
-                alert(
-                  error.message ||
-                    "Could not send magic link. Please try again in a bit."
-                );
-              } else {
-                alert("Magic link sent! Check your inbox.");
-              }
-            }}
-            className="text-sm text-pink-300 underline hover:text-pink-200 ml-4"
-          >
-            Sign in
-          </button>
+          <div className="flex justify-end">
+            <button
+              onClick={() => setShowAuthModal(true)}
+              className="text-sm px-4 py-2 rounded-2xl bg-pink-500 text-slate-950 font-medium shadow-lg shadow-pink-500/30 hover:bg-pink-400 transition"
+            >
+              Sign in
+            </button>
+          </div>
         ) : (
           <div className="flex items-center justify-end text-sm text-slate-400 ml-4 gap-2">
             <div className="flex flex-col items-end gap-0.5">
@@ -1323,80 +1599,97 @@ async function handleToggleFavorite(pulseId: number) {
             </details>
           </div>
 
-          <div className="flex flex-wrap gap-3 items-center">
-            {/* Mood picker */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">Mood</span>
-              <div className="flex gap-1.5 bg-slate-950/70 border border-slate-800 rounded-2xl px-2 py-1">
-                {MOODS.map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => setMood(m)}
-                    className={`text-lg px-1.5 rounded-2xl transition ${
-                      mood === m
-                        ? "bg-slate-800 scale-110"
-                        : "opacity-70 hover:opacity-100"
-                    }`}
-                  >
-                    {m}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Tag select */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">Tag</span>
-              <select
-                value={tag}
-                onChange={(e) => setTag(e.target.value)}
-                className="rounded-2xl bg-slate-950/70 border border-slate-800 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
-              >
-                <option>Traffic</option>
-                <option>Weather</option>
-                <option>Events</option>
-                <option>General</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Message input */}
-          <div className="space-y-3">
-            <textarea
-              value={message}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value.length > MAX_MESSAGE_LENGTH) return;
-                setMessage(value);
-                setValidationError(null);
-              }}
-              rows={3}
-              className="w-full rounded-2xl bg-slate-950/80 border border-slate-800 px-3 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent resize-none"
-              placeholder="What’s the vibe right now? (e.g., 'Commute is smooth on 183, sunset looks insane.')"
-            />
-            <div className="flex items-center justify-between text-[11px] mt-1">
-              <span className="text-slate-500">
-                {message.length}/{MAX_MESSAGE_LENGTH}
-              </span>
-              {validationError && (
-                <span className="text-red-400">{validationError}</span>
-              )}
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] text-slate-500">
-                Posting as{" "}
-                <span className="text-slate-200">{displayName}</span>. Pulses
-                are public. Keep it kind & useful.
-              </span>
+          {!sessionUser ? (
+            <div className="rounded-2xl bg-slate-950/60 border border-slate-800 px-4 py-8 text-center">
+              <p className="text-sm text-slate-300 mb-3">
+                Sign in to drop pulses and track your streak
+              </p>
               <button
-                onClick={handleAddPulse}
-                disabled={!message.trim() || loading}
-                className="inline-flex items-center gap-1 rounded-2xl bg-pink-500 px-4 py-1.5 text-xs font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                onClick={() => setShowAuthModal(true)}
+                className="inline-flex items-center gap-2 rounded-2xl bg-pink-500 px-5 py-2 text-sm font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 transition"
               >
-                <span>Post pulse</span> <span>⚡</span>
+                <span>Sign in to post</span>
+                <span>→</span>
               </button>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-3 items-center">
+                {/* Mood picker */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400">Mood</span>
+                  <div className="flex gap-1.5 bg-slate-950/70 border border-slate-800 rounded-2xl px-2 py-1">
+                    {MOODS.map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => setMood(m)}
+                        className={`text-lg px-1.5 rounded-2xl transition ${
+                          mood === m
+                            ? "bg-slate-800 scale-110"
+                            : "opacity-70 hover:opacity-100"
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tag select */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400">Tag</span>
+                  <select
+                    value={tag}
+                    onChange={(e) => setTag(e.target.value)}
+                    className="rounded-2xl bg-slate-950/70 border border-slate-800 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+                  >
+                    <option>Traffic</option>
+                    <option>Weather</option>
+                    <option>Events</option>
+                    <option>General</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Message input */}
+              <div className="space-y-3">
+                <textarea
+                  value={message}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value.length > MAX_MESSAGE_LENGTH) return;
+                    setMessage(value);
+                    setValidationError(null);
+                  }}
+                  rows={3}
+                  className="w-full rounded-2xl bg-slate-950/80 border border-slate-800 px-3 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent resize-none"
+                  placeholder="What's the vibe right now? (e.g., 'Commute is smooth on 183, sunset looks insane.')"
+                />
+                <div className="flex items-center justify-between text-[11px] mt-1">
+                  <span className="text-slate-500">
+                    {message.length}/{MAX_MESSAGE_LENGTH}
+                  </span>
+                  {validationError && (
+                    <span className="text-red-400">{validationError}</span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-slate-500">
+                    Posting as{" "}
+                    <span className="text-slate-200">{displayName}</span>. Pulses
+                    are public. Keep it kind & useful.
+                  </span>
+                  <button
+                    onClick={handleAddPulse}
+                    disabled={!message.trim() || loading}
+                    className="inline-flex items-center gap-1 rounded-2xl bg-pink-500 px-4 py-1.5 text-xs font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    <span>Post pulse</span> <span>⚡</span>
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
           {errorMsg && (
             <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/40 rounded-2xl px-3 py-2 mt-1">
               {errorMsg}
