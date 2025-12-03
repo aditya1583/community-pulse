@@ -889,25 +889,77 @@ async function handleToggleFavorite(pulseId: number) {
         });
 
         if (signUpError) {
+          // Check if error is about user already existing
+          if (signUpError.message.toLowerCase().includes("already registered") ||
+              signUpError.message.toLowerCase().includes("already exists") ||
+              signUpError.message.toLowerCase().includes("user already")) {
+            setAuthError("This email is already registered. Please check your email for a confirmation link, or try signing in.");
+            return;
+          }
           setAuthError(signUpError.message || "Could not create account. Please try again.");
           return;
         }
 
+        // Check if this is a new signup or a resent confirmation
+        // Supabase returns user but may have already sent confirmation email
         if (signUpData.user) {
+          // Check if user session is not immediately available (needs confirmation)
+          if (!signUpData.session) {
+            // Email confirmation required
+            setAuthError("Account created! Please check your email to confirm your account before signing in.");
+            setAuthEmail("");
+            setAuthPassword("");
+            setAuthPasswordConfirm("");
+            return;
+          }
+
+          // User is immediately signed in (email confirmation disabled)
           setSessionUser(signUpData.user);
 
-          // Create profile with random username
-          const anon = generateFunUsername();
-          await supabase.from("profiles").insert({
-            id: signUpData.user.id,
-            anon_name: anon,
-            name_locked: false,
-          });
+          // Check if profile already exists
+          const { data: existingProfile } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", signUpData.user.id)
+            .single();
 
-          setProfile({
-            anon_name: anon,
-            name_locked: false,
-          });
+          if (existingProfile) {
+            // Profile exists, just load it
+            setProfile({
+              anon_name: existingProfile.anon_name,
+              name_locked: existingProfile.name_locked ?? false,
+            });
+          } else {
+            // Create new profile with random username
+            const anon = generateFunUsername();
+            const { error: insertError } = await supabase.from("profiles").insert({
+              id: signUpData.user.id,
+              anon_name: anon,
+              name_locked: false,
+            });
+
+            if (insertError) {
+              console.error("Error creating profile:", insertError);
+              // If insert failed, try to fetch existing profile one more time
+              const { data: retryProfile } = await supabase
+                .from("profiles")
+                .select("*")
+                .eq("id", signUpData.user.id)
+                .single();
+
+              if (retryProfile) {
+                setProfile({
+                  anon_name: retryProfile.anon_name,
+                  name_locked: retryProfile.name_locked ?? false,
+                });
+              }
+            } else {
+              setProfile({
+                anon_name: anon,
+                name_locked: false,
+              });
+            }
+          }
 
           // Clear form and close modal
           setAuthEmail("");
@@ -946,16 +998,33 @@ async function handleToggleFavorite(pulseId: number) {
           } else {
             // Create profile if it doesn't exist (legacy users)
             const anon = generateFunUsername();
-            await supabase.from("profiles").insert({
+            const { error: insertError } = await supabase.from("profiles").insert({
               id: signInData.user.id,
               anon_name: anon,
               name_locked: false,
             });
 
-            setProfile({
-              anon_name: anon,
-              name_locked: false,
-            });
+            if (insertError) {
+              console.error("Error creating profile on sign in:", insertError);
+              // If insert failed, profile might already exist, try to fetch it
+              const { data: retryProfile } = await supabase
+                .from("profiles")
+                .select("*")
+                .eq("id", signInData.user.id)
+                .single();
+
+              if (retryProfile) {
+                setProfile({
+                  anon_name: retryProfile.anon_name,
+                  name_locked: retryProfile.name_locked ?? false,
+                });
+              }
+            } else {
+              setProfile({
+                anon_name: anon,
+                name_locked: false,
+              });
+            }
           }
 
           // Clear form and close modal
@@ -1317,7 +1386,6 @@ async function handleToggleFavorite(pulseId: number) {
                 ) : (
                   <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-900/80 border border-emerald-500/50 text-emerald-300 flex items-center gap-1">
                     <span>🔒</span>
-                    <span>Username locked</span>
                   </span>
                 )}
 
@@ -1337,7 +1405,7 @@ async function handleToggleFavorite(pulseId: number) {
           </div>
         )}
 
-        {sessionUser && showUsernameEditor && (
+        {sessionUser && showUsernameEditor && !profile?.name_locked && (
           <div className="mt-3 mx-4 rounded-2xl bg-slate-900/80 border border-slate-800 px-4 py-3 text-xs text-slate-200">
             <p className="text-[11px] text-slate-300 mb-2">
               Describe your vibe in <span className="font-semibold">3+ words</span>, and we&apos;ll craft a fun anonymous name for you.
