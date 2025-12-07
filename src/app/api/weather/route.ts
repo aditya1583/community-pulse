@@ -26,7 +26,15 @@ export async function POST(req: Request) {
       );
     }
 
-    const q = encodeURIComponent(city.trim());
+    // Handle "City, ST" format - convert to OpenWeatherMap format "City,ST,US"
+    let weatherQuery = city.trim();
+    const cityStateMatch = weatherQuery.match(/^(.+),\s*([A-Z]{2})$/);
+    if (cityStateMatch) {
+      const [, cityName, stateCode] = cityStateMatch;
+      weatherQuery = `${cityName},${stateCode},US`;
+    }
+
+    const q = encodeURIComponent(weatherQuery);
 
     const url = `https://api.openweathermap.org/data/2.5/weather?q=${q}&appid=${apiKey}&units=imperial`;
 
