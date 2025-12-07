@@ -1625,9 +1625,9 @@ async function handleToggleFavorite(pulseId: number) {
             ref={cityDropdownRef}
             className="absolute z-50 top-full left-0 right-0 mt-1 bg-slate-900 border border-slate-700 rounded-2xl shadow-xl overflow-hidden max-h-64 overflow-y-auto"
           >
-            {citySuggestions.map((suggestion) => (
+            {citySuggestions.map((suggestion, idx) => (
               <button
-                key={suggestion.displayName}
+                key={`${idx}-${suggestion.displayName}`}
                 type="button"
                 onClick={() => handleCitySelect(suggestion)}
                 className="w-full px-3 py-2 text-left text-sm hover:bg-slate-800 transition flex items-center justify-between group"
