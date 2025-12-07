@@ -1636,7 +1636,9 @@ async function handleToggleFavorite(pulseId: number) {
                   {suggestion.displayName}
                 </span>
                 <span className="text-[10px] text-slate-500">
-                  {(suggestion.population / 1000).toFixed(0)}k
+                  {suggestion.population >= 1000000
+                    ? `${(suggestion.population / 1000000).toFixed(1)}M`
+                    : `${(suggestion.population / 1000).toFixed(0)}k`}
                 </span>
               </button>
             ))}
