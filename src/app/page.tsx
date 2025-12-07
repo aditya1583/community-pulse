@@ -94,6 +94,7 @@ type NewsData = {
   sourceCity: string;
   originalCity: string;
   isNearbyFallback: boolean;
+  notConfigured?: boolean;
 };
 
 // CITY MOOD
@@ -1792,6 +1793,10 @@ async function handleToggleFavorite(pulseId: number) {
             </div>
           ) : newsError ? (
             <p className="text-sm text-red-400 py-4">{newsError}</p>
+          ) : news?.notConfigured ? (
+            <p className="text-sm text-slate-500 py-4 text-center">
+              News feature coming soon
+            </p>
           ) : news && news.articles.length > 0 ? (
             <div className="space-y-2">
               {news.articles.slice(0, 5).map((article, index) => (

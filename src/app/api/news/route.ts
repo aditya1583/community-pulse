@@ -80,10 +80,14 @@ export async function GET(req: NextRequest) {
   }
 
   if (!NEWS_API_KEY) {
-    return NextResponse.json(
-      { error: "News API not configured" },
-      { status: 500 }
-    );
+    // Return empty response instead of error when API key not configured
+    return NextResponse.json({
+      articles: [],
+      sourceCity: cityParam,
+      originalCity: cityParam,
+      isNearbyFallback: false,
+      notConfigured: true,
+    });
   }
 
   // Try to find the city in our database
