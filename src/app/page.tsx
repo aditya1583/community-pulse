@@ -3,7 +3,8 @@
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
-import { searchCities, City } from "./data/cities";
+import { useGeocodingAutocomplete } from "@/hooks/useGeocodingAutocomplete";
+import type { GeocodedCity } from "@/lib/geocoding";
 
 const MAX_MESSAGE_LENGTH = 240;
 
@@ -107,6 +108,26 @@ type MoodScore = {
 const TAGS = ["All", "Traffic", "Weather", "Events", "General"];
 const MOODS = ["😊", "😐", "😢", "😡", "😴", "🤩"];
 
+const DEFAULT_CITY: GeocodedCity = {
+  id: "austin-tx-us",
+  name: "Austin",
+  state: "TX",
+  country: "US",
+  lat: 30.2672,
+  lon: -97.7431,
+  displayName: "Austin, TX, US",
+};
+
+type StoredCity = {
+  displayName: string;
+  name?: string;
+  state?: string;
+  country?: string;
+  lat?: number;
+  lon?: number;
+  id?: string;
+};
+
 function generateFunUsername() {
   const moods = [
     "Chill",
@@ -145,7 +166,13 @@ type Profile = {
 
 export default function Home() {
   // Core state
-  const [city, setCity] = useState("Austin");
+  const [city, setCity] = useState(DEFAULT_CITY.displayName);
+  const [selectedCity, setSelectedCity] = useState<GeocodedCity | null>(
+    DEFAULT_CITY
+  );
+  const [lastValidCity, setLastValidCity] = useState<GeocodedCity>(
+    DEFAULT_CITY
+  );
   const [tagFilter, setTagFilter] = useState("All");
   const [username, setUsername] = useState<string>("");
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -231,9 +258,22 @@ export default function Home() {
   const [cityMoodError, setCityMoodError] = useState<string | null>(null);
 
   // City Autocomplete
-  const [cityInput, setCityInput] = useState("Austin, TX");
-  const [citySuggestions, setCitySuggestions] = useState<City[]>([]);
-  const [showCitySuggestions, setShowCitySuggestions] = useState(false);
+  const {
+    inputValue: cityInput,
+    setInputValue: setCityInput,
+    suggestions: citySuggestions,
+    selectCity: applySuggestionSelection,
+    loading: citySuggestionsLoading,
+    error: citySuggestionsError,
+    notFound: citySuggestionsNotFound,
+    open: showCitySuggestions,
+    setOpen: setShowCitySuggestions,
+    highlightedIndex,
+    setHighlightedIndex,
+    commitInput: commitCityInput,
+    clearSuggestions,
+  } = useGeocodingAutocomplete({ minLength: 3, debounceMs: 300, limit: 7 });
+
   const cityInputRef = useRef<HTMLInputElement>(null);
   const cityDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -278,7 +318,7 @@ export default function Home() {
         }
 
         setSummary(data.summary);
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setSummaryError("Unable to summarize right now.");
           setSummary(null);
@@ -371,16 +411,6 @@ useEffect(() => {
     fetchCityMood();
   }, [city, pulses.length]);
 
-  // ========= CITY AUTOCOMPLETE =========
-  useEffect(() => {
-    if (cityInput.length >= 2) {
-      const suggestions = searchCities(cityInput, 8);
-      setCitySuggestions(suggestions);
-    } else {
-      setCitySuggestions([]);
-    }
-  }, [cityInput]);
-
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -391,20 +421,20 @@ useEffect(() => {
         !cityDropdownRef.current.contains(event.target as Node)
       ) {
         setShowCitySuggestions(false);
+        clearSuggestions();
       }
     }
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [clearSuggestions, setShowCitySuggestions]);
 
-  // Sync cityInput with city when city changes from localStorage
+  // Keep the visible input aligned with the active city label
   useEffect(() => {
-    if (city && cityInput !== city) {
+    if (city) {
       setCityInput(city);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [city, setCityInput]);
 
   // ========= NEWS FETCH =========
   useEffect(() => {
@@ -458,7 +488,13 @@ useEffect(() => {
         const res = await fetch("/api/weather", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ city }),
+          body: JSON.stringify({
+            city,
+            lat: selectedCity?.lat,
+            lon: selectedCity?.lon,
+            country: selectedCity?.country,
+            state: selectedCity?.state,
+          }),
         });
 
         const data = await res.json();
@@ -472,7 +508,7 @@ useEffect(() => {
         }
 
         setWeather(data);
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setWeather(null);
           setWeatherError("Unable to load weather.");
@@ -489,7 +525,7 @@ useEffect(() => {
     return () => {
       cancelled = true;
     };
-  }, [city]);
+  }, [city, selectedCity?.lat, selectedCity?.lon, selectedCity?.country, selectedCity?.state]);
 
   // ========= LOAD SESSION + PROFILE =========
     useEffect(() => {
@@ -708,45 +744,120 @@ useEffect(() => {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const savedCity = localStorage.getItem("cp-city");
-    if (savedCity) {
-      setCity(savedCity);
-      setCityInput(savedCity);
+    if (!savedCity) return;
+
+    try {
+      const parsed = JSON.parse(savedCity) as StoredCity;
+      if (parsed && parsed.displayName) {
+        const restoredCity: GeocodedCity = {
+          id:
+            parsed.id ||
+            `${parsed.displayName}-${parsed.lat ?? "unknown"}-${
+              parsed.lon ?? "unknown"
+            }`,
+          name:
+            parsed.name ||
+            parsed.displayName.split(",")[0]?.trim() ||
+            parsed.displayName,
+          state: parsed.state,
+          country: parsed.country,
+          lat: parsed.lat ?? DEFAULT_CITY.lat,
+          lon: parsed.lon ?? DEFAULT_CITY.lon,
+          displayName: parsed.displayName,
+        };
+
+        setCity(restoredCity.displayName);
+        setCityInput(restoredCity.displayName);
+        if (parsed.lat && parsed.lon) {
+          setSelectedCity(restoredCity);
+          setLastValidCity(restoredCity);
+        }
+        return;
+      }
+    } catch {
+      // Fallback to treating the saved value as a plain string
     }
-  }, []);
+
+    setCity(savedCity);
+    setCityInput(savedCity);
+    setSelectedCity(null);
+  }, [setCityInput, setLastValidCity, setSelectedCity, setCity]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!city) return;
-    localStorage.setItem("cp-city", city);
-  }, [city]);
+    const toStore: StoredCity =
+      selectedCity ?? {
+        displayName: city,
+      };
+
+    try {
+      localStorage.setItem("cp-city", JSON.stringify(toStore));
+    } catch {
+      // Ignore storage errors in environments where localStorage is blocked
+    }
+  }, [city, selectedCity]);
 
   // Handler for selecting a city from autocomplete
-  function handleCitySelect(selectedCity: City) {
-    setCity(selectedCity.displayName);
-    setCityInput(selectedCity.displayName);
+  function handleCitySelect(chosenCity: GeocodedCity) {
+    applySuggestionSelection(chosenCity);
+    setCity(chosenCity.displayName);
+    setSelectedCity(chosenCity);
+    setLastValidCity(chosenCity);
     setShowCitySuggestions(false);
-    setCitySuggestions([]);
   }
 
   // Handler for city input changes
   function handleCityInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value;
     setCityInput(value);
-    setShowCitySuggestions(true);
+    setShowCitySuggestions(value.trim().length >= 3);
+    setHighlightedIndex(-1);
   }
 
   // Handler for pressing Enter in city input
   function handleCityInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "ArrowDown") {
+      if (citySuggestions.length === 0) return;
+      e.preventDefault();
+      setShowCitySuggestions(true);
+      setHighlightedIndex((prev) =>
+        prev < citySuggestions.length - 1 ? prev + 1 : 0
+      );
+      return;
+    }
+
+    if (e.key === "ArrowUp") {
+      if (citySuggestions.length === 0) return;
+      e.preventDefault();
+      setShowCitySuggestions(true);
+      setHighlightedIndex((prev) =>
+        prev <= 0 ? citySuggestions.length - 1 : prev - 1
+      );
+      return;
+    }
+
     if (e.key === "Enter") {
       e.preventDefault();
       if (citySuggestions.length > 0) {
-        handleCitySelect(citySuggestions[0]);
+        const selection =
+          highlightedIndex >= 0 && highlightedIndex < citySuggestions.length
+            ? citySuggestions[highlightedIndex]
+            : citySuggestions[0];
+        handleCitySelect(selection);
       } else if (cityInput.trim()) {
-        setCity(cityInput.trim());
+        const manualCity = cityInput.trim();
+        commitCityInput();
+        setCity(manualCity);
+        setSelectedCity(null);
         setShowCitySuggestions(false);
       }
-    } else if (e.key === "Escape") {
+      return;
+    }
+
+    if (e.key === "Escape") {
       setShowCitySuggestions(false);
+      clearSuggestions();
     }
   }
 
@@ -1636,16 +1747,23 @@ async function handleToggleFavorite(pulseId: number) {
       <label className="text-xs text-slate-400 uppercase tracking-wide">
         City
       </label>
-      <div className="relative">
+      <div className="relative w-full sm:w-64">
         <input
           ref={cityInputRef}
           value={cityInput}
           onChange={handleCityInputChange}
           onKeyDown={handleCityInputKeyDown}
-          onFocus={() => cityInput.length >= 2 && setShowCitySuggestions(true)}
-          className="w-full sm:w-48 rounded-2xl bg-slate-900 border border-slate-700 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
-          placeholder="Type city name..."
+          onFocus={() =>
+            cityInput.trim().length >= 3 && setShowCitySuggestions(true)
+          }
+          className="w-full rounded-2xl bg-slate-900 border border-slate-700 px-3 py-1.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+          placeholder="Search any city (e.g., Hyderabad)"
         />
+        {citySuggestionsLoading && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-500">
+            Searching…
+          </span>
+        )}
         {showCitySuggestions && citySuggestions.length > 0 && (
           <div
             ref={cityDropdownRef}
@@ -1653,22 +1771,34 @@ async function handleToggleFavorite(pulseId: number) {
           >
             {citySuggestions.map((suggestion, idx) => (
               <button
-                key={`${idx}-${suggestion.displayName}`}
+                key={suggestion.id}
                 type="button"
+                onMouseEnter={() => setHighlightedIndex(idx)}
                 onClick={() => handleCitySelect(suggestion)}
-                className="w-full px-3 py-2 text-left text-sm hover:bg-slate-800 transition flex items-center justify-between group"
+                className={`w-full px-3 py-2 text-left text-sm transition flex items-center justify-between ${
+                  highlightedIndex === idx
+                    ? "bg-slate-800 text-pink-200"
+                    : "hover:bg-slate-800 text-slate-100"
+                }`}
               >
-                <span className="text-slate-100 group-hover:text-pink-300">
-                  {suggestion.displayName}
-                </span>
-                <span className="text-[10px] text-slate-500">
-                  {suggestion.population >= 1000000
-                    ? `${(suggestion.population / 1000000).toFixed(1)}M`
-                    : `${(suggestion.population / 1000).toFixed(0)}k`}
+                <span>{suggestion.displayName}</span>
+                <span className="text-[10px] text-slate-400">
+                  {suggestion.country || "🌍"}
                 </span>
               </button>
             ))}
           </div>
+        )}
+        {citySuggestionsNotFound && !citySuggestionsLoading && (
+          <p className="mt-1 text-[11px] text-amber-300">
+            We couldn’t find that city yet. Try typing &quot;City, Country&quot;
+            (e.g., &quot;Hyderabad, IN&quot;).
+          </p>
+        )}
+        {citySuggestionsError && (
+          <p className="mt-1 text-[11px] text-red-400">
+            {citySuggestionsError} Keeping {lastValidCity.displayName}.
+          </p>
         )}
       </div>
     </div>
