@@ -359,7 +359,7 @@ useEffect(() => {
           scores: data.scores || [],
           pulseCount: data.pulseCount || 0,
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error fetching city mood:", err);
         setCityMoodError("Unable to load city mood right now.");
         setCityMood(null);
@@ -424,9 +424,13 @@ useEffect(() => {
 
         const data: NewsData = await res.json();
         setNews(data);
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Unable to load news right now.";
         console.error("Error fetching news:", err);
-        setNewsError(err?.message || "Unable to load news right now.");
+        setNewsError(message);
         setNews(null);
       } finally {
         setNewsLoading(false);
@@ -670,7 +674,8 @@ useEffect(() => {
 
         const res = await fetch(`/api/events?city=${encodeURIComponent(city)}`);
 
-        let data: any = null;
+        type EventsResponse = { events?: EventItem[]; error?: string };
+        let data: EventsResponse | null = null;
         try {
           data = await res.json();
         } catch {
@@ -687,7 +692,7 @@ useEffect(() => {
         }
 
         setEvents((data && data.events) || []);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error fetching events:", err);
         setEventsError("Unable to load local events right now.");
         setEvents([]);
@@ -767,7 +772,7 @@ useEffect(() => {
         setErrorMsg("Could not load pulses. Try again in a bit.");
         setPulses([]);
       } else if (data) {
-        const mapped: Pulse[] = data.map((row: any) => ({
+        const mapped: Pulse[] = (data as DBPulse[]).map((row) => ({
           id: row.id,
           city: row.city,
           mood: row.mood,
@@ -801,13 +806,25 @@ useEffect(() => {
 
         const res = await fetch(`/api/traffic?city=${encodeURIComponent(city)}`);
 
-        if (!res.ok) {
-          throw new Error("Failed to fetch traffic snapshot");
+        let data: { level?: "Light" | "Moderate" | "Heavy"; error?: string } | null =
+          null;
+        try {
+          data = await res.json();
+        } catch {
+          // ignore JSON parse error
         }
 
-        const data = await res.json();
+        if (!res.ok || !data?.level) {
+          const message =
+            (data && data.error) || "Unable to load traffic right now.";
+          setTrafficError(message);
+          setTrafficLevel(null);
+          return;
+        }
+
         setTrafficLevel(data.level);
-      } catch (err: any) {
+        setTrafficError(null);
+      } catch (err: unknown) {
         console.error("Error fetching traffic:", err);
         setTrafficError("Unable to load traffic right now.");
         setTrafficLevel(null);
@@ -839,7 +856,8 @@ useEffect(() => {
         }),
       });
 
-      let data: any = null;
+      type CreateEventResponse = { event?: EventItem; error?: string };
+      let data: CreateEventResponse | null = null;
       try {
         data = await res.json();
       } catch {
@@ -860,11 +878,13 @@ useEffect(() => {
       setNewEventTitle("");
       setNewEventLocation("");
       setNewEventTime("");
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Unable to create event right now.";
       console.error("Error creating event:", err);
-      setEventCreateError(
-        err?.message || "Unable to create event right now."
-      );
+      setEventCreateError(message);
     } finally {
       setCreatingEvent(false);
     }
@@ -1161,9 +1181,13 @@ async function handleToggleFavorite(pulseId: number) {
           setShowAuthModal(false);
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Something went wrong. Please try again.";
       console.error("Auth error:", err);
-      setAuthError(err?.message || "Something went wrong. Please try again.");
+      setAuthError(message);
     } finally {
       setAuthLoading(false);
     }
@@ -1226,11 +1250,13 @@ async function handleToggleFavorite(pulseId: number) {
       if (error) {
         console.error("Error updating profile anon_name:", error);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Unable to generate a name right now.";
       console.error("Error generating username:", err);
-      setUsernameErrorMsg(
-        err?.message || "Unable to generate a name right now."
-      );
+      setUsernameErrorMsg(message);
     } finally {
       setUsernameGenerating(false);
     }

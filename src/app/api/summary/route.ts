@@ -96,11 +96,13 @@ Return ONLY the summary text, nothing else.
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error ? err.message : "Failed to generate summary";
     console.error("Error in /api/summary:", err);
     return new Response(
       JSON.stringify({
-        error: err?.message || "Failed to generate summary",
+        error: message,
       }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
