@@ -6,7 +6,7 @@ const GEOCODING_API_KEY =
   process.env.OPENWEATHER_API_KEY ||
   process.env.WEATHER_API_KEY;
 
-type OpenWeatherGeoResult = {
+type OpenWeatherGeoResultPartial = {
   name?: string;
   lat?: number;
   lon?: number;
@@ -14,7 +14,15 @@ type OpenWeatherGeoResult = {
   state?: string;
 };
 
-function isValidGeoResult(entry: OpenWeatherGeoResult): entry is Required<OpenWeatherGeoResult> {
+type OpenWeatherGeoResultValid = {
+  name: string;
+  lat: number;
+  lon: number;
+  country?: string;
+  state?: string;
+};
+
+function isValidGeoResult(entry: OpenWeatherGeoResultPartial): entry is OpenWeatherGeoResultValid {
   return (
     typeof entry.name === "string" &&
     typeof entry.lat === "number" &&
@@ -60,8 +68,9 @@ export async function GET(req: NextRequest) {
     const results: GeocodedCity[] = [];
 
     for (const entry of data) {
-      if (!isValidGeoResult(entry as OpenWeatherGeoResult)) continue;
-      const mapped = mapOpenWeatherResult(entry as OpenWeatherGeoResult);
+      const partialEntry = entry as OpenWeatherGeoResultPartial;
+      if (!isValidGeoResult(partialEntry)) continue;
+      const mapped = mapOpenWeatherResult(partialEntry);
       if (seen.has(mapped.displayName)) continue;
       seen.add(mapped.displayName);
       results.push(mapped);

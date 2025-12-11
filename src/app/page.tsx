@@ -5,6 +5,7 @@ import type { User } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
 import { useGeocodingAutocomplete } from "@/hooks/useGeocodingAutocomplete";
 import type { GeocodedCity } from "@/lib/geocoding";
+import LocalNewsCard from "@/components/LocalNewsCard";
 
 const MAX_MESSAGE_LENGTH = 240;
 
@@ -78,24 +79,6 @@ type EventItem = {
   starts_at: string;
   ends_at?: string | null;
   is_sponsored?: boolean | null;
-};
-
-// NEWS
-type NewsArticle = {
-  title: string;
-  description: string | null;
-  url: string;
-  urlToImage: string | null;
-  publishedAt: string;
-  source: { name: string };
-};
-
-type NewsData = {
-  articles: NewsArticle[];
-  sourceCity: string;
-  originalCity: string;
-  isNearbyFallback: boolean;
-  notConfigured?: boolean;
 };
 
 // CITY MOOD
@@ -277,11 +260,6 @@ export default function Home() {
   const cityInputRef = useRef<HTMLInputElement>(null);
   const cityDropdownRef = useRef<HTMLDivElement>(null);
 
-  // News
-  const [news, setNews] = useState<NewsData | null>(null);
-  const [newsLoading, setNewsLoading] = useState(false);
-  const [newsError, setNewsError] = useState<string | null>(null);
-
   // ========= AI SUMMARY =========
   useEffect(() => {
     if (pulses.length === 0) {
@@ -435,40 +413,6 @@ useEffect(() => {
       setCityInput(city);
     }
   }, [city, setCityInput]);
-
-  // ========= NEWS FETCH =========
-  useEffect(() => {
-    if (!city) return;
-
-    async function fetchNews() {
-      try {
-        setNewsLoading(true);
-        setNewsError(null);
-
-        const res = await fetch(`/api/news?city=${encodeURIComponent(city)}`);
-
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || "Failed to fetch news");
-        }
-
-        const data: NewsData = await res.json();
-        setNews(data);
-      } catch (err: unknown) {
-        const message =
-          err instanceof Error
-            ? err.message
-            : "Unable to load news right now.";
-        console.error("Error fetching news:", err);
-        setNewsError(message);
-        setNews(null);
-      } finally {
-        setNewsLoading(false);
-      }
-    }
-
-    fetchNews();
-  }, [city]);
 
   // ========= WEATHER =========
   useEffect(() => {
@@ -983,7 +927,7 @@ useEffect(() => {
       }
 
       if (data && data.event) {
-        setEvents((prev) => [data.event, ...prev]);
+        setEvents((prev) => [data.event as EventItem, ...prev]);
       }
 
       setNewEventTitle("");
@@ -1928,86 +1872,8 @@ async function handleToggleFavorite(pulseId: number) {
           </section>
         </div>
 
-        {/* Local News Section */}
-        <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-slate-200 flex items-center gap-2">
-              <span className="text-base">📰</span>
-              Local News
-              {news?.isNearbyFallback && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  from {news.sourceCity}
-                </span>
-              )}
-            </h2>
-            <span className="text-[10px] text-slate-500">
-              Powered by NewsAPI.org
-            </span>
-          </div>
-
-          {newsLoading ? (
-            <div className="flex items-center justify-center py-6">
-              <p className="text-sm text-slate-400">Fetching local news...</p>
-            </div>
-          ) : newsError ? (
-            <p className="text-sm text-red-400 py-4">{newsError}</p>
-          ) : news?.notConfigured ? (
-            <p className="text-sm text-slate-500 py-4 text-center">
-              News feature coming soon
-            </p>
-          ) : news && news.articles.length > 0 ? (
-            <div className="space-y-2">
-              {news.articles.slice(0, 5).map((article, index) => (
-                <a
-                  key={index}
-                  href={article.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block rounded-2xl bg-slate-950/60 border border-slate-800 px-3 py-2.5 hover:border-pink-500/60 hover:shadow-pink-500/20 transition group"
-                >
-                  <div className="flex gap-3">
-                    {article.urlToImage && (
-                      <div className="flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-slate-800">
-                        <img
-                          src={article.urlToImage}
-                          alt=""
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = "none";
-                          }}
-                        />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm text-slate-100 font-medium line-clamp-2 group-hover:text-pink-300 transition">
-                        {article.title}
-                      </h3>
-                      {article.description && (
-                        <p className="text-xs text-slate-400 mt-1 line-clamp-1">
-                          {article.description}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-2 mt-1.5 text-[10px] text-slate-500">
-                        <span>{article.source.name}</span>
-                        <span>•</span>
-                        <span>
-                          {new Date(article.publishedAt).toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </a>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-slate-500 py-4 text-center">
-              No local news available
-            </p>
-          )}
-        </section>
+        {/* Local News Section with AI Summary */}
+        <LocalNewsCard city={city} />
 
         {/* New Pulse Card */}
         <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-lg p-4 sm:p-5 space-y-4">
