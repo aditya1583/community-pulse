@@ -3,7 +3,8 @@ import { findCity, getNearbyCities, City } from "../../data/cities"; // eslint-d
 import { generateNewsSummary, NewsArticleSummaryInput } from "@/lib/ai";
 
 const NEWS_API_KEY = process.env.NEWS_API_KEY;
-const NEWS_API_URL = "https://newsapi.org/v2/everything";
+const NEWS_API_EVERYTHING_URL = "https://newsapi.org/v2/everything";
+const NEWS_API_TOP_HEADLINES_URL = "https://newsapi.org/v2/top-headlines";
 
 /**
  * Shape of a single news article
@@ -38,22 +39,13 @@ export type LocalNewsResponse = {
   notConfigured?: boolean;
 };
 
-// Filter out negative/doomscrolling content
+// Filter out only severe negative content
 const NEGATIVE_KEYWORDS = [
-  "death",
-  "killed",
   "murder",
-  "shooting",
-  "attack",
-  "crash",
-  "fatal",
-  "tragedy",
-  "disaster",
-  "victim",
-  "crime",
-  "threat",
-  "war",
-  "bombing",
+  "killed in",
+  "fatal shooting",
+  "mass shooting",
+  "terrorism",
 ];
 
 // Filter out non-local sports news
@@ -92,6 +84,9 @@ const LOCAL_TOPIC_KEYWORDS = [
   "opening",
   "library",
   "park",
+  "local",
+  "area",
+  "district",
 ];
 
 type RawNewsArticle = {
@@ -103,13 +98,127 @@ type RawNewsArticle = {
   source: { name: string };
 };
 
-function scoreArticle(article: RawNewsArticle): {
+function isGeographicallyRelevant(
+  article: RawNewsArticle,
+  cityName: string,
+  state?: string
+): boolean {
+  const text = `${article.title} ${article.description || ""}`.toLowerCase();
+  const cityLower = cityName.toLowerCase();
+  const stateLower = state?.toLowerCase();
+  const sourceName = article.source.name.toLowerCase();
+
+  // Must mention the city somewhere
+  if (!text.includes(cityLower)) {
+    return false;
+  }
+
+  // If we have a state, articles mentioning both city and state are highly relevant
+  if (stateLower && text.includes(stateLower)) {
+    return true;
+  }
+
+  // Check for state abbreviation (e.g., "TX", "CA")
+  const stateAbbreviations: Record<string, string> = {
+    tx: "texas", ca: "california", ny: "new york", fl: "florida",
+    il: "illinois", pa: "pennsylvania", oh: "ohio", ga: "georgia",
+    nc: "north carolina", mi: "michigan", nj: "new jersey", va: "virginia",
+    wa: "washington", az: "arizona", ma: "massachusetts", tn: "tennessee",
+    in: "indiana", mo: "missouri", md: "maryland", wi: "wisconsin",
+    co: "colorado", mn: "minnesota", sc: "south carolina", al: "alabama",
+    la: "louisiana", ky: "kentucky", or: "oregon", ok: "oklahoma",
+    ct: "connecticut", ut: "utah", ia: "iowa", nv: "nevada",
+    ar: "arkansas", ms: "mississippi", ks: "kansas", nm: "new mexico",
+  };
+
+  if (stateLower && stateAbbreviations[stateLower]) {
+    // Check for patterns like "Austin, TX" or "Austin TX" or "Austin, Texas"
+    const statePattern = new RegExp(`${cityLower}[,\\s]+${stateLower}\\b`, 'i');
+    if (statePattern.test(text)) {
+      return true;
+    }
+  }
+
+  // Check for local news source names
+  const localSourcePatterns = [
+    cityLower,
+    stateLower || "",
+    "local",
+    "chronicle",
+    "tribune",
+    "times",
+    "journal",
+    "post",
+    "news",
+    "observer",
+  ].filter(Boolean);
+
+  const hasLocalSource = localSourcePatterns.some((pattern) =>
+    sourceName.includes(pattern as string)
+  );
+
+  if (hasLocalSource && text.includes(cityLower)) {
+    return true;
+  }
+
+  // For cities with common names (Austin, Portland, etc.), be more lenient
+  // Accept if article mentions the city and doesn't mention other major cities prominently
+  const otherMajorCities = [
+    "new york city",
+    "los angeles",
+    "chicago",
+    "houston",
+    "phoenix",
+    "philadelphia",
+    "san antonio",
+    "san diego",
+    "san jose",
+    "san francisco",
+    "seattle",
+    "boston",
+    "miami",
+    "atlanta",
+    "denver",
+    "las vegas",
+    "detroit",
+    "nashville",
+    "baltimore",
+    "washington dc",
+    "washington d.c.",
+  ].filter((city) => !city.includes(cityLower));
+
+  // Only filter if ANOTHER major city is prominently mentioned in the title
+  const titleLower = article.title.toLowerCase();
+  const mentionsOtherCityInTitle = otherMajorCities.some((city) =>
+    titleLower.includes(city)
+  );
+
+  if (mentionsOtherCityInTitle) {
+    return false;
+  }
+
+  // Accept if the article mentions the city - the NewsAPI query already filters by city
+  return true;
+}
+
+function scoreArticle(
+  article: RawNewsArticle,
+  cityName: string,
+  state?: string
+): {
   score: number;
   isValid: boolean;
 } {
   const text = `${article.title} ${article.description || ""}`.toLowerCase();
+  const cityLower = cityName.toLowerCase();
+  const stateLower = state?.toLowerCase();
 
-  // Filter out negative content
+  // Check geographic relevance first
+  if (!isGeographicallyRelevant(article, cityName, state)) {
+    return { score: 0, isValid: false };
+  }
+
+  // Filter out severe negative content
   const isPositive = !NEGATIVE_KEYWORDS.some((keyword) =>
     text.includes(keyword)
   );
@@ -119,16 +228,47 @@ function scoreArticle(article: RawNewsArticle): {
     text.includes(keyword)
   );
 
-  // Calculate local topic relevance score
-  const localTopicScore = LOCAL_TOPIC_KEYWORDS.filter((keyword) =>
+  if (!isPositive || isNonLocalSports) {
+    return { score: 0, isValid: false };
+  }
+
+  // Calculate score
+  let score = 5; // Base score
+
+  // Bonus for city + state mention
+  if (stateLower && text.includes(cityLower) && text.includes(stateLower)) {
+    score += 15;
+  }
+
+  // Bonus for local topic keywords
+  const localTopicCount = LOCAL_TOPIC_KEYWORDS.filter((keyword) =>
     text.includes(keyword)
   ).length;
+  score += localTopicCount * 3;
+
+  // Bonus for local news sources
+  if (article.source.name.toLowerCase().includes(cityLower)) {
+    score += 10;
+  }
 
   return {
-    score: localTopicScore,
-    isValid: isPositive && !isNonLocalSports,
+    score,
+    isValid: true,
   };
 }
+
+// Map state abbreviations to full names for better search
+const STATE_FULL_NAMES: Record<string, string> = {
+  tx: "Texas", ca: "California", ny: "New York", fl: "Florida",
+  il: "Illinois", pa: "Pennsylvania", oh: "Ohio", ga: "Georgia",
+  nc: "North Carolina", mi: "Michigan", nj: "New Jersey", va: "Virginia",
+  wa: "Washington", az: "Arizona", ma: "Massachusetts", tn: "Tennessee",
+  in: "Indiana", mo: "Missouri", md: "Maryland", wi: "Wisconsin",
+  co: "Colorado", mn: "Minnesota", sc: "South Carolina", al: "Alabama",
+  la: "Louisiana", ky: "Kentucky", or: "Oregon", ok: "Oklahoma",
+  ct: "Connecticut", ut: "Utah", ia: "Iowa", nv: "Nevada",
+  ar: "Arkansas", ms: "Mississippi", ks: "Kansas", nm: "New Mexico",
+};
 
 async function fetchNewsForCity(
   cityName: string,
@@ -139,21 +279,25 @@ async function fetchNewsForCity(
     return [];
   }
 
-  // Build search query - include state for better results
-  const searchQuery = state
-    ? `"${cityName}" AND "${state}"`
-    : `"${cityName}"`;
+  // Build search query - use city name with OR for state variations
+  // This helps get more results for cities with common names
+  const stateFull = state ? STATE_FULL_NAMES[state.toLowerCase()] : undefined;
+  let searchQuery = `"${cityName}"`;
+  if (stateFull) {
+    // Search for "Austin" AND (Texas OR TX) to get local news
+    searchQuery = `"${cityName}" AND (${stateFull} OR ${state})`;
+  }
 
   const params = new URLSearchParams({
     q: searchQuery,
     apiKey: NEWS_API_KEY,
     language: "en",
     sortBy: "publishedAt",
-    pageSize: "50", // Fetch more to filter better
+    pageSize: "100", // Fetch more since we'll filter aggressively
   });
 
   try {
-    const response = await fetch(`${NEWS_API_URL}?${params}`, {
+    const response = await fetch(`${NEWS_API_EVERYTHING_URL}?${params}`, {
       headers: {
         "User-Agent": "CommunityPulse/1.0",
       },
@@ -179,12 +323,10 @@ async function fetchNewsForCity(
       )
       .map((article: RawNewsArticle) => ({
         article,
-        ...scoreArticle(article),
+        ...scoreArticle(article, cityName, state),
       }))
       .filter((item: { isValid: boolean }) => item.isValid)
-      .sort(
-        (a: { score: number }, b: { score: number }) => b.score - a.score
-      )
+      .sort((a: { score: number }, b: { score: number }) => b.score - a.score)
       .map((item: { article: RawNewsArticle }) => item.article);
 
     return validArticles;
@@ -206,7 +348,6 @@ export async function GET(req: NextRequest) {
   }
 
   if (!NEWS_API_KEY) {
-    // Return empty response instead of error when API key not configured
     const response: LocalNewsResponse = {
       articles: [],
       aiSummary: null,
@@ -293,7 +434,10 @@ export async function GET(req: NextRequest) {
     articles,
     aiSummary,
     city: city?.displayName || cityParam,
-    sourceCity: isNearbyFallback && rawArticles.length > 0 ? sourceCity : (city?.displayName || cityParam),
+    sourceCity:
+      isNearbyFallback && rawArticles.length > 0
+        ? sourceCity
+        : city?.displayName || cityParam,
     isNearbyFallback: isNearbyFallback && rawArticles.length > 0,
     fetchedAt: new Date().toISOString(),
   };
