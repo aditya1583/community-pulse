@@ -6,6 +6,14 @@ type WeatherResponse = {
   cityName: string;
 };
 
+type WeatherRequest = {
+  city: string;
+  lat?: number;
+  lon?: number;
+  country?: string | null;
+  state?: string | null;
+};
+
 export async function POST(req: Request) {
   try {
     const apiKey = process.env.WEATHER_API_KEY;
@@ -17,7 +25,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { city } = body as { city: string };
+    const { city, lat, lon, country, state } = body as WeatherRequest;
 
     if (!city || !city.trim()) {
       return new Response(
@@ -26,17 +34,26 @@ export async function POST(req: Request) {
       );
     }
 
-    // Handle "City, ST" format - convert to OpenWeatherMap format "City,ST,US"
-    let weatherQuery = city.trim();
-    const cityStateMatch = weatherQuery.match(/^(.+),\s*([A-Z]{2})$/);
-    if (cityStateMatch) {
-      const [, cityName, stateCode] = cityStateMatch;
-      weatherQuery = `${cityName},${stateCode},US`;
+    // Prefer coordinates for accuracy; fall back to text query
+    let url = "";
+    if (typeof lat === "number" && typeof lon === "number") {
+      url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=imperial`;
+    } else {
+      // Handle "City, ST" format - convert to OpenWeatherMap format "City,ST,COUNTRY"
+      let weatherQuery = city.trim();
+      const cityStateMatch = weatherQuery.match(/^(.+),\s*([A-Z]{2})$/);
+      if (cityStateMatch && (country === "US" || !country)) {
+        const [, cityName, stateCode] = cityStateMatch;
+        weatherQuery = `${cityName},${stateCode},US`;
+      } else if (country && !weatherQuery.toLowerCase().includes(country.toLowerCase())) {
+        weatherQuery = `${weatherQuery},${country}`;
+      } else if (state && !weatherQuery.toLowerCase().includes(state.toLowerCase())) {
+        weatherQuery = `${weatherQuery},${state}`;
+      }
+
+      const q = encodeURIComponent(weatherQuery);
+      url = `https://api.openweathermap.org/data/2.5/weather?q=${q}&appid=${apiKey}&units=imperial`;
     }
-
-    const q = encodeURIComponent(weatherQuery);
-
-    const url = `https://api.openweathermap.org/data/2.5/weather?q=${q}&appid=${apiKey}&units=imperial`;
 
     const res = await fetch(url);
     const data = await res.json();
