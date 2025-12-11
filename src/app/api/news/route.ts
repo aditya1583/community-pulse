@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { findCity, getNearbyCities, City } from "../../data/cities";
+import { findCity, getNearbyCities, City } from "../../data/cities"; // eslint-disable-line @typescript-eslint/no-unused-vars
 
 const NEWS_API_KEY = process.env.NEWS_API_KEY;
 const NEWS_API_URL = "https://newsapi.org/v2/everything";
