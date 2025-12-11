@@ -20,6 +20,45 @@ type NewsResponse = {
   isNearbyFallback: boolean;
 };
 
+// Filter out negative/doomscrolling content
+const NEGATIVE_KEYWORDS = [
+  'death', 'killed', 'murder', 'shooting', 'attack', 'crash', 'fatal',
+  'tragedy', 'disaster', 'victim', 'crime', 'threat', 'war', 'bombing'
+];
+
+// Filter out non-local sports news
+const NON_LOCAL_SPORTS_KEYWORDS = [
+  'penn state', 'ohio state', 'michigan state', 'florida state',
+  'ncaa tournament', 'ncaa women', 'ncaa men', 'bowl game',
+  'march madness', 'final four', 'college football playoff'
+];
+
+// Local community topics to prioritize
+const LOCAL_TOPIC_KEYWORDS = [
+  'city council', 'school district', 'local business', 'downtown',
+  'traffic', 'road closure', 'construction', 'weather', 'festival',
+  'community', 'neighborhood', 'residents', 'mayor', 'election',
+  'development', 'new restaurant', 'opening', 'library', 'park'
+];
+
+function scoreArticle(article: NewsArticle): { score: number; isValid: boolean } {
+  const text = `${article.title} ${article.description || ''}`.toLowerCase();
+
+  // Filter out negative content
+  const isPositive = !NEGATIVE_KEYWORDS.some(keyword => text.includes(keyword));
+
+  // Filter out non-local sports
+  const isNonLocalSports = NON_LOCAL_SPORTS_KEYWORDS.some(keyword => text.includes(keyword));
+
+  // Calculate local topic relevance score
+  const localTopicScore = LOCAL_TOPIC_KEYWORDS.filter(keyword => text.includes(keyword)).length;
+
+  return {
+    score: localTopicScore,
+    isValid: isPositive && !isNonLocalSports
+  };
+}
+
 async function fetchNewsForCity(cityName: string, state?: string): Promise<NewsArticle[]> {
   if (!NEWS_API_KEY) {
     console.error("NEWS_API_KEY not configured");
@@ -34,7 +73,7 @@ async function fetchNewsForCity(cityName: string, state?: string): Promise<NewsA
     apiKey: NEWS_API_KEY,
     language: "en",
     sortBy: "publishedAt",
-    pageSize: "10",
+    pageSize: "50", // Fetch more to filter better
   });
 
   try {
@@ -53,13 +92,21 @@ async function fetchNewsForCity(cityName: string, state?: string): Promise<NewsA
 
     const data = await response.json();
 
-    // Filter out articles with [Removed] content (NewsAPI sometimes returns these)
-    const validArticles = (data.articles || []).filter((article: NewsArticle) =>
-      article.title &&
-      article.title !== "[Removed]" &&
-      article.description &&
-      article.description !== "[Removed]"
-    );
+    // Filter, score, and sort articles
+    const validArticles = (data.articles || [])
+      .filter((article: NewsArticle) =>
+        article.title &&
+        article.title !== "[Removed]" &&
+        article.description &&
+        article.description !== "[Removed]"
+      )
+      .map((article: NewsArticle) => ({
+        article,
+        ...scoreArticle(article)
+      }))
+      .filter((item: { isValid: boolean }) => item.isValid)
+      .sort((a: { score: number }, b: { score: number }) => b.score - a.score)
+      .map((item: { article: NewsArticle }) => item.article);
 
     return validArticles;
   } catch (error) {
