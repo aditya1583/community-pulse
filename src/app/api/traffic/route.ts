@@ -226,9 +226,10 @@ export async function GET(req: NextRequest) {
 
     if (error) {
       console.error("Error fetching pulses for traffic:", error);
+      // Return graceful error payload so the client can show a friendly message
       return NextResponse.json(
-        { error: "Failed to fetch pulses" },
-        { status: 500 }
+        { level: null, error: "Failed to fetch pulses" },
+        { status: 200 }
       );
     }
 
@@ -258,8 +259,8 @@ export async function GET(req: NextRequest) {
   } catch (e) {
     console.error("Unexpected error in /api/traffic:", e);
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { level: null, error: "Internal server error" },
+      { status: 200 }
     );
   }
 }
