@@ -270,6 +270,51 @@ const STATE_FULL_NAMES: Record<string, string> = {
   ar: "Arkansas", ms: "Mississippi", ks: "Kansas", nm: "New Mexico",
 };
 
+/**
+ * Parsed result from a comma-separated city string
+ */
+export type ParsedCityString = {
+  cityName: string;
+  region?: string;
+  country?: string;
+};
+
+/**
+ * Parse a comma-separated city string into its components.
+ * Handles formats like:
+ *   - "Austin, TX, US" -> { cityName: "Austin", region: "TX", country: "US" }
+ *   - "Austin, Texas, US" -> { cityName: "Austin", region: "Texas", country: "US" }
+ *   - "Austin, TX" -> { cityName: "Austin", region: "TX" }
+ *   - "Austin" -> { cityName: "Austin" }
+ */
+export function parseCityString(cityString: string): ParsedCityString {
+  const parts = cityString.split(",").map((part) => part.trim()).filter(Boolean);
+
+  if (parts.length === 0) {
+    return { cityName: cityString.trim() || "" };
+  }
+
+  if (parts.length === 1) {
+    return { cityName: parts[0] };
+  }
+
+  if (parts.length === 2) {
+    return { cityName: parts[0], region: parts[1] };
+  }
+
+  // 3+ parts: first is city, second is region, third is country
+  return {
+    cityName: parts[0],
+    region: parts[1],
+    country: parts[2],
+  };
+}
+
+// Map full state names to abbreviations (reverse of STATE_FULL_NAMES)
+const STATE_ABBREVS: Record<string, string> = Object.fromEntries(
+  Object.entries(STATE_FULL_NAMES).map(([abbrev, full]) => [full.toLowerCase(), abbrev.toUpperCase()])
+);
+
 async function fetchNewsForCity(
   cityName: string,
   state?: string
@@ -281,11 +326,32 @@ async function fetchNewsForCity(
 
   // Build search query - use city name with OR for state variations
   // This helps get more results for cities with common names
-  const stateFull = state ? STATE_FULL_NAMES[state.toLowerCase()] : undefined;
+  let stateFull: string | undefined;
+  let stateAbbrev: string | undefined;
+
+  if (state) {
+    const stateLower = state.toLowerCase();
+    // Check if state is an abbreviation (e.g., "TX")
+    if (STATE_FULL_NAMES[stateLower]) {
+      stateFull = STATE_FULL_NAMES[stateLower];
+      stateAbbrev = state.toUpperCase();
+    } else if (STATE_ABBREVS[stateLower]) {
+      // State is a full name (e.g., "Texas")
+      stateAbbrev = STATE_ABBREVS[stateLower];
+      stateFull = state;
+    } else {
+      // Unknown state format - use as-is
+      stateFull = state;
+      stateAbbrev = state;
+    }
+  }
+
   let searchQuery = `"${cityName}"`;
-  if (stateFull) {
+  if (stateFull && stateAbbrev) {
     // Search for "Austin" AND (Texas OR TX) to get local news
-    searchQuery = `"${cityName}" AND (${stateFull} OR ${state})`;
+    searchQuery = `"${cityName}" AND (${stateFull} OR ${stateAbbrev})`;
+  } else if (stateFull) {
+    searchQuery = `"${cityName}" AND ${stateFull}`;
   }
 
   const params = new URLSearchParams({
@@ -360,10 +426,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(response);
   }
 
-  // Try to find the city in our database
-  const city = findCity(cityParam);
-  const cityName = city?.name || cityParam;
-  const state = city?.state;
+  // Parse the city string to extract components (handles "Austin, TX, US" format)
+  const parsed = parseCityString(cityParam);
+
+  // Try to find the city in our database using just the city name
+  const city = findCity(parsed.cityName) || findCity(cityParam);
+
+  // Use city database values if found, otherwise fall back to parsed values
+  const cityName = city?.name || parsed.cityName;
+  // Use parsed region if city not found in database (supports both abbrev and full state names)
+  const state = city?.state || parsed.region;
 
   // First, try to fetch news for the requested city
   let rawArticles = await fetchNewsForCity(cityName, state);
