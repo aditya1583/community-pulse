@@ -159,8 +159,8 @@ export default function Home() {
   const [tagFilter, setTagFilter] = useState("All");
   const [username, setUsername] = useState<string>("");
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [mood, setMood] = useState("😊");
-  const [tag, setTag] = useState("General");
+  const [mood, setMood] = useState("");
+  const [tag, setTag] = useState("");
   const [message, setMessage] = useState("");
   const [pulses, setPulses] = useState<Pulse[]>([]);
 
@@ -190,6 +190,16 @@ export default function Home() {
   const [usernameErrorMsg, setUsernameErrorMsg] = useState<string | null>(null);
   const [showUsernameEditor, setShowUsernameEditor] = useState(false);
   const [lastAnonName, setLastAnonName] = useState<string | null>(null);
+
+  // First-time user onboarding
+  const [showFirstPulseModal, setShowFirstPulseModal] = useState(false);
+  const [showFirstPulseBadgeToast, setShowFirstPulseBadgeToast] = useState(false);
+  const [hasShownOnboarding, setHasShownOnboarding] = useState(false);
+
+  // Form validation errors for mood and tag
+  const [moodValidationError, setMoodValidationError] = useState<string | null>(null);
+  const [tagValidationError, setTagValidationError] = useState<string | null>(null);
+  const [showValidationErrors, setShowValidationErrors] = useState(false);
 
   // Auth form state
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -259,6 +269,7 @@ export default function Home() {
 
   const cityInputRef = useRef<HTMLInputElement>(null);
   const cityDropdownRef = useRef<HTMLDivElement>(null);
+  const pulseTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // ========= AI SUMMARY =========
   useEffect(() => {
@@ -601,6 +612,18 @@ const loadStreak = useCallback(async () => {
 useEffect(() => {
   loadStreak();
 }, [loadStreak]);
+
+// ========= FIRST-TIME USER ONBOARDING =========
+useEffect(() => {
+  // Only show onboarding modal once streak loading is complete
+  // and we have a logged-in user with 0 pulses
+  if (streakLoading || !sessionUser || hasShownOnboarding) return;
+
+  if (userPulseCount === 0) {
+    setShowFirstPulseModal(true);
+    setHasShownOnboarding(true);
+  }
+}, [streakLoading, sessionUser, userPulseCount, hasShownOnboarding]);
 
 
 
@@ -1355,18 +1378,54 @@ async function handleToggleFavorite(pulseId: number) {
   // ========= ADD PULSE =========
   const handleAddPulse = async () => {
     const trimmed = message.trim();
-    if (!trimmed) return;
 
-    if (!isCleanMessage(trimmed)) {
+    // Validate all required fields
+    let hasErrors = false;
+
+    if (!mood) {
+      setMoodValidationError("Pick a mood so others know how you're feeling.");
+      hasErrors = true;
+    } else {
+      setMoodValidationError(null);
+    }
+
+    if (!tag) {
+      setTagValidationError("Choose a tag so we can organize your pulse.");
+      hasErrors = true;
+    } else {
+      setTagValidationError(null);
+    }
+
+    if (!trimmed) {
+      setValidationError("Write something to share with your city.");
+      hasErrors = true;
+    } else if (!isCleanMessage(trimmed)) {
       setValidationError("Pulse contains disallowed language.");
+      hasErrors = true;
+    } else {
+      setValidationError(null);
+    }
+
+    if (hasErrors) {
+      setShowValidationErrors(true);
       return;
     }
 
     setErrorMsg(null);
-    setValidationError(null);
+    setShowValidationErrors(false);
+
+    // Track if this is the user's first pulse (before we post)
+    const wasFirstPulse = userPulseCount === 0;
 
     const authorName = profile?.anon_name || username || "Anonymous";
 
+    // Note: For full server-side validation, add NOT NULL constraints and
+    // CHECK constraints on the pulses table for mood and tag columns.
+    // Example SQL:
+    //   ALTER TABLE pulses ALTER COLUMN mood SET NOT NULL;
+    //   ALTER TABLE pulses ALTER COLUMN tag SET NOT NULL;
+    //   ALTER TABLE pulses ADD CONSTRAINT mood_not_empty CHECK (mood <> '');
+    //   ALTER TABLE pulses ADD CONSTRAINT tag_not_empty CHECK (tag <> '');
     const { data, error } = await supabase
       .from("pulses")
       .insert([
@@ -1394,20 +1453,25 @@ async function handleToggleFavorite(pulseId: number) {
 
       if (sessionUser) {
         await loadStreak();
+
+        // Show first pulse badge toast if this was their first pulse
+        if (wasFirstPulse) {
+          setShowFirstPulseBadgeToast(true);
+          // Auto-hide the toast after 5 seconds
+          setTimeout(() => {
+            setShowFirstPulseBadgeToast(false);
+          }, 5000);
+        }
       }
     }
   };
 
-  const displayName = profile?.anon_name || username || "…";
+  const displayName = profile?.anon_name || username || "...";
   const currentStreak = streakInfo?.currentStreak ?? 0;
-  const streakLabel = streakLoading
-    ? "Checking streak…"
-    : !sessionUser
-      ? "Sign in to track streaks"
-      : currentStreak > 0
-        ? `Streak: ${currentStreak} day${currentStreak === 1 ? "" : "s"} 🔥`
-        : "Start a streak today!";
 
+  // Badge definitions (streak data still used for badges/summaries, just not in composer header)
+  // These are intentionally defined for future badge display features
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const badges = [
     {
       id: "first-pulse",
@@ -1423,10 +1487,71 @@ async function handleToggleFavorite(pulseId: number) {
     },
   ];
 
-  const unlockedBadges = badges.filter((b) => b.unlocked).length;
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col">
+      {/* First-Time User Onboarding Modal */}
+      {showFirstPulseModal && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setShowFirstPulseModal(false)}
+        >
+          <div
+            className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-5xl mb-4">{"<"}3</div>
+            <h2 className="text-xl font-semibold text-slate-100 mb-2">
+              Drop your first pulse
+            </h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Tell your city what&apos;s up right now — traffic, weather, mood, anything.
+            </p>
+            <button
+              onClick={() => {
+                setShowFirstPulseModal(false);
+                // Focus the pulse textarea after modal closes
+                setTimeout(() => {
+                  pulseTextareaRef.current?.focus();
+                }, 100);
+              }}
+              className="inline-flex items-center gap-2 rounded-2xl bg-pink-500 px-6 py-2.5 text-sm font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 transition"
+            >
+              <span>Start my first pulse</span>
+              <span>{">"}</span>
+            </button>
+            <button
+              onClick={() => setShowFirstPulseModal(false)}
+              className="block mx-auto mt-3 text-xs text-slate-500 hover:text-slate-300 transition"
+            >
+              Maybe later
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* First Pulse Badge Toast */}
+      {showFirstPulseBadgeToast && (
+        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 fade-in duration-300">
+          <div className="bg-emerald-500/15 border border-emerald-500/60 rounded-2xl px-4 py-3 shadow-lg shadow-emerald-500/20 flex items-center gap-3">
+            <span className="text-2xl">{"<"}3</span>
+            <div>
+              <p className="text-sm font-medium text-emerald-100">
+                Nice! You just started your streak
+              </p>
+              <p className="text-xs text-emerald-300/80">
+                and unlocked your first badge
+              </p>
+            </div>
+            <button
+              onClick={() => setShowFirstPulseBadgeToast(false)}
+              className="text-emerald-300 hover:text-emerald-100 text-lg leading-none ml-2"
+            >
+              x
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Auth Modal */}
       {showAuthModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowAuthModal(false)}>
@@ -1887,44 +2012,6 @@ async function handleToggleFavorite(pulseId: number) {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-2xl bg-slate-950/60 border border-slate-800 px-3 py-2">
-            <div className="text-xs sm:text-sm text-slate-200">{streakLabel}</div>
-
-            <details className="group text-xs text-slate-300 w-full sm:w-auto">
-              <summary className="flex items-center gap-2 cursor-pointer select-none list-none">
-                <span>Badges</span>
-                <span className="text-[10px] text-slate-400">
-                  ({unlockedBadges}/{badges.length})
-                </span>
-                <span className="text-sm">🏅</span>
-              </summary>
-
-              <div className="mt-2 flex flex-wrap gap-2">
-                {badges.map((badge) => (
-                  <div
-                    key={badge.id}
-                    className={`flex items-start gap-2 rounded-2xl border px-3 py-2 ${
-                      badge.unlocked
-                        ? "border-emerald-400/60 bg-emerald-500/10 text-emerald-100"
-                        : "border-slate-800 bg-slate-900/70 text-slate-300"
-                    }`}
-                  >
-                    <span className="text-lg">
-                      {badge.unlocked ? "✨" : "🔒"}
-                    </span>
-                    <div className="flex flex-col">
-                      <span className="text-xs font-semibold text-slate-100">
-                        {badge.name}
-                      </span>
-                      <span className="text-[11px] text-slate-400">
-                        {badge.description}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </details>
-          </div>
 
           {!sessionUser ? (
             <div className="rounded-2xl bg-slate-950/60 border border-slate-800 px-4 py-8 text-center">
@@ -1941,46 +2028,72 @@ async function handleToggleFavorite(pulseId: number) {
             </div>
           ) : (
             <>
-              <div className="flex flex-wrap gap-3 items-center">
+              <div className="flex flex-wrap gap-3 items-start">
                 {/* Mood picker */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400">Mood</span>
-                  <div className="flex gap-1.5 bg-slate-950/70 border border-slate-800 rounded-2xl px-2 py-1">
-                    {MOODS.map((m) => (
-                      <button
-                        key={m}
-                        onClick={() => setMood(m)}
-                        className={`text-lg px-1.5 rounded-2xl transition ${
-                          mood === m
-                            ? "bg-slate-800 scale-110"
-                            : "opacity-70 hover:opacity-100"
-                        }`}
-                      >
-                        {m}
-                      </button>
-                    ))}
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400">Mood</span>
+                    <div className={`flex gap-1.5 bg-slate-950/70 border rounded-2xl px-2 py-1 ${
+                      showValidationErrors && moodValidationError
+                        ? "border-red-500/60"
+                        : "border-slate-800"
+                    }`}>
+                      {MOODS.map((m) => (
+                        <button
+                          key={m}
+                          onClick={() => {
+                            setMood(m);
+                            setMoodValidationError(null);
+                          }}
+                          className={`text-lg px-1.5 rounded-2xl transition ${
+                            mood === m
+                              ? "bg-slate-800 scale-110"
+                              : "opacity-70 hover:opacity-100"
+                          }`}
+                        >
+                          {m}
+                        </button>
+                      ))}
+                    </div>
                   </div>
+                  {showValidationErrors && moodValidationError && (
+                    <p className="text-[11px] text-red-400 ml-10">{moodValidationError}</p>
+                  )}
                 </div>
 
                 {/* Tag select */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400">Tag</span>
-                  <select
-                    value={tag}
-                    onChange={(e) => setTag(e.target.value)}
-                    className="rounded-2xl bg-slate-950/70 border border-slate-800 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
-                  >
-                    <option>Traffic</option>
-                    <option>Weather</option>
-                    <option>Events</option>
-                    <option>General</option>
-                  </select>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400">Tag</span>
+                    <select
+                      value={tag}
+                      onChange={(e) => {
+                        setTag(e.target.value);
+                        setTagValidationError(null);
+                      }}
+                      className={`rounded-2xl bg-slate-950/70 border px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent ${
+                        showValidationErrors && tagValidationError
+                          ? "border-red-500/60"
+                          : "border-slate-800"
+                      } ${!tag ? "text-slate-500" : ""}`}
+                    >
+                      <option value="" disabled>Select a tag...</option>
+                      <option value="Traffic">Traffic</option>
+                      <option value="Weather">Weather</option>
+                      <option value="Events">Events</option>
+                      <option value="General">General</option>
+                    </select>
+                  </div>
+                  {showValidationErrors && tagValidationError && (
+                    <p className="text-[11px] text-red-400 ml-7">{tagValidationError}</p>
+                  )}
                 </div>
               </div>
 
               {/* Message input */}
               <div className="space-y-3">
                 <textarea
+                  ref={pulseTextareaRef}
                   value={message}
                   onChange={(e) => {
                     const value = e.target.value;
@@ -1989,14 +2102,18 @@ async function handleToggleFavorite(pulseId: number) {
                     setValidationError(null);
                   }}
                   rows={3}
-                  className="w-full rounded-2xl bg-slate-950/80 border border-slate-800 px-3 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent resize-none"
+                  className={`w-full rounded-2xl bg-slate-950/80 border px-3 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent resize-none ${
+                    showValidationErrors && validationError
+                      ? "border-red-500/60"
+                      : "border-slate-800"
+                  }`}
                   placeholder="What's the vibe right now? (e.g., 'Commute is smooth on 183, sunset looks insane.')"
                 />
                 <div className="flex items-center justify-between text-[11px] mt-1">
                   <span className="text-slate-500">
                     {message.length}/{MAX_MESSAGE_LENGTH}
                   </span>
-                  {validationError && (
+                  {showValidationErrors && validationError && (
                     <span className="text-red-400">{validationError}</span>
                   )}
                 </div>
@@ -2008,7 +2125,7 @@ async function handleToggleFavorite(pulseId: number) {
                   </span>
                   <button
                     onClick={handleAddPulse}
-                    disabled={!message.trim() || loading}
+                    disabled={!mood || !tag || !message.trim() || loading}
                     className="inline-flex items-center gap-1 rounded-2xl bg-pink-500 px-4 py-1.5 text-xs font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 disabled:opacity-40 disabled:cursor-not-allowed transition"
                   >
                     <span>Post pulse</span> <span>⚡</span>
