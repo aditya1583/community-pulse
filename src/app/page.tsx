@@ -6,16 +6,23 @@ import { supabase } from "../../lib/supabaseClient";
 import { useGeocodingAutocomplete } from "@/hooks/useGeocodingAutocomplete";
 import type { GeocodedCity } from "@/lib/geocoding";
 import LocalNewsCard from "@/components/LocalNewsCard";
+import {
+  formatPulseDateTime,
+  formatPulseLocation,
+  isInRecentWindow,
+  isPostEnabled,
+  readOnboardingCompleted,
+  resetComposerAfterSuccessfulPost,
+  shouldShowFirstPulseOnboarding,
+  startOfRecentWindow,
+  startOfNextLocalDay,
+  writeOnboardingCompleted,
+  type AuthStatus,
+} from "@/lib/pulses";
+import { moderateContent } from "@/lib/moderation";
+import { generateUniqueUsername } from "@/lib/username";
 
 const MAX_MESSAGE_LENGTH = 240;
-
-// Replace these placeholders with your own list
-const BANNED_WORDS = ["badword1", "badword2", "badword3"];
-
-function isCleanMessage(text: string) {
-  const lowered = text.toLowerCase();
-  return !BANNED_WORDS.some((w) => lowered.includes(w));
-}
 
 type WeatherInfo = {
   temp: number;
@@ -28,11 +35,13 @@ type WeatherInfo = {
 type Pulse = {
   id: number;
   city: string;
+  neighborhood?: string | null;
   mood: string;
   tag: string;
   message: string;
   author: string;
   createdAt: string;
+  user_id?: string;
 };
 
 // GLOBAL POSTING STEAK
@@ -50,22 +59,26 @@ type FavoritePulseId = number;
 type DBPulse = {
   id: number;
   city: string;
+  neighborhood?: string | null;
   mood: string;
   tag: string;
   message: string;
   author: string;
   created_at: string;
+  user_id?: string;
 };
 
 function mapDBPulseToPulse(row: DBPulse): Pulse {
   return {
     id: row.id,
     city: row.city,
+    neighborhood: row.neighborhood ?? null,
     mood: row.mood,
     tag: row.tag,
     message: row.message,
     author: row.author,
     createdAt: row.created_at,
+    user_id: row.user_id,
   };
 }
 
@@ -111,35 +124,6 @@ type StoredCity = {
   id?: string;
 };
 
-function generateFunUsername() {
-  const moods = [
-    "Chill",
-    "Spicy",
-    "Sleepy",
-    "Curious",
-    "Salty",
-    "Hyper",
-    "Zen",
-    "Chaotic",
-  ];
-  const animals = [
-    "Coyote",
-    "Otter",
-    "Panda",
-    "Falcon",
-    "Capybara",
-    "Llama",
-    "Raccoon",
-    "Fox",
-  ];
-
-  const mood = moods[Math.floor(Math.random() * moods.length)];
-  const animal = animals[Math.floor(Math.random() * animals.length)];
-  const num = Math.floor(Math.random() * 90) + 10; // 10–99
-
-  return `${mood} ${animal} ${num}`;
-}
-
 type Profile = {
   anon_name: string;
   name_locked?: boolean | null;
@@ -168,13 +152,16 @@ export default function Home() {
   const [sessionUser, setSessionUser] = useState<User | null>(null);
   // const [profile, setProfile] = useState<{ anon_name: string } | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
+  const [profileLoading, setProfileLoading] = useState(false);
 
 
   // USER STREAK
 
   const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
-  const [streakLoading, setStreakLoading] = useState(false);
+  const [, setStreakLoading] = useState(false);
   const [userPulseCount, setUserPulseCount] = useState(0);
+  const [pulseCountResolved, setPulseCountResolved] = useState(false);
 
 
   // Saved Favorites
@@ -195,6 +182,7 @@ export default function Home() {
   const [showFirstPulseModal, setShowFirstPulseModal] = useState(false);
   const [showFirstPulseBadgeToast, setShowFirstPulseBadgeToast] = useState(false);
   const [hasShownOnboarding, setHasShownOnboarding] = useState(false);
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
 
   // Form validation errors for mood and tag
   const [moodValidationError, setMoodValidationError] = useState<string | null>(null);
@@ -327,22 +315,31 @@ export default function Home() {
   }, [city, pulses]);
 
   // ========= REAL-TIME FEED =========
+  // B2 FIX: Realtime subscription for cross-browser updates
+  // - Removed filter from subscription (city filter was causing issues with special chars)
+  // - Filter is applied client-side after receiving the payload
+  // - Added DELETE event handling for immediate removal
 useEffect(() => {
   if (!city) return;
 
+  // Create a unique channel name per city to avoid conflicts
+  const channelName = `pulses-realtime-${city.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
   const channel = supabase
-    .channel("pulses-realtime")
+    .channel(channelName)
     .on(
       "postgres_changes",
       {
         event: "INSERT",
         schema: "public",
         table: "pulses",
-        filter: `city=eq.${city}`,
       },
       (payload) => {
         const row = payload.new as DBPulse;
+        // Client-side filter: only show pulses for current city
         if (!row || row.city !== city) return;
+        // Only show recent pulses (7-day window)
+        if (!isInRecentWindow(row.created_at)) return;
 
         const pulse = mapDBPulseToPulse(row);
 
@@ -356,6 +353,20 @@ useEffect(() => {
               new Date(a.createdAt).getTime()
           );
         });
+      }
+    )
+    .on(
+      "postgres_changes",
+      {
+        event: "DELETE",
+        schema: "public",
+        table: "pulses",
+      },
+      (payload) => {
+        const deleted = payload.old as { id?: number };
+        if (!deleted?.id) return;
+
+        setPulses((prev) => prev.filter((p) => p.id !== deleted.id));
       }
     )
     .subscribe();
@@ -483,43 +494,75 @@ useEffect(() => {
   }, [city, selectedCity?.lat, selectedCity?.lon, selectedCity?.country, selectedCity?.state]);
 
   // ========= LOAD SESSION + PROFILE =========
-    useEffect(() => {
+  useEffect(() => {
     async function loadUser() {
+      setAuthStatus("loading");
+      setProfileLoading(false);
+
       const { data: auth } = await supabase.auth.getUser();
       const user = auth.user;
       setSessionUser(user);
 
-      if (!user) return;
+      if (!user) {
+        setProfile(null);
+        setAuthStatus("signed_out");
+        return;
+      }
 
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
+      setAuthStatus("signed_in");
+      setProfileLoading(true);
+      try {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
 
-      if (profileData) {
-        setProfile({
-          anon_name: profileData.anon_name,
-          name_locked: profileData.name_locked ?? false,
-        });
-      } else {
-        const anon = generateFunUsername();
+        if (profileData) {
+          setProfile({
+            anon_name: profileData.anon_name,
+            name_locked: profileData.name_locked ?? false,
+          });
+        } else {
+          // B10 FIX: Generate unique anon username by checking for collisions
+          const anon = await generateUniqueUsername(supabase);
 
-        await supabase.from("profiles").insert({
-          id: user.id,
-          anon_name: anon,
-          name_locked: false,
-        });
+          await supabase.from("profiles").insert({
+            id: user.id,
+            anon_name: anon,
+            name_locked: false,
+          });
 
-        setProfile({
-          anon_name: anon,
-          name_locked: false,
-        });
+          setProfile({
+            anon_name: anon,
+            name_locked: false,
+          });
+        }
+      } finally {
+        setProfileLoading(false);
       }
     }
 
     loadUser();
   }, []);
+
+  const identityReady =
+    authStatus === "signed_in" && !!sessionUser && !profileLoading && !!profile;
+
+  useEffect(() => {
+    const userId = sessionUser?.id;
+
+    setShowFirstPulseModal(false);
+    setHasShownOnboarding(false);
+    setPulseCountResolved(false);
+
+    if (!userId) {
+      setOnboardingCompleted(false);
+      return;
+    }
+
+    setOnboardingCompleted(readOnboardingCompleted(window.localStorage, userId));
+  }, [sessionUser?.id]);
 
 
 // USER STREAK
@@ -530,11 +573,13 @@ const loadStreak = useCallback(async () => {
     setStreakInfo(null);
     setUserPulseCount(0);
     setStreakLoading(false);
+    setPulseCountResolved(false);
     return;
   }
 
   try {
     setStreakLoading(true);
+    setPulseCountResolved(false);
 
     // Grab up to 365 days of posts for this user
     const { data, error, count } = await supabase
@@ -550,7 +595,14 @@ const loadStreak = useCallback(async () => {
     }
 
     const rows = data || [];
-    setUserPulseCount(count ?? rows.length);
+    const nextCount = count ?? rows.length;
+    setUserPulseCount(nextCount);
+    setPulseCountResolved(true);
+
+    if (nextCount > 0 && !onboardingCompleted) {
+      writeOnboardingCompleted(window.localStorage, userId);
+      setOnboardingCompleted(true);
+    }
 
     if (rows.length === 0) {
       setStreakInfo({ currentStreak: 0, lastActiveDate: null });
@@ -607,7 +659,7 @@ const loadStreak = useCallback(async () => {
   } finally {
     setStreakLoading(false);
   }
-}, [sessionUser]);
+}, [sessionUser, onboardingCompleted]);
 
 useEffect(() => {
   loadStreak();
@@ -615,15 +667,38 @@ useEffect(() => {
 
 // ========= FIRST-TIME USER ONBOARDING =========
 useEffect(() => {
-  // Only show onboarding modal once streak loading is complete
-  // and we have a logged-in user with 0 pulses
-  if (streakLoading || !sessionUser || hasShownOnboarding) return;
+  const show = shouldShowFirstPulseOnboarding({
+    authStatus,
+    identityReady,
+    pulseCountResolved,
+    userPulseCount,
+    onboardingCompleted,
+    hasShownThisSession: hasShownOnboarding,
+  });
 
-  if (userPulseCount === 0) {
+  if (show) {
     setShowFirstPulseModal(true);
     setHasShownOnboarding(true);
   }
-}, [streakLoading, sessionUser, userPulseCount, hasShownOnboarding]);
+}, [
+  authStatus,
+  identityReady,
+  pulseCountResolved,
+  userPulseCount,
+  onboardingCompleted,
+  hasShownOnboarding,
+]);
+
+useEffect(() => {
+  if (!showFirstPulseModal) return;
+  if (onboardingCompleted) {
+    setShowFirstPulseModal(false);
+    return;
+  }
+  if (pulseCountResolved && userPulseCount > 0) {
+    setShowFirstPulseModal(false);
+  }
+}, [showFirstPulseModal, onboardingCompleted, pulseCountResolved, userPulseCount]);
 
 
 
@@ -833,16 +908,25 @@ useEffect(() => {
   // No more localStorage fallback to prevent confusion
 
   // ========= PULSES FETCH =========
+  // B1/B7 FIX: Public read - fetch pulses regardless of auth state
+  // Changed from today-only to 7-day "recent" window so feed isn't empty for new users
   useEffect(() => {
     const fetchPulses = async () => {
       setLoading(true);
       setErrorMsg(null);
       setPulses([]);
 
+      const now = new Date();
+      // B7 FIX: Use 7-day window instead of today-only
+      const start = startOfRecentWindow(now, 7);
+      const end = startOfNextLocalDay(now);
+
       const { data, error } = await supabase
         .from("pulses")
         .select("*")
         .eq("city", city)
+        .gte("created_at", start.toISOString())
+        .lt("created_at", end.toISOString())
         .order("created_at", { ascending: false });
 
       if (error) {
@@ -851,16 +935,8 @@ useEffect(() => {
         setPulses([]);
       } else if (data) {
         const mapped: Pulse[] = (data as DBPulse[]).map((row) => ({
-          id: row.id,
-          city: row.city,
-          mood: row.mood,
-          tag: row.tag,
-          message: row.message,
+          ...mapDBPulseToPulse(row),
           author: row.author || "Anonymous",
-          createdAt: new Date(row.created_at).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
         }));
         setPulses(mapped);
       }
@@ -1042,7 +1118,54 @@ async function handleToggleFavorite(pulseId: number) {
     }
   }
 
+  // ========= DELETE PULSE HANDLER (B9) =========
+  async function handleDeletePulse(pulseId: number) {
+    const userId = sessionUser?.id;
+    if (!userId) {
+      setErrorMsg("Sign in to delete pulses.");
+      return;
+    }
 
+    // Find the pulse to verify ownership
+    const pulse = pulses.find((p) => p.id === pulseId);
+    if (!pulse) {
+      setErrorMsg("Pulse not found.");
+      return;
+    }
+
+    if (pulse.user_id !== userId) {
+      setErrorMsg("You can only delete your own pulses.");
+      return;
+    }
+
+    // Confirm deletion
+    if (!window.confirm("Are you sure you want to delete this pulse?")) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("pulses")
+        .delete()
+        .eq("id", pulseId)
+        .eq("user_id", userId); // Extra safety: only delete if user_id matches
+
+      if (error) {
+        console.error("Error deleting pulse:", error);
+        setErrorMsg("Could not delete pulse. Please try again.");
+        return;
+      }
+
+      // Optimistic update - realtime will also handle this
+      setPulses((prev) => prev.filter((p) => p.id !== pulseId));
+
+      // Update user pulse count
+      setUserPulseCount((prev) => Math.max(0, prev - 1));
+    } catch (err) {
+      console.error("Unexpected error deleting pulse:", err);
+      setErrorMsg("Could not delete pulse. Please try again.");
+    }
+  }
 
   // ========= PASSWORD VALIDATION =========
   function validatePassword(password: string): { valid: boolean; error?: string } {
@@ -1135,55 +1258,62 @@ async function handleToggleFavorite(pulseId: number) {
             setAuthEmail("");
             setAuthPassword("");
             setAuthPasswordConfirm("");
+            setAuthStatus("signed_out");
             return;
           }
 
           // User is immediately signed in (email confirmation disabled)
           setSessionUser(signUpData.user);
+          setAuthStatus("signed_in");
+          setProfileLoading(true);
 
-          // Check if profile already exists
-          const { data: existingProfile } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", signUpData.user.id)
-            .single();
+          try {
+            // Check if profile already exists
+            const { data: existingProfile } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", signUpData.user.id)
+              .single();
 
-          if (existingProfile) {
-            // Profile exists, just load it
-            setProfile({
-              anon_name: existingProfile.anon_name,
-              name_locked: existingProfile.name_locked ?? false,
-            });
-          } else {
-            // Create new profile with random username
-            const anon = generateFunUsername();
-            const { error: insertError } = await supabase.from("profiles").insert({
-              id: signUpData.user.id,
-              anon_name: anon,
-              name_locked: false,
-            });
-
-            if (insertError) {
-              console.error("Error creating profile:", insertError);
-              // If insert failed, try to fetch existing profile one more time
-              const { data: retryProfile } = await supabase
-                .from("profiles")
-                .select("*")
-                .eq("id", signUpData.user.id)
-                .single();
-
-              if (retryProfile) {
-                setProfile({
-                  anon_name: retryProfile.anon_name,
-                  name_locked: retryProfile.name_locked ?? false,
-                });
-              }
-            } else {
+            if (existingProfile) {
+              // Profile exists, just load it
               setProfile({
+                anon_name: existingProfile.anon_name,
+                name_locked: existingProfile.name_locked ?? false,
+              });
+            } else {
+              // B10 FIX: Create new profile with unique username
+              const anon = await generateUniqueUsername(supabase);
+              const { error: insertError } = await supabase.from("profiles").insert({
+                id: signUpData.user.id,
                 anon_name: anon,
                 name_locked: false,
               });
+
+              if (insertError) {
+                console.error("Error creating profile:", insertError);
+                // If insert failed, try to fetch existing profile one more time
+                const { data: retryProfile } = await supabase
+                  .from("profiles")
+                  .select("*")
+                  .eq("id", signUpData.user.id)
+                  .single();
+
+                if (retryProfile) {
+                  setProfile({
+                    anon_name: retryProfile.anon_name,
+                    name_locked: retryProfile.name_locked ?? false,
+                  });
+                }
+              } else {
+                setProfile({
+                  anon_name: anon,
+                  name_locked: false,
+                });
+              }
             }
+          } finally {
+            setProfileLoading(false);
           }
 
           // Clear form and close modal
@@ -1207,49 +1337,55 @@ async function handleToggleFavorite(pulseId: number) {
 
         if (signInData.user) {
           setSessionUser(signInData.user);
+          setAuthStatus("signed_in");
+          setProfileLoading(true);
 
-          // Load or create profile
-          const { data: profileData } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", signInData.user.id)
-            .single();
+          try {
+            // Load or create profile
+            const { data: profileData } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", signInData.user.id)
+              .single();
 
-          if (profileData) {
-            setProfile({
-              anon_name: profileData.anon_name,
-              name_locked: profileData.name_locked ?? false,
-            });
-          } else {
-            // Create profile if it doesn't exist (legacy users)
-            const anon = generateFunUsername();
-            const { error: insertError } = await supabase.from("profiles").insert({
-              id: signInData.user.id,
-              anon_name: anon,
-              name_locked: false,
-            });
-
-            if (insertError) {
-              console.error("Error creating profile on sign in:", insertError);
-              // If insert failed, profile might already exist, try to fetch it
-              const { data: retryProfile } = await supabase
-                .from("profiles")
-                .select("*")
-                .eq("id", signInData.user.id)
-                .single();
-
-              if (retryProfile) {
-                setProfile({
-                  anon_name: retryProfile.anon_name,
-                  name_locked: retryProfile.name_locked ?? false,
-                });
-              }
-            } else {
+            if (profileData) {
               setProfile({
+                anon_name: profileData.anon_name,
+                name_locked: profileData.name_locked ?? false,
+              });
+            } else {
+              // B10 FIX: Create profile with unique username if it doesn't exist (legacy users)
+              const anon = await generateUniqueUsername(supabase);
+              const { error: insertError } = await supabase.from("profiles").insert({
+                id: signInData.user.id,
                 anon_name: anon,
                 name_locked: false,
               });
+
+              if (insertError) {
+                console.error("Error creating profile on sign in:", insertError);
+                // If insert failed, profile might already exist, try to fetch it
+                const { data: retryProfile } = await supabase
+                  .from("profiles")
+                  .select("*")
+                  .eq("id", signInData.user.id)
+                  .single();
+
+                if (retryProfile) {
+                  setProfile({
+                    anon_name: retryProfile.anon_name,
+                    name_locked: retryProfile.name_locked ?? false,
+                  });
+                }
+              } else {
+                setProfile({
+                  anon_name: anon,
+                  name_locked: false,
+                });
+              }
             }
+          } finally {
+            setProfileLoading(false);
           }
 
           // Clear form and close modal
@@ -1371,13 +1507,25 @@ async function handleToggleFavorite(pulseId: number) {
   }
 
   // ========= FILTER PULSES =========
-  const filteredPulses = pulses.filter(
-    (p) => tagFilter === "All" || p.tag === tagFilter
-  );
+  // B7 FIX: Use 7-day "recent" window instead of today-only
+  const filteredPulses = pulses
+    .filter((p) => isInRecentWindow(p.createdAt))
+    .filter((p) => tagFilter === "All" || p.tag === tagFilter);
 
   // ========= ADD PULSE =========
   const handleAddPulse = async () => {
     const trimmed = message.trim();
+
+    if (!sessionUser) {
+      setErrorMsg("Sign in to post.");
+      setShowAuthModal(true);
+      return;
+    }
+
+    if (!identityReady) {
+      setErrorMsg("Please wait…");
+      return;
+    }
 
     // Validate all required fields
     let hasErrors = false;
@@ -1399,11 +1547,15 @@ async function handleToggleFavorite(pulseId: number) {
     if (!trimmed) {
       setValidationError("Write something to share with your city.");
       hasErrors = true;
-    } else if (!isCleanMessage(trimmed)) {
-      setValidationError("Pulse contains disallowed language.");
-      hasErrors = true;
     } else {
-      setValidationError(null);
+      // B8 FIX: Use server-side moderation check (client-side for immediate UX feedback)
+      const moderationResult = moderateContent(trimmed);
+      if (!moderationResult.allowed) {
+        setValidationError(moderationResult.reason || "Pulse contains disallowed language.");
+        hasErrors = true;
+      } else {
+        setValidationError(null);
+      }
     }
 
     if (hasErrors) {
@@ -1415,9 +1567,10 @@ async function handleToggleFavorite(pulseId: number) {
     setShowValidationErrors(false);
 
     // Track if this is the user's first pulse (before we post)
-    const wasFirstPulse = userPulseCount === 0;
+    const wasFirstPulse =
+      pulseCountResolved && userPulseCount === 0 && !onboardingCompleted;
 
-    const authorName = profile?.anon_name || username || "Anonymous";
+    const authorName = profile.anon_name || username || "Anonymous";
 
     // Note: For full server-side validation, add NOT NULL constraints and
     // CHECK constraints on the pulses table for mood and tag columns.
@@ -1435,7 +1588,7 @@ async function handleToggleFavorite(pulseId: number) {
           tag,
           message: trimmed,
           author: authorName,
-          user_id: sessionUser?.id ?? null,
+          user_id: sessionUser.id,
         },
       ])
       .select()
@@ -1449,7 +1602,24 @@ async function handleToggleFavorite(pulseId: number) {
 
     if (data) {
       // Realtime listener will add it to the list
-      setMessage("");
+      const reset = resetComposerAfterSuccessfulPost();
+      setMessage(reset.message);
+      setMood(reset.mood);
+      setTag(reset.tag);
+      setValidationError(null);
+      setMoodValidationError(null);
+      setTagValidationError(null);
+      setShowValidationErrors(false);
+
+      setPulseCountResolved(true);
+      setUserPulseCount((prev) => prev + 1);
+
+      if (wasFirstPulse) {
+        writeOnboardingCompleted(window.localStorage, sessionUser.id);
+        setOnboardingCompleted(true);
+        setShowFirstPulseModal(false);
+        setHasShownOnboarding(true);
+      }
 
       if (sessionUser) {
         await loadStreak();
@@ -1490,15 +1660,24 @@ async function handleToggleFavorite(pulseId: number) {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col">
       {/* First-Time User Onboarding Modal */}
+      {/* B3 FIX: Modal does NOT close on backdrop click - only via explicit controls */}
       {showFirstPulseModal && (
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={() => setShowFirstPulseModal(false)}
+          // B3 FIX: Removed onClick handler to prevent backdrop dismiss
         >
           <div
-            className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl text-center"
+            className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl text-center relative"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* B3 FIX: Added explicit X close button */}
+            <button
+              onClick={() => setShowFirstPulseModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 text-xl leading-none"
+              aria-label="Close"
+            >
+              x
+            </button>
             <div className="text-5xl mb-4">{"<"}3</div>
             <h2 className="text-xl font-semibold text-slate-100 mb-2">
               Drop your first pulse
@@ -1729,6 +1908,8 @@ async function handleToggleFavorite(pulseId: number) {
                   await supabase.auth.signOut();
                   setSessionUser(null);
                   setProfile(null);
+                  setAuthStatus("signed_out");
+                  setProfileLoading(false);
                 }}
                 className="text-[11px] text-slate-500 hover:text-pink-300 underline"
               >
@@ -2125,10 +2306,19 @@ async function handleToggleFavorite(pulseId: number) {
                   </span>
                   <button
                     onClick={handleAddPulse}
-                    disabled={!mood || !tag || !message.trim() || loading}
+                    disabled={
+                      !isPostEnabled({
+                        identityReady,
+                        loading,
+                        mood,
+                        tag,
+                        message,
+                      })
+                    }
                     className="inline-flex items-center gap-1 rounded-2xl bg-pink-500 px-4 py-1.5 text-xs font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 disabled:opacity-40 disabled:cursor-not-allowed transition"
                   >
-                    <span>Post pulse</span> <span>⚡</span>
+                    <span>{identityReady ? "Post pulse" : "Please wait…"}</span>{" "}
+                    <span>⚡</span>
                   </button>
                 </div>
               </div>
@@ -2280,6 +2470,18 @@ async function handleToggleFavorite(pulseId: number) {
                     <span className="text-slate-300">{pulse.author}</span>
 
                     <div className="flex items-center gap-3">
+                      {/* B9 FIX: Delete button - only visible to owner */}
+                      {sessionUser && pulse.user_id === sessionUser.id && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePulse(pulse.id)}
+                          className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-red-400 transition"
+                          title="Delete this pulse"
+                        >
+                          <span className="text-sm leading-none">x</span>
+                        </button>
+                      )}
+
                       {/* Favorite star */}
                       <button
                         type="button"
@@ -2291,8 +2493,9 @@ async function handleToggleFavorite(pulseId: number) {
                         </span>
                       </button>
 
-                      <span>
-                        {pulse.city} · {pulse.createdAt}
+                      <span className="text-slate-500">
+                        {formatPulseDateTime(pulse.createdAt)} ·{" "}
+                        {formatPulseLocation(pulse.city, pulse.neighborhood)}
                       </span>
                     </div>
                   </div>
