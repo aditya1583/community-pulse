@@ -1827,7 +1827,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...
 
 # OpenAI API (Required for AI features)
-OPENAI_API_KEY=sk-proj-...
+OPENAI_API_KEY=<OPENAI_API_KEY>
 
 # OpenWeatherMap (Required for weather widget)
 WEATHER_API_KEY=abc123...
@@ -1852,7 +1852,7 @@ NEWS_API_KEY=xyz789...
 
 **OPENAI_API_KEY**
 - Source: platform.openai.com → API keys
-- Format: `sk-proj-...` or `sk-...`
+- Format: `<OPENAI_API_KEY>` or `<OPENAI_API_KEY>`
 - Used by: Backend only (server-side)
 - Features requiring this:
   - AI pulse summary

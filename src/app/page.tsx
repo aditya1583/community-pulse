@@ -68,6 +68,9 @@ type DBPulse = {
   user_id?: string;
 };
 
+// Pagination constants
+const PULSES_PAGE_SIZE = 50;
+
 function mapDBPulseToPulse(row: DBPulse): Pulse {
   return {
     id: row.id,
@@ -201,6 +204,10 @@ export default function Home() {
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Pagination state
+  const [hasMorePulses, setHasMorePulses] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // Events state
   const [events, setEvents] = useState<EventItem[]>([]);
@@ -910,31 +917,42 @@ useEffect(() => {
   // ========= PULSES FETCH =========
   // B1/B7 FIX: Public read - fetch pulses regardless of auth state
   // Changed from today-only to 7-day "recent" window so feed isn't empty for new users
+  // PERFORMANCE: Uses pagination (limit 50) to avoid slow queries on large datasets
   useEffect(() => {
     const fetchPulses = async () => {
       setLoading(true);
       setErrorMsg(null);
       setPulses([]);
+      setHasMorePulses(false);
 
       const now = new Date();
       // B7 FIX: Use 7-day window instead of today-only
       const start = startOfRecentWindow(now, 7);
       const end = startOfNextLocalDay(now);
 
+      // Fetch one extra to know if there are more pages
       const { data, error } = await supabase
         .from("pulses")
         .select("*")
         .eq("city", city)
         .gte("created_at", start.toISOString())
         .lt("created_at", end.toISOString())
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(PULSES_PAGE_SIZE + 1);
 
       if (error) {
         console.error("Error fetching pulses:", error.message);
         setErrorMsg("Could not load pulses. Try again in a bit.");
         setPulses([]);
       } else if (data) {
-        const mapped: Pulse[] = (data as DBPulse[]).map((row) => ({
+        // Check if there are more pages
+        const hasMore = data.length > PULSES_PAGE_SIZE;
+        setHasMorePulses(hasMore);
+
+        // Only use the first PAGE_SIZE items
+        const pageData = hasMore ? data.slice(0, PULSES_PAGE_SIZE) : data;
+
+        const mapped: Pulse[] = (pageData as DBPulse[]).map((row) => ({
           ...mapDBPulseToPulse(row),
           author: row.author || "Anonymous",
         }));
@@ -948,6 +966,57 @@ useEffect(() => {
       fetchPulses();
     }
   }, [city]);
+
+  // ========= LOAD MORE PULSES =========
+  const handleLoadMorePulses = async () => {
+    if (loadingMore || !hasMorePulses || pulses.length === 0) return;
+
+    setLoadingMore(true);
+
+    const now = new Date();
+    const start = startOfRecentWindow(now, 7);
+    const end = startOfNextLocalDay(now);
+
+    // Get the oldest pulse's timestamp as cursor
+    const oldestPulse = pulses[pulses.length - 1];
+    const cursor = oldestPulse.createdAt;
+
+    try {
+      const { data, error } = await supabase
+        .from("pulses")
+        .select("*")
+        .eq("city", city)
+        .gte("created_at", start.toISOString())
+        .lt("created_at", cursor) // Before the oldest we have
+        .order("created_at", { ascending: false })
+        .limit(PULSES_PAGE_SIZE + 1);
+
+      if (error) {
+        console.error("Error loading more pulses:", error.message);
+      } else if (data) {
+        const hasMore = data.length > PULSES_PAGE_SIZE;
+        setHasMorePulses(hasMore);
+
+        const pageData = hasMore ? data.slice(0, PULSES_PAGE_SIZE) : data;
+
+        const mapped: Pulse[] = (pageData as DBPulse[]).map((row) => ({
+          ...mapDBPulseToPulse(row),
+          author: row.author || "Anonymous",
+        }));
+
+        // Append to existing pulses, avoiding duplicates
+        setPulses((prev) => {
+          const existingIds = new Set(prev.map((p) => p.id));
+          const newPulses = mapped.filter((p) => !existingIds.has(p.id));
+          return [...prev, ...newPulses];
+        });
+      }
+    } catch (err) {
+      console.error("Unexpected error loading more pulses:", err);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   // ========= TRAFFIC =========
   useEffect(() => {
@@ -1579,28 +1648,60 @@ async function handleToggleFavorite(pulseId: number) {
     //   ALTER TABLE pulses ALTER COLUMN tag SET NOT NULL;
     //   ALTER TABLE pulses ADD CONSTRAINT mood_not_empty CHECK (mood <> '');
     //   ALTER TABLE pulses ADD CONSTRAINT tag_not_empty CHECK (tag <> '');
-    const { data, error } = await supabase
-      .from("pulses")
-      .insert([
-        {
+    try {
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
+      if (sessionError || !accessToken) {
+        setErrorMsg("Sign in to post.");
+        setShowAuthModal(true);
+        return;
+      }
+
+      const res = await fetch("/api/pulses", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
           city,
           mood,
           tag,
           message: trimmed,
           author: authorName,
-          user_id: sessionUser.id,
-        },
-      ])
-      .select()
-      .single();
+        }),
+      });
 
-    if (error) {
-      console.error("Error inserting pulse:", error.message);
-      setErrorMsg("Could not post your pulse. Please try again.");
-      return;
-    }
+      type CreatePulseResponse = { pulse?: unknown; error?: string; code?: string };
+      let data: CreatePulseResponse | null = null;
+      try {
+        data = await res.json();
+      } catch {
+        // ignore JSON parse error
+      }
 
-    if (data) {
+      if (!res.ok || !data?.pulse) {
+        const message =
+          data?.error || "Could not post your pulse. Please try again.";
+
+        if (data?.code === "MODERATION_FAILED") {
+          setValidationError(message);
+          setShowValidationErrors(true);
+          return;
+        }
+
+        if (res.status === 401) {
+          setErrorMsg("Sign in to post.");
+          setShowAuthModal(true);
+          return;
+        }
+
+        setErrorMsg(message);
+        return;
+      }
+
       // Realtime listener will add it to the list
       const reset = resetComposerAfterSuccessfulPost();
       setMessage(reset.message);
@@ -1633,6 +1734,10 @@ async function handleToggleFavorite(pulseId: number) {
           }, 5000);
         }
       }
+    } catch (err) {
+      console.error("Unexpected error creating pulse:", err);
+      setErrorMsg("Could not post your pulse. Please try again.");
+      return;
     }
   };
 
@@ -2448,60 +2553,75 @@ async function handleToggleFavorite(pulseId: number) {
               the first to set the vibe.
             </div>
           ) : (
-            filteredPulses.map((pulse) => (
-              <article
-                key={pulse.id}
-                className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 flex gap-3 hover:border-pink-500/60 hover:shadow-pink-500/20 transition"
-              >
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-10 h-10 rounded-2xl bg-slate-950/80 flex items-center justify-center text-2xl">
-                    {pulse.mood}
+            <>
+              {filteredPulses.map((pulse) => (
+                <article
+                  key={pulse.id}
+                  className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 flex gap-3 hover:border-pink-500/60 hover:shadow-pink-500/20 transition"
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-10 h-10 rounded-2xl bg-slate-950/80 flex items-center justify-center text-2xl">
+                      {pulse.mood}
+                    </div>
+                    <span className="text-[10px] uppercase tracking-wide text-pink-300 bg-pink-500/10 border border-pink-500/30 px-2 py-0.5 rounded-full">
+                      {pulse.tag}
+                    </span>
                   </div>
-                  <span className="text-[10px] uppercase tracking-wide text-pink-300 bg-pink-500/10 border border-pink-500/30 px-2 py-0.5 rounded-full">
-                    {pulse.tag}
-                  </span>
-                </div>
-                <div className="flex-1 flex flex-col justify-between">
-                  <p className="text-sm text-slate-100 leading-snug">
-                    {pulse.message}
-                  </p>
+                  <div className="flex-1 flex flex-col justify-between">
+                    <p className="text-sm text-slate-100 leading-snug">
+                      {pulse.message}
+                    </p>
 
-                  <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
-                    <span className="text-slate-300">{pulse.author}</span>
+                    <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
+                      <span className="text-slate-300">{pulse.author}</span>
 
-                    <div className="flex items-center gap-3">
-                      {/* B9 FIX: Delete button - only visible to owner */}
-                      {sessionUser && pulse.user_id === sessionUser.id && (
+                      <div className="flex items-center gap-3">
+                        {/* B9 FIX: Delete button - only visible to owner */}
+                        {sessionUser && pulse.user_id === sessionUser.id && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePulse(pulse.id)}
+                            className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-red-400 transition"
+                            title="Delete this pulse"
+                          >
+                            <span className="text-sm leading-none">x</span>
+                          </button>
+                        )}
+
+                        {/* Favorite star */}
                         <button
                           type="button"
-                          onClick={() => handleDeletePulse(pulse.id)}
-                          className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-red-400 transition"
-                          title="Delete this pulse"
+                          onClick={() => handleToggleFavorite(pulse.id)}
+                          className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-yellow-300 transition"
                         >
-                          <span className="text-sm leading-none">x</span>
+                          <span className="text-base leading-none">
+                            {favoritePulseIds.includes(pulse.id) ? "★" : "☆"}
+                          </span>
                         </button>
-                      )}
 
-                      {/* Favorite star */}
-                      <button
-                        type="button"
-                        onClick={() => handleToggleFavorite(pulse.id)}
-                        className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-yellow-300 transition"
-                      >
-                        <span className="text-base leading-none">
-                          {favoritePulseIds.includes(pulse.id) ? "★" : "☆"}
+                        <span className="text-slate-500">
+                          {formatPulseDateTime(pulse.createdAt)} ·{" "}
+                          {formatPulseLocation(pulse.city, pulse.neighborhood)}
                         </span>
-                      </button>
-
-                      <span className="text-slate-500">
-                        {formatPulseDateTime(pulse.createdAt)} ·{" "}
-                        {formatPulseLocation(pulse.city, pulse.neighborhood)}
-                      </span>
+                      </div>
                     </div>
                   </div>
+                </article>
+              ))}
+
+              {/* Load more button - only show when there are more pulses and tag filter is "All" */}
+              {hasMorePulses && tagFilter === "All" && (
+                <div className="flex justify-center pt-4">
+                  <button
+                    onClick={handleLoadMorePulses}
+                    disabled={loadingMore}
+                    className="px-6 py-2 rounded-2xl bg-slate-900/70 border border-slate-700 text-sm text-slate-300 hover:bg-slate-800 hover:border-pink-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  >
+                    {loadingMore ? "Loading..." : "Load more pulses"}
+                  </button>
                 </div>
-              </article>
-            ))
+              )}
+            </>
           )}
         </section>
 

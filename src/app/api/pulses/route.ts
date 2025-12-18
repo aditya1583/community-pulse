@@ -1,16 +1,89 @@
 /**
  * API route for pulse creation with server-side moderation
  * This endpoint enforces content moderation and ownership rules
+ *
+ * SECURITY: Server-Authoritative Design
+ * - Users CANNOT insert directly into pulses table (RLS denies all user writes)
+ * - This API is the ONLY path to create pulses
+ * - Uses SERVICE ROLE key to bypass RLS for writes
+ * - Still authenticates users via bearer token to set user_id
+ *
+ * FAIL-CLOSED GUARANTEE (NON-NEGOTIABLE):
+ * - If deterministic checks fail (PII/spam) -> reject 400, NO INSERT
+ * - If deterministic checks pass -> AI moderation MUST still run before insert
+ * - If AI moderation blocks -> reject 400, NO INSERT
+ * - If AI moderation errors/times out/misconfigured/missing key -> reject 503, NO INSERT
+ * - Production ALWAYS fails closed, regardless of MODERATION_FAIL_OPEN env var
+ *
+ * Safety Pipeline (Three-Layer Architecture):
+ *
+ * Layer 0 (PII Detection - First Pass):
+ * - Detects personally identifiable information
+ * - Blocks emails, phones, SSNs, credit cards, addresses, social handles
+ * - Blocks spam/nonsense content
+ * - Runs BEFORE content moderation to prevent PII from reaching AI services
+ *
+ * Layer A (Fast, Local):
+ * 1. Dynamic blocklist - catches known problematic terms from database
+ * 2. Local heuristics - catches obvious English profanity/obfuscations
+ *
+ * Layer B (Authoritative, AI):
+ * 3. OpenAI Moderation API - catches multilingual, context, obfuscation
+ * 4. Google Perspective API (optional) - supplementary toxicity signal
+ *
+ * Environment Variables:
+ * - SUPABASE_SERVICE_ROLE_KEY: REQUIRED for server-side writes
+ * - OPENAI_API_KEY: REQUIRED for AI moderation (posting fails without it)
+ * - MODERATION_FAIL_OPEN: Optional, default "false" - IGNORED in production (always fail-closed)
+ * - MODERATION_TIMEOUT_MS: Optional, default 2000
+ * - MODERATION_HARASSMENT_SCORE_THRESHOLD: Optional, default 0.01
+ * - PERSPECTIVE_API_KEY: Optional, enables Perspective API
+ * - PII_FAIL_OPEN: Optional, default "false" (fail closed for PII)
+ * - PII_BLOCK_SOCIAL_HANDLES: Optional, default "true"
+ * - PII_ALLOW_NAMES: Optional, default "false"
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { serverModerateContent } from "@/lib/moderation";
+import { runModerationPipeline, quickModerateContent } from "@/lib/moderationPipeline";
+import { detectPII, hashContentForLogging, logPIIDetection } from "@/lib/piiDetection";
+import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
 
-// Server-side Supabase client with service role for RLS bypass when needed
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+// Create service role client for server-side writes (bypasses RLS)
+// Reads env vars at call time to support testing
+function getServiceRoleClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.error(
+      "[/api/pulses] CRITICAL: SUPABASE_SERVICE_ROLE_KEY is not set. " +
+      "Server cannot write to database. All pulse creation will fail."
+    );
+    return null;
+  }
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
+// Create user client with token for auth verification
+function getUserClient(token: string) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  });
+}
 
 type PulseCreatePayload = {
   city: string;
@@ -24,6 +97,9 @@ type PulseCreatePayload = {
 
 /**
  * POST /api/pulses - Create a new pulse with server-side moderation
+ *
+ * SECURITY: This is the ONLY way to create pulses.
+ * Direct database inserts are blocked by RLS.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -38,22 +114,26 @@ export async function POST(req: NextRequest) {
 
     const token = authHeader.slice(7);
 
-    // Create Supabase client with user's token
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    });
+    // Create Supabase client with user's token to verify authentication
+    const userClient = getUserClient(token);
 
     // Verify the user is authenticated
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await userClient.auth.getUser();
 
     if (authError || !user) {
       return NextResponse.json(
         { error: "Invalid or expired session" },
         { status: 401 }
+      );
+    }
+
+    // Get service role client for database writes
+    const serviceClient = getServiceRoleClient();
+    if (!serviceClient) {
+      console.error("[/api/pulses] Service role client not available");
+      return NextResponse.json(
+        { error: "Server configuration error. Please try again later." },
+        { status: 500 }
       );
     }
 
@@ -114,10 +194,59 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Generate request ID for telemetry
+    const requestId = crypto.randomBytes(8).toString("hex");
+    const contentHash = hashContentForLogging(trimmedMessage);
+
+    // =========================================================================
+    // PII DETECTION - Runs FIRST, before any AI moderation
+    // This prevents PII from ever reaching external services
+    // =========================================================================
+    const piiResult = detectPII(trimmedMessage);
+
+    if (piiResult.blocked) {
+      // Log the PII detection (privacy-safe: no raw text, only categories and hash)
+      logPIIDetection(requestId, piiResult, contentHash);
+
+      return NextResponse.json(
+        {
+          error: piiResult.reason,
+          code: "PII_DETECTED",
+        },
+        { status: 400 }
+      );
+    }
+
+    // =========================================================================
     // SERVER-SIDE MODERATION - This is the authoritative check
-    const moderationResult = serverModerateContent(trimmedMessage);
+    // Uses the full moderation pipeline: blocklist -> local -> AI -> (optional) Perspective
+    //
+    // FAIL-CLOSED GUARANTEE:
+    // - If moderation blocks content -> 400 (content rejected)
+    // - If moderation service errors/times out/misconfigured -> 503 (service unavailable)
+    // - Production NEVER fails open, regardless of MODERATION_FAIL_OPEN env var
+    // =========================================================================
+    const moderationResult = await runModerationPipeline(trimmedMessage);
 
     if (!moderationResult.allowed) {
+      // Check if this was a service error (API timeout, missing key, etc.)
+      // vs actual content being blocked by moderation rules
+      if (moderationResult.serviceError) {
+        // Service unavailable - return 503 with generic message
+        // Do NOT reveal the specific error to prevent information disclosure
+        console.error(
+          "[/api/pulses] Moderation service unavailable - failing closed"
+        );
+        return NextResponse.json(
+          {
+            error: "Posting is temporarily unavailable. Please try again.",
+            code: "SERVICE_UNAVAILABLE"
+          },
+          { status: 503 }
+        );
+      }
+
+      // Content was actively blocked by moderation rules - return 400
       return NextResponse.json(
         {
           error: moderationResult.reason || "Message violates content guidelines",
@@ -127,8 +256,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Also moderate the author name
-    const authorModeration = serverModerateContent(author.trim());
+    // Also moderate the author name (quick local check only for performance)
+    const authorModeration = quickModerateContent(author.trim());
     if (!authorModeration.allowed) {
       return NextResponse.json(
         {
@@ -148,8 +277,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Insert the pulse
-    const { data, error: insertError } = await supabase
+    // =========================================================================
+    // INSERT PULSE using SERVICE ROLE (bypasses RLS)
+    // The user_id is explicitly set from the verified auth context
+    // =========================================================================
+      console.error("[/api/pulses] ABOUT TO INSERT", {
+        trimmedMessage,
+        city,
+        mood,
+        tag,
+        author,
+        user_id: user?.id,
+      });
+
+    const { data, error: insertError } = await serviceClient
       .from("pulses")
       .insert([
         {
@@ -158,7 +299,7 @@ export async function POST(req: NextRequest) {
           tag: tag.trim(),
           message: trimmedMessage,
           author: author.trim(),
-          user_id: user.id,
+          user_id: user.id, // From verified auth, not from request body
           neighborhood: neighborhood?.trim() || null,
         },
       ])
@@ -185,6 +326,8 @@ export async function POST(req: NextRequest) {
 
 /**
  * DELETE /api/pulses - Delete a pulse (owner only)
+ *
+ * Uses the user's token directly since RLS allows owner deletes.
  */
 export async function DELETE(req: NextRequest) {
   try {
@@ -200,13 +343,7 @@ export async function DELETE(req: NextRequest) {
     const token = authHeader.slice(7);
 
     // Create Supabase client with user's token
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    });
+    const supabase = getUserClient(token);
 
     // Verify the user is authenticated
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -250,7 +387,7 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    // Delete the pulse
+    // Delete the pulse (RLS allows owner delete)
     const { error: deleteError } = await supabase
       .from("pulses")
       .delete()
