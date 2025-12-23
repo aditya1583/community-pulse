@@ -29,12 +29,23 @@ export type LocalNewsSummary = {
 /**
  * Full response from the local-news API
  */
+/**
+ * Article with optional fallback source metadata
+ */
+export type LocalNewsArticleWithFallback = LocalNewsArticle & {
+  _fallbackSource?: string;
+};
+
+/**
+ * Full response from the local-news API
+ */
 export type LocalNewsResponse = {
-  articles: LocalNewsArticle[];
+  articles: LocalNewsArticleWithFallback[];
   aiSummary: LocalNewsSummary | null;
   city: string;
   sourceCity: string;
   isNearbyFallback: boolean;
+  fallbackSources: string[];
   fetchedAt: string;
   notConfigured?: boolean;
 };
@@ -420,6 +431,7 @@ export async function GET(req: NextRequest) {
       city: cityParam,
       sourceCity: cityParam,
       isNearbyFallback: false,
+      fallbackSources: [],
       fetchedAt: new Date().toISOString(),
       notConfigured: true,
     };
@@ -437,17 +449,26 @@ export async function GET(req: NextRequest) {
   // Use parsed region if city not found in database (supports both abbrev and full state names)
   const state = city?.state || parsed.region;
 
+  // Track articles with their source city for fallback attribution
+  type ArticleWithSource = RawNewsArticle & { _sourceCity?: string };
+
   // First, try to fetch news for the requested city
-  let rawArticles = await fetchNewsForCity(cityName, state);
-  let sourceCity = city?.displayName || cityParam;
+  let rawArticles: ArticleWithSource[] = await fetchNewsForCity(cityName, state);
+  const fallbackSourcesSet = new Set<string>();
   let isNearbyFallback = false;
 
-  // If we don't have enough articles (less than 3), try nearby larger cities
-  if (rawArticles.length < 3 && city) {
-    const nearbyCities = getNearbyCities(cityParam, 75, 100000); // 75 miles, 100k+ population
+  // MINIMUM 3 ARTICLES: If we don't have enough articles, try nearby cities more aggressively
+  // Increased radius to 100 miles and lowered population threshold to 50k
+  const FALLBACK_RADIUS_MILES = 100;
+  const FALLBACK_MIN_POPULATION = 50000;
+  const MIN_ARTICLES_TARGET = 3;
+
+  if (rawArticles.length < MIN_ARTICLES_TARGET && city) {
+    const nearbyCities = getNearbyCities(cityParam, FALLBACK_RADIUS_MILES, FALLBACK_MIN_POPULATION);
 
     for (const nearbyCity of nearbyCities) {
-      if (rawArticles.length >= 5) break;
+      // Stop when we have enough articles
+      if (rawArticles.length >= MIN_ARTICLES_TARGET + 2) break; // Target 5 for buffer
 
       const nearbyArticles = await fetchNewsForCity(
         nearbyCity.name,
@@ -457,16 +478,17 @@ export async function GET(req: NextRequest) {
       if (nearbyArticles.length > 0) {
         // Add nearby city articles, avoiding duplicates
         const existingUrls = new Set(rawArticles.map((a) => a.url));
-        const newArticles = nearbyArticles.filter(
-          (a) => !existingUrls.has(a.url)
-        );
+        const newArticles = nearbyArticles
+          .filter((a) => !existingUrls.has(a.url))
+          .map((a) => ({
+            ...a,
+            _sourceCity: nearbyCity.displayName, // Tag with source city
+          }));
 
         if (newArticles.length > 0) {
           rawArticles = [...rawArticles, ...newArticles];
-          if (rawArticles.length <= 3) {
-            sourceCity = nearbyCity.displayName;
-            isNearbyFallback = true;
-          }
+          fallbackSourcesSet.add(nearbyCity.displayName);
+          isNearbyFallback = true;
         }
       }
     }
@@ -475,15 +497,20 @@ export async function GET(req: NextRequest) {
   // Limit to 8 articles max for display
   rawArticles = rawArticles.slice(0, 8);
 
-  // Transform to our response format
-  const articles: LocalNewsArticle[] = rawArticles.map((article) => ({
+  // Transform to our response format with fallback source tracking
+  const articles: LocalNewsArticleWithFallback[] = rawArticles.map((article) => ({
     title: article.title,
     source: article.source.name,
     publishedAt: article.publishedAt,
     url: article.url,
     description: article.description,
     urlToImage: article.urlToImage,
+    // Include fallback source if article came from a nearby city
+    ...(article._sourceCity ? { _fallbackSource: article._sourceCity } : {}),
   }));
+
+  // Convert fallback sources set to array
+  const fallbackSources = Array.from(fallbackSourcesSet);
 
   // Generate AI summary if we have articles
   let aiSummary: LocalNewsSummary | null = null;
@@ -506,11 +533,9 @@ export async function GET(req: NextRequest) {
     articles,
     aiSummary,
     city: city?.displayName || cityParam,
-    sourceCity:
-      isNearbyFallback && rawArticles.length > 0
-        ? sourceCity
-        : city?.displayName || cityParam,
-    isNearbyFallback: isNearbyFallback && rawArticles.length > 0,
+    sourceCity: city?.displayName || cityParam,
+    isNearbyFallback: isNearbyFallback && fallbackSources.length > 0,
+    fallbackSources,
     fetchedAt: new Date().toISOString(),
   };
 

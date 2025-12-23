@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import type { LocalNewsResponse, LocalNewsArticle } from "@/app/api/local-news/route";
+import type { LocalNewsResponse, LocalNewsArticleWithFallback } from "@/app/api/local-news/route";
 
 type LocalNewsCardProps = {
   city: string;
@@ -53,9 +53,9 @@ function NewsCardSkeleton() {
 }
 
 /**
- * Single article item in the list
+ * Single article item in the list - now supports fallback source badge
  */
-function ArticleItem({ article }: { article: LocalNewsArticle }) {
+function ArticleItem({ article }: { article: LocalNewsArticleWithFallback }) {
   return (
     <a
       href={article.url}
@@ -77,9 +77,17 @@ function ArticleItem({ article }: { article: LocalNewsArticle }) {
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm text-slate-100 font-medium line-clamp-2 group-hover:text-pink-300 transition leading-snug">
-            {article.title}
-          </h3>
+          <div className="flex items-start gap-2">
+            <h3 className="text-sm text-slate-100 font-medium line-clamp-2 group-hover:text-pink-300 transition leading-snug flex-1">
+              {article.title}
+            </h3>
+            {/* Fallback source badge - shows when article is from a nearby city */}
+            {article._fallbackSource && (
+              <span className="flex-shrink-0 bg-amber-500/10 text-amber-400 rounded-full px-2 py-0.5 text-xs">
+                From {article._fallbackSource.split(",")[0]}
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-slate-500">
             <span className="font-medium text-slate-400">{article.source}</span>
             <span>-</span>
@@ -152,19 +160,23 @@ export default function LocalNewsCard({ city }: LocalNewsCardProps) {
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h2 className="text-base font-medium text-slate-100 flex items-center gap-2">
+          <h2 className="text-base font-medium text-slate-100">
             Local News in {displayCity}
-            {data?.isNearbyFallback && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                includes {data.sourceCity}
-              </span>
-            )}
           </h2>
           <p className="text-[10px] text-slate-500 mt-0.5">
             Auto-generated from multiple sources
           </p>
         </div>
       </div>
+
+      {/* Fallback Sources Banner - shows when including news from nearby cities */}
+      {data?.isNearbyFallback && data.fallbackSources && data.fallbackSources.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl px-3 py-2">
+          <p className="text-xs text-amber-400">
+            Including news from nearby: {data.fallbackSources.map(s => s.split(",")[0]).join(", ")}
+          </p>
+        </div>
+      )}
 
       {/* Content */}
       {loading ? (
