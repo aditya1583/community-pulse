@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findCity, getNearbyCities } from "../../data/cities";
 import { generateNewsSummary, NewsArticleSummaryInput } from "@/lib/ai";
+import { deduplicateArticles } from "./deduplication";
 import type {
   LocalNewsArticle,
   LocalNewsResponse,
@@ -607,6 +608,15 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Deduplicate articles BEFORE slicing to final count
+  // This removes duplicate AP wire stories that appear from multiple sources
+  const dedupeResult = deduplicateArticles(articles, false);
+  articles = dedupeResult.articles;
+  const duplicatesRemoved = dedupeResult.duplicatesRemoved;
+  if (duplicatesRemoved > 0) {
+    console.log("[NEWS] Removed " + duplicatesRemoved + " duplicate article(s) for " + cityParam);
+  }
+
   // Limit to MAX articles
   articles = articles.slice(0, MAX_ARTICLES);
 
@@ -635,6 +645,7 @@ export async function GET(req: NextRequest) {
     isNearbyFallback: fallbackSources.length > 0 && articles.length > 0,
     fetchedAt: new Date().toISOString(),
     provider: provider || undefined,
+    _duplicatesRemoved: duplicatesRemoved > 0 ? duplicatesRemoved : undefined,
   };
 
   return NextResponse.json(response);

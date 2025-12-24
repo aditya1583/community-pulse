@@ -5,6 +5,9 @@ import type { LocalNewsArticle } from "@/types/news";
 import { formatRelativeTime } from "@/lib/time";
 
 export default function NewsCard({ article }: { article: LocalNewsArticle }) {
+  const hasImage = !!article.urlToImage;
+  const showInlineFallback = !!article._fallbackSource && !hasImage;
+
   return (
     <a
       href={article.url}
@@ -13,7 +16,7 @@ export default function NewsCard({ article }: { article: LocalNewsArticle }) {
       className="block bg-slate-800/60 rounded-xl overflow-hidden border border-slate-700/50 hover:border-emerald-500/30 transition-all group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70"
     >
       {article.urlToImage && (
-        <div className="aspect-video bg-slate-900/60 overflow-hidden">
+        <div className="aspect-video bg-slate-900/60 overflow-hidden relative">
           <img
             src={article.urlToImage}
             alt=""
@@ -24,11 +27,17 @@ export default function NewsCard({ article }: { article: LocalNewsArticle }) {
               (e.target as HTMLImageElement).style.display = "none";
             }}
           />
+
+          {article._fallbackSource && (
+            <span className="absolute top-2 left-2 px-2 py-1 text-[11px] font-medium bg-amber-400/90 text-slate-950 rounded-full">
+              From {article._fallbackSource}
+            </span>
+          )}
         </div>
       )}
 
       <div className="p-4 space-y-2">
-        {article._fallbackSource && (
+        {showInlineFallback && (
           <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-medium bg-amber-500/10 text-amber-300 border border-amber-500/20 rounded-full">
             From {article._fallbackSource}
           </span>

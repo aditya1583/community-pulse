@@ -23,4 +23,5 @@ export type LocalNewsResponse = {
   fetchedAt: string;
   notConfigured?: boolean;
   provider?: "gnews" | "newsapi";
+  _duplicatesRemoved?: number;
 };

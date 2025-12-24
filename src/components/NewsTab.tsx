@@ -76,6 +76,7 @@ export default function NewsTab({
 
   const displayCity = city.split(",")[0]?.trim() || city;
   const hasMinimumArticles = articles.length >= minDisplay;
+  const articleLabel = articles.length === 1 ? "article" : "articles";
 
   return (
     <div className="space-y-4">
@@ -85,7 +86,7 @@ export default function NewsTab({
           Local News for <span className="text-emerald-400">{displayCity}</span>
         </h3>
         <span className="text-xs text-slate-500 font-mono">
-          {articles.length} articles
+          {articles.length} {articleLabel}
         </span>
       </div>
 

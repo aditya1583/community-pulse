@@ -12,10 +12,25 @@ type NewsGridProps = {
 
 function NewsCardSkeleton() {
   return (
-    <div className="bg-slate-800/60 rounded-xl border border-slate-700/50 p-4 animate-pulse">
-      <div className="aspect-video bg-slate-900/60 rounded-lg mb-3" />
-      <div className="h-4 bg-slate-700/50 rounded w-3/4 mb-2" />
-      <div className="h-3 bg-slate-700/50 rounded w-1/2" />
+    <div className="bg-slate-800/60 rounded-xl overflow-hidden border border-slate-700/50">
+      <div className="aspect-video bg-gradient-to-r from-slate-900/70 via-slate-700/40 to-slate-900/70 animate-shimmer" />
+
+      <div className="p-4 space-y-3">
+        <div className="space-y-2">
+          <div className="h-4 bg-gradient-to-r from-slate-700/40 via-slate-600/50 to-slate-700/40 rounded animate-shimmer w-full" />
+          <div className="h-4 bg-gradient-to-r from-slate-700/40 via-slate-600/50 to-slate-700/40 rounded animate-shimmer w-3/4" />
+        </div>
+
+        <div className="space-y-2">
+          <div className="h-3 bg-gradient-to-r from-slate-700/30 via-slate-600/40 to-slate-700/30 rounded animate-shimmer w-full" />
+          <div className="h-3 bg-gradient-to-r from-slate-700/30 via-slate-600/40 to-slate-700/30 rounded animate-shimmer w-5/6" />
+        </div>
+
+        <div className="flex items-center justify-between pt-1">
+          <div className="h-3 bg-slate-700/40 rounded w-20 animate-pulse" />
+          <div className="h-3 bg-slate-700/40 rounded w-16 animate-pulse" />
+        </div>
+      </div>
     </div>
   );
 }
