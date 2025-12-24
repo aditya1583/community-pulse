@@ -13,6 +13,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "events", label: "Events" },
   { id: "traffic", label: "Traffic" },
   { id: "news", label: "News" },
+  { id: "local", label: "Local" },
 ];
 
 /**

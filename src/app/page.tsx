@@ -32,6 +32,7 @@ import PulseInput from "@/components/PulseInput";
 import FAB from "@/components/FAB";
 import PulseModal from "@/components/PulseModal";
 import TrafficContent from "@/components/TrafficContent";
+import LocalTab from "@/components/LocalTab";
 import type { TabId, WeatherInfo, Pulse, CityMood, TrafficLevel } from "@/components/types";
 import type { LocalNewsResponse } from "@/types/news";
 
@@ -2204,6 +2205,8 @@ export default function Home() {
             weather={weather}
             weatherLoading={weatherLoading}
             activeUsersCount={activeUsersCount}
+            lat={selectedCity?.lat}
+            lon={selectedCity?.lon}
           />
 
           {/* Quick Stats */}
@@ -2382,6 +2385,16 @@ export default function Home() {
                 data={newsData}
                 loading={newsLoading}
                 error={newsError}
+              />
+            )}
+
+            {/* Local Tab */}
+            {activeTab === "local" && (
+              <LocalTab
+                cityName={selectedCity?.name || city.split(",")[0]?.trim() || city}
+                state={selectedCity?.state || ""}
+                lat={selectedCity?.lat}
+                lon={selectedCity?.lon}
               />
             )}
           </div>

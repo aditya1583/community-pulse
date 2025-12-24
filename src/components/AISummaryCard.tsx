@@ -105,6 +105,7 @@ export default function AISummaryCard({
       Light: "Roads are clear. Great time to travel.",
       Moderate: "Some congestion in busy areas. Allow extra time.",
       Heavy: "Significant delays expected. Consider alternate routes.",
+      Severe: "Major delays and incidents reported. Avoid travel if possible.",
     };
 
     return `${trafficLevel} traffic across ${displayCity}. ${

@@ -65,6 +65,7 @@ export type AIModerationResult = {
     category: string;
     confidence: number;
     reason?: string;
+    language?: string;
     cacheHit?: boolean;
   };
 };
@@ -77,6 +78,7 @@ type HaikuModerationResponse = {
   category: string;
   confidence: number;
   reason?: string;
+  language?: string; // Detected language of the content
 };
 
 /**
@@ -142,27 +144,70 @@ function sleep(ms: number): Promise<void> {
  *
  * This prompt encodes Community Pulse's specific content policies.
  * It's designed to catch content that fixed-category APIs miss.
+ *
+ * MULTILINGUAL SUPPORT: Claude Haiku understands dozens of languages.
+ * This prompt explicitly instructs the model to detect violations in ANY language,
+ * including obfuscated and transliterated profanity.
  */
 function buildSystemPrompt(): string {
-  return `You are a content moderator for Community Pulse, a hyper-local social app where users post short messages about what's happening in their city.
+  return `You are a MULTILINGUAL content moderator for Community Pulse, a hyper-local social app where users post short messages about what's happening in their city.
 
 Your job is to classify user-submitted content as ALLOW or BLOCK.
 
-BLOCK content that falls into these categories:
+=== CRITICAL: MULTILINGUAL DETECTION ===
+You MUST detect violations in ANY LANGUAGE, not just English. This includes but is not limited to:
+- Spanish, Portuguese, French, German, Italian
+- Hindi, Telugu, Tamil, Bengali, Punjabi, Marathi, Gujarati
+- Mandarin, Cantonese, Japanese, Korean, Vietnamese, Thai
+- Arabic, Hebrew, Turkish, Persian (Farsi), Urdu
+- Russian, Polish, Ukrainian
+- Tagalog, Indonesian, Malay
+- And ALL other languages
 
-1. PROFANITY & VULGARITY
-   - Explicit profanity (fuck, shit, ass, etc.)
-   - Obfuscated profanity: "f u c k", "sh1t", "a$$", "f*ck", "@ss"
+You are fluent in these languages. Use your knowledge to detect profanity, slurs, and violations regardless of language.
+
+=== OBFUSCATION TECHNIQUES TO DETECT ===
+Users try to bypass moderation using:
+1. SPACING: "m o d d a", "f u c k", "p u t a"
+2. NUMBERS: "sh1t", "a55", "b1tch", "fvck"
+3. SYMBOLS: "f*ck", "@ss", "$hit", "b!tch"
+4. TRANSLITERATIONS: "madarchod" (Hindi), "puta madre" (Spanish), "modda" (Telugu)
+5. MIXED SCRIPTS: Combining Latin letters with Cyrillic, Devanagari, Arabic
+6. LEET SPEAK: "h4ck3r", "pr0n", "n00b"
+7. VOWEL REMOVAL: "fck", "sht", "btch"
+8. PHONETIC SPELLING: "eff you", "ess aitch eye tee"
+
+=== COMMON MULTILINGUAL PROFANITY PATTERNS ===
+Examples (BLOCK these and similar patterns in ANY language):
+- Telugu: "modda", "lanja", "dengudu", "pooku"
+- Hindi: "madarchod", "bhenchod", "chutiya", "gaand", "bhosdike"
+- Spanish: "puta", "mierda", "pendejo", "cabron", "chingar"
+- Portuguese: "porra", "caralho", "foda-se"
+- French: "merde", "putain", "connard", "salaud"
+- German: "scheiße", "arschloch", "fick dich"
+- Arabic: "sharmouta", "kos omak", "ibn el-sharmouta"
+- Russian: "suka", "blyad", "pizdec", "хуй"
+- Chinese: "他妈的", "傻逼", "操你妈"
+- Japanese: "くそ", "ちくしょう"
+- Korean: "씨발", "개새끼"
+
+=== BLOCK CATEGORIES ===
+
+1. PROFANITY & VULGARITY (ANY LANGUAGE)
+   - Explicit profanity in any language
+   - Obfuscated profanity: "f u c k", "sh1t", "a$$", "f*ck", "@ss", "m o d d a"
    - Transpositions: "ASSOHLE", "fcuk"
    - Symbol substitutions: "#", "*", "@" replacing letters
+   - Transliterated profanity from non-Latin scripts
 
-2. HARASSMENT & HATE
-   - Personal attacks, insults, name-calling
+2. HARASSMENT & HATE (ANY LANGUAGE)
+   - Personal attacks, insults, name-calling in any language
    - Hate speech targeting race, gender, religion, etc.
    - Threatening language
+   - Slurs in any language
 
 3. SEXUAL CONTENT & SOLICITATION
-   - Explicit sexual content
+   - Explicit sexual content in any language
    - Sexual solicitation: "body rub", "massage parlor", "happy ending"
    - Escort-style language: "car date", "looking for fun", "good time"
    - Objectifying comments: "Stacy is hot and sexy", "she's a 10"
@@ -180,30 +225,35 @@ BLOCK content that falls into these categories:
    - Excessive punctuation without meaning
 
 6. DANGEROUS CONTENT
-   - Threats of violence
+   - Threats of violence in any language
    - Self-harm encouragement
    - Illegal activity promotion
    - Drug dealing
 
-IMPORTANT RULES:
+=== IMPORTANT RULES ===
 - Be TYPO-TOLERANT: "car date ayone?" is solicitation (ayone = anyone)
 - Context matters: "body rub massage parlor" is solicitation, not a business review
 - "Hot and sexy" about people is inappropriate for a community board
 - Symbol-heavy messages with no clear meaning are spam
+- ALWAYS check for profanity in the ORIGINAL language, not just English translations
+- If content contains ANY detectable profanity in ANY language, BLOCK it
 
-ALLOW content that is:
-- Normal community updates: traffic, weather, events, local news
+=== ALLOW CONTENT ===
+- Normal community updates in any language: traffic, weather, events, local news
 - Questions about local services, restaurants, businesses
-- Friendly conversation, greetings, positive messages
+- Friendly conversation, greetings, positive messages in any language
 - Constructive feedback or complaints about local issues
+- Legitimate non-English posts (e.g., "Mucho tráfico en la autopista" = "Heavy traffic on the highway")
 
+=== RESPONSE FORMAT ===
 Respond with ONLY valid JSON in this exact format:
-{"decision":"ALLOW","category":"clean","confidence":0.95}
+{"decision":"ALLOW","category":"clean","confidence":0.95,"language":"en"}
 or
-{"decision":"BLOCK","category":"<category>","confidence":0.9,"reason":"<brief reason>"}
+{"decision":"BLOCK","category":"<category>","confidence":0.9,"reason":"<brief reason>","language":"<detected language code>"}
 
 Categories for BLOCK: profanity, harassment, hate, sexual_solicitation, spam, dangerous, contact_solicitation
 Category for ALLOW: clean
+Language codes: Use ISO 639-1 codes (en, es, hi, te, zh, ar, etc.) or "mixed" for multi-language content
 
 Do not include any text outside the JSON object.`;
 }
@@ -229,6 +279,7 @@ function parseHaikuResponse(text: string): HaikuModerationResponse | null {
       category: parsed.category,
       confidence: parsed.confidence,
       reason: parsed.reason,
+      language: parsed.language, // New: detected language
     };
   } catch {
     return null;
@@ -345,7 +396,7 @@ export async function moderateWithAI(
       timeoutMs
     );
 
-    const { decision, category, confidence, reason } = moderation;
+    const { decision, category, confidence, reason, language } = moderation;
 
     // Build debug info (for server logs, not client)
     const debugInfo = {
@@ -353,11 +404,12 @@ export async function moderateWithAI(
       category,
       confidence,
       reason,
+      language,
     };
 
     // Decision: Haiku says BLOCK
     if (decision === "BLOCK") {
-      logModerationBlock(`category=${category}`, content.slice(0, 50), reason);
+      logModerationBlock(`category=${category}`, content.slice(0, 50), reason, language);
       const blockResult: AIModerationResult = {
         allowed: false,
         reason: FRIENDLY_MODERATION_MESSAGE,
@@ -392,15 +444,18 @@ export async function moderateWithAI(
 
 /**
  * Log moderation block (server-side only, no user content in production)
+ * Now includes detected language for multilingual moderation debugging.
  */
-function logModerationBlock(category: string, contentPreview: string, reason?: string): void {
+function logModerationBlock(category: string, contentPreview: string, reason?: string, language?: string): void {
   // In production, don't log content to avoid privacy issues
   const isProduction = process.env.NODE_ENV === "production";
+  const langInfo = language ? ` [lang: ${language}]` : "";
+
   if (isProduction) {
-    console.log(`[aiModeration] Content blocked: ${category}${reason ? ` - ${reason}` : ""}`);
+    console.log(`[aiModeration] Content blocked: ${category}${langInfo}${reason ? ` - ${reason}` : ""}`);
   } else {
     console.log(
-      `[aiModeration] Content blocked: ${category} | preview: "${contentPreview}..."${reason ? ` | reason: ${reason}` : ""}`
+      `[aiModeration] Content blocked: ${category}${langInfo} | preview: "${contentPreview}..."${reason ? ` | reason: ${reason}` : ""}`
     );
   }
 }

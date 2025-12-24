@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { findCity, getNearbyCities } from "../../data/cities";
+import { findCity, getNearbyCities, City } from "../../data/cities";
 import { generateNewsSummary, NewsArticleSummaryInput } from "@/lib/ai";
 import { deduplicateArticles } from "./deduplication";
 import type {
@@ -9,6 +9,382 @@ import type {
 } from "@/types/news";
 
 export type { LocalNewsArticle, LocalNewsResponse, LocalNewsSummary } from "@/types/news";
+
+// =============================================================================
+// THREE-TIER METRO FALLBACK SYSTEM
+// =============================================================================
+// When a small city lacks sufficient news coverage, we use a three-tier fallback:
+//   Tier 1: Hard-coded metro area mappings (instant, most reliable)
+//   Tier 2: Geographic proximity using getNearbyCities() (if city has coordinates)
+//   Tier 3: State capital/major city as last resort
+// =============================================================================
+
+/**
+ * TIER 1: Hard-coded metro area mappings
+ * Maps suburban cities to their metropolitan anchor cities.
+ * This is the most reliable fallback - instant lookup, no geo calculation needed.
+ */
+const METRO_FALLBACKS: Record<string, string[]> = {
+  // Austin Metro (Texas)
+  "Leander": ["Austin", "Cedar Park", "Round Rock"],
+  "Cedar Park": ["Austin", "Round Rock", "Leander"],
+  "Round Rock": ["Austin", "Cedar Park", "Georgetown"],
+  "Pflugerville": ["Austin", "Round Rock", "Manor"],
+  "Georgetown": ["Austin", "Round Rock", "Cedar Park"],
+  "Kyle": ["Austin", "San Marcos", "Buda"],
+  "Buda": ["Austin", "Kyle", "San Marcos"],
+  "Lakeway": ["Austin", "Bee Cave", "Cedar Park"],
+  "Bee Cave": ["Austin", "Lakeway", "Dripping Springs"],
+  "Manor": ["Austin", "Pflugerville", "Round Rock"],
+  "Hutto": ["Austin", "Round Rock", "Georgetown"],
+  "Taylor": ["Austin", "Round Rock", "Georgetown"],
+  "Bastrop": ["Austin", "Elgin", "Smithville"],
+  "Dripping Springs": ["Austin", "Bee Cave", "Wimberley"],
+  "Liberty Hill": ["Austin", "Cedar Park", "Georgetown"],
+
+  // Dallas-Fort Worth Metro
+  "Plano": ["Dallas", "Frisco", "Richardson"],
+  "Frisco": ["Dallas", "Plano", "McKinney"],
+  "McKinney": ["Dallas", "Frisco", "Allen"],
+  "Allen": ["Dallas", "Plano", "McKinney"],
+  "Irving": ["Dallas", "Fort Worth", "Arlington"],
+  "Richardson": ["Dallas", "Plano", "Garland"],
+  "Garland": ["Dallas", "Richardson", "Mesquite"],
+  "Mesquite": ["Dallas", "Garland", "Sunnyvale"],
+  "Carrollton": ["Dallas", "Addison", "Farmers Branch"],
+  "Lewisville": ["Dallas", "Denton", "Flower Mound"],
+  "Flower Mound": ["Dallas", "Lewisville", "Denton"],
+  "Denton": ["Dallas", "Fort Worth", "Lewisville"],
+  "Arlington, TX": ["Dallas", "Fort Worth", "Grand Prairie"],
+  "Grand Prairie": ["Dallas", "Fort Worth", "Arlington"],
+  "Grapevine": ["Dallas", "Fort Worth", "Southlake"],
+  "Southlake": ["Dallas", "Fort Worth", "Grapevine"],
+  "Colleyville": ["Dallas", "Fort Worth", "Grapevine"],
+  "Keller": ["Fort Worth", "Dallas", "Southlake"],
+  "Bedford": ["Fort Worth", "Dallas", "Arlington"],
+  "Euless": ["Fort Worth", "Dallas", "Arlington"],
+  "Hurst": ["Fort Worth", "Dallas", "Bedford"],
+  "North Richland Hills": ["Fort Worth", "Dallas", "Hurst"],
+  "Rockwall": ["Dallas", "Garland", "Rowlett"],
+  "Rowlett": ["Dallas", "Garland", "Rockwall"],
+  "Wylie": ["Dallas", "Plano", "Allen"],
+  "Murphy": ["Dallas", "Plano", "Wylie"],
+  "Sachse": ["Dallas", "Garland", "Wylie"],
+  "The Colony": ["Dallas", "Plano", "Lewisville"],
+  "Little Elm": ["Dallas", "Frisco", "The Colony"],
+  "Prosper": ["Dallas", "Frisco", "McKinney"],
+  "Celina": ["Dallas", "Frisco", "McKinney"],
+
+  // Houston Metro
+  "Sugar Land": ["Houston", "Missouri City", "Pearland"],
+  "The Woodlands": ["Houston", "Conroe", "Spring"],
+  "Pearland": ["Houston", "Sugar Land", "Friendswood"],
+  "Katy": ["Houston", "Cypress", "Sugar Land"],
+  "Cypress": ["Houston", "Katy", "Tomball"],
+  "Pasadena, TX": ["Houston", "Deer Park", "La Porte"],
+  "League City": ["Houston", "Clear Lake", "Friendswood"],
+  "Friendswood": ["Houston", "League City", "Pearland"],
+  "Missouri City": ["Houston", "Sugar Land", "Stafford"],
+  "Baytown": ["Houston", "Pasadena", "La Porte"],
+  "Conroe": ["Houston", "The Woodlands", "Spring"],
+  "Spring": ["Houston", "The Woodlands", "Tomball"],
+  "Tomball": ["Houston", "Spring", "Cypress"],
+  "Humble": ["Houston", "Kingwood", "Atascocita"],
+  "Kingwood": ["Houston", "Humble", "Atascocita"],
+  "Atascocita": ["Houston", "Humble", "Kingwood"],
+  "Richmond": ["Houston", "Sugar Land", "Rosenberg"],
+  "Rosenberg": ["Houston", "Richmond", "Sugar Land"],
+  "La Porte": ["Houston", "Pasadena", "Deer Park"],
+  "Deer Park": ["Houston", "Pasadena", "La Porte"],
+  "Galveston": ["Houston", "League City", "Texas City"],
+  "Texas City": ["Houston", "Galveston", "La Marque"],
+
+  // San Antonio Metro
+  "New Braunfels": ["San Antonio", "San Marcos", "Seguin"],
+  "Schertz": ["San Antonio", "New Braunfels", "Cibolo"],
+  "Cibolo": ["San Antonio", "Schertz", "New Braunfels"],
+  "Boerne": ["San Antonio", "Helotes", "Fair Oaks Ranch"],
+  "Helotes": ["San Antonio", "Boerne", "Leon Valley"],
+  "Converse": ["San Antonio", "Live Oak", "Universal City"],
+  "Live Oak": ["San Antonio", "Converse", "Universal City"],
+  "Universal City": ["San Antonio", "Live Oak", "Converse"],
+  "Seguin": ["San Antonio", "New Braunfels", "San Marcos"],
+  "Floresville": ["San Antonio", "Seguin", "Pleasanton"],
+
+  // Phoenix Metro (Arizona)
+  "Scottsdale": ["Phoenix", "Tempe", "Mesa"],
+  "Tempe": ["Phoenix", "Scottsdale", "Mesa"],
+  "Mesa": ["Phoenix", "Tempe", "Gilbert"],
+  "Gilbert": ["Phoenix", "Mesa", "Chandler"],
+  "Chandler": ["Phoenix", "Gilbert", "Tempe"],
+  "Glendale, AZ": ["Phoenix", "Peoria", "Scottsdale"],
+  "Peoria": ["Phoenix", "Glendale", "Surprise"],
+  "Surprise": ["Phoenix", "Peoria", "Sun City"],
+  "Goodyear": ["Phoenix", "Avondale", "Buckeye"],
+  "Avondale": ["Phoenix", "Goodyear", "Tolleson"],
+  "Buckeye": ["Phoenix", "Goodyear", "Avondale"],
+  "Queen Creek": ["Phoenix", "Gilbert", "Mesa"],
+  "Cave Creek": ["Phoenix", "Scottsdale", "Carefree"],
+  "Fountain Hills": ["Phoenix", "Scottsdale", "Mesa"],
+  "Paradise Valley": ["Phoenix", "Scottsdale", "Tempe"],
+  "Apache Junction": ["Phoenix", "Mesa", "Gilbert"],
+
+  // Denver Metro (Colorado)
+  "Aurora, CO": ["Denver", "Centennial", "Lakewood"],
+  "Lakewood, CO": ["Denver", "Aurora", "Golden"],
+  "Thornton": ["Denver", "Westminster", "Northglenn"],
+  "Arvada": ["Denver", "Westminster", "Golden"],
+  "Westminster": ["Denver", "Thornton", "Arvada"],
+  "Centennial": ["Denver", "Aurora", "Englewood"],
+  "Highlands Ranch": ["Denver", "Centennial", "Lone Tree"],
+  "Lone Tree": ["Denver", "Highlands Ranch", "Centennial"],
+  "Parker": ["Denver", "Aurora", "Centennial"],
+  "Castle Rock": ["Denver", "Lone Tree", "Parker"],
+  "Littleton": ["Denver", "Englewood", "Centennial"],
+  "Englewood": ["Denver", "Littleton", "Centennial"],
+  "Golden": ["Denver", "Lakewood", "Arvada"],
+  "Broomfield": ["Denver", "Boulder", "Westminster"],
+  "Louisville": ["Denver", "Boulder", "Broomfield"],
+  "Lafayette": ["Denver", "Boulder", "Broomfield"],
+  "Erie": ["Denver", "Boulder", "Broomfield"],
+  "Brighton": ["Denver", "Thornton", "Commerce City"],
+  "Commerce City": ["Denver", "Thornton", "Brighton"],
+  "Northglenn": ["Denver", "Thornton", "Westminster"],
+
+  // Seattle Metro (Washington)
+  "Bellevue": ["Seattle", "Redmond", "Kirkland"],
+  "Redmond": ["Seattle", "Bellevue", "Kirkland"],
+  "Kirkland": ["Seattle", "Bellevue", "Redmond"],
+  "Kent": ["Seattle", "Renton", "Auburn"],
+  "Renton": ["Seattle", "Kent", "Bellevue"],
+  "Federal Way": ["Seattle", "Tacoma", "Kent"],
+  "Auburn": ["Seattle", "Kent", "Federal Way"],
+  "Sammamish": ["Seattle", "Bellevue", "Redmond"],
+  "Issaquah": ["Seattle", "Bellevue", "Sammamish"],
+  "Bothell": ["Seattle", "Kirkland", "Lynnwood"],
+  "Lynnwood": ["Seattle", "Everett", "Bothell"],
+  "Everett": ["Seattle", "Lynnwood", "Marysville"],
+  "Marysville": ["Seattle", "Everett", "Lake Stevens"],
+  "Lake Stevens": ["Seattle", "Everett", "Marysville"],
+  "Shoreline": ["Seattle", "Lynnwood", "Edmonds"],
+  "Edmonds": ["Seattle", "Shoreline", "Lynnwood"],
+  "Burien": ["Seattle", "Renton", "SeaTac"],
+  "SeaTac": ["Seattle", "Burien", "Tukwila"],
+  "Tukwila": ["Seattle", "Renton", "SeaTac"],
+  "Mercer Island": ["Seattle", "Bellevue", "Renton"],
+
+  // Los Angeles Metro (California)
+  "Santa Monica": ["Los Angeles", "Beverly Hills", "Culver City"],
+  "Beverly Hills": ["Los Angeles", "Santa Monica", "West Hollywood"],
+  "West Hollywood": ["Los Angeles", "Beverly Hills", "Hollywood"],
+  "Pasadena, CA": ["Los Angeles", "Glendale", "Arcadia"],
+  "Glendale, CA": ["Los Angeles", "Burbank", "Pasadena"],
+  "Burbank": ["Los Angeles", "Glendale", "North Hollywood"],
+  "Long Beach": ["Los Angeles", "Lakewood", "Carson"],
+  "Torrance": ["Los Angeles", "Carson", "Redondo Beach"],
+  "Carson": ["Los Angeles", "Torrance", "Long Beach"],
+  "Downey": ["Los Angeles", "Norwalk", "South Gate"],
+  "Norwalk": ["Los Angeles", "Downey", "Cerritos"],
+  "Cerritos": ["Los Angeles", "Norwalk", "Lakewood"],
+  "Lakewood, CA": ["Los Angeles", "Long Beach", "Cerritos"],
+  "Whittier": ["Los Angeles", "La Mirada", "Pico Rivera"],
+  "Fullerton": ["Los Angeles", "Anaheim", "Buena Park"],
+  "Anaheim": ["Los Angeles", "Fullerton", "Orange"],
+  "Irvine": ["Los Angeles", "Newport Beach", "Costa Mesa"],
+  "Huntington Beach": ["Los Angeles", "Newport Beach", "Costa Mesa"],
+  "Costa Mesa": ["Los Angeles", "Irvine", "Newport Beach"],
+  "Newport Beach": ["Los Angeles", "Irvine", "Costa Mesa"],
+  "Santa Ana": ["Los Angeles", "Anaheim", "Orange"],
+  "Ontario": ["Los Angeles", "Rancho Cucamonga", "Pomona"],
+  "Rancho Cucamonga": ["Los Angeles", "Ontario", "Fontana"],
+  "Pomona": ["Los Angeles", "Ontario", "Claremont"],
+  "Fontana": ["Los Angeles", "Rancho Cucamonga", "Rialto"],
+  "San Bernardino": ["Los Angeles", "Riverside", "Fontana"],
+  "Riverside": ["Los Angeles", "San Bernardino", "Corona"],
+  "Corona": ["Los Angeles", "Riverside", "Norco"],
+
+  // San Francisco Bay Area
+  "Oakland": ["San Francisco", "Berkeley", "Alameda"],
+  "Berkeley": ["San Francisco", "Oakland", "Albany"],
+  "San Jose": ["San Francisco", "Santa Clara", "Sunnyvale"],
+  "Sunnyvale": ["San Francisco", "San Jose", "Santa Clara"],
+  "Santa Clara": ["San Francisco", "San Jose", "Sunnyvale"],
+  "Mountain View": ["San Francisco", "Palo Alto", "Sunnyvale"],
+  "Palo Alto": ["San Francisco", "Mountain View", "Menlo Park"],
+  "Menlo Park": ["San Francisco", "Palo Alto", "Redwood City"],
+  "Redwood City": ["San Francisco", "Menlo Park", "San Mateo"],
+  "San Mateo": ["San Francisco", "Redwood City", "Foster City"],
+  "Foster City": ["San Francisco", "San Mateo", "Redwood City"],
+  "Daly City": ["San Francisco", "South San Francisco", "Pacifica"],
+  "South San Francisco": ["San Francisco", "Daly City", "San Bruno"],
+  "Fremont": ["San Francisco", "Newark", "Hayward"],
+  "Hayward": ["San Francisco", "Fremont", "Castro Valley"],
+  "Pleasanton": ["San Francisco", "Dublin", "Livermore"],
+  "Dublin": ["San Francisco", "Pleasanton", "Livermore"],
+  "Livermore": ["San Francisco", "Pleasanton", "Dublin"],
+  "Walnut Creek": ["San Francisco", "Concord", "Pleasant Hill"],
+  "Concord": ["San Francisco", "Walnut Creek", "Pleasant Hill"],
+  "San Ramon": ["San Francisco", "Dublin", "Danville"],
+  "Danville": ["San Francisco", "San Ramon", "Walnut Creek"],
+
+  // Chicago Metro (Illinois)
+  "Naperville": ["Chicago", "Aurora", "Bolingbrook"],
+  "Aurora, IL": ["Chicago", "Naperville", "Oswego"],
+  "Joliet": ["Chicago", "Bolingbrook", "Plainfield"],
+  "Evanston": ["Chicago", "Skokie", "Wilmette"],
+  "Skokie": ["Chicago", "Evanston", "Niles"],
+  "Oak Park": ["Chicago", "Forest Park", "Berwyn"],
+  "Schaumburg": ["Chicago", "Arlington Heights", "Hoffman Estates"],
+  "Arlington Heights": ["Chicago", "Schaumburg", "Mount Prospect"],
+  "Palatine": ["Chicago", "Arlington Heights", "Rolling Meadows"],
+  "Elgin": ["Chicago", "Schaumburg", "South Elgin"],
+  "Bolingbrook": ["Chicago", "Naperville", "Romeoville"],
+  "Orland Park": ["Chicago", "Tinley Park", "Oak Lawn"],
+  "Tinley Park": ["Chicago", "Orland Park", "Oak Lawn"],
+  "Oak Lawn": ["Chicago", "Evergreen Park", "Orland Park"],
+  "Downers Grove": ["Chicago", "Naperville", "Westmont"],
+  "Lombard": ["Chicago", "Glen Ellyn", "Villa Park"],
+  "Wheaton": ["Chicago", "Glen Ellyn", "Carol Stream"],
+  "Glen Ellyn": ["Chicago", "Wheaton", "Lombard"],
+  "Hoffman Estates": ["Chicago", "Schaumburg", "Streamwood"],
+  "Streamwood": ["Chicago", "Hoffman Estates", "Bartlett"],
+  "Des Plaines": ["Chicago", "Park Ridge", "Mount Prospect"],
+
+  // Atlanta Metro (Georgia)
+  "Marietta": ["Atlanta", "Smyrna", "Kennesaw"],
+  "Sandy Springs": ["Atlanta", "Dunwoody", "Roswell"],
+  "Roswell": ["Atlanta", "Alpharetta", "Sandy Springs"],
+  "Alpharetta": ["Atlanta", "Roswell", "Johns Creek"],
+  "Johns Creek": ["Atlanta", "Alpharetta", "Duluth"],
+  "Duluth": ["Atlanta", "Johns Creek", "Suwanee"],
+  "Suwanee": ["Atlanta", "Duluth", "Buford"],
+  "Lawrenceville": ["Atlanta", "Snellville", "Duluth"],
+  "Smyrna": ["Atlanta", "Marietta", "Vinings"],
+  "Dunwoody": ["Atlanta", "Sandy Springs", "Brookhaven"],
+  "Brookhaven": ["Atlanta", "Dunwoody", "Chamblee"],
+  "Kennesaw": ["Atlanta", "Marietta", "Acworth"],
+  "Acworth": ["Atlanta", "Kennesaw", "Marietta"],
+  "Peachtree City": ["Atlanta", "Fayetteville", "Newnan"],
+  "Newnan": ["Atlanta", "Peachtree City", "Carrollton"],
+  "Decatur": ["Atlanta", "Stone Mountain", "Tucker"],
+  "Tucker": ["Atlanta", "Stone Mountain", "Decatur"],
+  "Stone Mountain": ["Atlanta", "Tucker", "Lilburn"],
+
+  // Miami Metro (Florida)
+  "Fort Lauderdale": ["Miami", "Hollywood", "Pompano Beach"],
+  "Hollywood": ["Miami", "Fort Lauderdale", "Pembroke Pines"],
+  "Pembroke Pines": ["Miami", "Miramar", "Hollywood"],
+  "Miramar": ["Miami", "Pembroke Pines", "Hollywood"],
+  "Hialeah": ["Miami", "Miami Lakes", "Hialeah Gardens"],
+  "Miami Beach": ["Miami", "Sunny Isles Beach", "Surfside"],
+  "Coral Gables": ["Miami", "South Miami", "Coconut Grove"],
+  "Doral": ["Miami", "Sweetwater", "Hialeah"],
+  "Boca Raton": ["Miami", "Delray Beach", "Pompano Beach"],
+  "Pompano Beach": ["Miami", "Fort Lauderdale", "Deerfield Beach"],
+  "Coral Springs": ["Miami", "Parkland", "Pompano Beach"],
+  "Plantation": ["Miami", "Fort Lauderdale", "Sunrise"],
+  "Sunrise": ["Miami", "Fort Lauderdale", "Plantation"],
+  "Davie": ["Miami", "Fort Lauderdale", "Pembroke Pines"],
+  "Weston": ["Miami", "Fort Lauderdale", "Pembroke Pines"],
+  "Homestead": ["Miami", "Florida City", "Cutler Bay"],
+  "Kendall": ["Miami", "Pinecrest", "South Miami"],
+  "Aventura": ["Miami", "Sunny Isles Beach", "North Miami Beach"],
+
+  // Boston Metro (Massachusetts)
+  "Cambridge": ["Boston", "Somerville", "Arlington"],
+  "Somerville": ["Boston", "Cambridge", "Medford"],
+  "Brookline": ["Boston", "Newton", "Brighton"],
+  "Newton": ["Boston", "Brookline", "Wellesley"],
+  "Quincy": ["Boston", "Braintree", "Weymouth"],
+  "Braintree": ["Boston", "Quincy", "Weymouth"],
+  "Medford": ["Boston", "Somerville", "Malden"],
+  "Malden": ["Boston", "Medford", "Revere"],
+  "Revere": ["Boston", "Malden", "Chelsea"],
+  "Chelsea": ["Boston", "Revere", "Everett"],
+  "Waltham": ["Boston", "Newton", "Watertown"],
+  "Watertown": ["Boston", "Waltham", "Cambridge"],
+  "Arlington, MA": ["Boston", "Cambridge", "Lexington"],
+  "Lexington": ["Boston", "Arlington", "Bedford"],
+  "Woburn": ["Boston", "Winchester", "Burlington"],
+  "Burlington": ["Boston", "Woburn", "Lexington"],
+  "Framingham": ["Boston", "Natick", "Wellesley"],
+  "Natick": ["Boston", "Framingham", "Wellesley"],
+
+  // New York Metro
+  "Jersey City": ["New York", "Hoboken", "Newark"],
+  "Newark": ["New York", "Jersey City", "Elizabeth"],
+  "Hoboken": ["New York", "Jersey City", "Weehawken"],
+  "Yonkers": ["New York", "Mount Vernon", "New Rochelle"],
+  "White Plains": ["New York", "Yonkers", "New Rochelle"],
+  "New Rochelle": ["New York", "Yonkers", "White Plains"],
+  "Stamford": ["New York", "Greenwich", "Norwalk"],
+  "Greenwich": ["New York", "Stamford", "White Plains"],
+  "Bridgeport": ["New York", "Stamford", "New Haven"],
+  "Long Island City": ["New York", "Astoria", "Brooklyn"],
+  "Staten Island": ["New York", "Brooklyn", "Jersey City"],
+  "Brooklyn": ["New York", "Queens", "Staten Island"],
+  "Queens": ["New York", "Brooklyn", "Long Island City"],
+  "Bronx": ["New York", "Yonkers", "Mount Vernon"],
+  "Paterson": ["New York", "Newark", "Passaic"],
+  "Elizabeth": ["New York", "Newark", "Linden"],
+};
+
+/**
+ * TIER 3: State capital/major city fallbacks
+ * When tier 1 and tier 2 fail, fall back to the state's largest city or capital.
+ */
+const STATE_CAPITALS: Record<string, string[]> = {
+  "TX": ["Austin", "Houston", "Dallas"],
+  "CA": ["Sacramento", "Los Angeles", "San Francisco"],
+  "NY": ["Albany", "New York", "Buffalo"],
+  "FL": ["Tallahassee", "Miami", "Orlando"],
+  "IL": ["Springfield", "Chicago"],
+  "PA": ["Harrisburg", "Philadelphia", "Pittsburgh"],
+  "OH": ["Columbus", "Cleveland", "Cincinnati"],
+  "GA": ["Atlanta", "Savannah"],
+  "NC": ["Raleigh", "Charlotte", "Durham"],
+  "MI": ["Lansing", "Detroit", "Grand Rapids"],
+  "AZ": ["Phoenix", "Tucson"],
+  "WA": ["Olympia", "Seattle", "Spokane"],
+  "CO": ["Denver", "Colorado Springs"],
+  "MA": ["Boston", "Worcester"],
+  "TN": ["Nashville", "Memphis", "Knoxville"],
+  "IN": ["Indianapolis", "Fort Wayne"],
+  "MO": ["Jefferson City", "Kansas City", "St. Louis"],
+  "MD": ["Annapolis", "Baltimore"],
+  "WI": ["Madison", "Milwaukee"],
+  "MN": ["St. Paul", "Minneapolis"],
+  "SC": ["Columbia", "Charleston"],
+  "AL": ["Montgomery", "Birmingham"],
+  "LA": ["Baton Rouge", "New Orleans"],
+  "KY": ["Frankfort", "Louisville", "Lexington"],
+  "OR": ["Salem", "Portland"],
+  "OK": ["Oklahoma City", "Tulsa"],
+  "CT": ["Hartford", "New Haven", "Bridgeport"],
+  "UT": ["Salt Lake City"],
+  "IA": ["Des Moines", "Cedar Rapids"],
+  "NV": ["Carson City", "Las Vegas", "Reno"],
+  "AR": ["Little Rock"],
+  "MS": ["Jackson"],
+  "KS": ["Topeka", "Wichita", "Kansas City"],
+  "NM": ["Santa Fe", "Albuquerque"],
+  "NE": ["Lincoln", "Omaha"],
+  "ID": ["Boise"],
+  "HI": ["Honolulu"],
+  "NH": ["Concord", "Manchester"],
+  "ME": ["Augusta", "Portland"],
+  "RI": ["Providence"],
+  "MT": ["Helena", "Billings"],
+  "DE": ["Dover", "Wilmington"],
+  "SD": ["Pierre", "Sioux Falls"],
+  "ND": ["Bismarck", "Fargo"],
+  "AK": ["Juneau", "Anchorage"],
+  "VT": ["Montpelier", "Burlington"],
+  "WY": ["Cheyenne"],
+  "WV": ["Charleston", "Huntington"],
+  "VA": ["Richmond", "Virginia Beach", "Norfolk"],
+  "NJ": ["Trenton", "Newark", "Jersey City"],
+};
 
 // GNews API (primary)
 const GNEWS_API_KEY = process.env.GNEWS_API_KEY;
@@ -576,35 +952,180 @@ export async function GET(req: NextRequest) {
   let articles: LocalNewsArticle[] = primary.articles.map((a) => toLocalNewsArticle(a));
   const sourceCity = city?.displayName || cityParam;
   const fallbackSources: string[] = [];
+  const existingUrls = new Set(articles.map((a) => a.url));
 
-  // Aggressive nearby-city scaling when content is sparse
-  if (articles.length < MINIMUM_ARTICLES && city) {
-    const nearbyCities = getNearbyCities(
-      cityParam,
-      FALLBACK_RADIUS_MILES,
-      FALLBACK_MIN_POPULATION
-    );
+  // =============================================================================
+  // THREE-TIER FALLBACK SYSTEM
+  // =============================================================================
+  // When primary city has insufficient articles, we use a three-tier fallback:
+  //   Tier 1: Hard-coded metro area mappings (instant, most reliable)
+  //   Tier 2: Geographic proximity using getNearbyCities() (if city has coordinates)
+  //   Tier 3: State capital/major city as last resort
+  // =============================================================================
 
-    const existingUrls = new Set(articles.map((a) => a.url));
+  if (articles.length < IDEAL_ARTICLES) {
+    console.log(`[NEWS FALLBACK] ${cityName} has only ${articles.length} articles, need ${IDEAL_ARTICLES}. Starting fallback...`);
 
-    for (const nearbyCity of nearbyCities) {
-      if (articles.length >= IDEAL_ARTICLES) break;
+    // -------------------------------------------------------------------------
+    // TIER 1: Hard-coded metro area mappings (instant, most reliable)
+    // -------------------------------------------------------------------------
+    // Try multiple key formats: "Leander", "Leander, TX", city?.displayName
+    const lookupKeys = [
+      cityName,
+      state ? `${cityName}, ${state.toUpperCase()}` : null,
+      city?.displayName,
+    ].filter(Boolean) as string[];
 
-      const nearby = await fetchNewsForCity(nearbyCity.name, nearbyCity.state);
+    let metroCities: string[] | undefined;
+    for (const key of lookupKeys) {
+      if (METRO_FALLBACKS[key]) {
+        metroCities = METRO_FALLBACKS[key];
+        console.log(`[NEWS FALLBACK] Tier 1: Found metro mapping using key "${key}"`);
+        break;
+      }
+    }
 
-      if (!provider && nearby.provider) {
-        provider = nearby.provider;
+    if (metroCities && metroCities.length > 0 && articles.length < IDEAL_ARTICLES) {
+      console.log(`[NEWS FALLBACK] Tier 1: Found metro mapping for ${cityName}: ${metroCities.join(", ")}`);
+
+      for (const metroCity of metroCities) {
+        if (articles.length >= IDEAL_ARTICLES) break;
+
+        // Find the metro city in the database to get its state
+        const metroCityData = findCity(metroCity);
+        const metroState = metroCityData?.state || state;
+
+        console.log(`[NEWS FALLBACK] Tier 1: Fetching news from ${metroCity}, ${metroState}...`);
+        const metroResult = await fetchNewsForCity(metroCity, metroState);
+
+        if (!provider && metroResult.provider) {
+          provider = metroResult.provider;
+        }
+
+        const newArticles = metroResult.articles
+          .filter((a) => !existingUrls.has(a.url))
+          .map((a) => toLocalNewsArticle(a, metroCityData?.displayName || `${metroCity}, ${metroState}`));
+
+        if (newArticles.length > 0) {
+          console.log(`[NEWS FALLBACK] Tier 1: Found ${newArticles.length} new articles from ${metroCity}`);
+          for (const a of newArticles) existingUrls.add(a.url);
+          articles = [...articles, ...newArticles];
+          fallbackSources.push(metroCityData?.displayName || `${metroCity}, ${metroState}`);
+        }
       }
 
-      const newArticles = nearby.articles
-        .filter((a) => !existingUrls.has(a.url))
-        .map((a) => toLocalNewsArticle(a, nearbyCity.displayName));
-
-      if (newArticles.length > 0) {
-        for (const a of newArticles) existingUrls.add(a.url);
-        articles = [...articles, ...newArticles];
-        fallbackSources.push(nearbyCity.displayName);
+      if (articles.length >= IDEAL_ARTICLES) {
+        console.log(`[NEWS FALLBACK] Tier 1 SUCCESS: Now have ${articles.length} articles`);
       }
+    }
+
+    // -------------------------------------------------------------------------
+    // TIER 2: Geographic proximity using getNearbyCities()
+    // -------------------------------------------------------------------------
+    if (articles.length < IDEAL_ARTICLES && city && city.lat && city.lng) {
+      console.log(`[NEWS FALLBACK] Tier 2: Using geographic proximity for ${cityName}...`);
+
+      const nearbyCities = getNearbyCities(
+        cityParam,
+        FALLBACK_RADIUS_MILES,
+        FALLBACK_MIN_POPULATION
+      );
+
+      if (nearbyCities.length > 0) {
+        console.log(`[NEWS FALLBACK] Tier 2: Found ${nearbyCities.length} nearby cities: ${nearbyCities.map(c => c.name).join(", ")}`);
+
+        for (const nearbyCity of nearbyCities) {
+          if (articles.length >= IDEAL_ARTICLES) break;
+
+          // Skip if we already fetched from this city in Tier 1
+          if (metroCities?.includes(nearbyCity.name)) {
+            console.log(`[NEWS FALLBACK] Tier 2: Skipping ${nearbyCity.name} (already fetched in Tier 1)`);
+            continue;
+          }
+
+          console.log(`[NEWS FALLBACK] Tier 2: Fetching news from ${nearbyCity.displayName}...`);
+          const nearby = await fetchNewsForCity(nearbyCity.name, nearbyCity.state);
+
+          if (!provider && nearby.provider) {
+            provider = nearby.provider;
+          }
+
+          const newArticles = nearby.articles
+            .filter((a) => !existingUrls.has(a.url))
+            .map((a) => toLocalNewsArticle(a, nearbyCity.displayName));
+
+          if (newArticles.length > 0) {
+            console.log(`[NEWS FALLBACK] Tier 2: Found ${newArticles.length} new articles from ${nearbyCity.displayName}`);
+            for (const a of newArticles) existingUrls.add(a.url);
+            articles = [...articles, ...newArticles];
+            fallbackSources.push(nearbyCity.displayName);
+          }
+        }
+
+        if (articles.length >= IDEAL_ARTICLES) {
+          console.log(`[NEWS FALLBACK] Tier 2 SUCCESS: Now have ${articles.length} articles`);
+        }
+      } else {
+        console.log(`[NEWS FALLBACK] Tier 2: No nearby cities found within ${FALLBACK_RADIUS_MILES} miles with population >= ${FALLBACK_MIN_POPULATION}`);
+      }
+    } else if (articles.length < IDEAL_ARTICLES && city && (!city.lat || !city.lng)) {
+      console.log(`[NEWS FALLBACK] Tier 2 SKIPPED: ${cityName} lacks coordinates in database`);
+    }
+
+    // -------------------------------------------------------------------------
+    // TIER 3: State capital/major city as last resort
+    // -------------------------------------------------------------------------
+    if (articles.length < IDEAL_ARTICLES && state) {
+      const stateUpper = state.toUpperCase();
+      const stateMajorCities = STATE_CAPITALS[stateUpper];
+
+      if (stateMajorCities && stateMajorCities.length > 0) {
+        console.log(`[NEWS FALLBACK] Tier 3: Falling back to state major cities for ${stateUpper}: ${stateMajorCities.join(", ")}`);
+
+        for (const majorCity of stateMajorCities) {
+          if (articles.length >= IDEAL_ARTICLES) break;
+
+          // Skip if we already fetched from this city
+          if (metroCities?.includes(majorCity)) {
+            console.log(`[NEWS FALLBACK] Tier 3: Skipping ${majorCity} (already fetched in Tier 1)`);
+            continue;
+          }
+
+          // Find the major city to get its full display name
+          const majorCityData = findCity(majorCity);
+
+          console.log(`[NEWS FALLBACK] Tier 3: Fetching news from ${majorCity}, ${stateUpper}...`);
+          const majorResult = await fetchNewsForCity(majorCity, stateUpper);
+
+          if (!provider && majorResult.provider) {
+            provider = majorResult.provider;
+          }
+
+          const newArticles = majorResult.articles
+            .filter((a) => !existingUrls.has(a.url))
+            .map((a) => toLocalNewsArticle(a, majorCityData?.displayName || `${majorCity}, ${stateUpper}`));
+
+          if (newArticles.length > 0) {
+            console.log(`[NEWS FALLBACK] Tier 3: Found ${newArticles.length} new articles from ${majorCity}`);
+            for (const a of newArticles) existingUrls.add(a.url);
+            articles = [...articles, ...newArticles];
+            fallbackSources.push(majorCityData?.displayName || `${majorCity}, ${stateUpper}`);
+          }
+        }
+
+        if (articles.length >= IDEAL_ARTICLES) {
+          console.log(`[NEWS FALLBACK] Tier 3 SUCCESS: Now have ${articles.length} articles`);
+        }
+      } else {
+        console.log(`[NEWS FALLBACK] Tier 3 SKIPPED: No major cities defined for state ${stateUpper}`);
+      }
+    }
+
+    // Final logging
+    if (articles.length >= IDEAL_ARTICLES) {
+      console.log(`[NEWS FALLBACK] COMPLETE: ${cityName} now has ${articles.length} articles from ${fallbackSources.length} fallback source(s)`);
+    } else {
+      console.log(`[NEWS FALLBACK] INCOMPLETE: ${cityName} has only ${articles.length} articles after all fallback tiers`);
     }
   }
 
