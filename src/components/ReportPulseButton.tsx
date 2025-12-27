@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { supabase } from "../../lib/supabaseClient";
 
 type ReportReason = "spam" | "harassment" | "inappropriate" | "misinformation" | "other";
 
@@ -40,9 +41,20 @@ export default function ReportPulseButton({
     setError(null);
 
     try {
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
+      if (sessionError || !accessToken) {
+        throw new Error("Sign in to report");
+      }
+
       const response = await fetch("/api/report-pulse", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
         body: JSON.stringify({
           pulseId,
           reporterId,

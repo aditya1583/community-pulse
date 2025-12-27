@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
 import { useGeocodingAutocomplete } from "@/hooks/useGeocodingAutocomplete";
@@ -28,12 +28,12 @@ import AISummaryCard from "@/components/AISummaryCard";
 import NewsTab from "@/components/NewsTab";
 import EventCard from "@/components/EventCard";
 import PulseCard from "@/components/PulseCard";
+import LocalTab from "@/components/LocalTab";
 import PulseInput from "@/components/PulseInput";
 import FAB from "@/components/FAB";
 import PulseModal from "@/components/PulseModal";
 import TrafficContent from "@/components/TrafficContent";
-import LocalTab from "@/components/LocalTab";
-import type { TabId, WeatherInfo, Pulse, CityMood, TrafficLevel } from "@/components/types";
+import { DASHBOARD_TABS, type TabId, type WeatherInfo, type Pulse, type CityMood, type TrafficLevel } from "@/components/types";
 import type { LocalNewsResponse } from "@/types/news";
 
 // Real-time Live Updates
@@ -113,6 +113,12 @@ type Profile = {
   anon_name: string;
   name_locked?: boolean | null;
 };
+
+const TAB_ID_SET = new Set<TabId>(DASHBOARD_TABS.map((tab) => tab.id));
+
+function isTabId(value: unknown): value is TabId {
+  return typeof value === "string" && TAB_ID_SET.has(value as TabId);
+}
 
 export default function Home() {
   // Core state
@@ -255,6 +261,14 @@ export default function Home() {
   const pulseTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [renderCitySuggestionsMenu, setRenderCitySuggestionsMenu] = useState(false);
   const cityDropdownOpen = showCitySuggestions && citySuggestions.length > 0;
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    if (!isTabId(activeTab)) {
+      console.warn(`[tabs] Unknown activeTab "${String(activeTab)}" — defaulting to "pulse"`);
+      setActiveTab("pulse");
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (cityDropdownOpen) {
@@ -1596,6 +1610,7 @@ export default function Home() {
   // ========= ADD PULSE =========
   const handleAddPulse = async () => {
     const trimmed = message.trim();
+    const resolvedTag = tag || "General";
 
     if (!sessionUser) {
       setErrorMsg("Sign in to post.");
@@ -1620,23 +1635,24 @@ export default function Home() {
 
     // Tag/Category defaults to General if not selected
     if (!tag) {
-      setTag("General");
-      setTagValidationError(null);
-    } else {
-      setTagValidationError(null);
+      setTag(resolvedTag);
     }
+    setTagValidationError(null);
 
-    // Message is now optional - only validate if provided
-    if (trimmed) {
+    // Message is required (matches server validation)
+    if (!trimmed) {
+      setValidationError("Please enter a message");
+      hasErrors = true;
+    } else {
       const moderationResult = moderateContent(trimmed);
       if (!moderationResult.allowed) {
-        setValidationError(moderationResult.reason || "Pulse contains disallowed language.");
+        setValidationError(
+          moderationResult.reason || "Pulse contains disallowed language."
+        );
         hasErrors = true;
       } else {
         setValidationError(null);
       }
-    } else {
-      setValidationError(null);
     }
 
     if (hasErrors) {
@@ -1672,7 +1688,7 @@ export default function Home() {
         body: JSON.stringify({
           city,
           mood,
-          tag,
+          tag: resolvedTag,
           message: trimmed,
           author: authorName,
         }),
@@ -1704,6 +1720,40 @@ export default function Home() {
 
         setErrorMsg(message);
         return;
+      }
+
+      // Optimistically insert the created pulse into local state so the author sees it immediately,
+      // even if realtime delivery is delayed or the websocket reconnects.
+      const raw = data.pulse as Record<string, unknown>;
+      const createdAt =
+        typeof raw.created_at === "string"
+          ? raw.created_at
+          : typeof raw.createdAt === "string"
+            ? raw.createdAt
+            : new Date().toISOString();
+
+      const createdPulse: Pulse = {
+        id: Number(raw.id),
+        city: typeof raw.city === "string" ? raw.city : city,
+        neighborhood:
+          typeof raw.neighborhood === "string" ? raw.neighborhood : null,
+        mood: typeof raw.mood === "string" ? raw.mood : mood,
+        tag: typeof raw.tag === "string" ? raw.tag : resolvedTag,
+        message: typeof raw.message === "string" ? raw.message : trimmed,
+        author: typeof raw.author === "string" ? raw.author : authorName,
+        createdAt,
+        user_id: typeof raw.user_id === "string" ? raw.user_id : sessionUser.id,
+      };
+
+      if (createdPulse.id) {
+        setPulses((prev) => {
+          const exists = prev.some((p) => String(p.id) === String(createdPulse.id));
+          if (exists) return prev;
+          return [createdPulse, ...prev].sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+        });
       }
 
       const reset = resetComposerAfterSuccessfulPost();
@@ -1748,8 +1798,41 @@ export default function Home() {
   const displayName = profile?.anon_name || username || "...";
   const currentStreak = streakInfo?.currentStreak ?? 0;
 
-  // Calculate active users count (from city mood pulseCount)
-  const activeUsersCount = cityMood?.pulseCount || 0;
+  const recentPulseCount2h = useMemo(() => {
+    const cutoff = Date.now() - 2 * 60 * 60 * 1000;
+    return pulses.reduce((count, pulse) => {
+      const createdAtMs = new Date(pulse.createdAt).getTime();
+      if (Number.isNaN(createdAtMs)) return count;
+      return createdAtMs >= cutoff ? count + 1 : count;
+    }, 0);
+  }, [pulses]);
+
+  const safeActiveTab: TabId = isTabId(activeTab) ? activeTab : "pulse";
+  const localState = selectedCity?.state ?? lastValidCity.state ?? "";
+  const localLat = selectedCity?.lat ?? lastValidCity.lat;
+  const localLon = selectedCity?.lon ?? lastValidCity.lon;
+
+  const handleDropPulseJump = useCallback(() => {
+    setActiveTab("pulse");
+
+    const tryFocus = (attempt: number) => {
+      const target = document.getElementById("drop-a-pulse");
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        const textarea =
+          pulseTextareaRef.current ??
+          target.querySelector<HTMLTextAreaElement>("textarea");
+        textarea?.focus();
+        return;
+      }
+
+      if (attempt < 10) {
+        window.setTimeout(() => tryFocus(attempt + 1), 50);
+      }
+    };
+
+    window.setTimeout(() => tryFocus(0), 0);
+  }, [setActiveTab]);
 
   return (
     <div className="min-h-screen neon-grid-bg text-slate-50 flex flex-col">
@@ -2204,9 +2287,8 @@ export default function Home() {
           <CurrentVibeCard
             weather={weather}
             weatherLoading={weatherLoading}
-            activeUsersCount={activeUsersCount}
-            lat={selectedCity?.lat}
-            lon={selectedCity?.lon}
+            recentPulseCount={recentPulseCount2h}
+            onDropPulse={handleDropPulseJump}
           />
 
           {/* Quick Stats */}
@@ -2251,152 +2333,165 @@ export default function Home() {
               newsLoading={newsLoading}
               newsError={newsError}
               newsCount={newsData?.articles?.length ?? 0}
+              onNavigateTab={setActiveTab}
             />
           </div>
 
           {/* Tab Content */}
           <div className="space-y-4">
-            {/* Pulse Tab */}
-            {activeTab === "pulse" && (
-              <>
-                {/* Pulse Input */}
-                <PulseInput
-                  ref={pulseTextareaRef}
-                  mood={mood}
-                  tag={tag}
-                  message={message}
-                  displayName={displayName}
-                  isSignedIn={!!sessionUser}
-                  identityReady={identityReady}
-                  loading={loading}
-                  moodValidationError={moodValidationError}
-                  tagValidationError={tagValidationError}
-                  messageValidationError={validationError}
-                  showValidationErrors={showValidationErrors}
-                  onMoodChange={(m) => {
-                    setMood(m);
-                    setMoodValidationError(null);
-                  }}
-                  onTagChange={(t) => {
-                    setTag(t);
-                    setTagValidationError(null);
-                  }}
-                  onMessageChange={(m) => {
-                    setMessage(m);
-                    setValidationError(null);
-                  }}
-                  onSubmit={handleAddPulse}
-                  onSignInClick={() => setShowAuthModal(true)}
-                  weather={weather}
-                />
-
-                {errorMsg && (
-                  <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/40 rounded-lg px-3 py-2">
-                    {errorMsg}
-                  </p>
-                )}
-
-                {/* Filter chips */}
-                <div className="flex flex-wrap gap-2">
-                  {TAGS.map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setTagFilter(t)}
-                      className={`px-3 py-1.5 rounded-lg text-xs border transition ${
-                        tagFilter === t
-                          ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow shadow-emerald-500/40"
-                          : "bg-slate-800/60 border-slate-700/50 text-slate-300 hover:bg-slate-700"
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Pulses list */}
-                <section className="space-y-3 pb-12">
-                  {loading && pulses.length === 0 ? (
-                    <div className="bg-slate-800/60 border border-dashed border-slate-700/50 rounded-xl px-4 py-10 text-center text-sm text-slate-400">
-                      Loading pulses for{" "}
-                      <span className="font-semibold text-white">{city}</span>...
-                    </div>
-                  ) : filteredPulses.length === 0 ? (
-                    <div className="bg-slate-800/60 border border-dashed border-slate-700/50 rounded-xl px-4 py-10 text-center text-sm text-slate-400">
-                      No pulses yet for{" "}
-                      <span className="font-semibold text-white">{city}</span>. Be
-                      the first to set the vibe.
-                    </div>
-                  ) : (
+            {(() => {
+              switch (safeActiveTab) {
+                case "events":
+                  return (
+                    <EventCard
+                      events={ticketmasterEvents}
+                      isLoading={ticketmasterLoading}
+                      error={ticketmasterError}
+                      hasLocation={!!(selectedCity?.lat && selectedCity?.lon)}
+                    />
+                  );
+                case "traffic":
+                  return (
+                    <TrafficContent
+                      trafficLevel={trafficLevel}
+                      trafficLoading={trafficLoading}
+                      trafficError={trafficError}
+                      trafficPulses={trafficPulses}
+                      cityName={city}
+                    />
+                  );
+                case "news":
+                  return (
+                    <NewsTab
+                      city={city}
+                      data={newsData}
+                      loading={newsLoading}
+                      error={newsError}
+                    />
+                  );
+                case "local":
+                  return (
+                    <LocalTab
+                      cityName={city}
+                      state={localState}
+                      lat={localLat}
+                      lon={localLon}
+                    />
+                  );
+                case "pulse":
+                default:
+                  return (
                     <>
-                      {filteredPulses.map((pulse) => (
-                        <PulseCard
-                          key={pulse.id}
-                          pulse={pulse}
-                          isOwnPulse={sessionUser?.id === pulse.user_id}
-                          isFavorite={favoritePulseIds.includes(pulse.id)}
-                          onToggleFavorite={handleToggleFavorite}
-                          onDelete={handleDeletePulse}
+                      {/* Pulse Input */}
+                      <div id="drop-a-pulse">
+                        <PulseInput
+                          ref={pulseTextareaRef}
+                          mood={mood}
+                          tag={tag}
+                          message={message}
+                          displayName={displayName}
+                          isSignedIn={!!sessionUser}
+                          identityReady={identityReady}
+                          loading={loading}
+                          moodValidationError={moodValidationError}
+                          tagValidationError={tagValidationError}
+                          messageValidationError={validationError}
+                          showValidationErrors={showValidationErrors}
+                          onMoodChange={(m) => {
+                            setMood(m);
+                            setMoodValidationError(null);
+                          }}
+                          onTagChange={(t) => {
+                            setTag(t);
+                            setTagValidationError(null);
+                          }}
+                          onMessageChange={(m) => {
+                            setMessage(m);
+                            setValidationError(null);
+                          }}
+                          onSubmit={handleAddPulse}
+                          onSignInClick={() => setShowAuthModal(true)}
+                          weather={weather}
                         />
-                      ))}
+                      </div>
 
-                      {/* Load more button */}
-                      {hasMorePulses && tagFilter === "All" && (
-                        <div className="flex justify-center pt-4">
-                          <button
-                            onClick={handleLoadMorePulses}
-                            disabled={loadingMore}
-                            className="px-6 py-2 rounded-lg bg-slate-800/60 border border-slate-700/50 text-sm text-slate-300 hover:bg-slate-700 hover:border-emerald-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                          >
-                            {loadingMore ? "Loading..." : "Load more pulses"}
-                          </button>
-                        </div>
+                      {errorMsg && (
+                        <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/40 rounded-lg px-3 py-2">
+                          {errorMsg}
+                        </p>
                       )}
+
+                      {/* Filter chips */}
+                      <div className="flex flex-wrap gap-2">
+                        {TAGS.map((t) => (
+                          <button
+                            key={t}
+                            onClick={() => setTagFilter(t)}
+                            className={`px-3 py-1.5 rounded-lg text-xs border transition ${
+                              tagFilter === t
+                                ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow shadow-emerald-500/40"
+                                : "bg-slate-800/60 border-slate-700/50 text-slate-300 hover:bg-slate-700"
+                            }`}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Pulses list */}
+                      <section className="space-y-3 pb-12">
+                        {loading && pulses.length === 0 ? (
+                          <div className="bg-slate-800/60 border border-dashed border-slate-700/50 rounded-xl px-4 py-10 text-center text-sm text-slate-400">
+                            Loading pulses for{" "}
+                            <span className="font-semibold text-white">
+                              {city}
+                            </span>
+                            ...
+                          </div>
+                        ) : filteredPulses.length === 0 ? (
+                          <div className="bg-slate-800/60 border border-dashed border-slate-700/50 rounded-xl px-4 py-10 text-center text-sm text-slate-400">
+                            No pulses yet for{" "}
+                            <span className="font-semibold text-white">
+                              {city}
+                            </span>
+                            . Be the first to set the vibe.
+                          </div>
+                        ) : (
+                          <>
+                            {filteredPulses.map((pulse) => (
+                              <PulseCard
+                                key={pulse.id}
+                                pulse={pulse}
+                                isOwnPulse={sessionUser?.id === pulse.user_id}
+                                isFavorite={favoritePulseIds.includes(pulse.id)}
+                                onToggleFavorite={handleToggleFavorite}
+                                onDelete={handleDeletePulse}
+                                reporterId={sessionUser?.id}
+                                userIdentifier={sessionUser ? displayName : undefined}
+                              />
+                            ))}
+
+                            {/* Load more button */}
+                            {hasMorePulses && tagFilter === "All" && (
+                              <div className="flex justify-center pt-4">
+                                <button
+                                  onClick={handleLoadMorePulses}
+                                  disabled={loadingMore}
+                                  className="px-6 py-2 rounded-lg bg-slate-800/60 border border-slate-700/50 text-sm text-slate-300 hover:bg-slate-700 hover:border-emerald-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                >
+                                  {loadingMore
+                                    ? "Loading..."
+                                    : "Load more pulses"}
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </section>
                     </>
-                  )}
-                </section>
-              </>
-            )}
-
-            {/* Events Tab */}
-            {activeTab === "events" && (
-              <EventCard
-                events={ticketmasterEvents}
-                isLoading={ticketmasterLoading}
-                error={ticketmasterError}
-                hasLocation={!!(selectedCity?.lat && selectedCity?.lon)}
-              />
-            )}
-
-            {/* Traffic Tab */}
-            {activeTab === "traffic" && (
-              <TrafficContent
-                trafficLevel={trafficLevel}
-                trafficLoading={trafficLoading}
-                trafficError={trafficError}
-                trafficPulses={trafficPulses}
-                cityName={city}
-              />
-            )}
-
-            {/* News Tab */}
-            {activeTab === "news" && (
-              <NewsTab
-                city={city}
-                data={newsData}
-                loading={newsLoading}
-                error={newsError}
-              />
-            )}
-
-            {/* Local Tab */}
-            {activeTab === "local" && (
-              <LocalTab
-                cityName={selectedCity?.name || city.split(",")[0]?.trim() || city}
-                state={selectedCity?.state || ""}
-                lat={selectedCity?.lat}
-                lon={selectedCity?.lon}
-              />
-            )}
+                  );
+              }
+            })()}
           </div>
 
           {/* Disclaimer */}

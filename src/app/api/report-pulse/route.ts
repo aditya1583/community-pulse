@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "../../../../lib/supabaseClient";
+import { createClient } from "@supabase/supabase-js";
 
 /**
  * Report Pulse API Route
@@ -26,7 +26,47 @@ type ReportResponse = {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json() as ReportRequest;
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.slice(7);
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.json(
+        { error: "Server configuration error" },
+        { status: 500 }
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    });
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Invalid or expired session" },
+        { status: 401 }
+      );
+    }
+
+    const body = (await req.json()) as ReportRequest;
     const { pulseId, reporterId, reason, details } = body;
 
     // Validate required fields
@@ -37,10 +77,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!reporterId || typeof reporterId !== "string") {
+    // reporterId comes from the client, but we enforce it from auth to prevent spoofing.
+    if (reporterId && reporterId !== user.id) {
       return NextResponse.json(
-        { error: "Invalid or missing reporterId" },
-        { status: 400 }
+        { error: "Reporter mismatch" },
+        { status: 403 }
       );
     }
 
@@ -73,11 +114,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if user already reported this pulse
-    const { data: existingReport } = await supabase
+    const { data: existingReport, error: existingError } = await supabase
       .from("pulse_reports")
       .select("id")
       .eq("pulse_id", pulseId)
-      .eq("reporter_id", reporterId)
+      .eq("reporter_id", user.id)
       .single();
 
     if (existingReport) {
@@ -87,12 +128,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // PGRST116 = no rows returned (expected when the report doesn't exist)
+    if (existingError && existingError.code !== "PGRST116") {
+      return NextResponse.json(
+        { error: "Failed to check existing report" },
+        { status: 500 }
+      );
+    }
+
     // Insert the report
     const { error: insertError } = await supabase
       .from("pulse_reports")
       .insert({
         pulse_id: pulseId,
-        reporter_id: reporterId,
+        reporter_id: user.id,
         reason,
         details: details || null,
       });
@@ -108,10 +157,12 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      return NextResponse.json(
-        { error: "Failed to submit report" },
-        { status: 500 }
-      );
+      const safeMessage =
+        process.env.NODE_ENV === "production"
+          ? "Failed to submit report"
+          : insertError.message;
+
+      return NextResponse.json({ error: safeMessage }, { status: 500 });
     }
 
     // Get updated report count

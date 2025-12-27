@@ -228,7 +228,8 @@ export default function PulseModal({
               <span className="text-xs text-slate-400">Current conditions</span>
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-lg font-medium text-white">
-                  {Math.round(weather.temp)}°F
+                  {Math.round(weather.temp)}
+                  {"\u00B0F"}
                 </span>
                 <span className="text-sm text-slate-300 capitalize">
                   {weather.description}
