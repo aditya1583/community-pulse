@@ -92,8 +92,8 @@ const PulseInput = forwardRef<HTMLTextAreaElement, PulseInputProps>(
     const categoryMoods = CATEGORY_MOODS[selectedCategory];
 
     // Check if form is ready for submission
-    // Mood is mandatory, message can be empty
-    const isPostEnabled = identityReady && !loading && !!mood && !!tag;
+    // Message is required (matches server validation)
+    const isPostEnabled = identityReady && !loading && !!mood && !!tag && !!message.trim();
 
     // Not signed in state
     if (!isSignedIn) {
@@ -208,7 +208,8 @@ const PulseInput = forwardRef<HTMLTextAreaElement, PulseInputProps>(
             <span className="text-xs text-slate-400">Current conditions</span>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-lg font-medium text-white">
-                {Math.round(weather.temp)}°F
+                {Math.round(weather.temp)}
+                {"\u00B0F"}
               </span>
               <span className="text-sm text-slate-300 capitalize">
                 {weather.description}

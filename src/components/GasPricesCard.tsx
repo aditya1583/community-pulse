@@ -45,7 +45,7 @@ export default function GasPricesCard({ state }: GasPricesCardProps) {
   };
 
   // Get change indicator
-  const getChangeIndicator = (change: number | undefined) => {
+  const getChangeIndicator = (change: number | null | undefined) => {
     if (!change || change === 0) return null;
     if (change > 0) {
       return (

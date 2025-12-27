@@ -26,7 +26,40 @@ type AISummaryCardProps = {
   newsLoading?: boolean;
   newsError?: string | null;
   newsCount?: number;
+  onNavigateTab?: (tab: TabId) => void;
 };
+
+function firstSentence(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) return "";
+
+  const match = trimmed.match(/(.+?[.!?])(\s|$)/);
+  return (match ? match[1] : trimmed).trim();
+}
+
+function InlineLinkButton(props: {
+  onClick?: () => void;
+  children: React.ReactNode;
+  disabled?: boolean;
+}) {
+  if (!props.onClick || props.disabled) {
+    return (
+      <span className="text-slate-200 underline decoration-slate-600 underline-offset-2">
+        {props.children}
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={props.onClick}
+      className="text-emerald-200 underline decoration-emerald-400/50 hover:decoration-emerald-400/80 underline-offset-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40 rounded-sm"
+    >
+      {props.children}
+    </button>
+  );
+}
 
 /**
  * AI Summary Card - Always visible below tabs
@@ -53,24 +86,9 @@ export default function AISummaryCard({
   newsLoading = false,
   newsError = null,
   newsCount = 0,
+  onNavigateTab,
 }: AISummaryCardProps) {
   const displayCity = cityName.split(",")[0]?.trim() || cityName;
-
-  // Get tab-specific summary intro
-  const getSummaryIntro = (): string => {
-    switch (activeTab) {
-      case "pulse":
-        return "Based on recent community pulses";
-      case "events":
-        return "Events happening in your area";
-      case "traffic":
-        return "Current traffic conditions";
-      case "news":
-        return "Latest local news highlights";
-      default:
-        return "Community overview";
-    }
-  };
 
   const getEventSummary = (): string | null => {
     if (events.length === 0) return null;
@@ -117,49 +135,41 @@ export default function AISummaryCard({
     return newsSummary.paragraph;
   };
 
-  const summaryState = () => {
-    if (activeTab === "events") {
-      return {
-        loading: eventsLoading,
-        error: eventsError,
-        summary: getEventSummary(),
-        fallback: "No events nearby this week.",
-      };
-    }
+  const hasNavigate = !!onNavigateTab;
 
-    if (activeTab === "traffic") {
-      return {
-        loading: trafficLoading,
-        error: trafficError,
-        summary: getTrafficSummary(),
-        fallback: "Traffic data is unavailable right now.",
-      };
-    }
+  const pulseLine = (() => {
+    if (summaryLoading) return "Loading pulse summary…";
+    if (summaryError) return summaryError;
+    if (summary) return firstSentence(summary);
+    if (pulsesCount === 0) return `No recent pulses in ${displayCity}.`;
+    return `Generating summary from ${pulsesCount} recent pulses…`;
+  })();
 
-    if (activeTab === "news") {
-      return {
-        loading: newsLoading,
-        error: newsError,
-        summary: getNewsSummary(),
-        fallback:
-          newsCount === 0
-            ? `No local news found for ${displayCity}.`
-            : "Loading news summary...",
-      };
-    }
+  const eventsLine = (() => {
+    if (eventsLoading) return "Loading events…";
+    if (eventsError) return eventsError;
+    const s = getEventSummary();
+    return s ? firstSentence(s) : "No events nearby this week.";
+  })();
 
-    return {
-      loading: summaryLoading,
-      error: summaryError,
-      summary,
-      fallback:
-        pulsesCount === 0
-          ? `No recent pulses in ${displayCity}. Be the first to share what's happening!`
-          : `Generating summary from ${pulsesCount} recent pulses...`,
-    };
-  };
+  const trafficLine = (() => {
+    if (trafficLoading) return "Loading traffic…";
+    if (trafficError) return trafficError;
+    const s = getTrafficSummary();
+    return s ? firstSentence(s) : "Traffic data is unavailable right now.";
+  })();
 
-  const activeSummary = summaryState();
+  const newsLine = (() => {
+    if (newsLoading) return "Loading news…";
+    if (newsError) return newsError;
+    const s = getNewsSummary();
+    if (s) return firstSentence(s);
+    return newsCount === 0
+      ? `No local news found for ${displayCity}.`
+      : "News summary is unavailable right now.";
+  })();
+
+  const localLine = `Local essentials (deals, gas, and markets) for ${displayCity}.`;
 
   return (
     <div className="bg-gradient-to-r from-emerald-900/30 to-slate-900/80 border border-emerald-500/30 rounded-xl p-4">
@@ -186,24 +196,78 @@ export default function AISummaryCard({
 
       {/* Summary content */}
       <div className="space-y-2">
-        {activeSummary.loading ? (
-          <div className="space-y-2">
-            <div className="h-4 w-full bg-slate-700/50 rounded animate-pulse" />
-            <div className="h-4 w-4/5 bg-slate-700/50 rounded animate-pulse" />
-            <div className="h-4 w-3/5 bg-slate-700/50 rounded animate-pulse" />
-          </div>
-        ) : activeSummary.error ? (
-          <p className="text-sm text-red-400">{activeSummary.error}</p>
-        ) : activeSummary.summary ? (
-          <>
-            <p className="text-xs text-slate-500 mb-2">{getSummaryIntro()}</p>
-            <p className="text-sm text-slate-300 leading-relaxed">
-              {activeSummary.summary}
-            </p>
-          </>
-        ) : (
-          <p className="text-sm text-slate-400">{activeSummary.fallback}</p>
-        )}
+        <p className="text-sm text-slate-300 leading-relaxed">
+          <InlineLinkButton
+            onClick={hasNavigate ? () => onNavigateTab?.("pulse") : undefined}
+            disabled={activeTab === "pulse"}
+          >
+            Pulses
+          </InlineLinkButton>
+          {": "}
+          {pulseLine}
+        </p>
+
+        <p className="text-sm text-slate-300 leading-relaxed">
+          <InlineLinkButton
+            onClick={hasNavigate ? () => onNavigateTab?.("traffic") : undefined}
+            disabled={activeTab === "traffic"}
+          >
+            Traffic
+          </InlineLinkButton>
+          {": "}
+          {trafficLine}
+        </p>
+
+        <p className="text-sm text-slate-300 leading-relaxed">
+          <InlineLinkButton
+            onClick={hasNavigate ? () => onNavigateTab?.("events") : undefined}
+            disabled={activeTab === "events"}
+          >
+            Events
+          </InlineLinkButton>
+          {": "}
+          {events.length > 0 ? (
+            <>
+              Upcoming events include{" "}
+              {events.slice(0, 2).map((event, idx) => (
+                <React.Fragment key={event.id}>
+                  {idx > 0 ? " and " : ""}
+                  <InlineLinkButton
+                    onClick={hasNavigate ? () => onNavigateTab?.("events") : undefined}
+                    disabled={activeTab === "events"}
+                  >
+                    {event.name}
+                  </InlineLinkButton>
+                </React.Fragment>
+              ))}
+              .
+            </>
+          ) : (
+            eventsLine
+          )}
+        </p>
+
+        <p className="text-sm text-slate-300 leading-relaxed">
+          <InlineLinkButton
+            onClick={hasNavigate ? () => onNavigateTab?.("news") : undefined}
+            disabled={activeTab === "news"}
+          >
+            News
+          </InlineLinkButton>
+          {": "}
+          {newsLine}
+        </p>
+
+        <p className="text-sm text-slate-300 leading-relaxed">
+          <InlineLinkButton
+            onClick={hasNavigate ? () => onNavigateTab?.("local") : undefined}
+            disabled={activeTab === "local"}
+          >
+            Local
+          </InlineLinkButton>
+          {": "}
+          {localLine}
+        </p>
       </div>
     </div>
   );

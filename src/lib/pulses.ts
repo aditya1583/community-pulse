@@ -88,16 +88,18 @@ export function isInRecentWindow(createdAt: string | Date, now: Date = new Date(
   return t >= start && t < end;
 }
 
-export function formatPulseDateTime(createdAt: string | Date, locale?: string) {
+export function formatPulseDateTime(createdAt: string | Date) {
   const d = createdAt instanceof Date ? createdAt : new Date(createdAt);
   if (Number.isNaN(d.getTime())) return "Unknown time";
 
-  return d.toLocaleString(locale, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  const year = String(d.getFullYear()).slice(-2);
+  const hours12 = d.getHours() % 12 || 12;
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+
+  // Example: 12/26/25 9:07
+  return `${month}/${day}/${year} ${hours12}:${minutes}`;
 }
 
 export function formatPulseLocation(city: string, neighborhood?: string | null) {

@@ -1,20 +1,12 @@
 "use client";
 
 import React from "react";
-import type { TabId } from "./types";
+import { DASHBOARD_TABS, type TabId } from "./types";
 
 type TabNavigationProps = {
   activeTab: TabId;
   onTabChange: (tab: TabId) => void;
 };
-
-const TABS: { id: TabId; label: string }[] = [
-  { id: "pulse", label: "Pulse" },
-  { id: "events", label: "Events" },
-  { id: "traffic", label: "Traffic" },
-  { id: "news", label: "News" },
-  { id: "local", label: "Local" },
-];
 
 /**
  * Tab Navigation component
@@ -29,7 +21,7 @@ export default function TabNavigation({
 }: TabNavigationProps) {
   return (
     <nav className="bg-slate-800/50 rounded-xl p-1 flex gap-1">
-      {TABS.map((tab) => {
+      {DASHBOARD_TABS.map((tab) => {
         const isActive = activeTab === tab.id;
 
         return (
