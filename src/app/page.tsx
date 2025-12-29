@@ -38,6 +38,8 @@ import PulseModal from "@/components/PulseModal";
 import TrafficContent from "@/components/TrafficContent";
 import { DASHBOARD_TABS, type TabId, type WeatherInfo, type Pulse, type CityMood, type TrafficLevel } from "@/components/types";
 import type { LocalNewsResponse } from "@/types/news";
+import { useGamification } from "@/hooks/useGamification";
+import XPProgressBadge from "@/components/XPProgressBadge";
 
 // Real-time Live Updates
 type DBPulse = {
@@ -143,6 +145,8 @@ export default function Home() {
   const [pulses, setPulses] = useState<Pulse[]>([]);
   // Track whether initial pulse fetch has completed (prevents "No pulses" flash)
   const [initialPulsesFetched, setInitialPulsesFetched] = useState(false);
+  // Author stats for displaying level/rank on pulse cards
+  const [authorStats, setAuthorStats] = useState<Record<string, { level: number; rank: number | null }>>({});
 
   // Tab state for new Neon theme
   const [activeTab, setActiveTab] = useState<TabId>("pulse");
@@ -153,6 +157,14 @@ export default function Home() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
   const [profileLoading, setProfileLoading] = useState(false);
+
+  // User gamification stats (level, XP, tier)
+  const {
+    level: userLevel,
+    xp: userXp,
+    weeklyRank: userRank,
+    loading: gamificationLoading,
+  } = useGamification(sessionUser?.id ?? null);
 
   // USER STREAK
   const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
@@ -1076,6 +1088,42 @@ export default function Home() {
       fetchPulses();
     }
   }, [city]);
+
+  // ========= FETCH AUTHOR STATS =========
+  // Batch fetch level and rank for all unique authors when pulses change
+  useEffect(() => {
+    const fetchAuthorStats = async () => {
+      // Get unique user IDs from pulses
+      const userIds = [
+        ...new Set(
+          pulses
+            .map((p) => p.user_id)
+            .filter((id): id is string => Boolean(id))
+        ),
+      ];
+
+      if (userIds.length === 0) {
+        setAuthorStats({});
+        return;
+      }
+
+      try {
+        const res = await fetch(
+          `/api/gamification/batch-stats?userIds=${userIds.join(",")}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setAuthorStats(data.stats || {});
+        }
+      } catch (err) {
+        console.error("[fetchAuthorStats] Error:", err);
+      }
+    };
+
+    if (pulses.length > 0) {
+      fetchAuthorStats();
+    }
+  }, [pulses]);
 
   // ========= LOAD MORE PULSES =========
   const handleLoadMorePulses = async () => {
@@ -2156,6 +2204,15 @@ export default function Home() {
             <div className="flex items-center justify-end text-sm text-slate-400 gap-2">
               <div className="flex flex-col items-end gap-0.5">
                 <div className="flex items-center gap-2">
+                  {/* XP Progress Badge - tap to view Status tab */}
+                  {!gamificationLoading && userLevel > 0 && (
+                    <XPProgressBadge
+                      level={userLevel}
+                      xp={userXp}
+                      weeklyRank={userRank}
+                      onClick={() => setActiveTab("status")}
+                    />
+                  )}
                   <span className="text-cyan-400">{displayName}</span>
 
                   {!profile?.name_locked ? (
@@ -2535,6 +2592,8 @@ export default function Home() {
                                 onDelete={handleDeletePulse}
                                 reporterId={sessionUser?.id}
                                 userIdentifier={sessionUser ? displayName : undefined}
+                                authorRank={pulse.user_id ? authorStats[pulse.user_id]?.rank : null}
+                                authorLevel={pulse.user_id ? authorStats[pulse.user_id]?.level : undefined}
                               />
                             ))}
 
