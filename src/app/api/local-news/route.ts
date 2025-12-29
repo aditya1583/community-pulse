@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { findCity, getNearbyCities } from "../../data/cities";
+import { findCity, getNearbyCities, getNewsFallbackHierarchy, STATE_FULL_NAMES } from "../../data/cities";
 import { generateNewsSummary, NewsArticleSummaryInput } from "@/lib/ai";
 import { deduplicateArticles } from "./deduplication";
 import type {
@@ -274,18 +274,7 @@ function scoreArticle(
   };
 }
 
-// Map state abbreviations to full names for better search
-const STATE_FULL_NAMES: Record<string, string> = {
-  tx: "Texas", ca: "California", ny: "New York", fl: "Florida",
-  il: "Illinois", pa: "Pennsylvania", oh: "Ohio", ga: "Georgia",
-  nc: "North Carolina", mi: "Michigan", nj: "New Jersey", va: "Virginia",
-  wa: "Washington", az: "Arizona", ma: "Massachusetts", tn: "Tennessee",
-  in: "Indiana", mo: "Missouri", md: "Maryland", wi: "Wisconsin",
-  co: "Colorado", mn: "Minnesota", sc: "South Carolina", al: "Alabama",
-  la: "Louisiana", ky: "Kentucky", or: "Oregon", ok: "Oklahoma",
-  ct: "Connecticut", ut: "Utah", ia: "Iowa", nv: "Nevada",
-  ar: "Arkansas", ms: "Mississippi", ks: "Kansas", nm: "New Mexico",
-};
+// STATE_FULL_NAMES is imported from cities.ts
 
 /**
  * Parsed result from a comma-separated city string
@@ -411,6 +400,71 @@ async function fetchFromGNewsAPI(
   } catch (error) {
     console.error("Error fetching from GNews API:", error);
     return [];
+  }
+}
+
+/**
+ * Fetch news from GNews API with a general search term (for county/metro/state fallback)
+ * Less strict filtering than city-specific searches
+ */
+async function fetchFromGNewsAPIGeneral(
+  searchTerm: string
+): Promise<{ articles: RawNewsArticle[]; provider: "gnews" | "newsapi" | null }> {
+  if (!GNEWS_API_KEY) {
+    return { articles: [], provider: null };
+  }
+
+  const params = new URLSearchParams({
+    q: searchTerm,
+    token: GNEWS_API_KEY,
+    lang: "en",
+    country: "us",
+    max: "10",
+    sortby: "publishedAt",
+  });
+
+  try {
+    const response = await fetch(`${GNEWS_API_URL}?${params}`, {
+      headers: {
+        "User-Agent": "CommunityPulse/1.0",
+      },
+      next: { revalidate: 300 },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error("GNews API error (general):", response.status, errorData);
+      return { articles: [], provider: null };
+    }
+
+    const data = await response.json();
+
+    // Transform GNews API response - less strict filtering for fallback searches
+    const articles: RawNewsArticle[] = (data.articles || [])
+      .filter(
+        (article: GNewsArticle) =>
+          article.title &&
+          article.title !== "[Removed]" &&
+          article.description
+      )
+      .map((article: GNewsArticle) => ({
+        title: article.title,
+        description: article.description,
+        url: article.url,
+        urlToImage: article.image,
+        publishedAt: article.publishedAt,
+        source: { name: article.source?.name || "Unknown" },
+      }))
+      // Only filter out severe negative content, no geographic filtering
+      .filter((article: RawNewsArticle) => {
+        const text = `${article.title} ${article.description || ""}`.toLowerCase();
+        return !NEGATIVE_KEYWORDS.some((keyword) => text.includes(keyword));
+      });
+
+    return { articles, provider: "gnews" };
+  } catch (error) {
+    console.error("Error fetching from GNews API (general):", error);
+    return { articles: [], provider: null };
   }
 }
 
@@ -570,22 +624,56 @@ export async function GET(req: NextRequest) {
   const cityName = city?.name || parsed.cityName;
   const state = city?.state || parsed.region;
 
-  // Fetch news
-  const primary = await fetchNewsForCity(cityName, state);
-  let provider = primary.provider;
-  let articles: LocalNewsArticle[] = primary.articles.map((a) => toLocalNewsArticle(a));
+  // Get the fallback hierarchy: City → County → Metro → State
+  const fallbackHierarchy = getNewsFallbackHierarchy(cityName, state);
+
+  let provider: "gnews" | "newsapi" | null = null;
+  let articles: LocalNewsArticle[] = [];
   const sourceCity = city?.displayName || cityParam;
   const fallbackSources: string[] = [];
+  let fallbackLevel: "city" | "county" | "metro" | "state" | "nearby" = "city";
+  const existingUrls = new Set<string>();
 
-  // Aggressive nearby-city scaling when content is sparse
+  // Try each level of the hierarchy until we have enough articles
+  for (const level of fallbackHierarchy) {
+    if (articles.length >= IDEAL_ARTICLES) break;
+
+    console.log(`[NEWS] Trying ${level.level} level: "${level.searchTerm}" for ${cityParam}`);
+
+    // For city level, use the standard city+state query
+    // For other levels, do a more general search
+    const result = level.level === "city"
+      ? await fetchNewsForCity(cityName, state)
+      : await fetchFromGNewsAPIGeneral(level.searchTerm);
+
+    if (!provider && result.provider) {
+      provider = result.provider;
+    }
+
+    const newArticles = (result.articles || [])
+      .filter((a: RawNewsArticle) => !existingUrls.has(a.url))
+      .map((a: RawNewsArticle) => {
+        existingUrls.add(a.url);
+        return toLocalNewsArticle(a, level.level !== "city" ? level.label : undefined);
+      });
+
+    if (newArticles.length > 0) {
+      articles = [...articles, ...newArticles];
+      if (level.level !== "city") {
+        fallbackSources.push(level.label);
+        fallbackLevel = level.level;
+      }
+      console.log(`[NEWS] Found ${newArticles.length} articles at ${level.level} level`);
+    }
+  }
+
+  // If still sparse, try nearby cities as final fallback
   if (articles.length < MINIMUM_ARTICLES && city) {
     const nearbyCities = getNearbyCities(
       cityParam,
       FALLBACK_RADIUS_MILES,
       FALLBACK_MIN_POPULATION
     );
-
-    const existingUrls = new Set(articles.map((a) => a.url));
 
     for (const nearbyCity of nearbyCities) {
       if (articles.length >= IDEAL_ARTICLES) break;
@@ -598,12 +686,15 @@ export async function GET(req: NextRequest) {
 
       const newArticles = nearby.articles
         .filter((a) => !existingUrls.has(a.url))
-        .map((a) => toLocalNewsArticle(a, nearbyCity.displayName));
+        .map((a) => {
+          existingUrls.add(a.url);
+          return toLocalNewsArticle(a, nearbyCity.displayName);
+        });
 
       if (newArticles.length > 0) {
-        for (const a of newArticles) existingUrls.add(a.url);
         articles = [...articles, ...newArticles];
         fallbackSources.push(nearbyCity.displayName);
+        fallbackLevel = "nearby";
       }
     }
   }
@@ -643,6 +734,7 @@ export async function GET(req: NextRequest) {
     sourceCity,
     fallbackSources: Array.from(new Set(fallbackSources)),
     isNearbyFallback: fallbackSources.length > 0 && articles.length > 0,
+    fallbackLevel: fallbackLevel !== "city" ? fallbackLevel : undefined,
     fetchedAt: new Date().toISOString(),
     provider: provider || undefined,
     _duplicatesRemoved: duplicatesRemoved > 0 ? duplicatesRemoved : undefined,

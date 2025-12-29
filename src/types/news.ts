@@ -20,6 +20,7 @@ export type LocalNewsResponse = {
   sourceCity: string;
   fallbackSources: string[];
   isNearbyFallback: boolean;
+  fallbackLevel?: "city" | "county" | "metro" | "state" | "nearby";
   fetchedAt: string;
   notConfigured?: boolean;
   provider?: "gnews" | "newsapi";

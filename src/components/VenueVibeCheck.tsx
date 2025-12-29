@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { VENUE_VIBE_TYPES, getVibeTypeInfo, VenueVibeType, VenueVibeAggregate } from "./types";
 
 type VenueVibeCheckProps = {
@@ -135,36 +136,39 @@ export default function VenueVibeCheck({
       <div className="flex items-center gap-2">
         {/* Current vibe badge */}
         {topVibe && topVibeInfo && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-violet-500/20 text-violet-300 border border-violet-500/30 rounded-full">
+          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-violet-500/20 text-violet-300 border border-violet-500/30 rounded-full">
             <span>{topVibeInfo.emoji}</span>
             <span>{topVibeInfo.label}</span>
             {topVibe.count > 1 && (
-              <span className="text-violet-400/60">({topVibe.count})</span>
+              <span className="text-violet-400/60 text-[10px]">({topVibe.count})</span>
             )}
           </span>
         )}
 
-        {/* Vibe check button */}
+        {/* Vibe check button - vibrant and inviting */}
         <button
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
             setIsOpen(true);
           }}
-          className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full transition ${
+          className={`group inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full transition-all duration-300 ${
             submitSuccess
-              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-              : "bg-slate-700/50 text-slate-300 hover:bg-violet-500/20 hover:text-violet-300 border border-slate-600/50 hover:border-violet-500/30"
+              ? "bg-emerald-500/30 text-emerald-300 border border-emerald-400/50 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
+              : "bg-gradient-to-r from-violet-600/80 to-fuchsia-600/80 text-white hover:from-violet-500 hover:to-fuchsia-500 shadow-[0_0_16px_rgba(139,92,246,0.4)] hover:shadow-[0_0_20px_rgba(139,92,246,0.6)] border border-violet-400/30 animate-subtle-pulse"
           }`}
         >
           {submitSuccess ? (
             <>
-              <span>+1</span>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              <span>Added!</span>
             </>
           ) : (
             <>
-              <span>Vibe</span>
-              <span className="text-violet-400">?</span>
+              <span className="text-sm">✨</span>
+              <span>Log Vibe</span>
             </>
           )}
         </button>
@@ -181,6 +185,16 @@ export default function VenueVibeCheck({
             venueName={venueName}
           />
         )}
+
+        <style jsx>{`
+          @keyframes subtle-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.9; transform: scale(1.02); }
+          }
+          .animate-subtle-pulse {
+            animation: subtle-pulse 2s ease-in-out infinite;
+          }
+        `}</style>
       </div>
     );
   }
@@ -263,7 +277,7 @@ export default function VenueVibeCheck({
   );
 }
 
-// Vibe picker modal component
+// Vibe picker modal component - uses Portal to escape anchor tags
 function VibePicker({
   vibesByCategory,
   currentVibes,
@@ -287,14 +301,24 @@ function VibePicker({
     return found?.count || 0;
   };
 
-  return (
+  // Use portal to render outside of any parent anchor tags
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm"
-      onClick={onClose}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      }}
     >
       <div
         className="w-full sm:max-w-md bg-slate-900 border border-slate-700/50 rounded-t-2xl sm:rounded-2xl p-4 sm:p-6 animate-slide-up"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
@@ -429,7 +453,8 @@ function VibePicker({
           animation: slide-up 0.2s ease-out;
         }
       `}</style>
-    </div>
+    </div>,
+    document.body
   );
 }
 

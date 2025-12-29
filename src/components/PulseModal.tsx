@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { POST_TAGS, CATEGORY_MOODS, type PulseCategory } from "./types";
+import { getStablePulsePrompt } from "@/lib/pulsePrompts";
 
 const MAX_MESSAGE_LENGTH = 240;
 
@@ -25,22 +26,6 @@ type PulseModalProps = {
   weather?: { temp: number; description: string } | null;
 };
 
-/**
- * Get placeholder text based on selected category
- */
-function getPlaceholderText(category: PulseCategory): string {
-  switch (category) {
-    case "Traffic":
-      return "What's traffic like? (e.g., 'I-35 is backed up near downtown')";
-    case "Weather":
-      return "How's the weather feeling? (e.g., 'Perfect day for a walk!')";
-    case "Events":
-      return "What event are you at? (e.g., 'Amazing concert at Zilker!')";
-    case "General":
-    default:
-      return "What's the vibe right now?";
-  }
-}
 
 /**
  * Pulse Creation Modal - Slide-up sheet or centered modal
@@ -79,6 +64,18 @@ export default function PulseModal({
     tag && POST_TAGS.includes(tag as (typeof POST_TAGS)[number])
       ? (tag as PulseCategory)
       : "General";
+
+  // Time-based placeholder prompt (refreshes when category changes or modal opens)
+  const [placeholder, setPlaceholder] = useState(() =>
+    getStablePulsePrompt(selectedCategory)
+  );
+
+  // Update placeholder when category changes or modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setPlaceholder(getStablePulsePrompt(selectedCategory));
+    }
+  }, [selectedCategory, isOpen]);
 
   // Handle category selection
   const handleCategorySelect = (category: PulseCategory) => {
@@ -255,7 +252,7 @@ export default function PulseModal({
                   ? "border-red-500/60"
                   : "border-slate-700/50"
               }`}
-              placeholder={getPlaceholderText(selectedCategory)}
+              placeholder={placeholder}
             />
 
             {/* Character count + validation error */}

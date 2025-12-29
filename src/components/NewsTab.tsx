@@ -90,9 +90,9 @@ export default function NewsTab({
         </span>
       </div>
 
-      {/* Nearby fallback notice */}
+      {/* Fallback notice - shows context about where news is coming from */}
       {data?.isNearbyFallback && (data.fallbackSources?.length ?? 0) > 0 && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-300">
+        <div className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs text-emerald-300">
           <svg
             className="w-4 h-4 flex-shrink-0"
             fill="none"
@@ -103,24 +103,51 @@ export default function NewsTab({
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.852l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+              d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"
             />
           </svg>
           <span>
-            Including news from nearby: {data.fallbackSources.join(", ")}
+            {data.fallbackLevel === "county" && "County news: "}
+            {data.fallbackLevel === "metro" && "Area news: "}
+            {data.fallbackLevel === "state" && "State news: "}
+            {data.fallbackLevel === "nearby" && "Nearby: "}
+            {data.fallbackSources.join(", ")}
           </span>
         </div>
       )}
 
-      {/* Empty state (still fills layout with placeholders) */}
+      {/* Empty state - provide Google News link as escape hatch */}
       {articles.length === 0 && (
-        <div className="bg-slate-800/60 border border-dashed border-slate-700/50 rounded-xl p-6 text-center">
-          <p className="text-sm text-slate-400 mb-1">
-            No local news found for {displayCity} yet
-          </p>
-          <p className="text-xs text-slate-500">
-            Check back soon — we&apos;ll keep looking.
-          </p>
+        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-6 text-center space-y-3">
+          <div className="w-10 h-10 mx-auto bg-slate-700/50 rounded-full flex items-center justify-center">
+            <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25M16.5 7.5V18a2.25 2.25 0 002.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875V18a2.25 2.25 0 002.25 2.25h13.5M6 7.5h3v3H6v-3z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm text-slate-300 mb-1">
+              Local news is quiet today
+            </p>
+            <p className="text-xs text-slate-500">
+              No breaking stories for {displayCity} right now
+            </p>
+          </div>
+          <a
+            href={`https://news.google.com/search?q=${encodeURIComponent(city)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-lg transition"
+          >
+            <span>Search Google News</span>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+            </svg>
+          </a>
         </div>
       )}
 
