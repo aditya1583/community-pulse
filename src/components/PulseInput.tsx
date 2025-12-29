@@ -215,6 +215,19 @@ const PulseInput = forwardRef<HTMLTextAreaElement, PulseInputProps>(
 
         {/* Message input */}
         <div className="space-y-2">
+          {/* Suggestion chip - tappable prompt that auto-fills */}
+          {!message && (
+            <button
+              type="button"
+              onClick={() => onMessageChange(placeholder)}
+              className="group flex items-center gap-2 w-full px-3 py-2 text-left text-sm bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-lg hover:from-amber-500/20 hover:to-orange-500/20 hover:border-amber-500/40 transition-all"
+            >
+              <span className="text-amber-400 text-base animate-pulse">💡</span>
+              <span className="text-amber-200/90 flex-1 line-clamp-1">{placeholder}</span>
+              <span className="text-[10px] text-amber-400/60 group-hover:text-amber-400 transition-colors whitespace-nowrap">tap to use</span>
+            </button>
+          )}
+
           <textarea
             ref={ref}
             value={message}
@@ -230,7 +243,7 @@ const PulseInput = forwardRef<HTMLTextAreaElement, PulseInputProps>(
                 ? "border-red-500/60"
                 : "border-slate-700/50"
             }`}
-            placeholder={placeholder}
+            placeholder="Share what's happening..."
           />
 
           {/* Character count + validation error */}

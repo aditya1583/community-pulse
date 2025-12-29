@@ -4,6 +4,22 @@
     {
       "path": "/api/notifications/trigger",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/notifications/daily-prompts",
+      "schedule": "30 13 * * 1-5"
+    },
+    {
+      "path": "/api/notifications/daily-prompts",
+      "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/notifications/daily-prompts",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/notifications/daily-prompts",
+      "schedule": "0 16 * * 0,6"
     }
   ]
 }

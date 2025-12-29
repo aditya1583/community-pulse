@@ -19,7 +19,7 @@ import type { VibeIntensity } from "@/components/types";
 // TYPES
 // ============================================================================
 
-export type NotificationType = "vibe_shift" | "spike_alert" | "keyword_cluster";
+export type NotificationType = "vibe_shift" | "spike_alert" | "keyword_cluster" | "engagement_prompt";
 
 export type VibeShiftPayload = {
   type: "vibe_shift";
@@ -50,10 +50,18 @@ export type KeywordClusterPayload = {
   recentPulseIds: number[];
 };
 
+export type EngagementPromptPayload = {
+  type: "engagement_prompt";
+  city: string;
+  promptType: "morning_commute" | "lunch_check" | "evening_dinner" | "weekend_plans";
+  promptText: string;
+};
+
 export type NotificationPayload =
   | VibeShiftPayload
   | SpikeAlertPayload
-  | KeywordClusterPayload;
+  | KeywordClusterPayload
+  | EngagementPromptPayload;
 
 export type NotificationPreferences = {
   id: string;
@@ -243,6 +251,25 @@ export function generateNotificationMessage(payload: NotificationPayload): {
         },
       };
     }
+
+    case "engagement_prompt": {
+      const promptTitles: Record<string, string> = {
+        morning_commute: `Good morning, ${cityName}!`,
+        lunch_check: `Lunchtime in ${cityName}`,
+        evening_dinner: `Evening check-in`,
+        weekend_plans: `Weekend in ${cityName}`,
+      };
+      return {
+        title: promptTitles[payload.promptType] || `What's happening in ${cityName}?`,
+        body: payload.promptText,
+        tag: `prompt-${payload.promptType}-${payload.city}-${Date.now()}`,
+        data: {
+          type: "engagement_prompt",
+          city: payload.city,
+          url: `/?city=${encodeURIComponent(payload.city)}&tab=pulse`,
+        },
+      };
+    }
   }
 }
 
@@ -353,6 +380,7 @@ const NOTIFICATION_COOLDOWNS: Record<NotificationType, number> = {
   spike_alert: 60 * 60 * 1000, // 1 hour
   vibe_shift: 30 * 60 * 1000, // 30 minutes
   keyword_cluster: 60 * 60 * 1000, // 1 hour
+  engagement_prompt: 6 * 60 * 60 * 1000, // 6 hours between prompts
 };
 
 /**
