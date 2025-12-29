@@ -120,7 +120,12 @@ export default function PulseCard({
           <div className="flex items-center justify-between text-xs gap-3">
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-cyan-400 font-medium truncate">{pulse.author}</span>
-              <StatusIndicator rank={authorRank} level={authorLevel} />
+              {pulse.is_bot && (
+                <span className="text-[9px] px-1.5 py-0.5 bg-slate-700 text-slate-400 rounded font-medium uppercase tracking-wide">
+                  Bot
+                </span>
+              )}
+              {!pulse.is_bot && <StatusIndicator rank={authorRank} level={authorLevel} />}
             </div>
 
             <div className="flex items-center gap-3 flex-shrink-0">

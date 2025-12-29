@@ -320,11 +320,20 @@ export default function Home() {
         setSummaryLoading(true);
         setSummaryError(null);
 
-        // Prepare events data for the summary (deduplicated by name)
+        // Prepare events data for the summary (deduplicated by normalized name)
+        // Robust normalization: lowercase, trim, collapse whitespace, remove special chars
+        const normalizeEventName = (name: string): string => {
+          return name
+            .toLowerCase()
+            .trim()
+            .replace(/\s+/g, " ")           // Collapse multiple spaces
+            .replace(/[^\w\s]/g, "");       // Remove special characters
+        };
+
         const seenEventNames = new Set<string>();
         const eventsForSummary = ticketmasterEvents
           .filter((e) => {
-            const normalizedName = e.name.toLowerCase().trim();
+            const normalizedName = normalizeEventName(e.name);
             if (seenEventNames.has(normalizedName)) {
               return false;
             }

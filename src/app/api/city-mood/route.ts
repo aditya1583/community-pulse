@@ -208,9 +208,11 @@ function generateVibeHeadline(
   }
 
   // === PULSE-BASED HEADLINES (when we have strong mood signal but no tag dominance) ===
+  // IMPORTANT: Require significant volume before declaring city mood
+  // 1-4 posts should NOT define the city's emotional state
 
-  // Strong pulse signal (70%+ concentration) - this IS the city's mood
-  if (pulseCount > 0 && dominantMoodPercent >= 70 && dominantMood) {
+  // Strong pulse signal: 5+ posts with 70%+ same mood - this IS the city's mood
+  if (pulseCount >= 5 && dominantMoodPercent >= 70 && dominantMood) {
     const emotion = MOOD_TO_EMOTION[dominantMood] || "Mixed";
     const tagContext = dominantTag && dominantTagPercent >= 50
       ? ` about ${dominantTag}`
@@ -220,18 +222,27 @@ function generateVibeHeadline(
       headline: `${shortCityName} is ${emotion}`,
       subtext: dominantTagPercent >= 50
         ? `${dominantMoodPercent}% of pulses are${tagContext}`
-        : `${pulseCount} ${pulseCount === 1 ? "pulse" : "pulses"} in the last 3 hours`,
+        : `${pulseCount} pulses in the last 3 hours`,
       emotion: emotion.toLowerCase(),
     };
   }
 
-  // Moderate pulse signal (50-70%) with good volume
-  if (pulseCount >= 3 && dominantMoodPercent >= 50 && dominantMood) {
+  // Moderate pulse signal: 8+ posts with 60%+ same mood
+  if (pulseCount >= 8 && dominantMoodPercent >= 60 && dominantMood) {
     const emotion = MOOD_TO_EMOTION[dominantMood] || "Mixed";
     return {
       headline: `${shortCityName} is feeling ${emotion.toLowerCase()}`,
-      subtext: `${pulseCount} ${pulseCount === 1 ? "thing" : "things"} happening right now`,
+      subtext: `${pulseCount} things happening right now`,
       emotion: emotion.toLowerCase(),
+    };
+  }
+
+  // With fewer posts, use neutral "activity" language instead of emotion
+  if (pulseCount > 0 && pulseCount < 5) {
+    return {
+      headline: `${pulseCount} ${pulseCount === 1 ? "thing" : "things"} happening in ${shortCityName}`,
+      subtext: "See what neighbors are sharing",
+      emotion: "active",
     };
   }
 
