@@ -8,6 +8,7 @@ export const DASHBOARD_TABS = [
   { id: "traffic", label: "Traffic" },
   { id: "news", label: "News" },
   { id: "local", label: "Local" },
+  { id: "status", label: "Status" },
 ] as const;
 
 export type TabId = (typeof DASHBOARD_TABS)[number]["id"];
@@ -77,7 +78,34 @@ export type Pulse = {
   author: string;
   createdAt: string;
   user_id?: string;
+  /** ISO timestamp when this pulse expires. Used for ephemeral content decay. */
+  expiresAt?: string | null;
 };
+
+/**
+ * Expiry status for pulse display
+ */
+export type PulseExpiryStatus = "active" | "expiring-soon" | "fading" | "expired";
+
+/**
+ * Lifespan configuration per category (in hours)
+ */
+export const PULSE_LIFESPAN_HOURS: Record<PulseCategory, number> = {
+  Traffic: 2,
+  Weather: 4,
+  Events: 24,
+  General: 24,
+};
+
+/**
+ * Grace period after expiry where pulse remains visible but faded (in hours)
+ */
+export const PULSE_GRACE_PERIOD_HOURS = 1;
+
+/**
+ * Threshold for "expiring soon" warning (in minutes)
+ */
+export const EXPIRING_SOON_THRESHOLD_MINUTES = 30;
 
 export type MoodScore = {
   mood: string;
@@ -85,10 +113,25 @@ export type MoodScore = {
   percent: number;
 };
 
+export type TagScore = {
+  tag: string;
+  count: number;
+  percent: number;
+};
+
+export type VibeIntensity = "quiet" | "active" | "buzzing" | "intense";
+
 export type CityMood = {
   dominantMood: string | null;
   scores: MoodScore[];
   pulseCount: number;
+  // New vibe system fields
+  tagScores?: TagScore[];
+  dominantTag?: string | null;
+  vibeHeadline?: string;
+  vibeSubtext?: string;
+  vibeEmotion?: string;
+  vibeIntensity?: VibeIntensity;
 };
 
 export type TrafficLevel = "Light" | "Moderate" | "Heavy";

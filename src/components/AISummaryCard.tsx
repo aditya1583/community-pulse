@@ -3,6 +3,7 @@
 import React from "react";
 import type { TicketmasterEvent } from "@/hooks/useEvents";
 import type { TabId, TrafficLevel } from "./types";
+import ShareableSummaryCard from "./ShareableSummaryCard";
 
 type NewsSummary = {
   paragraph: string;
@@ -27,6 +28,12 @@ type AISummaryCardProps = {
   newsError?: string | null;
   newsCount?: number;
   onNavigateTab?: (tab: TabId) => void;
+  /** Optional vibe headline from city mood */
+  vibeHeadline?: string;
+  /** Optional vibe emoji from city mood */
+  vibeEmoji?: string;
+  /** Optional temperature for the share card */
+  temperature?: number;
 };
 
 function firstSentence(text: string): string {
@@ -87,6 +94,9 @@ export default function AISummaryCard({
   newsError = null,
   newsCount = 0,
   onNavigateTab,
+  vibeHeadline,
+  vibeEmoji,
+  temperature,
 }: AISummaryCardProps) {
   const displayCity = cityName.split(",")[0]?.trim() || cityName;
 
@@ -269,6 +279,19 @@ export default function AISummaryCard({
           {localLine}
         </p>
       </div>
+
+      {/* Share Today's Brief button */}
+      {summary && !summaryLoading && !summaryError && (
+        <ShareableSummaryCard
+          cityName={cityName}
+          vibeHeadline={vibeHeadline || `${displayCity} is ${pulsesCount > 0 ? "Active" : "Quiet"}`}
+          vibeEmoji={vibeEmoji}
+          summary={summary}
+          trafficLevel={trafficLevel}
+          eventsCount={events.length}
+          temperature={temperature}
+        />
+      )}
     </div>
   );
 }

@@ -14,6 +14,8 @@ import {
   startOfRecentWindow,
   startOfNextLocalDay,
   writeOnboardingCompleted,
+  filterVisiblePulses,
+  isPulseVisible,
   type AuthStatus,
 } from "@/lib/pulses";
 import { moderateContent } from "@/lib/moderation";
@@ -29,6 +31,7 @@ import NewsTab from "@/components/NewsTab";
 import EventCard from "@/components/EventCard";
 import PulseCard from "@/components/PulseCard";
 import LocalTab from "@/components/LocalTab";
+import StatusTab from "@/components/StatusTab";
 import PulseInput from "@/components/PulseInput";
 import FAB from "@/components/FAB";
 import PulseModal from "@/components/PulseModal";
@@ -47,6 +50,7 @@ type DBPulse = {
   author: string;
   created_at: string;
   user_id?: string;
+  expires_at?: string | null;
 };
 
 // Pagination constants
@@ -63,6 +67,7 @@ function mapDBPulseToPulse(row: DBPulse): Pulse {
     author: row.author,
     createdAt: row.created_at,
     user_id: row.user_id,
+    expiresAt: row.expires_at ?? null,
   };
 }
 
@@ -136,6 +141,8 @@ export default function Home() {
   const [tag, setTag] = useState("");
   const [message, setMessage] = useState("");
   const [pulses, setPulses] = useState<Pulse[]>([]);
+  // Track whether initial pulse fetch has completed (prevents "No pulses" flash)
+  const [initialPulsesFetched, setInitialPulsesFetched] = useState(false);
 
   // Tab state for new Neon theme
   const [activeTab, setActiveTab] = useState<TabId>("pulse");
@@ -420,6 +427,8 @@ export default function Home() {
   }, [city, setPulses]);
 
   // ========= CITY MOOD =========
+  // ENHANCED: Now passes ALL city context (events, traffic, weather, news)
+  // so the vibe calculation reflects total city activity, not just pulses.
   useEffect(() => {
     if (!city) return;
 
@@ -428,9 +437,31 @@ export default function Home() {
         setCityMoodLoading(true);
         setCityMoodError(null);
 
-        const res = await fetch(
-          `/api/city-mood?city=${encodeURIComponent(city)}`
-        );
+        // Build query params with full city context
+        const params = new URLSearchParams();
+        params.set("city", city);
+
+        // Include events count for activity calculation
+        if (ticketmasterEvents.length > 0) {
+          params.set("eventsCount", String(ticketmasterEvents.length));
+        }
+
+        // Include traffic level for commute mood
+        if (trafficLevel) {
+          params.set("trafficLevel", trafficLevel);
+        }
+
+        // Include weather condition for environmental context
+        if (weather) {
+          params.set("weatherCondition", `${weather.description}, ${Math.round(weather.temp)}F`);
+        }
+
+        // Include news count for noteworthy happenings
+        if (newsData?.articles?.length) {
+          params.set("newsCount", String(newsData.articles.length));
+        }
+
+        const res = await fetch(`/api/city-mood?${params.toString()}`);
         if (!res.ok) {
           throw new Error("Failed to fetch city mood");
         }
@@ -440,6 +471,13 @@ export default function Home() {
           dominantMood: data.dominantMood,
           scores: data.scores || [],
           pulseCount: data.pulseCount || 0,
+          // New vibe system fields
+          tagScores: data.tagScores || [],
+          dominantTag: data.dominantTag || null,
+          vibeHeadline: data.vibeHeadline,
+          vibeSubtext: data.vibeSubtext,
+          vibeEmotion: data.vibeEmotion,
+          vibeIntensity: data.vibeIntensity,
         });
       } catch (err: unknown) {
         console.error("Error fetching city mood:", err);
@@ -451,7 +489,7 @@ export default function Home() {
     }
 
     fetchCityMood();
-  }, [city, pulses.length]);
+  }, [city, pulses.length, ticketmasterEvents.length, trafficLevel, weather, newsData?.articles?.length]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -983,11 +1021,18 @@ export default function Home() {
   }
 
   // ========= PULSES FETCH =========
+  // FIXED: Added initialPulsesFetched flag to prevent "No pulses" flash on initial load.
+  // The issue was that setPulses([]) was called before fetch completed, causing a
+  // momentary display of "No pulses yet" even when pulses existed in the database.
   useEffect(() => {
+    // Reset the flag when city changes to indicate we need to fetch again
+    setInitialPulsesFetched(false);
+
     const fetchPulses = async () => {
       setLoading(true);
       setErrorMsg(null);
-      setPulses([]);
+      // IMPORTANT: Don't clear pulses here - let the loading state show instead
+      // This prevents the "No pulses" flash before data arrives
       setHasMorePulses(false);
 
       const now = new Date();
@@ -1018,9 +1063,13 @@ export default function Home() {
           author: row.author || "Anonymous",
         }));
         setPulses(mapped);
+      } else {
+        // Explicit empty case
+        setPulses([]);
       }
 
       setLoading(false);
+      setInitialPulsesFetched(true);
     };
 
     if (city) {
@@ -1600,12 +1649,16 @@ export default function Home() {
   }
 
   // ========= FILTER PULSES =========
-  const filteredPulses = pulses
+  // Client-side expiry filtering as a safety net
+  // This ensures expired pulses are hidden even if they weren't filtered server-side
+  const visiblePulses = filterVisiblePulses(pulses);
+
+  const filteredPulses = visiblePulses
     .filter((p) => isInRecentWindow(p.createdAt))
     .filter((p) => tagFilter === "All" || p.tag === tagFilter);
 
-  // Traffic-tagged pulses for traffic tab
-  const trafficPulses = pulses.filter((p) => p.tag === "Traffic");
+  // Traffic-tagged pulses for traffic tab (also filter expired)
+  const trafficPulses = visiblePulses.filter((p) => p.tag === "Traffic");
 
   // ========= ADD PULSE =========
   const handleAddPulse = async () => {
@@ -2289,6 +2342,8 @@ export default function Home() {
             weatherLoading={weatherLoading}
             recentPulseCount={recentPulseCount2h}
             onDropPulse={handleDropPulseJump}
+            cityMood={cityMood}
+            cityMoodLoading={cityMoodLoading}
           />
 
           {/* Quick Stats */}
@@ -2334,6 +2389,9 @@ export default function Home() {
               newsError={newsError}
               newsCount={newsData?.articles?.length ?? 0}
               onNavigateTab={setActiveTab}
+              vibeHeadline={cityMood?.vibeHeadline}
+              vibeEmoji={cityMood?.dominantMood ?? undefined}
+              temperature={weather?.temp}
             />
           </div>
 
@@ -2376,6 +2434,13 @@ export default function Home() {
                       state={localState}
                       lat={localLat}
                       lon={localLon}
+                    />
+                  );
+                case "status":
+                  return (
+                    <StatusTab
+                      userId={sessionUser?.id ?? null}
+                      city={city}
                     />
                   );
                 case "pulse":
@@ -2439,8 +2504,10 @@ export default function Home() {
                       </div>
 
                       {/* Pulses list */}
+                      {/* FIXED: Show loading state until initial fetch completes to prevent
+                          the "No pulses yet" flash that was causing user confusion */}
                       <section className="space-y-3 pb-12">
-                        {loading && pulses.length === 0 ? (
+                        {(loading || !initialPulsesFetched) && pulses.length === 0 ? (
                           <div className="bg-slate-800/60 border border-dashed border-slate-700/50 rounded-xl px-4 py-10 text-center text-sm text-slate-400">
                             Loading pulses for{" "}
                             <span className="font-semibold text-white">
@@ -2569,7 +2636,7 @@ export default function Home() {
         </div>
       </main>
 
-      {/* FAB - only visible on Events and Traffic tabs */}
+      {/* FAB - Always visible for quick pulse creation */}
       <FAB
         onClick={() => {
           if (!sessionUser) {
@@ -2578,7 +2645,8 @@ export default function Home() {
             setShowPulseModal(true);
           }
         }}
-        visible={activeTab !== "pulse"}
+        visible={true}
+        animated={activeTab !== "pulse"}
       />
     </div>
   );

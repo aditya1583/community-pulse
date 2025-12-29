@@ -3,8 +3,11 @@
 import React from "react";
 import type { Pulse } from "./types";
 import { formatPulseDateTime } from "@/lib/pulses";
+import { useExpiryCountdown } from "@/hooks/useExpiryCountdown";
 import PulseLikeButton from "@/components/PulseLikeButton";
 import ReportPulseButton from "@/components/ReportPulseButton";
+import StatusRing from "@/components/StatusRing";
+import { StatusIndicator } from "@/components/StatusRing";
 
 type PulseCardProps = {
   pulse: Pulse;
@@ -14,7 +17,51 @@ type PulseCardProps = {
   onDelete: (pulseId: number) => void;
   reporterId?: string;
   userIdentifier?: string;
+  /** Optional: author's weekly leaderboard rank for status display */
+  authorRank?: number | null;
+  /** Optional: author's level */
+  authorLevel?: number;
 };
+
+/**
+ * Expiry badge component showing remaining time
+ * Displays with appropriate urgency styling based on status
+ */
+function ExpiryBadge({
+  remainingText,
+  isExpiringSoon,
+  isFading,
+}: {
+  remainingText: string | null;
+  isExpiringSoon: boolean;
+  isFading: boolean;
+}) {
+  if (!remainingText) return null;
+
+  // Determine badge styling based on urgency
+  let badgeClasses =
+    "text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full font-medium";
+
+  if (isFading) {
+    // Fading: muted orange/amber with pulsing animation
+    badgeClasses +=
+      " text-amber-400/70 bg-amber-500/10 border border-amber-500/20 animate-pulse";
+  } else if (isExpiringSoon) {
+    // Expiring soon: more urgent orange
+    badgeClasses +=
+      " text-orange-400 bg-orange-500/15 border border-orange-500/30";
+  } else {
+    // Active: subtle slate
+    badgeClasses +=
+      " text-slate-400 bg-slate-700/50 border border-slate-600/30";
+  }
+
+  return (
+    <span className={badgeClasses} title="Time until this pulse fades">
+      {remainingText}
+    </span>
+  );
+}
 
 export default function PulseCard({
   pulse,
@@ -24,14 +71,44 @@ export default function PulseCard({
   onDelete,
   reporterId,
   userIdentifier,
+  authorRank,
+  authorLevel,
 }: PulseCardProps) {
+  // Track expiry countdown for visual decay
+  const { remainingText, opacity, isExpiringSoon, isFading, isExpired } =
+    useExpiryCountdown(pulse.expiresAt);
+
+  // Don't render if fully expired (client-side safety)
+  if (isExpired) {
+    return null;
+  }
+
+  // Determine card border color based on expiry status
+  const getBorderClass = () => {
+    if (isFading) {
+      return "border-amber-500/20 hover:border-amber-500/30";
+    }
+    if (isExpiringSoon) {
+      return "border-orange-500/20 hover:border-orange-500/30";
+    }
+    return "border-slate-700/50 hover:border-emerald-500/30";
+  };
+
   return (
-    <article className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 hover:border-emerald-500/30 transition">
+    <article
+      className={`bg-slate-800/60 border rounded-xl p-4 transition ${getBorderClass()}`}
+      style={{ opacity }}
+    >
       <div className="flex gap-3">
         <div className="flex flex-col items-center gap-2 flex-shrink-0">
-          <div className="w-10 h-10 rounded-xl bg-slate-900/80 flex items-center justify-center text-2xl">
-            {pulse.mood}
-          </div>
+          <StatusRing
+            rank={authorRank}
+            level={authorLevel}
+            showLevel={authorLevel !== undefined && authorLevel > 1}
+            size="md"
+          >
+            <span className="text-2xl">{pulse.mood}</span>
+          </StatusRing>
           <span className="text-[10px] uppercase tracking-wide text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
             {pulse.tag}
           </span>
@@ -41,9 +118,19 @@ export default function PulseCard({
           <p className="text-sm text-white leading-snug mb-3">{pulse.message}</p>
 
           <div className="flex items-center justify-between text-xs gap-3">
-            <span className="text-cyan-400 font-medium truncate">{pulse.author}</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-cyan-400 font-medium truncate">{pulse.author}</span>
+              <StatusIndicator rank={authorRank} level={authorLevel} />
+            </div>
 
             <div className="flex items-center gap-3 flex-shrink-0">
+              {/* Expiry indicator */}
+              <ExpiryBadge
+                remainingText={remainingText}
+                isExpiringSoon={isExpiringSoon}
+                isFading={isFading}
+              />
+
               <PulseLikeButton pulseId={pulse.id} userIdentifier={userIdentifier} />
 
               {reporterId ? (

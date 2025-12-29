@@ -1,3 +1,10 @@
+import type { PulseExpiryStatus, PulseCategory } from "@/components/types";
+import {
+  PULSE_LIFESPAN_HOURS,
+  PULSE_GRACE_PERIOD_HOURS,
+  EXPIRING_SOON_THRESHOLD_MINUTES,
+} from "@/components/types";
+
 export type AuthStatus = "loading" | "signed_in" | "signed_out";
 
 export function getOnboardingCompletedStorageKey(userId: string) {
@@ -128,5 +135,199 @@ export function isPostEnabled(args: {
 
 export function resetComposerAfterSuccessfulPost() {
   return { mood: "", tag: "", message: "" };
+}
+
+// ============================================================================
+// EPHEMERAL PULSE SYSTEM
+// Content decay makes feeds feel fresh and urgent
+// ============================================================================
+
+/**
+ * Calculate the expiry timestamp for a pulse based on its category
+ */
+export function calculateExpiryTime(
+  createdAt: string | Date,
+  tag: string
+): Date {
+  const created = createdAt instanceof Date ? createdAt : new Date(createdAt);
+  const category = tag as PulseCategory;
+  const lifespanHours = PULSE_LIFESPAN_HOURS[category] ?? 24;
+
+  const expiresAt = new Date(created);
+  expiresAt.setHours(expiresAt.getHours() + lifespanHours);
+
+  return expiresAt;
+}
+
+/**
+ * Get the number of seconds remaining until a pulse expires
+ * Returns negative if expired, null if no expiry
+ */
+export function getRemainingSeconds(
+  expiresAt: string | Date | null | undefined,
+  now: Date = new Date()
+): number | null {
+  if (!expiresAt) return null;
+
+  const expires = expiresAt instanceof Date ? expiresAt : new Date(expiresAt);
+  if (Number.isNaN(expires.getTime())) return null;
+
+  return Math.floor((expires.getTime() - now.getTime()) / 1000);
+}
+
+/**
+ * Determine the expiry status of a pulse for display purposes
+ */
+export function getPulseExpiryStatus(
+  expiresAt: string | Date | null | undefined,
+  now: Date = new Date()
+): PulseExpiryStatus {
+  const remainingSeconds = getRemainingSeconds(expiresAt, now);
+
+  // No expiry set - treat as active
+  if (remainingSeconds === null) {
+    return "active";
+  }
+
+  // Past grace period - fully expired
+  const gracePeriodSeconds = PULSE_GRACE_PERIOD_HOURS * 60 * 60;
+  if (remainingSeconds < -gracePeriodSeconds) {
+    return "expired";
+  }
+
+  // Past expiry but within grace period - fading
+  if (remainingSeconds < 0) {
+    return "fading";
+  }
+
+  // Expiring soon threshold
+  const expiringThresholdSeconds = EXPIRING_SOON_THRESHOLD_MINUTES * 60;
+  if (remainingSeconds <= expiringThresholdSeconds) {
+    return "expiring-soon";
+  }
+
+  return "active";
+}
+
+/**
+ * Check if a pulse should be visible in the feed
+ * Pulses in grace period are still visible (faded)
+ * Pulses past grace period are hidden
+ */
+export function isPulseVisible(
+  expiresAt: string | Date | null | undefined,
+  now: Date = new Date()
+): boolean {
+  const status = getPulseExpiryStatus(expiresAt, now);
+  return status !== "expired";
+}
+
+/**
+ * Filter an array of pulses to only include visible ones
+ * This is the client-side safety net for expiry filtering
+ */
+export function filterVisiblePulses<T extends { expiresAt?: string | null }>(
+  pulses: T[],
+  now: Date = new Date()
+): T[] {
+  return pulses.filter((pulse) => isPulseVisible(pulse.expiresAt, now));
+}
+
+/**
+ * Format remaining time for display
+ * Returns human-readable strings like "2h left", "30m left", "Fading..."
+ */
+export function formatRemainingTime(
+  expiresAt: string | Date | null | undefined,
+  now: Date = new Date()
+): string | null {
+  const status = getPulseExpiryStatus(expiresAt, now);
+
+  if (status === "expired") {
+    return null;
+  }
+
+  if (status === "fading") {
+    return "Fading...";
+  }
+
+  const remainingSeconds = getRemainingSeconds(expiresAt, now);
+  if (remainingSeconds === null || remainingSeconds < 0) {
+    return null;
+  }
+
+  const hours = Math.floor(remainingSeconds / 3600);
+  const minutes = Math.floor((remainingSeconds % 3600) / 60);
+
+  if (hours > 0) {
+    const minutePart = minutes > 0 ? ` ${minutes}m` : "";
+    return `${hours}h${minutePart} left`;
+  }
+
+  if (minutes > 0) {
+    return `${minutes}m left`;
+  }
+
+  return "< 1m left";
+}
+
+/**
+ * Calculate opacity for a fading pulse
+ * Returns 1.0 for active, gradually decreasing for expiring-soon and fading
+ */
+export function getPulseOpacity(
+  expiresAt: string | Date | null | undefined,
+  now: Date = new Date()
+): number {
+  const status = getPulseExpiryStatus(expiresAt, now);
+  const remainingSeconds = getRemainingSeconds(expiresAt, now);
+
+  switch (status) {
+    case "active":
+      return 1.0;
+
+    case "expiring-soon": {
+      // Gradually fade from 1.0 to 0.8 during expiring-soon phase
+      if (remainingSeconds === null) return 1.0;
+      const thresholdSeconds = EXPIRING_SOON_THRESHOLD_MINUTES * 60;
+      const progress = 1 - remainingSeconds / thresholdSeconds;
+      return 1.0 - progress * 0.2; // 1.0 -> 0.8
+    }
+
+    case "fading": {
+      // Continue fading from 0.8 to 0.4 during grace period
+      if (remainingSeconds === null) return 0.6;
+      const gracePeriodSeconds = PULSE_GRACE_PERIOD_HOURS * 60 * 60;
+      const progress = Math.abs(remainingSeconds) / gracePeriodSeconds;
+      return 0.8 - progress * 0.4; // 0.8 -> 0.4
+    }
+
+    case "expired":
+      return 0;
+
+    default:
+      return 1.0;
+  }
+}
+
+/**
+ * Get CSS class names for expiry status
+ */
+export function getExpiryClasses(
+  expiresAt: string | Date | null | undefined,
+  now: Date = new Date()
+): string {
+  const status = getPulseExpiryStatus(expiresAt, now);
+
+  switch (status) {
+    case "expiring-soon":
+      return "pulse-expiring-soon";
+    case "fading":
+      return "pulse-fading";
+    case "expired":
+      return "pulse-expired";
+    default:
+      return "";
+  }
 }
 
