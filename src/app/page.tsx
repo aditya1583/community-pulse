@@ -320,13 +320,24 @@ export default function Home() {
         setSummaryLoading(true);
         setSummaryError(null);
 
-        // Prepare events data for the summary
-        const eventsForSummary = ticketmasterEvents.slice(0, 10).map((e) => ({
-          name: e.name,
-          venue: e.venue,
-          date: e.date,
-          time: e.time,
-        }));
+        // Prepare events data for the summary (deduplicated by name)
+        const seenEventNames = new Set<string>();
+        const eventsForSummary = ticketmasterEvents
+          .filter((e) => {
+            const normalizedName = e.name.toLowerCase().trim();
+            if (seenEventNames.has(normalizedName)) {
+              return false;
+            }
+            seenEventNames.add(normalizedName);
+            return true;
+          })
+          .slice(0, 10)
+          .map((e) => ({
+            name: e.name,
+            venue: e.venue,
+            date: e.date,
+            time: e.time,
+          }));
 
         // Prepare news data for the summary
         const newsForSummary = (newsData?.articles ?? []).slice(0, 5).map((a) => ({
