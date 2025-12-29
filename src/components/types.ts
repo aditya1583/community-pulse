@@ -176,3 +176,53 @@ export const CATEGORY_MOODS: Record<PulseCategory, { emoji: string; label: strin
     { emoji: "😴", label: "Tired" },
   ],
 };
+
+// =====================================================
+// VENUE VIBE CHECK SYSTEM
+// =====================================================
+// Real-time crowd-sourced venue atmosphere data
+// This is hyper-local intelligence that Google doesn't have
+
+export const VENUE_VIBE_TYPES = [
+  // Crowd level
+  { id: "busy", emoji: "🔥", label: "Busy", category: "crowd" },
+  { id: "moderate", emoji: "👥", label: "Moderate", category: "crowd" },
+  { id: "quiet", emoji: "🤫", label: "Quiet", category: "crowd" },
+  // Atmosphere
+  { id: "live_music", emoji: "🎵", label: "Live Music", category: "atmosphere" },
+  { id: "great_vibes", emoji: "✨", label: "Great Vibes", category: "atmosphere" },
+  { id: "chill", emoji: "😌", label: "Chill", category: "atmosphere" },
+  // Service
+  { id: "long_wait", emoji: "⏳", label: "Long Wait", category: "service" },
+  { id: "fast_service", emoji: "⚡", label: "Fast Service", category: "service" },
+  // Quality signals
+  { id: "worth_it", emoji: "👍", label: "Worth It", category: "quality" },
+  { id: "skip_it", emoji: "👎", label: "Skip It", category: "quality" },
+] as const;
+
+export type VenueVibeType = (typeof VENUE_VIBE_TYPES)[number]["id"];
+
+export type VenueVibeCategory = "crowd" | "atmosphere" | "service" | "quality";
+
+export type VenueVibe = {
+  id: string;
+  venueId: string;
+  venueName: string;
+  vibeType: VenueVibeType;
+  userId?: string;
+  createdAt: string;
+  expiresAt: string;
+};
+
+export type VenueVibeAggregate = {
+  vibeType: VenueVibeType;
+  count: number;
+  latestAt: string;
+};
+
+/**
+ * Get the display info for a vibe type
+ */
+export function getVibeTypeInfo(vibeType: VenueVibeType) {
+  return VENUE_VIBE_TYPES.find(v => v.id === vibeType) || VENUE_VIBE_TYPES[0];
+}

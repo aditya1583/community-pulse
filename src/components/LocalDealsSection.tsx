@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import type { LocalDeal } from "./types";
+import VenueVibeCheck from "./VenueVibeCheck";
 
 type LocalDealsSectionProps = {
   cityName: string;
@@ -233,6 +234,15 @@ export default function LocalDealsSection({
                       )}
                     </div>
                   )}
+
+                  {/* Venue Vibe Check - The secret weapon that differentiates from Google */}
+                  <div className="mt-2 pt-2 border-t border-slate-700/30">
+                    <VenueVibeCheck
+                      venueId={deal.id}
+                      venueName={deal.name}
+                      compact
+                    />
+                  </div>
                 </div>
               </div>
             </a>

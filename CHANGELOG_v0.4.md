@@ -1,8 +1,8 @@
 # Community Pulse v0.4 - Major Feature Release
 
-## Release Date: December 28, 2025
+## Release Date: December 28-29, 2025
 
-This release transforms Community Pulse from a simple local feed into an engaging, gamified social platform with smart notifications and ephemeral content.
+This release transforms Community Pulse from a simple local feed into an engaging, gamified social platform with smart notifications, ephemeral content, and real-time venue vibes.
 
 ---
 
@@ -153,6 +153,41 @@ node scripts/generate-vapid-keys.js
 
 ---
 
+### 6. Venue Vibe Checks (v0.4.1)
+
+**The Problem:** The Local "Deals" section was a Yelp clone. Why would users check here instead of Google Maps with 500 reviews?
+
+**The Solution:** Venue Vibe Checks - real-time crowd-sourced atmosphere data that Google doesn't have.
+
+**Features:**
+- One-tap vibe submission: "Busy", "Quiet", "Live Music", "Long Wait", "Great Vibes", "Worth It"
+- 4-hour expiry for freshness (stale vibes are useless)
+- Rate limiting: 1 vibe per venue per 30 minutes per user
+- Aggregated display: "3 people say: Busy"
+- Device fingerprinting for anonymous rate limiting
+
+**Vibe Categories:**
+| Category | Options |
+|----------|---------|
+| Crowd Level | Busy, Moderate, Quiet |
+| Atmosphere | Live Music, Great Vibes, Chill |
+| Service | Long Wait, Fast Service |
+| Quality | Worth It, Skip It |
+
+**Files:**
+- `src/components/VenueVibeCheck.tsx` - Main component (compact & full modes)
+- `src/app/api/venue-vibe/route.ts` - API endpoint (GET & POST)
+- `src/components/types.ts` - VenueVibe types added
+- `src/components/LocalDealsSection.tsx` - Integration
+- `supabase/migrations/20241229_venue_vibes.sql` - Database schema
+
+**Why This Wins:**
+- Google shows "4.5 stars from 500 reviews" (stale, generic)
+- Community Pulse shows "3 people here now say: Busy, Live Music" (fresh, specific)
+- Users check the app before going to a venue to see the real-time vibe
+
+---
+
 ## Database Migrations Required
 
 Run these in Supabase SQL Editor in order:
@@ -172,6 +207,11 @@ Run these in Supabase SQL Editor in order:
    -- Run contents of: supabase/migrations/20241227_bat_signal_notifications.sql
    ```
 
+4. **Venue Vibe Checks:**
+   ```sql
+   -- Run contents of: supabase/migrations/20241229_venue_vibes.sql
+   ```
+
 ---
 
 ## Environment Variables Required
@@ -188,7 +228,7 @@ CRON_SECRET=your-secure-random-string
 
 ## Files Changed Summary
 
-### New Files (25)
+### New Files (27)
 - `src/components/RadarPulse.tsx`
 - `src/components/ShareableSummaryCard.tsx`
 - `src/components/StatusRing.tsx`
@@ -198,6 +238,7 @@ CRON_SECRET=your-secure-random-string
 - `src/components/StatusTab.tsx`
 - `src/components/NotificationSettings.tsx`
 - `src/components/ServiceWorkerRegister.tsx`
+- `src/components/VenueVibeCheck.tsx`
 - `src/lib/gamification.ts`
 - `src/lib/batSignal.ts`
 - `src/lib/pushNotifications.ts`
@@ -210,12 +251,13 @@ CRON_SECRET=your-secure-random-string
 - `src/app/api/notifications/subscribe/route.ts`
 - `src/app/api/notifications/preferences/route.ts`
 - `src/app/api/notifications/trigger/route.ts`
+- `src/app/api/venue-vibe/route.ts`
 - `public/sw.js`
 - `scripts/generate-vapid-keys.js`
 - `vercel.json`
 - `docs/BAT_SIGNAL.md`
 
-### Modified Files (14)
+### Modified Files (15)
 - `src/app/page.tsx`
 - `src/app/layout.tsx`
 - `src/app/globals.css`
@@ -225,27 +267,30 @@ CRON_SECRET=your-secure-random-string
 - `src/components/FAB.tsx`
 - `src/components/Header.tsx`
 - `src/components/AISummaryCard.tsx`
+- `src/components/LocalDealsSection.tsx`
 - `src/components/types.ts`
 - `src/lib/pulses.ts`
 - `src/lib/__tests__/pulses.test.ts`
 - `package.json`
 - `package-lock.json`
 
-### Database Migrations (3)
+### Database Migrations (4)
 - `supabase/migrations/20241227_bat_signal_notifications.sql`
 - `supabase/migrations/20241228_ephemeral_pulses.sql`
 - `supabase/migrations/20241228_gamification_system.sql`
+- `supabase/migrations/20241229_venue_vibes.sql`
 
 ---
 
 ## The Psychology Behind These Features
 
-1. **Emotion-Based Vibes** → Curiosity ("Why is my city frustrated?")
-2. **Smart Notifications** → Urgency ("Something is happening NOW")
-3. **Gamification** → Status ("I want that gold ring")
-4. **Ephemeral Content** → FOMO ("I might miss something")
-5. **Shareable Summaries** → Virality (Free marketing from users)
-6. **Radar Animation** → Trust ("This app is actively monitoring")
+1. **Emotion-Based Vibes** - Curiosity ("Why is my city frustrated?")
+2. **Smart Notifications** - Urgency ("Something is happening NOW")
+3. **Gamification** - Status ("I want that gold ring")
+4. **Ephemeral Content** - FOMO ("I might miss something")
+5. **Shareable Summaries** - Virality (Free marketing from users)
+6. **Radar Animation** - Trust ("This app is actively monitoring")
+7. **Venue Vibe Checks** - Utility ("Is this place busy right now?")
 
 Together, these create a feedback loop that drives daily engagement.
 
@@ -253,4 +298,4 @@ Together, these create a feedback loop that drives daily engagement.
 
 ## Version
 
-**v0.4.0** - "The Engagement Update"
+**v0.4.1** - "The Engagement Update + Venue Vibes"
