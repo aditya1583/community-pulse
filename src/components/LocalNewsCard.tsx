@@ -1,36 +1,12 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import type { LocalNewsResponse, LocalNewsArticle } from "@/app/api/local-news/route";
+import type { LocalNewsResponse, LocalNewsArticle } from "@/types/news";
+import { formatRelativeTime } from "@/lib/time";
 
 type LocalNewsCardProps = {
   city: string;
 };
-
-/**
- * Format relative time (e.g., "2h ago", "3d ago")
- */
-function formatRelativeTime(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffMins < 60) {
-    return `${diffMins}m ago`;
-  } else if (diffHours < 24) {
-    return `${diffHours}h ago`;
-  } else if (diffDays < 7) {
-    return `${diffDays}d ago`;
-  } else {
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
-  }
-}
 
 /**
  * Skeleton loader for the news card
@@ -154,9 +130,9 @@ export default function LocalNewsCard({ city }: LocalNewsCardProps) {
         <div>
           <h2 className="text-base font-medium text-slate-100 flex items-center gap-2">
             Local News in {displayCity}
-            {data?.isNearbyFallback && (
+            {data?.isNearbyFallback && (data.fallbackSources?.length ?? 0) > 0 && (
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                includes {data.sourceCity}
+                includes {data.fallbackSources.join(", ")}
               </span>
             )}
           </h2>
@@ -233,7 +209,7 @@ export default function LocalNewsCard({ city }: LocalNewsCardProps) {
       {/* Footer */}
       <div className="flex items-center justify-between pt-1 border-t border-slate-800/50">
         <span className="text-[10px] text-slate-600">
-          Powered by NewsAPI.org
+          Powered by {data?.provider === "gnews" ? "GNews" : "NewsAPI.org"}
         </span>
         {data?.fetchedAt && (
           <span className="text-[10px] text-slate-600">

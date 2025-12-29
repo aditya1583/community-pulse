@@ -307,9 +307,12 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (insertError) {
-      console.error("[/api/pulses] Insert error:", insertError);
+      console.error(
+        "[/api/pulses] Insert error:",
+        JSON.stringify(insertError, null, 2)
+      );
       return NextResponse.json(
-        { error: "Failed to create pulse" },
+        { error: insertError.message },
         { status: 500 }
       );
     }
@@ -357,11 +360,22 @@ export async function DELETE(req: NextRequest) {
 
     // Get pulse ID from URL
     const { searchParams } = new URL(req.url);
-    const pulseId = searchParams.get("id");
+    const id = searchParams.get("id");
 
-    if (!pulseId) {
+    console.log("Attempting to delete pulse with ID:", id, "Type:", typeof id);
+
+    const numericId = id ? parseInt(id, 10) : NaN;
+
+    if (!id) {
       return NextResponse.json(
         { error: "Pulse ID is required" },
+        { status: 400 }
+      );
+    }
+
+    if (Number.isNaN(numericId)) {
+      return NextResponse.json(
+        { error: "Pulse ID must be a number" },
         { status: 400 }
       );
     }
@@ -370,14 +384,22 @@ export async function DELETE(req: NextRequest) {
     const { data: pulse, error: fetchError } = await supabase
       .from("pulses")
       .select("id, user_id")
-      .eq("id", pulseId)
+      .eq("id", numericId)
       .single();
 
-    if (fetchError || !pulse) {
-      return NextResponse.json(
-        { error: "Pulse not found" },
-        { status: 404 }
+    if (fetchError) {
+      console.error(
+        "[/api/pulses] Fetch pulse for delete error:",
+        JSON.stringify(fetchError, null, 2)
       );
+      if (fetchError.code === "PGRST116") {
+        return NextResponse.json({ error: "Pulse not found" }, { status: 404 });
+      }
+      return NextResponse.json({ error: fetchError.message }, { status: 500 });
+    }
+
+    if (!pulse) {
+      return NextResponse.json({ error: "Pulse not found" }, { status: 404 });
     }
 
     if (pulse.user_id !== user.id) {
@@ -391,17 +413,20 @@ export async function DELETE(req: NextRequest) {
     const { error: deleteError } = await supabase
       .from("pulses")
       .delete()
-      .eq("id", pulseId);
+      .eq("id", numericId);
 
     if (deleteError) {
-      console.error("[/api/pulses] Delete error:", deleteError);
+      console.error(
+        "[/api/pulses] Supabase delete error:",
+        JSON.stringify(deleteError, null, 2)
+      );
       return NextResponse.json(
-        { error: "Failed to delete pulse" },
+        { error: deleteError.message },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[/api/pulses] Unexpected error:", err);
     return NextResponse.json(

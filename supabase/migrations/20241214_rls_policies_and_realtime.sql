@@ -6,7 +6,20 @@
 -- 1. ENABLE REALTIME FOR PULSES TABLE
 -- Required for B2: Cross-browser live updates
 -- ============================================================================
-ALTER PUBLICATION supabase_realtime ADD TABLE pulses;
+-- ALTER PUBLICATION supabase_realtime ADD TABLE pulses;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'pulses'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.pulses;
+  END IF;
+END $$;
+
 
 -- ============================================================================
 -- 2. RLS POLICIES FOR PULSES

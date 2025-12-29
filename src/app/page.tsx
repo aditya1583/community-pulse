@@ -1,59 +1,43 @@
 "use client";
 
-import React, { useCallback, useEffect, useState, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
 import { useGeocodingAutocomplete } from "@/hooks/useGeocodingAutocomplete";
+import { useEvents } from "@/hooks/useEvents";
 import type { GeocodedCity } from "@/lib/geocoding";
-import LocalNewsCard from "@/components/LocalNewsCard";
 import {
-  formatPulseDateTime,
-  formatPulseLocation,
   isInRecentWindow,
-  isPostEnabled,
   readOnboardingCompleted,
   resetComposerAfterSuccessfulPost,
   shouldShowFirstPulseOnboarding,
   startOfRecentWindow,
   startOfNextLocalDay,
   writeOnboardingCompleted,
+  filterVisiblePulses,
+  isPulseVisible,
   type AuthStatus,
 } from "@/lib/pulses";
 import { moderateContent } from "@/lib/moderation";
 import { generateUniqueUsername } from "@/lib/username";
 
-const MAX_MESSAGE_LENGTH = 240;
-
-type WeatherInfo = {
-  temp: number;
-  feelsLike: number;
-  description: string;
-  icon: string;
-  cityName: string;
-};
-
-type Pulse = {
-  id: number;
-  city: string;
-  neighborhood?: string | null;
-  mood: string;
-  tag: string;
-  message: string;
-  author: string;
-  createdAt: string;
-  user_id?: string;
-};
-
-// GLOBAL POSTING STEAK
-
-type StreakInfo = {
-  currentStreak: number;
-  lastActiveDate: string | null;
-};
-
-
-// Saved Favorites
-type FavoritePulseId = number;
+// New Neon Theme Components
+import Header from "@/components/Header";
+import CurrentVibeCard from "@/components/CurrentVibeCard";
+import QuickStats from "@/components/QuickStats";
+import TabNavigation from "@/components/TabNavigation";
+import AISummaryCard from "@/components/AISummaryCard";
+import NewsTab from "@/components/NewsTab";
+import EventCard from "@/components/EventCard";
+import PulseCard from "@/components/PulseCard";
+import LocalTab from "@/components/LocalTab";
+import StatusTab from "@/components/StatusTab";
+import PulseInput from "@/components/PulseInput";
+import FAB from "@/components/FAB";
+import PulseModal from "@/components/PulseModal";
+import TrafficContent from "@/components/TrafficContent";
+import { DASHBOARD_TABS, type TabId, type WeatherInfo, type Pulse, type CityMood, type TrafficLevel } from "@/components/types";
+import type { LocalNewsResponse } from "@/types/news";
 
 // Real-time Live Updates
 type DBPulse = {
@@ -66,6 +50,7 @@ type DBPulse = {
   author: string;
   created_at: string;
   user_id?: string;
+  expires_at?: string | null;
 };
 
 // Pagination constants
@@ -82,6 +67,7 @@ function mapDBPulseToPulse(row: DBPulse): Pulse {
     author: row.author,
     createdAt: row.created_at,
     user_id: row.user_id,
+    expiresAt: row.expires_at ?? null,
   };
 }
 
@@ -97,15 +83,16 @@ type EventItem = {
   is_sponsored?: boolean | null;
 };
 
-// CITY MOOD
-type MoodScore = {
-  mood: string;
-  count: number;
-  percent: number;
+// GLOBAL POSTING STREAK
+type StreakInfo = {
+  currentStreak: number;
+  lastActiveDate: string | null;
 };
 
+// Saved Favorites
+type FavoritePulseId = number;
+
 const TAGS = ["All", "Traffic", "Weather", "Events", "General"];
-const MOODS = ["😊", "😐", "😢", "😡", "😴", "🤩"];
 
 const DEFAULT_CITY: GeocodedCity = {
   id: "austin-tx-us",
@@ -132,7 +119,11 @@ type Profile = {
   name_locked?: boolean | null;
 };
 
+const TAB_ID_SET = new Set<TabId>(DASHBOARD_TABS.map((tab) => tab.id));
 
+function isTabId(value: unknown): value is TabId {
+  return typeof value === "string" && TAB_ID_SET.has(value as TabId);
+}
 
 export default function Home() {
   // Core state
@@ -150,25 +141,26 @@ export default function Home() {
   const [tag, setTag] = useState("");
   const [message, setMessage] = useState("");
   const [pulses, setPulses] = useState<Pulse[]>([]);
+  // Track whether initial pulse fetch has completed (prevents "No pulses" flash)
+  const [initialPulsesFetched, setInitialPulsesFetched] = useState(false);
+
+  // Tab state for new Neon theme
+  const [activeTab, setActiveTab] = useState<TabId>("pulse");
+  const [showPulseModal, setShowPulseModal] = useState(false);
 
   // Auth + anon profile
   const [sessionUser, setSessionUser] = useState<User | null>(null);
-  // const [profile, setProfile] = useState<{ anon_name: string } | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
   const [profileLoading, setProfileLoading] = useState(false);
 
-
   // USER STREAK
-
   const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
   const [, setStreakLoading] = useState(false);
   const [userPulseCount, setUserPulseCount] = useState(0);
   const [pulseCountResolved, setPulseCountResolved] = useState(false);
 
-
   // Saved Favorites
-    // Saved Favorites
   const [favoritePulseIds, setFavoritePulseIds] = useState<FavoritePulseId[]>(
     []
   );
@@ -201,7 +193,6 @@ export default function Home() {
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -209,20 +200,29 @@ export default function Home() {
   const [hasMorePulses, setHasMorePulses] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // Events state
+  // Events state (legacy - user-created events from Supabase)
   const [events, setEvents] = useState<EventItem[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsError, setEventsError] = useState<string | null>(null);
 
   const [newEventTitle, setNewEventTitle] = useState("");
   const [newEventLocation, setNewEventLocation] = useState("");
-  const [newEventTime, setNewEventTime] = useState(""); // datetime-local value
+  const [newEventTime, setNewEventTime] = useState("");
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [eventCreateError, setEventCreateError] = useState<string | null>(null);
 
+  // Ticketmaster Events - uses useEvents hook with location
+  const {
+    events: ticketmasterEvents,
+    isLoading: ticketmasterLoading,
+    error: ticketmasterError,
+  } = useEvents(selectedCity?.lat ?? null, selectedCity?.lon ?? null, {
+    radius: 25,
+    city: city,
+  });
+
   // Traffic
-  const [trafficLevel, setTrafficLevel] =
-    useState<"Light" | "Moderate" | "Heavy" | null>(null);
+  const [trafficLevel, setTrafficLevel] = useState<TrafficLevel | null>(null);
   const [trafficLoading, setTrafficLoading] = useState(false);
   const [trafficError, setTrafficError] = useState<string | null>(null);
 
@@ -237,13 +237,14 @@ export default function Home() {
   const [weatherError, setWeatherError] = useState<string | null>(null);
 
   // City Mood
-  const [cityMood, setCityMood] = useState<{
-    dominantMood: string | null;
-    scores: MoodScore[];
-    pulseCount: number;
-  } | null>(null);
+  const [cityMood, setCityMood] = useState<CityMood | null>(null);
   const [cityMoodLoading, setCityMoodLoading] = useState(false);
   const [cityMoodError, setCityMoodError] = useState<string | null>(null);
+
+  // News
+  const [newsData, setNewsData] = useState<LocalNewsResponse | null>(null);
+  const [newsLoading, setNewsLoading] = useState(false);
+  const [newsError, setNewsError] = useState<string | null>(null);
 
   // City Autocomplete
   const {
@@ -265,10 +266,35 @@ export default function Home() {
   const cityInputRef = useRef<HTMLInputElement>(null);
   const cityDropdownRef = useRef<HTMLDivElement>(null);
   const pulseTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const [renderCitySuggestionsMenu, setRenderCitySuggestionsMenu] = useState(false);
+  const cityDropdownOpen = showCitySuggestions && citySuggestions.length > 0;
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    if (!isTabId(activeTab)) {
+      console.warn(`[tabs] Unknown activeTab "${String(activeTab)}" — defaulting to "pulse"`);
+      setActiveTab("pulse");
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (cityDropdownOpen) {
+      setRenderCitySuggestionsMenu(true);
+      return;
+    }
+
+    if (!renderCitySuggestionsMenu) return;
+
+    const t = window.setTimeout(() => setRenderCitySuggestionsMenu(false), 160);
+    return () => window.clearTimeout(t);
+  }, [cityDropdownOpen, renderCitySuggestionsMenu]);
 
   // ========= AI SUMMARY =========
   useEffect(() => {
-    if (pulses.length === 0) {
+    // Need at least some data to generate a summary
+    const hasData = pulses.length > 0 || ticketmasterEvents.length > 0 || (newsData?.articles?.length ?? 0) > 0;
+
+    if (!hasData) {
       setSummary(null);
       setSummaryError(null);
       setSummaryLoading(false);
@@ -282,12 +308,36 @@ export default function Home() {
         setSummaryLoading(true);
         setSummaryError(null);
 
+        // Prepare events data for the summary
+        const eventsForSummary = ticketmasterEvents.slice(0, 10).map((e) => ({
+          name: e.name,
+          venue: e.venue,
+          date: e.date,
+          time: e.time,
+        }));
+
+        // Prepare news data for the summary
+        const newsForSummary = (newsData?.articles ?? []).slice(0, 5).map((a) => ({
+          title: a.title,
+          source: a.source,
+        }));
+
+        // Get weather condition if available
+        const weatherCondition = weather
+          ? `${weather.description}, ${Math.round(weather.temp)}F`
+          : undefined;
+
         const res = await fetch("/api/summary", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             city,
+            context: "all",
             pulses,
+            events: eventsForSummary,
+            news: newsForSummary,
+            trafficLevel,
+            weatherCondition,
           }),
         });
 
@@ -319,72 +369,66 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [city, pulses]);
+  }, [city, pulses, ticketmasterEvents, newsData, trafficLevel, weather]);
 
   // ========= REAL-TIME FEED =========
-  // B2 FIX: Realtime subscription for cross-browser updates
-  // - Removed filter from subscription (city filter was causing issues with special chars)
-  // - Filter is applied client-side after receiving the payload
-  // - Added DELETE event handling for immediate removal
-useEffect(() => {
-  if (!city) return;
+  useEffect(() => {
+    if (!city) return;
 
-  // Create a unique channel name per city to avoid conflicts
-  const channelName = `pulses-realtime-${city.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    const channelName = `pulses-realtime-${city.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
-  const channel = supabase
-    .channel(channelName)
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "pulses",
-      },
-      (payload) => {
-        const row = payload.new as DBPulse;
-        // Client-side filter: only show pulses for current city
-        if (!row || row.city !== city) return;
-        // Only show recent pulses (7-day window)
-        if (!isInRecentWindow(row.created_at)) return;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "pulses",
+        },
+        (payload) => {
+          const row = payload.new as DBPulse;
+          if (!row || row.city !== city) return;
+          if (!isInRecentWindow(row.created_at)) return;
 
-        const pulse = mapDBPulseToPulse(row);
+          const pulse = mapDBPulseToPulse(row);
 
-        setPulses((prev) => {
-          const exists = prev.some((p) => String(p.id) === String(pulse.id));
-          if (exists) return prev;
+          setPulses((prev) => {
+            const exists = prev.some((p) => String(p.id) === String(pulse.id));
+            if (exists) return prev;
 
-          return [pulse, ...prev].sort(
-            (a, b) =>
-              new Date(b.createdAt).getTime() -
-              new Date(a.createdAt).getTime()
-          );
-        });
-      }
-    )
-    .on(
-      "postgres_changes",
-      {
-        event: "DELETE",
-        schema: "public",
-        table: "pulses",
-      },
-      (payload) => {
-        const deleted = payload.old as { id?: number };
-        if (!deleted?.id) return;
+            return [pulse, ...prev].sort(
+              (a, b) =>
+                new Date(b.createdAt).getTime() -
+                new Date(a.createdAt).getTime()
+            );
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "pulses",
+        },
+        (payload) => {
+          const deleted = payload.old as { id?: number };
+          if (!deleted?.id) return;
 
-        setPulses((prev) => prev.filter((p) => p.id !== deleted.id));
-      }
-    )
-    .subscribe();
+          setPulses((prev) => prev.filter((p) => p.id !== deleted.id));
+        }
+      )
+      .subscribe();
 
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, [city, setPulses]);  // DO NOT CHANGE THIS
-
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [city, setPulses]);
 
   // ========= CITY MOOD =========
+  // ENHANCED: Now passes ALL city context (events, traffic, weather, news)
+  // so the vibe calculation reflects total city activity, not just pulses.
   useEffect(() => {
     if (!city) return;
 
@@ -393,9 +437,31 @@ useEffect(() => {
         setCityMoodLoading(true);
         setCityMoodError(null);
 
-        const res = await fetch(
-          `/api/city-mood?city=${encodeURIComponent(city)}`
-        );
+        // Build query params with full city context
+        const params = new URLSearchParams();
+        params.set("city", city);
+
+        // Include events count for activity calculation
+        if (ticketmasterEvents.length > 0) {
+          params.set("eventsCount", String(ticketmasterEvents.length));
+        }
+
+        // Include traffic level for commute mood
+        if (trafficLevel) {
+          params.set("trafficLevel", trafficLevel);
+        }
+
+        // Include weather condition for environmental context
+        if (weather) {
+          params.set("weatherCondition", `${weather.description}, ${Math.round(weather.temp)}F`);
+        }
+
+        // Include news count for noteworthy happenings
+        if (newsData?.articles?.length) {
+          params.set("newsCount", String(newsData.articles.length));
+        }
+
+        const res = await fetch(`/api/city-mood?${params.toString()}`);
         if (!res.ok) {
           throw new Error("Failed to fetch city mood");
         }
@@ -405,6 +471,13 @@ useEffect(() => {
           dominantMood: data.dominantMood,
           scores: data.scores || [],
           pulseCount: data.pulseCount || 0,
+          // New vibe system fields
+          tagScores: data.tagScores || [],
+          dominantTag: data.dominantTag || null,
+          vibeHeadline: data.vibeHeadline,
+          vibeSubtext: data.vibeSubtext,
+          vibeEmotion: data.vibeEmotion,
+          vibeIntensity: data.vibeIntensity,
         });
       } catch (err: unknown) {
         console.error("Error fetching city mood:", err);
@@ -416,7 +489,7 @@ useEffect(() => {
     }
 
     fetchCityMood();
-  }, [city, pulses.length]);
+  }, [city, pulses.length, ticketmasterEvents.length, trafficLevel, weather, newsData?.articles?.length]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -500,6 +573,52 @@ useEffect(() => {
     };
   }, [city, selectedCity?.lat, selectedCity?.lon, selectedCity?.country, selectedCity?.state]);
 
+  // ========= LOCAL NEWS =========
+  useEffect(() => {
+    if (!city.trim()) {
+      setNewsData(null);
+      setNewsError(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchNews = async () => {
+      try {
+        setNewsLoading(true);
+        setNewsError(null);
+
+        const res = await fetch(`/api/local-news?city=${encodeURIComponent(city)}`);
+        const data: LocalNewsResponse = await res.json();
+
+        if (cancelled) return;
+
+        if (!res.ok) {
+          setNewsError("Unable to load news.");
+          setNewsData(null);
+          return;
+        }
+
+        setNewsData(data);
+      } catch {
+        if (!cancelled) {
+          setNewsError("Unable to load news.");
+          setNewsData(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setNewsLoading(false);
+        }
+      }
+    };
+
+    fetchNews();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [city]);
+
   // ========= LOAD SESSION + PROFILE =========
   useEffect(() => {
     async function loadUser() {
@@ -531,7 +650,6 @@ useEffect(() => {
             name_locked: profileData.name_locked ?? false,
           });
         } else {
-          // B10 FIX: Generate unique anon username by checking for collisions
           const anon = await generateUniqueUsername(supabase);
 
           await supabase.from("profiles").insert({
@@ -571,182 +689,174 @@ useEffect(() => {
     setOnboardingCompleted(readOnboardingCompleted(window.localStorage, userId));
   }, [sessionUser?.id]);
 
+  // USER STREAK
+  const loadStreak = useCallback(async () => {
+    const userId = sessionUser?.id;
 
-// USER STREAK
-const loadStreak = useCallback(async () => {
-  const userId = sessionUser?.id;
-
-  if (!userId) {
-    setStreakInfo(null);
-    setUserPulseCount(0);
-    setStreakLoading(false);
-    setPulseCountResolved(false);
-    return;
-  }
-
-  try {
-    setStreakLoading(true);
-    setPulseCountResolved(false);
-
-    // Grab up to 365 days of posts for this user
-    const { data, error, count } = await supabase
-      .from("pulses")
-      .select("created_at", { count: "exact" })
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(365);
-
-    if (error) {
-      console.error("Error loading streak data:", error);
+    if (!userId) {
+      setStreakInfo(null);
+      setUserPulseCount(0);
+      setStreakLoading(false);
+      setPulseCountResolved(false);
       return;
     }
 
-    const rows = data || [];
-    const nextCount = count ?? rows.length;
-    setUserPulseCount(nextCount);
-    setPulseCountResolved(true);
+    try {
+      setStreakLoading(true);
+      setPulseCountResolved(false);
 
-    if (nextCount > 0 && !onboardingCompleted) {
-      writeOnboardingCompleted(window.localStorage, userId);
-      setOnboardingCompleted(true);
-    }
+      const { data, error, count } = await supabase
+        .from("pulses")
+        .select("created_at", { count: "exact" })
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(365);
 
-    if (rows.length === 0) {
-      setStreakInfo({ currentStreak: 0, lastActiveDate: null });
-      return;
-    }
+      if (error) {
+        console.error("Error loading streak data:", error);
+        return;
+      }
 
-    // Convert to local YYYY-MM-DD strings & dedupe
-    const dateStrings = Array.from(
-      new Set(
-        rows.map((row: { created_at: string }) => {
-          const d = new Date(row.created_at);
-          // ISO-like local date (yyyy-mm-dd)
-          return d.toLocaleDateString("en-CA");
-        })
-      )
-    ).sort((a, b) => (a < b ? 1 : -1)); // newest first
+      const rows = data || [];
+      const nextCount = count ?? rows.length;
+      setUserPulseCount(nextCount);
+      setPulseCountResolved(true);
 
-    const today = new Date();
-    const todayStr = today.toLocaleDateString("en-CA");
+      if (nextCount > 0 && !onboardingCompleted) {
+        writeOnboardingCompleted(window.localStorage, userId);
+        setOnboardingCompleted(true);
+      }
 
-    let streak = 0;
-    let offsetDays = 0;
+      if (rows.length === 0) {
+        setStreakInfo({ currentStreak: 0, lastActiveDate: null });
+        return;
+      }
 
-    function offsetDate(days: number) {
-      const d = new Date();
-      d.setDate(d.getDate() - days);
-      return d.toLocaleDateString("en-CA");
-    }
+      const dateStrings = Array.from(
+        new Set(
+          rows.map((row: { created_at: string }) => {
+            const d = new Date(row.created_at);
+            return d.toLocaleDateString("en-CA");
+          })
+        )
+      ).sort((a, b) => (a < b ? 1 : -1));
 
-    for (const dayStr of dateStrings) {
-      const expected = offsetDate(offsetDays);
+      const today = new Date();
+      const todayStr = today.toLocaleDateString("en-CA");
 
-      if (dayStr === expected) {
-        streak += 1;
-        offsetDays += 1;
-      } else {
-        if (streak === 0 && dayStr === offsetDate(1) && todayStr !== dayStr) {
-          streak = 1;
-          offsetDays = 2;
+      let streak = 0;
+      let offsetDays = 0;
+
+      function offsetDate(days: number) {
+        const d = new Date();
+        d.setDate(d.getDate() - days);
+        return d.toLocaleDateString("en-CA");
+      }
+
+      for (const dayStr of dateStrings) {
+        const expected = offsetDate(offsetDays);
+
+        if (dayStr === expected) {
+          streak += 1;
+          offsetDays += 1;
         } else {
-          break;
+          if (streak === 0 && dayStr === offsetDate(1) && todayStr !== dayStr) {
+            streak = 1;
+            offsetDays = 2;
+          } else {
+            break;
+          }
         }
       }
+
+      const lastActive = dateStrings[0] ?? null;
+
+      setStreakInfo({
+        currentStreak: streak,
+        lastActiveDate: lastActive,
+      });
+    } catch (err) {
+      console.error("Unexpected error loading streak:", err);
+    } finally {
+      setStreakLoading(false);
     }
+  }, [sessionUser, onboardingCompleted]);
 
-    const lastActive = dateStrings[0] ?? null;
+  useEffect(() => {
+    loadStreak();
+  }, [loadStreak]);
 
-    setStreakInfo({
-      currentStreak: streak,
-      lastActiveDate: lastActive,
+  // ========= FIRST-TIME USER ONBOARDING =========
+  useEffect(() => {
+    const show = shouldShowFirstPulseOnboarding({
+      authStatus,
+      identityReady,
+      pulseCountResolved,
+      userPulseCount,
+      onboardingCompleted,
+      hasShownThisSession: hasShownOnboarding,
     });
-  } catch (err) {
-    console.error("Unexpected error loading streak:", err);
-  } finally {
-    setStreakLoading(false);
-  }
-}, [sessionUser, onboardingCompleted]);
 
-useEffect(() => {
-  loadStreak();
-}, [loadStreak]);
-
-// ========= FIRST-TIME USER ONBOARDING =========
-useEffect(() => {
-  const show = shouldShowFirstPulseOnboarding({
+    if (show) {
+      setShowFirstPulseModal(true);
+      setHasShownOnboarding(true);
+    }
+  }, [
     authStatus,
     identityReady,
     pulseCountResolved,
     userPulseCount,
     onboardingCompleted,
-    hasShownThisSession: hasShownOnboarding,
-  });
+    hasShownOnboarding,
+  ]);
 
-  if (show) {
-    setShowFirstPulseModal(true);
-    setHasShownOnboarding(true);
-  }
-}, [
-  authStatus,
-  identityReady,
-  pulseCountResolved,
-  userPulseCount,
-  onboardingCompleted,
-  hasShownOnboarding,
-]);
-
-useEffect(() => {
-  if (!showFirstPulseModal) return;
-  if (onboardingCompleted) {
-    setShowFirstPulseModal(false);
-    return;
-  }
-  if (pulseCountResolved && userPulseCount > 0) {
-    setShowFirstPulseModal(false);
-  }
-}, [showFirstPulseModal, onboardingCompleted, pulseCountResolved, userPulseCount]);
-
-
+  useEffect(() => {
+    if (!showFirstPulseModal) return;
+    if (onboardingCompleted) {
+      setShowFirstPulseModal(false);
+      return;
+    }
+    if (pulseCountResolved && userPulseCount > 0) {
+      setShowFirstPulseModal(false);
+    }
+  }, [showFirstPulseModal, onboardingCompleted, pulseCountResolved, userPulseCount]);
 
   // ========= LOAD FAVORITES FOR USER =========
-useEffect(() => {
-  // derive a stable userId for this effect run
-  const userId = sessionUser?.id;
+  useEffect(() => {
+    const userId = sessionUser?.id;
 
-  // If not logged in, clear favorites
-  if (!userId) {
-    setFavoritePulseIds([]);
-    return;
-  }
-
-  async function loadFavorites() {
-    try {
-      setFavoritesLoading(true);
-
-      const { data, error } = await supabase
-        .from("favorites")
-        .select("pulse_id")
-        .eq("user_id", userId); // use userId, not sessionUser.id
-
-      if (error) {
-        console.error("Error loading favorites:", error);
-        return;
-      }
-
-      const ids = (data || []).map(
-        (row: { pulse_id: number }) => row.pulse_id
-      );
-      setFavoritePulseIds(ids);
-    } catch (err) {
-      console.error("Unexpected error loading favorites:", err);
-    } finally {
-      setFavoritesLoading(false);
+    if (!userId) {
+      setFavoritePulseIds([]);
+      return;
     }
-  }
 
-  loadFavorites();
-}, [sessionUser]);
+    async function loadFavorites() {
+      try {
+        setFavoritesLoading(true);
+
+        const { data, error } = await supabase
+          .from("favorites")
+          .select("pulse_id")
+          .eq("user_id", userId);
+
+        if (error) {
+          console.error("Error loading favorites:", error);
+          return;
+        }
+
+        const ids = (data || []).map(
+          (row: { pulse_id: number }) => row.pulse_id
+        );
+        setFavoritePulseIds(ids);
+      } catch (err) {
+        console.error("Unexpected error loading favorites:", err);
+      } finally {
+        setFavoritesLoading(false);
+      }
+    }
+
+    loadFavorites();
+  }, [sessionUser]);
 
   // ========= EVENTS FETCH =========
   useEffect(() => {
@@ -843,7 +953,7 @@ useEffect(() => {
     try {
       localStorage.setItem("cp-city", JSON.stringify(toStore));
     } catch {
-      // Ignore storage errors in environments where localStorage is blocked
+      // Ignore storage errors
     }
   }, [city, selectedCity]);
 
@@ -910,27 +1020,25 @@ useEffect(() => {
     }
   }
 
-  // ========= LOCAL STORAGE: USERNAME (REMOVED - NOW REQUIRES AUTH) =========
-  // Username is now only assigned after authentication via profile
-  // No more localStorage fallback to prevent confusion
-
   // ========= PULSES FETCH =========
-  // B1/B7 FIX: Public read - fetch pulses regardless of auth state
-  // Changed from today-only to 7-day "recent" window so feed isn't empty for new users
-  // PERFORMANCE: Uses pagination (limit 50) to avoid slow queries on large datasets
+  // FIXED: Added initialPulsesFetched flag to prevent "No pulses" flash on initial load.
+  // The issue was that setPulses([]) was called before fetch completed, causing a
+  // momentary display of "No pulses yet" even when pulses existed in the database.
   useEffect(() => {
+    // Reset the flag when city changes to indicate we need to fetch again
+    setInitialPulsesFetched(false);
+
     const fetchPulses = async () => {
       setLoading(true);
       setErrorMsg(null);
-      setPulses([]);
+      // IMPORTANT: Don't clear pulses here - let the loading state show instead
+      // This prevents the "No pulses" flash before data arrives
       setHasMorePulses(false);
 
       const now = new Date();
-      // B7 FIX: Use 7-day window instead of today-only
       const start = startOfRecentWindow(now, 7);
       const end = startOfNextLocalDay(now);
 
-      // Fetch one extra to know if there are more pages
       const { data, error } = await supabase
         .from("pulses")
         .select("*")
@@ -945,11 +1053,9 @@ useEffect(() => {
         setErrorMsg("Could not load pulses. Try again in a bit.");
         setPulses([]);
       } else if (data) {
-        // Check if there are more pages
         const hasMore = data.length > PULSES_PAGE_SIZE;
         setHasMorePulses(hasMore);
 
-        // Only use the first PAGE_SIZE items
         const pageData = hasMore ? data.slice(0, PULSES_PAGE_SIZE) : data;
 
         const mapped: Pulse[] = (pageData as DBPulse[]).map((row) => ({
@@ -957,9 +1063,13 @@ useEffect(() => {
           author: row.author || "Anonymous",
         }));
         setPulses(mapped);
+      } else {
+        // Explicit empty case
+        setPulses([]);
       }
 
       setLoading(false);
+      setInitialPulsesFetched(true);
     };
 
     if (city) {
@@ -975,9 +1085,7 @@ useEffect(() => {
 
     const now = new Date();
     const start = startOfRecentWindow(now, 7);
-    const end = startOfNextLocalDay(now);
 
-    // Get the oldest pulse's timestamp as cursor
     const oldestPulse = pulses[pulses.length - 1];
     const cursor = oldestPulse.createdAt;
 
@@ -987,7 +1095,7 @@ useEffect(() => {
         .select("*")
         .eq("city", city)
         .gte("created_at", start.toISOString())
-        .lt("created_at", cursor) // Before the oldest we have
+        .lt("created_at", cursor)
         .order("created_at", { ascending: false })
         .limit(PULSES_PAGE_SIZE + 1);
 
@@ -1004,7 +1112,6 @@ useEffect(() => {
           author: row.author || "Anonymous",
         }));
 
-        // Append to existing pulses, avoiding duplicates
         setPulses((prev) => {
           const existingIds = new Set(prev.map((p) => p.id));
           const newPulses = mapped.filter((p) => !existingIds.has(p.id));
@@ -1029,8 +1136,7 @@ useEffect(() => {
 
         const res = await fetch(`/api/traffic?city=${encodeURIComponent(city)}`);
 
-        let data: { level?: "Light" | "Moderate" | "Heavy"; error?: string } | null =
-          null;
+        let data: { level?: TrafficLevel; error?: string } | null = null;
         try {
           data = await res.json();
         } catch {
@@ -1084,7 +1190,7 @@ useEffect(() => {
       try {
         data = await res.json();
       } catch {
-        // If body is empty or not JSON, keep data = null
+        // If body is empty or not JSON
       }
 
       if (!res.ok) {
@@ -1114,49 +1220,48 @@ useEffect(() => {
   }
 
   // ========= FAVORITES TOGGLE HANDLER =========
-async function handleToggleFavorite(pulseId: number) {
-  // Capture userId once so TS knows it won't change in this function
-  const userId = sessionUser?.id;
-  if (!userId) {
-    alert("Sign in to save favorites.");
-    return;
-  }
-
-  const alreadyFav = favoritePulseIds.includes(pulseId);
-
-  try {
-    if (alreadyFav) {
-      const { error } = await supabase
-        .from("favorites")
-        .delete()
-        .eq("user_id", userId)
-        .eq("pulse_id", pulseId);
-
-      if (error) {
-        console.error("Error removing favorite:", error);
-        return;
-      }
-
-      setFavoritePulseIds((prev) => prev.filter((id) => id !== pulseId));
-    } else {
-      const { error } = await supabase.from("favorites").insert({
-        user_id: userId,
-        pulse_id: pulseId,
-      });
-
-      if (error) {
-        console.error("Error adding favorite:", error);
-        return;
-      }
-
-      setFavoritePulseIds((prev) =>
-        prev.includes(pulseId) ? prev : [...prev, pulseId]
-      );
+  async function handleToggleFavorite(pulseId: number) {
+    const userId = sessionUser?.id;
+    if (!userId) {
+      alert("Sign in to save favorites.");
+      return;
     }
-  } catch (err) {
-    console.error("Unexpected error toggling favorite:", err);
+
+    const alreadyFav = favoritePulseIds.includes(pulseId);
+
+    try {
+      if (alreadyFav) {
+        const { error } = await supabase
+          .from("favorites")
+          .delete()
+          .eq("user_id", userId)
+          .eq("pulse_id", pulseId);
+
+        if (error) {
+          console.error("Error removing favorite:", error);
+          return;
+        }
+
+        setFavoritePulseIds((prev) => prev.filter((id) => id !== pulseId));
+      } else {
+        const { error } = await supabase.from("favorites").insert({
+          user_id: userId,
+          pulse_id: pulseId,
+        });
+
+        if (error) {
+          console.error("Error adding favorite:", error);
+          return;
+        }
+
+        setFavoritePulseIds((prev) =>
+          prev.includes(pulseId) ? prev : [...prev, pulseId]
+        );
+      }
+    } catch (err) {
+      console.error("Unexpected error toggling favorite:", err);
+    }
   }
-}
 
   async function handleLockUsername() {
     if (!sessionUser || !profile) return;
@@ -1187,7 +1292,7 @@ async function handleToggleFavorite(pulseId: number) {
     }
   }
 
-  // ========= DELETE PULSE HANDLER (B9) =========
+  // ========= DELETE PULSE HANDLER =========
   async function handleDeletePulse(pulseId: number) {
     const userId = sessionUser?.id;
     if (!userId) {
@@ -1195,7 +1300,6 @@ async function handleToggleFavorite(pulseId: number) {
       return;
     }
 
-    // Find the pulse to verify ownership
     const pulse = pulses.find((p) => p.id === pulseId);
     if (!pulse) {
       setErrorMsg("Pulse not found.");
@@ -1207,7 +1311,6 @@ async function handleToggleFavorite(pulseId: number) {
       return;
     }
 
-    // Confirm deletion
     if (!window.confirm("Are you sure you want to delete this pulse?")) {
       return;
     }
@@ -1217,7 +1320,7 @@ async function handleToggleFavorite(pulseId: number) {
         .from("pulses")
         .delete()
         .eq("id", pulseId)
-        .eq("user_id", userId); // Extra safety: only delete if user_id matches
+        .eq("user_id", userId);
 
       if (error) {
         console.error("Error deleting pulse:", error);
@@ -1225,10 +1328,7 @@ async function handleToggleFavorite(pulseId: number) {
         return;
       }
 
-      // Optimistic update - realtime will also handle this
       setPulses((prev) => prev.filter((p) => p.id !== pulseId));
-
-      // Update user pulse count
       setUserPulseCount((prev) => Math.max(0, prev - 1));
     } catch (err) {
       console.error("Unexpected error deleting pulse:", err);
@@ -1264,14 +1364,12 @@ async function handleToggleFavorite(pulseId: number) {
     const email = authEmail.trim();
     const password = authPassword.trim();
 
-    // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       setAuthError("Please enter a valid email address.");
       return;
     }
 
-    // Validation
     if (!email || !password) {
       setAuthError("Please enter both email and password.");
       return;
@@ -1282,9 +1380,6 @@ async function handleToggleFavorite(pulseId: number) {
       setAuthError(null);
 
       if (authMode === "signup") {
-        // ===== SIGN UP MODE =====
-
-        // Validate password strength
         const passwordValidation = validatePassword(password);
         if (!passwordValidation.valid) {
           setAuthError(passwordValidation.error || "Password does not meet requirements.");
@@ -1292,21 +1387,18 @@ async function handleToggleFavorite(pulseId: number) {
           return;
         }
 
-        // Check password confirmation
         if (password !== authPasswordConfirm) {
           setAuthError("Passwords do not match.");
           setAuthLoading(false);
           return;
         }
 
-        // Attempt sign up
         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
         });
 
         if (signUpError) {
-          // Check if error is about user already existing
           if (signUpError.message.toLowerCase().includes("already registered") ||
               signUpError.message.toLowerCase().includes("already exists") ||
               signUpError.message.toLowerCase().includes("user already")) {
@@ -1317,12 +1409,8 @@ async function handleToggleFavorite(pulseId: number) {
           return;
         }
 
-        // Check if this is a new signup or a resent confirmation
-        // Supabase returns user but may have already sent confirmation email
         if (signUpData.user) {
-          // Check if user session is not immediately available (needs confirmation)
           if (!signUpData.session) {
-            // Email confirmation required
             setAuthError("Account created! Please check your email to confirm your account before signing in.");
             setAuthEmail("");
             setAuthPassword("");
@@ -1331,13 +1419,11 @@ async function handleToggleFavorite(pulseId: number) {
             return;
           }
 
-          // User is immediately signed in (email confirmation disabled)
           setSessionUser(signUpData.user);
           setAuthStatus("signed_in");
           setProfileLoading(true);
 
           try {
-            // Check if profile already exists
             const { data: existingProfile } = await supabase
               .from("profiles")
               .select("*")
@@ -1345,13 +1431,11 @@ async function handleToggleFavorite(pulseId: number) {
               .single();
 
             if (existingProfile) {
-              // Profile exists, just load it
               setProfile({
                 anon_name: existingProfile.anon_name,
                 name_locked: existingProfile.name_locked ?? false,
               });
             } else {
-              // B10 FIX: Create new profile with unique username
               const anon = await generateUniqueUsername(supabase);
               const { error: insertError } = await supabase.from("profiles").insert({
                 id: signUpData.user.id,
@@ -1361,7 +1445,6 @@ async function handleToggleFavorite(pulseId: number) {
 
               if (insertError) {
                 console.error("Error creating profile:", insertError);
-                // If insert failed, try to fetch existing profile one more time
                 const { data: retryProfile } = await supabase
                   .from("profiles")
                   .select("*")
@@ -1385,15 +1468,12 @@ async function handleToggleFavorite(pulseId: number) {
             setProfileLoading(false);
           }
 
-          // Clear form and close modal
           setAuthEmail("");
           setAuthPassword("");
           setAuthPasswordConfirm("");
           setShowAuthModal(false);
         }
       } else {
-        // ===== SIGN IN MODE =====
-
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -1410,7 +1490,6 @@ async function handleToggleFavorite(pulseId: number) {
           setProfileLoading(true);
 
           try {
-            // Load or create profile
             const { data: profileData } = await supabase
               .from("profiles")
               .select("*")
@@ -1423,7 +1502,6 @@ async function handleToggleFavorite(pulseId: number) {
                 name_locked: profileData.name_locked ?? false,
               });
             } else {
-              // B10 FIX: Create profile with unique username if it doesn't exist (legacy users)
               const anon = await generateUniqueUsername(supabase);
               const { error: insertError } = await supabase.from("profiles").insert({
                 id: signInData.user.id,
@@ -1433,7 +1511,6 @@ async function handleToggleFavorite(pulseId: number) {
 
               if (insertError) {
                 console.error("Error creating profile on sign in:", insertError);
-                // If insert failed, profile might already exist, try to fetch it
                 const { data: retryProfile } = await supabase
                   .from("profiles")
                   .select("*")
@@ -1457,7 +1534,6 @@ async function handleToggleFavorite(pulseId: number) {
             setProfileLoading(false);
           }
 
-          // Clear form and close modal
           setAuthEmail("");
           setAuthPassword("");
           setAuthPasswordConfirm("");
@@ -1478,7 +1554,6 @@ async function handleToggleFavorite(pulseId: number) {
 
   // ========= AI USERNAME GENERATOR HANDLERS =========
   async function handleGenerateUsername() {
-  
     const prompt = usernamePrompt.trim();
     if (!sessionUser) return;
 
@@ -1511,7 +1586,6 @@ async function handleToggleFavorite(pulseId: number) {
 
       const newName: string = data.username;
 
-      // Remember previous name so user can undo
       setLastAnonName(profile?.anon_name || username || null);
 
       const updatedProfileName = newName;
@@ -1523,7 +1597,6 @@ async function handleToggleFavorite(pulseId: number) {
       );
       setUsername(updatedProfileName);
 
-      // Persist to Supabase profile
       const userId = sessionUser.id;
       const { error } = await supabase
         .from("profiles")
@@ -1576,14 +1649,21 @@ async function handleToggleFavorite(pulseId: number) {
   }
 
   // ========= FILTER PULSES =========
-  // B7 FIX: Use 7-day "recent" window instead of today-only
-  const filteredPulses = pulses
+  // Client-side expiry filtering as a safety net
+  // This ensures expired pulses are hidden even if they weren't filtered server-side
+  const visiblePulses = filterVisiblePulses(pulses);
+
+  const filteredPulses = visiblePulses
     .filter((p) => isInRecentWindow(p.createdAt))
     .filter((p) => tagFilter === "All" || p.tag === tagFilter);
+
+  // Traffic-tagged pulses for traffic tab (also filter expired)
+  const trafficPulses = visiblePulses.filter((p) => p.tag === "Traffic");
 
   // ========= ADD PULSE =========
   const handleAddPulse = async () => {
     const trimmed = message.trim();
+    const resolvedTag = tag || "General";
 
     if (!sessionUser) {
       setErrorMsg("Sign in to post.");
@@ -1592,35 +1672,36 @@ async function handleToggleFavorite(pulseId: number) {
     }
 
     if (!identityReady) {
-      setErrorMsg("Please wait…");
+      setErrorMsg("Please wait...");
       return;
     }
 
-    // Validate all required fields
     let hasErrors = false;
 
+    // Mood is now mandatory
     if (!mood) {
-      setMoodValidationError("Pick a mood so others know how you're feeling.");
+      setMoodValidationError("Please select a vibe");
       hasErrors = true;
     } else {
       setMoodValidationError(null);
     }
 
+    // Tag/Category defaults to General if not selected
     if (!tag) {
-      setTagValidationError("Choose a tag so we can organize your pulse.");
-      hasErrors = true;
-    } else {
-      setTagValidationError(null);
+      setTag(resolvedTag);
     }
+    setTagValidationError(null);
 
+    // Message is required (matches server validation)
     if (!trimmed) {
-      setValidationError("Write something to share with your city.");
+      setValidationError("Please enter a message");
       hasErrors = true;
     } else {
-      // B8 FIX: Use server-side moderation check (client-side for immediate UX feedback)
       const moderationResult = moderateContent(trimmed);
       if (!moderationResult.allowed) {
-        setValidationError(moderationResult.reason || "Pulse contains disallowed language.");
+        setValidationError(
+          moderationResult.reason || "Pulse contains disallowed language."
+        );
         hasErrors = true;
       } else {
         setValidationError(null);
@@ -1635,19 +1716,11 @@ async function handleToggleFavorite(pulseId: number) {
     setErrorMsg(null);
     setShowValidationErrors(false);
 
-    // Track if this is the user's first pulse (before we post)
     const wasFirstPulse =
       pulseCountResolved && userPulseCount === 0 && !onboardingCompleted;
 
     const authorName = profile.anon_name || username || "Anonymous";
 
-    // Note: For full server-side validation, add NOT NULL constraints and
-    // CHECK constraints on the pulses table for mood and tag columns.
-    // Example SQL:
-    //   ALTER TABLE pulses ALTER COLUMN mood SET NOT NULL;
-    //   ALTER TABLE pulses ALTER COLUMN tag SET NOT NULL;
-    //   ALTER TABLE pulses ADD CONSTRAINT mood_not_empty CHECK (mood <> '');
-    //   ALTER TABLE pulses ADD CONSTRAINT tag_not_empty CHECK (tag <> '');
     try {
       const { data: sessionData, error: sessionError } =
         await supabase.auth.getSession();
@@ -1668,7 +1741,7 @@ async function handleToggleFavorite(pulseId: number) {
         body: JSON.stringify({
           city,
           mood,
-          tag,
+          tag: resolvedTag,
           message: trimmed,
           author: authorName,
         }),
@@ -1702,7 +1775,40 @@ async function handleToggleFavorite(pulseId: number) {
         return;
       }
 
-      // Realtime listener will add it to the list
+      // Optimistically insert the created pulse into local state so the author sees it immediately,
+      // even if realtime delivery is delayed or the websocket reconnects.
+      const raw = data.pulse as Record<string, unknown>;
+      const createdAt =
+        typeof raw.created_at === "string"
+          ? raw.created_at
+          : typeof raw.createdAt === "string"
+            ? raw.createdAt
+            : new Date().toISOString();
+
+      const createdPulse: Pulse = {
+        id: Number(raw.id),
+        city: typeof raw.city === "string" ? raw.city : city,
+        neighborhood:
+          typeof raw.neighborhood === "string" ? raw.neighborhood : null,
+        mood: typeof raw.mood === "string" ? raw.mood : mood,
+        tag: typeof raw.tag === "string" ? raw.tag : resolvedTag,
+        message: typeof raw.message === "string" ? raw.message : trimmed,
+        author: typeof raw.author === "string" ? raw.author : authorName,
+        createdAt,
+        user_id: typeof raw.user_id === "string" ? raw.user_id : sessionUser.id,
+      };
+
+      if (createdPulse.id) {
+        setPulses((prev) => {
+          const exists = prev.some((p) => String(p.id) === String(createdPulse.id));
+          if (exists) return prev;
+          return [createdPulse, ...prev].sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+        });
+      }
+
       const reset = resetComposerAfterSuccessfulPost();
       setMessage(reset.message);
       setMood(reset.mood);
@@ -1711,6 +1817,9 @@ async function handleToggleFavorite(pulseId: number) {
       setMoodValidationError(null);
       setTagValidationError(null);
       setShowValidationErrors(false);
+
+      // Close the pulse modal after successful post
+      setShowPulseModal(false);
 
       setPulseCountResolved(true);
       setUserPulseCount((prev) => prev + 1);
@@ -1725,10 +1834,8 @@ async function handleToggleFavorite(pulseId: number) {
       if (sessionUser) {
         await loadStreak();
 
-        // Show first pulse badge toast if this was their first pulse
         if (wasFirstPulse) {
           setShowFirstPulseBadgeToast(true);
-          // Auto-hide the toast after 5 seconds
           setTimeout(() => {
             setShowFirstPulseBadgeToast(false);
           }, 5000);
@@ -1744,64 +1851,85 @@ async function handleToggleFavorite(pulseId: number) {
   const displayName = profile?.anon_name || username || "...";
   const currentStreak = streakInfo?.currentStreak ?? 0;
 
-  // Badge definitions (streak data still used for badges/summaries, just not in composer header)
-  // These are intentionally defined for future badge display features
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const badges = [
-    {
-      id: "first-pulse",
-      name: "First Pulse",
-      description: "Post 1 pulse",
-      unlocked: userPulseCount >= 1,
-    },
-    {
-      id: "steady-vibes",
-      name: "Steady Vibes",
-      description: "Maintain a 3-day streak",
-      unlocked: currentStreak >= 3,
-    },
-  ];
+  const recentPulseCount2h = useMemo(() => {
+    const cutoff = Date.now() - 2 * 60 * 60 * 1000;
+    return pulses.reduce((count, pulse) => {
+      const createdAtMs = new Date(pulse.createdAt).getTime();
+      if (Number.isNaN(createdAtMs)) return count;
+      return createdAtMs >= cutoff ? count + 1 : count;
+    }, 0);
+  }, [pulses]);
+
+  const safeActiveTab: TabId = isTabId(activeTab) ? activeTab : "pulse";
+  const localState = selectedCity?.state ?? lastValidCity.state ?? "";
+  const localLat = selectedCity?.lat ?? lastValidCity.lat;
+  const localLon = selectedCity?.lon ?? lastValidCity.lon;
+
+  const handleDropPulseJump = useCallback(() => {
+    setActiveTab("pulse");
+
+    const tryFocus = (attempt: number) => {
+      const target = document.getElementById("drop-a-pulse");
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        const textarea =
+          pulseTextareaRef.current ??
+          target.querySelector<HTMLTextAreaElement>("textarea");
+        textarea?.focus();
+        return;
+      }
+
+      if (attempt < 10) {
+        window.setTimeout(() => tryFocus(attempt + 1), 50);
+      }
+    };
+
+    window.setTimeout(() => tryFocus(0), 0);
+  }, [setActiveTab]);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col">
+    <div className="min-h-screen neon-grid-bg text-slate-50 flex flex-col">
       {/* First-Time User Onboarding Modal */}
-      {/* B3 FIX: Modal does NOT close on backdrop click - only via explicit controls */}
       {showFirstPulseModal && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          // B3 FIX: Removed onClick handler to prevent backdrop dismiss
-        >
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div
-            className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl text-center relative"
+            className="bg-slate-900 border border-slate-700/50 rounded-2xl p-6 max-w-md w-full shadow-2xl text-center relative"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* B3 FIX: Added explicit X close button */}
             <button
               onClick={() => setShowFirstPulseModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 text-xl leading-none"
+              className="absolute top-4 right-4 w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition"
               aria-label="Close"
             >
-              x
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
-            <div className="text-5xl mb-4">{"<"}3</div>
-            <h2 className="text-xl font-semibold text-slate-100 mb-2">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+              <svg className="w-8 h-8 text-slate-950" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold text-white mb-2">
               Drop your first pulse
             </h2>
             <p className="text-sm text-slate-400 mb-6">
-              Tell your city what&apos;s up right now — traffic, weather, mood, anything.
+              Share what&apos;s happening in your city - traffic, weather, mood, anything.
             </p>
             <button
               onClick={() => {
                 setShowFirstPulseModal(false);
-                // Focus the pulse textarea after modal closes
+                setActiveTab("pulse");
                 setTimeout(() => {
                   pulseTextareaRef.current?.focus();
                 }, 100);
               }}
-              className="inline-flex items-center gap-2 rounded-2xl bg-pink-500 px-6 py-2.5 text-sm font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 transition"
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-400 to-emerald-600 text-slate-950 font-medium text-sm rounded-lg shadow-lg shadow-emerald-500/30 hover:from-emerald-300 hover:to-emerald-500 transition"
             >
               <span>Start my first pulse</span>
-              <span>{">"}</span>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
             </button>
             <button
               onClick={() => setShowFirstPulseModal(false)}
@@ -1816,11 +1944,15 @@ async function handleToggleFavorite(pulseId: number) {
       {/* First Pulse Badge Toast */}
       {showFirstPulseBadgeToast && (
         <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 fade-in duration-300">
-          <div className="bg-emerald-500/15 border border-emerald-500/60 rounded-2xl px-4 py-3 shadow-lg shadow-emerald-500/20 flex items-center gap-3">
-            <span className="text-2xl">{"<"}3</span>
+          <div className="bg-emerald-500/15 border border-emerald-500/60 rounded-xl px-4 py-3 shadow-lg shadow-emerald-500/20 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg">
+              <svg className="w-5 h-5 text-slate-950" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
             <div>
               <p className="text-sm font-medium text-emerald-100">
-                Nice! You just started your streak
+                Nice! You started your streak
               </p>
               <p className="text-xs text-emerald-300/80">
                 and unlocked your first badge
@@ -1828,9 +1960,11 @@ async function handleToggleFavorite(pulseId: number) {
             </div>
             <button
               onClick={() => setShowFirstPulseBadgeToast(false)}
-              className="text-emerald-300 hover:text-emerald-100 text-lg leading-none ml-2"
+              className="text-emerald-300 hover:text-emerald-100 ml-2"
             >
-              x
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
         </div>
@@ -1839,7 +1973,7 @@ async function handleToggleFavorite(pulseId: number) {
       {/* Auth Modal */}
       {showAuthModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowAuthModal(false)}>
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-slate-900 border border-slate-700/50 rounded-2xl p-6 max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex gap-2">
                 <button
@@ -1849,10 +1983,10 @@ async function handleToggleFavorite(pulseId: number) {
                     setAuthError(null);
                     setAuthPasswordConfirm("");
                   }}
-                  className={`px-4 py-1.5 rounded-xl text-sm font-medium transition ${
+                  className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
                     authMode === "signin"
-                      ? "bg-pink-500 text-slate-950"
-                      : "bg-slate-950/50 text-slate-400 hover:text-slate-200"
+                      ? "bg-emerald-500 text-slate-950"
+                      : "bg-slate-800/60 text-slate-400 hover:text-white"
                   }`}
                 >
                   Sign In
@@ -1863,10 +1997,10 @@ async function handleToggleFavorite(pulseId: number) {
                     setAuthMode("signup");
                     setAuthError(null);
                   }}
-                  className={`px-4 py-1.5 rounded-xl text-sm font-medium transition ${
+                  className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
                     authMode === "signup"
-                      ? "bg-pink-500 text-slate-950"
-                      : "bg-slate-950/50 text-slate-400 hover:text-slate-200"
+                      ? "bg-emerald-500 text-slate-950"
+                      : "bg-slate-800/60 text-slate-400 hover:text-white"
                   }`}
                 >
                   Create Account
@@ -1881,9 +2015,11 @@ async function handleToggleFavorite(pulseId: number) {
                   setAuthPasswordConfirm("");
                   setAuthMode("signin");
                 }}
-                className="text-slate-400 hover:text-slate-200 text-2xl leading-none"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition"
               >
-                ×
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
             </div>
 
@@ -1901,7 +2037,7 @@ async function handleToggleFavorite(pulseId: number) {
                     setAuthError(null);
                   }}
                   placeholder="you@example.com"
-                  className="rounded-2xl bg-slate-950/80 border border-slate-800 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+                  className="rounded-lg bg-slate-800/70 border border-slate-700/50 px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:border-transparent"
                   disabled={authLoading}
                   autoFocus
                 />
@@ -1920,7 +2056,7 @@ async function handleToggleFavorite(pulseId: number) {
                     setAuthError(null);
                   }}
                   placeholder={authMode === "signup" ? "Create a strong password" : "Enter your password"}
-                  className="rounded-2xl bg-slate-950/80 border border-slate-800 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+                  className="rounded-lg bg-slate-800/70 border border-slate-700/50 px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:border-transparent"
                   disabled={authLoading}
                 />
                 {authMode === "signup" && (
@@ -1944,14 +2080,14 @@ async function handleToggleFavorite(pulseId: number) {
                       setAuthError(null);
                     }}
                     placeholder="Re-enter your password"
-                    className="rounded-2xl bg-slate-950/80 border border-slate-800 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
+                    className="rounded-lg bg-slate-800/70 border border-slate-700/50 px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:border-transparent"
                     disabled={authLoading}
                   />
                 </div>
               )}
 
               {authError && (
-                <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/40 rounded-2xl px-3 py-2">
+                <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/40 rounded-lg px-3 py-2">
                   {authError}
                 </p>
               )}
@@ -1959,7 +2095,7 @@ async function handleToggleFavorite(pulseId: number) {
               <button
                 type="submit"
                 disabled={authLoading}
-                className="w-full rounded-2xl bg-pink-500 px-4 py-2.5 text-sm font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                className="w-full px-4 py-2.5 bg-gradient-to-r from-emerald-400 to-emerald-600 text-slate-950 font-medium text-sm rounded-lg shadow-lg shadow-emerald-500/30 hover:from-emerald-300 hover:to-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
                 {authLoading ? "Please wait..." : authMode === "signup" ? "Create Account" : "Sign In"}
               </button>
@@ -1974,673 +2110,544 @@ async function handleToggleFavorite(pulseId: number) {
         </div>
       )}
 
-      <main className="flex-1 flex justify-center px-4 py-6">
-        <div className="w-full max-w-4xl space-y-6">
-          {/* Auth button in top right */}
-        {!sessionUser ? (
-          <div className="flex justify-end">
-            <button
-              onClick={() => setShowAuthModal(true)}
-              className="text-sm px-4 py-2 rounded-2xl bg-pink-500 text-slate-950 font-medium shadow-lg shadow-pink-500/30 hover:bg-pink-400 transition"
-            >
-              Sign in
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center justify-end text-sm text-slate-400 ml-4 gap-2">
-            <div className="flex flex-col items-end gap-0.5">
-              <div className="flex items-center gap-2">
-                <span>{displayName}</span>
+      {/* Pulse Modal - for FAB */}
+      <PulseModal
+        isOpen={showPulseModal}
+        onClose={() => setShowPulseModal(false)}
+        mood={mood}
+        tag={tag}
+        message={message}
+        displayName={displayName}
+        identityReady={identityReady}
+        loading={loading}
+        moodValidationError={moodValidationError}
+        tagValidationError={tagValidationError}
+        messageValidationError={validationError}
+        showValidationErrors={showValidationErrors}
+        onMoodChange={(m) => {
+          setMood(m);
+          setMoodValidationError(null);
+        }}
+        onTagChange={(t) => {
+          setTag(t);
+          setTagValidationError(null);
+        }}
+        onMessageChange={(m) => {
+          setMessage(m);
+          setValidationError(null);
+        }}
+        onSubmit={handleAddPulse}
+        weather={weather}
+      />
 
-                {!profile?.name_locked ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowUsernameEditor((prev) => !prev)}
-                    className="text-[11px] px-2 py-0.5 rounded-full bg-slate-900/80 border border-slate-700 text-slate-300 hover:border-pink-400 hover:text-pink-300 transition"
-                  >
-                    🎲 Edit vibe name
-                  </button>
-                ) : (
-                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-900/80 border border-emerald-500/50 text-emerald-300 flex items-center gap-1">
-                    <span>🔒</span>
-                  </span>
-                )}
-
-              </div>
-
-              <button
-                onClick={async () => {
-                  await supabase.auth.signOut();
-                  setSessionUser(null);
-                  setProfile(null);
-                  setAuthStatus("signed_out");
-                  setProfileLoading(false);
-                }}
-                className="text-[11px] text-slate-500 hover:text-pink-300 underline"
-              >
-                Log out
-              </button>
-            </div>
-          </div>
-        )}
-
-        {sessionUser && showUsernameEditor && !profile?.name_locked && (
-          <div className="mt-3 mx-4 rounded-2xl bg-slate-900/80 border border-slate-800 px-4 py-3 text-xs text-slate-200">
-            <p className="text-[11px] text-slate-300 mb-2">
-              Describe your vibe in <span className="font-semibold">3+ words</span>, and we&apos;ll craft a fun anonymous name for you.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-              <input
-                value={usernamePrompt}
-                onChange={(e) => setUsernamePrompt(e.target.value)}
-                placeholder="e.g. sleepy sarcastic overcaffeinated"
-                className="flex-1 rounded-2xl bg-slate-950/80 border border-slate-800 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
-              />
-                            <div className="flex gap-2 items-center">
-                <button
-                  type="button"
-                  onClick={handleGenerateUsername}
-                  disabled={
-                    usernameGenerating ||
-                    profile?.name_locked ||
-                    usernamePrompt.trim().split(/\s+/).filter(Boolean).length < 3
-                  }
-                  className="inline-flex items-center gap-1 rounded-2xl bg-pink-500 px-3 py-1.5 text-[11px] font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                >
-                  <span>{usernameGenerating ? "Rolling…" : "Roll"}</span>
-                  <span>🎲</span>
-                </button>
-                {lastAnonName && lastAnonName !== displayName && !profile?.name_locked && (
-                  <button
-                    type="button"
-                    onClick={handleRevertUsername}
-                    className="text-[11px] text-slate-400 hover:text-slate-200 underline-offset-2 hover:underline"
-                  >
-                    Undo
-                  </button>
-                )}
-                {!profile?.name_locked && (
-                  <button
-                    type="button"
-                    onClick={handleLockUsername}
-                    className="text-[11px] px-2 py-1 rounded-2xl bg-emerald-500/15 border border-emerald-500/60 text-emerald-200 hover:bg-emerald-500/25 transition"
-                  >
-                    Lock this name
-                  </button>
-                )}
-              </div>
-
-            </div>
-            {usernameErrorMsg && (
-              <p className="mt-1 text-[11px] text-red-400">{usernameErrorMsg}</p>
-            )}
-            <p className="mt-1 text-[11px] text-slate-400">
-              Current name: <span className="text-slate-100">{displayName}</span>
-            </p>
-          </div>
-        )}
-
-<header className="rounded-3xl bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 p-[1px] shadow-lg">
-  <div className="rounded-3xl bg-slate-950/90 px-6 py-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-    {/* Left side: title + tagline */}
-    <div>
-      <h1 className="text-3xl font-semibold tracking-tight flex flex-wrap items-center gap-2 sm:flex-nowrap">
-        <span>
-          Community <span className="text-pink-400">Pulse</span>
-        </span>
-        <span className="px-2 py-0.5 text-[10px] rounded-full bg-amber-500/20 text-amber-300 uppercase tracking-wide">
-          Beta
-        </span>
-      </h1>
-      <p className="text-sm text-slate-300 mt-1">
-        Real-time vibes from your city. No doom scroll, just quick pulses.
-      </p>
-    </div>
-
-    {/* Right side: city selector with autocomplete */}
-    <div className="flex flex-col sm:items-end gap-2 relative">
-      <label className="text-xs text-slate-400 uppercase tracking-wide">
-        City
-      </label>
-      <div className="relative w-full sm:w-64">
-        <input
-          ref={cityInputRef}
-          value={cityInput}
-          onChange={handleCityInputChange}
-          onKeyDown={handleCityInputKeyDown}
-          onFocus={() =>
-            cityInput.trim().length >= 3 && setShowCitySuggestions(true)
-          }
-          className="w-full rounded-2xl bg-slate-900 border border-slate-700 px-3 py-1.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent"
-          placeholder="Search any city (e.g., Hyderabad)"
-        />
-        {citySuggestionsLoading && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-500">
-            Searching…
-          </span>
-        )}
-        {showCitySuggestions && citySuggestions.length > 0 && (
-          <div
-            ref={cityDropdownRef}
-            className="absolute z-50 top-full left-0 right-0 mt-1 bg-slate-900 border border-slate-700 rounded-2xl shadow-xl overflow-hidden max-h-64 overflow-y-auto"
-          >
-            {citySuggestions.map((suggestion, idx) => (
-              <button
-                key={suggestion.id}
-                type="button"
-                onMouseEnter={() => setHighlightedIndex(idx)}
-                onClick={() => handleCitySelect(suggestion)}
-                className={`w-full px-3 py-2 text-left text-sm transition flex items-center justify-between ${
-                  highlightedIndex === idx
-                    ? "bg-slate-800 text-pink-200"
-                    : "hover:bg-slate-800 text-slate-100"
-                }`}
-              >
-                <span>{suggestion.displayName}</span>
-                <span className="text-[10px] text-slate-400">
-                  {suggestion.country || "🌍"}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-        {citySuggestionsNotFound && !citySuggestionsLoading && (
-          <p className="mt-1 text-[11px] text-amber-300">
-            We couldn’t find that city yet. Try typing &quot;City, Country&quot;
-            (e.g., &quot;Hyderabad, IN&quot;).
-          </p>
-        )}
-        {citySuggestionsError && (
-          <p className="mt-1 text-[11px] text-red-400">
-            {citySuggestionsError} Keeping {lastValidCity.displayName}.
-          </p>
-        )}
-      </div>
-    </div>
-  </div>
-</header>
-
-        {/* Info widgets grid - Weather, Mood, Traffic */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* Weather widget */}
-          <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 flex flex-col items-center justify-center text-center min-h-[120px]">
-            <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">
-              Weather in {weather?.cityName || city}
-            </p>
-            {weatherLoading ? (
-              <p className="text-sm text-slate-400">Fetching latest weather…</p>
-            ) : weather ? (
-              <>
-                <span className="text-4xl mb-2">
-                  {(() => {
-                    const map: Record<string, string> = {
-                      "01d": "☀️",
-                      "01n": "🌕",
-                      "02d": "🌤️",
-                      "02n": "☁️🌙",
-                      "03d": "⛅",
-                      "03n": "☁️",
-                      "04d": "☁️",
-                      "04n": "☁️",
-                      "09d": "🌧️",
-                      "09n": "🌧️",
-                      "10d": "🌦️",
-                      "10n": "🌧️🌙",
-                      "11d": "⛈️",
-                      "11n": "🌩️",
-                      "13d": "❄️",
-                      "13n": "❄️🌙",
-                      "50d": "🌫️",
-                      "50n": "🌫️🌙",
-                    };
-                    return map[weather.icon] || "🌍";
-                  })()}
-                </span>
-                <p className="text-lg text-slate-100 font-semibold">
-                  {Math.round(weather.temp)}°F
-                </p>
-                <p className="text-xs text-slate-400">
-                  Feels like {Math.round(weather.feelsLike)}°F
-                </p>
-                <p className="text-xs text-slate-400 capitalize mt-1">
-                  {weather.description}
-                </p>
-              </>
-            ) : weatherError ? (
-              <p className="text-xs text-red-400">{weatherError}</p>
-            ) : (
-              <p className="text-xs text-slate-500">Weather data not available yet.</p>
-            )}
-          </section>
-
-          {/* City Mood Meter */}
-          <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 flex flex-col items-center justify-center text-center min-h-[120px]">
-            <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">
-              City mood in {city || "your city"}
-            </p>
-            {cityMoodLoading ? (
-              <p className="text-sm text-slate-400">Reading the vibes…</p>
-            ) : cityMoodError ? (
-              <p className="text-sm text-red-400">{cityMoodError}</p>
-            ) : !cityMood || cityMood.pulseCount === 0 ? (
-              <p className="text-sm text-slate-400">Not enough recent pulses to read the mood.</p>
-            ) : (
-              <>
-                <span className="text-4xl mb-2">
-                  {cityMood.dominantMood || "😐"}
-                </span>
-                <p className="text-sm text-slate-100">
-                  From <span className="font-semibold">{cityMood.pulseCount}</span> recent pulses
-                </p>
-                <div className="mt-2 flex flex-wrap gap-1 justify-center">
-                  {cityMood.scores.slice(0, 3).map((item) => (
-                    <div
-                      key={item.mood}
-                      className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-slate-950/60 border border-slate-700/60"
-                    >
-                      <span className="text-xs">{item.mood}</span>
-                      <span className="text-slate-300">{item.percent}%</span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </section>
-
-          {/* Traffic snapshot widget */}
-          <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 flex flex-col items-center justify-center text-center min-h-[120px]">
-            <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">
-              Traffic in {city || "your city"}
-            </p>
-            {trafficLoading ? (
-              <p className="text-sm text-slate-400">Estimating traffic…</p>
-            ) : trafficError ? (
-              <p className="text-sm text-red-400">{trafficError}</p>
-            ) : trafficLevel ? (
-              <>
-                {trafficLevel === "Light" && (
-                  <>
-                    <span className="text-4xl mb-2">🟢</span>
-                    <p className="text-lg text-slate-100 font-semibold">Light traffic</p>
-                  </>
-                )}
-                {trafficLevel === "Moderate" && (
-                  <>
-                    <span className="text-4xl mb-2">🟡</span>
-                    <p className="text-lg text-slate-100 font-semibold">Moderate traffic</p>
-                  </>
-                )}
-                {trafficLevel === "Heavy" && (
-                  <>
-                    <span className="text-4xl mb-2">🔴</span>
-                    <p className="text-lg text-slate-100 font-semibold">Heavy traffic</p>
-                  </>
-                )}
-              </>
-            ) : (
-              <p className="text-sm text-slate-400">Not enough recent data yet.</p>
-            )}
-          </section>
-        </div>
-
-        {/* Local News Section with AI Summary */}
-        <LocalNewsCard city={city} />
-
-        {/* New Pulse Card */}
-        <section className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-lg p-4 sm:p-5 space-y-4">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-medium text-slate-100">
-              Drop a <span className="text-pink-400">pulse</span>
-            </h2>
-            <div className="flex items-center gap-1 text-xs text-slate-400">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              {loading ? "Loading…" : "Live board"}
-            </div>
-          </div>
-
-
+      <main className="flex-1 flex justify-center px-4 py-4">
+        <div className="w-full max-w-lg space-y-4 stagger-reveal">
+          {/* Auth/User bar */}
           {!sessionUser ? (
-            <div className="rounded-2xl bg-slate-950/60 border border-slate-800 px-4 py-8 text-center">
-              <p className="text-sm text-slate-300 mb-3">
-                Sign in to drop pulses and track your streak
-              </p>
+            <div className="flex justify-end">
               <button
                 onClick={() => setShowAuthModal(true)}
-                className="inline-flex items-center gap-2 rounded-2xl bg-pink-500 px-5 py-2 text-sm font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 transition"
+                className="text-sm px-4 py-2 rounded-lg bg-gradient-to-r from-emerald-400 to-emerald-600 text-slate-950 font-medium shadow-lg shadow-emerald-500/30 hover:from-emerald-300 hover:to-emerald-500 transition"
               >
-                <span>Sign in to post</span>
-                <span>→</span>
+                Sign in
               </button>
             </div>
           ) : (
-            <>
-              <div className="flex flex-wrap gap-3 items-start">
-                {/* Mood picker */}
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-400">Mood</span>
-                    <div className={`flex gap-1.5 bg-slate-950/70 border rounded-2xl px-2 py-1 ${
-                      showValidationErrors && moodValidationError
-                        ? "border-red-500/60"
-                        : "border-slate-800"
-                    }`}>
-                      {MOODS.map((m) => (
-                        <button
-                          key={m}
-                          onClick={() => {
+            <div className="flex items-center justify-end text-sm text-slate-400 gap-2">
+              <div className="flex flex-col items-end gap-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-cyan-400">{displayName}</span>
+
+                  {!profile?.name_locked ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowUsernameEditor((prev) => !prev)}
+                      className="text-[11px] px-2 py-0.5 rounded-full bg-slate-800/60 border border-slate-700/50 text-slate-300 hover:border-emerald-500/50 hover:text-emerald-300 transition"
+                    >
+                      Edit vibe name
+                    </button>
+                  ) : (
+                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  onClick={async () => {
+                    await supabase.auth.signOut();
+                    setSessionUser(null);
+                    setProfile(null);
+                    setAuthStatus("signed_out");
+                    setProfileLoading(false);
+                  }}
+                  className="text-[11px] text-slate-500 hover:text-emerald-300 underline-offset-2 hover:underline"
+                >
+                  Log out
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Username editor */}
+          {sessionUser && showUsernameEditor && !profile?.name_locked && (
+            <div className="rounded-xl bg-slate-800/60 border border-slate-700/50 px-4 py-3 text-xs text-slate-200">
+              <p className="text-[11px] text-slate-300 mb-2">
+                Describe your vibe in <span className="font-semibold">3+ words</span>, and we&apos;ll craft a fun anonymous name for you.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                <input
+                  value={usernamePrompt}
+                  onChange={(e) => setUsernamePrompt(e.target.value)}
+                  placeholder="e.g. sleepy sarcastic overcaffeinated"
+                  className="flex-1 rounded-lg bg-slate-900/70 border border-slate-700/50 px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:border-transparent"
+                />
+                <div className="flex gap-2 items-center">
+                  <button
+                    type="button"
+                    onClick={handleGenerateUsername}
+                    disabled={
+                      usernameGenerating ||
+                      profile?.name_locked ||
+                      usernamePrompt.trim().split(/\s+/).filter(Boolean).length < 3
+                    }
+                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-emerald-400 to-emerald-600 text-slate-950 font-medium text-[11px] rounded-lg shadow-lg shadow-emerald-500/30 hover:from-emerald-300 hover:to-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    <span>{usernameGenerating ? "Rolling..." : "Roll"}</span>
+                  </button>
+                  {lastAnonName && lastAnonName !== displayName && !profile?.name_locked && (
+                    <button
+                      type="button"
+                      onClick={handleRevertUsername}
+                      className="text-[11px] text-slate-400 hover:text-slate-200 underline-offset-2 hover:underline"
+                    >
+                      Undo
+                    </button>
+                  )}
+                  {!profile?.name_locked && (
+                    <button
+                      type="button"
+                      onClick={handleLockUsername}
+                      className="text-[11px] px-2 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/60 text-emerald-200 hover:bg-emerald-500/25 transition"
+                    >
+                      Lock this name
+                    </button>
+                  )}
+                </div>
+              </div>
+              {usernameErrorMsg && (
+                <p className="mt-1 text-[11px] text-red-400">{usernameErrorMsg}</p>
+              )}
+              <p className="mt-1 text-[11px] text-slate-400">
+                Current name: <span className="text-cyan-400">{displayName}</span>
+              </p>
+            </div>
+          )}
+
+          {/* City selector */}
+          <div className="relative z-50">
+            <label className="text-xs text-slate-400 uppercase tracking-wide mb-1 block">
+              City
+            </label>
+            <div className="relative">
+              <input
+                ref={cityInputRef}
+                value={cityInput}
+                onChange={handleCityInputChange}
+                onKeyDown={handleCityInputKeyDown}
+                onFocus={() =>
+                  cityInput.trim().length >= 3 && setShowCitySuggestions(true)
+                }
+                className="w-full rounded-lg bg-slate-800/60 border border-slate-700/50 px-3 py-2 pr-10 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:border-transparent"
+                placeholder="Search any city (e.g., Austin, TX)"
+              />
+              {citySuggestionsLoading && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-500">
+                  Searching...
+                </span>
+              )}
+
+              {renderCitySuggestionsMenu && (
+                <>
+                  {/* Backdrop: click-outside-to-close + ensures correct z-index stacking */}
+                  <div
+                    aria-hidden="true"
+                    className={`fixed inset-0 z-40 transition-opacity duration-150 ${
+                      cityDropdownOpen
+                        ? "opacity-100 pointer-events-auto"
+                        : "opacity-0 pointer-events-none"
+                    }`}
+                    onClick={() => {
+                      setShowCitySuggestions(false);
+                      clearSuggestions();
+                    }}
+                  />
+
+                  <div
+                    ref={cityDropdownRef}
+                    className={`absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 bg-slate-900 border border-slate-700/50 rounded-lg shadow-xl max-h-64 overflow-y-auto transform transition duration-150 origin-top motion-reduce:transition-none ${
+                      cityDropdownOpen
+                        ? "opacity-100 translate-y-0 scale-100 pointer-events-auto"
+                        : "opacity-0 -translate-y-1 scale-[0.98] pointer-events-none"
+                    }`}
+                    role="listbox"
+                    aria-label="City suggestions"
+                    aria-hidden={!cityDropdownOpen}
+                  >
+                    {citySuggestions.map((suggestion, idx) => (
+                      <button
+                        key={suggestion.id}
+                        type="button"
+                        tabIndex={cityDropdownOpen ? 0 : -1}
+                        onMouseEnter={() => setHighlightedIndex(idx)}
+                        onClick={() => handleCitySelect(suggestion)}
+                        className={`w-full px-4 py-3 text-left text-sm transition flex items-center justify-between border-b border-slate-800 last:border-b-0 ${
+                          highlightedIndex === idx
+                            ? "bg-slate-800 text-emerald-200"
+                            : "hover:bg-slate-800 text-slate-100"
+                        }`}
+                        role="option"
+                        aria-selected={highlightedIndex === idx}
+                      >
+                        <span className="truncate">{suggestion.displayName}</span>
+                        <span className="text-[10px] text-slate-400">
+                          {suggestion.country || ""}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {citySuggestionsNotFound && !citySuggestionsLoading && (
+                <p className="mt-1 text-[11px] text-amber-300">
+                  We couldn&apos;t find that city. Try &quot;City, Country&quot; format.
+                </p>
+              )}
+              {citySuggestionsError && (
+                <p className="mt-1 text-[11px] text-red-400">
+                  {citySuggestionsError} Keeping {lastValidCity.displayName}.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Header */}
+          <Header cityName={city} isLive={!loading} />
+
+          {/* Current Vibe Card */}
+          <CurrentVibeCard
+            weather={weather}
+            weatherLoading={weatherLoading}
+            recentPulseCount={recentPulseCount2h}
+            onDropPulse={handleDropPulseJump}
+            cityMood={cityMood}
+            cityMoodLoading={cityMoodLoading}
+          />
+
+          {/* Quick Stats */}
+          <QuickStats
+            trafficLevel={trafficLevel}
+            trafficLoading={trafficLoading}
+            eventsCount={ticketmasterEvents.length}
+            eventsLoading={ticketmasterLoading}
+            cityMood={cityMood}
+            cityMoodLoading={cityMoodLoading}
+            onTrafficClick={() => setActiveTab("traffic")}
+            onEventsClick={() => setActiveTab("events")}
+            onMoodClick={() => {
+              setActiveTab("pulse");
+              window.setTimeout(() => {
+                document
+                  .getElementById("mood-selector")
+                  ?.scrollIntoView({ behavior: "smooth", block: "center" });
+              }, 100);
+            }}
+          />
+
+          {/* Tab Navigation */}
+          <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+
+          {/* AI Summary Card + News Preview */}
+          <div>
+            <AISummaryCard
+              activeTab={activeTab}
+              summary={summary}
+              summaryLoading={summaryLoading}
+              summaryError={summaryError}
+              pulsesCount={pulses.length}
+              cityName={city}
+              events={ticketmasterEvents}
+              eventsLoading={ticketmasterLoading}
+              eventsError={ticketmasterError}
+              trafficLevel={trafficLevel}
+              trafficLoading={trafficLoading}
+              trafficError={trafficError}
+              newsSummary={newsData?.aiSummary}
+              newsLoading={newsLoading}
+              newsError={newsError}
+              newsCount={newsData?.articles?.length ?? 0}
+              onNavigateTab={setActiveTab}
+              vibeHeadline={cityMood?.vibeHeadline}
+              vibeEmoji={cityMood?.dominantMood ?? undefined}
+              temperature={weather?.temp}
+            />
+          </div>
+
+          {/* Tab Content */}
+          <div className="space-y-4">
+            {(() => {
+              switch (safeActiveTab) {
+                case "events":
+                  return (
+                    <EventCard
+                      events={ticketmasterEvents}
+                      isLoading={ticketmasterLoading}
+                      error={ticketmasterError}
+                      hasLocation={!!(selectedCity?.lat && selectedCity?.lon)}
+                    />
+                  );
+                case "traffic":
+                  return (
+                    <TrafficContent
+                      trafficLevel={trafficLevel}
+                      trafficLoading={trafficLoading}
+                      trafficError={trafficError}
+                      trafficPulses={trafficPulses}
+                      cityName={city}
+                    />
+                  );
+                case "news":
+                  return (
+                    <NewsTab
+                      city={city}
+                      data={newsData}
+                      loading={newsLoading}
+                      error={newsError}
+                    />
+                  );
+                case "local":
+                  return (
+                    <LocalTab
+                      cityName={city}
+                      state={localState}
+                      lat={localLat}
+                      lon={localLon}
+                    />
+                  );
+                case "status":
+                  return (
+                    <StatusTab
+                      userId={sessionUser?.id ?? null}
+                      city={city}
+                    />
+                  );
+                case "pulse":
+                default:
+                  return (
+                    <>
+                      {/* Pulse Input */}
+                      <div id="drop-a-pulse">
+                        <PulseInput
+                          ref={pulseTextareaRef}
+                          mood={mood}
+                          tag={tag}
+                          message={message}
+                          displayName={displayName}
+                          isSignedIn={!!sessionUser}
+                          identityReady={identityReady}
+                          loading={loading}
+                          moodValidationError={moodValidationError}
+                          tagValidationError={tagValidationError}
+                          messageValidationError={validationError}
+                          showValidationErrors={showValidationErrors}
+                          onMoodChange={(m) => {
                             setMood(m);
                             setMoodValidationError(null);
                           }}
-                          className={`text-lg px-1.5 rounded-2xl transition ${
-                            mood === m
-                              ? "bg-slate-800 scale-110"
-                              : "opacity-70 hover:opacity-100"
-                          }`}
-                        >
-                          {m}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {showValidationErrors && moodValidationError && (
-                    <p className="text-[11px] text-red-400 ml-10">{moodValidationError}</p>
-                  )}
-                </div>
+                          onTagChange={(t) => {
+                            setTag(t);
+                            setTagValidationError(null);
+                          }}
+                          onMessageChange={(m) => {
+                            setMessage(m);
+                            setValidationError(null);
+                          }}
+                          onSubmit={handleAddPulse}
+                          onSignInClick={() => setShowAuthModal(true)}
+                          weather={weather}
+                        />
+                      </div>
 
-                {/* Tag select */}
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-400">Tag</span>
-                    <select
-                      value={tag}
-                      onChange={(e) => {
-                        setTag(e.target.value);
-                        setTagValidationError(null);
-                      }}
-                      className={`rounded-2xl bg-slate-950/70 border px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent ${
-                        showValidationErrors && tagValidationError
-                          ? "border-red-500/60"
-                          : "border-slate-800"
-                      } ${!tag ? "text-slate-500" : ""}`}
-                    >
-                      <option value="" disabled>Select a tag...</option>
-                      <option value="Traffic">Traffic</option>
-                      <option value="Weather">Weather</option>
-                      <option value="Events">Events</option>
-                      <option value="General">General</option>
-                    </select>
-                  </div>
-                  {showValidationErrors && tagValidationError && (
-                    <p className="text-[11px] text-red-400 ml-7">{tagValidationError}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Message input */}
-              <div className="space-y-3">
-                <textarea
-                  ref={pulseTextareaRef}
-                  value={message}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value.length > MAX_MESSAGE_LENGTH) return;
-                    setMessage(value);
-                    setValidationError(null);
-                  }}
-                  rows={3}
-                  className={`w-full rounded-2xl bg-slate-950/80 border px-3 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500/70 focus:border-transparent resize-none ${
-                    showValidationErrors && validationError
-                      ? "border-red-500/60"
-                      : "border-slate-800"
-                  }`}
-                  placeholder="What's the vibe right now? (e.g., 'Commute is smooth on 183, sunset looks insane.')"
-                />
-                <div className="flex items-center justify-between text-[11px] mt-1">
-                  <span className="text-slate-500">
-                    {message.length}/{MAX_MESSAGE_LENGTH}
-                  </span>
-                  {showValidationErrors && validationError && (
-                    <span className="text-red-400">{validationError}</span>
-                  )}
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-500">
-                    Posting as{" "}
-                    <span className="text-slate-200">{displayName}</span>. Pulses
-                    are public. Keep it kind & useful.
-                  </span>
-                  <button
-                    onClick={handleAddPulse}
-                    disabled={
-                      !isPostEnabled({
-                        identityReady,
-                        loading,
-                        mood,
-                        tag,
-                        message,
-                      })
-                    }
-                    className="inline-flex items-center gap-1 rounded-2xl bg-pink-500 px-4 py-1.5 text-xs font-medium text-slate-950 shadow-lg shadow-pink-500/30 hover:bg-pink-400 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                  >
-                    <span>{identityReady ? "Post pulse" : "Please wait…"}</span>{" "}
-                    <span>⚡</span>
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-          {errorMsg && (
-            <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/40 rounded-2xl px-3 py-2 mt-1">
-              {errorMsg}
-            </p>
-          )}
-        </section>
-
-        {/* AI Summary Section */}
-        <div className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-slate-200">
-              AI Summary for {city}
-            </h2>
-            <span className="text-[11px] text-slate-400">
-              {summaryLoading
-                ? "Summarizing recent pulses…"
-                : "Auto-generated from recent pulses"}
-            </span>
-          </div>
-
-          {summaryError && (
-            <p className="text-xs text-red-400">{summaryError}</p>
-          )}
-
-          {summary ? (
-            <p className="text-sm text-slate-300 leading-relaxed bg-slate-950/60 border border-slate-800 rounded-2xl p-3">
-              {summary}
-            </p>
-          ) : !summaryLoading && pulses.length === 0 ? (
-            <p className="text-xs text-slate-500">
-              No pulses yet. Start posting to see an AI summary here.
-            </p>
-          ) : null}
-        </div>
-
-        {/* Filter chips */}
-        <div className="flex flex-wrap gap-2">
-          {TAGS.map((t) => (
-            <button
-              key={t}
-              onClick={() => setTagFilter(t)}
-              className={`px-3 py-1.5 rounded-2xl text-xs border transition ${
-                tagFilter === t
-                  ? "bg-pink-500 text-slate-950 border-pink-400 shadow shadow-pink-500/40"
-                  : "bg-slate-900/70 border-slate-800 text-slate-300 hover:bg-slate-800"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-
-        {/* Show upcoming events when "Events" tab is active */}
-        {tagFilter === "Events" && (
-          <div className="space-y-2 pb-4">
-            {events.length === 0 ? (
-              <p className="text-xs text-slate-500">
-                No upcoming events yet for {city}. Create one above.
-              </p>
-            ) : (
-              events.map((ev) => {
-                const start = new Date(ev.starts_at);
-                const timeStr = start.toLocaleString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  hour: "numeric",
-                  minute: "2-digit",
-                });
-
-                const mapsUrl = ev.location
-                  ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                      ev.location
-                    )}`
-                  : null;
-
-                return (
-                  <button
-                    key={ev.id}
-                    type="button"
-                    onClick={() => {
-                      if (mapsUrl) window.open(mapsUrl, "_blank");
-                    }}
-                    className="w-full flex justify-between items-start rounded-2xl bg-slate-950/70 border border-slate-800 px-3 py-2 text-left hover:border-pink-500/60 hover:shadow-pink-500/20 transition"
-                  >
-                    <div>
-                      <p className="text-sm text-slate-100 font-medium">
-                        {ev.title}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        {timeStr}
-                        {ev.location ? ` · ${ev.location}` : ""}
-                      </p>
-                      {ev.description && (
-                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-                          {ev.description}
+                      {errorMsg && (
+                        <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/40 rounded-lg px-3 py-2">
+                          {errorMsg}
                         </p>
                       )}
-                    </div>
-                    {ev.category && (
-                      <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-300 border border-pink-500/30">
-                        {ev.category}
-                      </span>
-                    )}
-                  </button>
-                );
-              })
-            )}
-          </div>
-        )}
 
-        {/* Pulses list */}
-        <section className="space-y-3 pb-12">
-          {loading && pulses.length === 0 ? (
-            <div className="rounded-3xl bg-slate-900/70 border border-dashed border-slate-700 px-4 py-10 text-center text-sm text-slate-400">
-              Loading pulses for{" "}
-              <span className="font-semibold text-slate-100">{city}</span>…
-            </div>
-          ) : filteredPulses.length === 0 ? (
-            <div className="rounded-3xl bg-slate-900/70 border border-dashed border-slate-700 px-4 py-10 text-center text-sm text-slate-400">
-              No pulses yet for{" "}
-              <span className="font-semibold text-slate-100">{city}</span>. Be
-              the first to set the vibe.
-            </div>
-          ) : (
-            <>
-              {filteredPulses.map((pulse) => (
-                <article
-                  key={pulse.id}
-                  className="rounded-3xl bg-slate-900/80 border border-slate-800 shadow-md p-4 flex gap-3 hover:border-pink-500/60 hover:shadow-pink-500/20 transition"
-                >
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="w-10 h-10 rounded-2xl bg-slate-950/80 flex items-center justify-center text-2xl">
-                      {pulse.mood}
-                    </div>
-                    <span className="text-[10px] uppercase tracking-wide text-pink-300 bg-pink-500/10 border border-pink-500/30 px-2 py-0.5 rounded-full">
-                      {pulse.tag}
-                    </span>
-                  </div>
-                  <div className="flex-1 flex flex-col justify-between">
-                    <p className="text-sm text-slate-100 leading-snug">
-                      {pulse.message}
-                    </p>
-
-                    <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
-                      <span className="text-slate-300">{pulse.author}</span>
-
-                      <div className="flex items-center gap-3">
-                        {/* B9 FIX: Delete button - only visible to owner */}
-                        {sessionUser && pulse.user_id === sessionUser.id && (
+                      {/* Filter chips */}
+                      <div className="flex flex-wrap gap-2">
+                        {TAGS.map((t) => (
                           <button
-                            type="button"
-                            onClick={() => handleDeletePulse(pulse.id)}
-                            className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-red-400 transition"
-                            title="Delete this pulse"
+                            key={t}
+                            onClick={() => setTagFilter(t)}
+                            className={`px-3 py-1.5 rounded-lg text-xs border transition ${
+                              tagFilter === t
+                                ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow shadow-emerald-500/40"
+                                : "bg-slate-800/60 border-slate-700/50 text-slate-300 hover:bg-slate-700"
+                            }`}
                           >
-                            <span className="text-sm leading-none">x</span>
+                            {t}
                           </button>
-                        )}
-
-                        {/* Favorite star */}
-                        <button
-                          type="button"
-                          onClick={() => handleToggleFavorite(pulse.id)}
-                          className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-yellow-300 transition"
-                        >
-                          <span className="text-base leading-none">
-                            {favoritePulseIds.includes(pulse.id) ? "★" : "☆"}
-                          </span>
-                        </button>
-
-                        <span className="text-slate-500">
-                          {formatPulseDateTime(pulse.createdAt)} ·{" "}
-                          {formatPulseLocation(pulse.city, pulse.neighborhood)}
-                        </span>
+                        ))}
                       </div>
-                    </div>
-                  </div>
-                </article>
-              ))}
 
-              {/* Load more button - only show when there are more pulses and tag filter is "All" */}
-              {hasMorePulses && tagFilter === "All" && (
-                <div className="flex justify-center pt-4">
-                  <button
-                    onClick={handleLoadMorePulses}
-                    disabled={loadingMore}
-                    className="px-6 py-2 rounded-2xl bg-slate-900/70 border border-slate-700 text-sm text-slate-300 hover:bg-slate-800 hover:border-pink-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                  >
-                    {loadingMore ? "Loading..." : "Load more pulses"}
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-        </section>
+                      {/* Pulses list */}
+                      {/* FIXED: Show loading state until initial fetch completes to prevent
+                          the "No pulses yet" flash that was causing user confusion */}
+                      <section className="space-y-3 pb-12">
+                        {(loading || !initialPulsesFetched) && pulses.length === 0 ? (
+                          <div className="bg-slate-800/60 border border-dashed border-slate-700/50 rounded-xl px-4 py-10 text-center text-sm text-slate-400">
+                            Loading pulses for{" "}
+                            <span className="font-semibold text-white">
+                              {city}
+                            </span>
+                            ...
+                          </div>
+                        ) : filteredPulses.length === 0 ? (
+                          <div className="bg-slate-800/60 border border-dashed border-slate-700/50 rounded-xl px-4 py-10 text-center text-sm text-slate-400">
+                            No pulses yet for{" "}
+                            <span className="font-semibold text-white">
+                              {city}
+                            </span>
+                            . Be the first to set the vibe.
+                          </div>
+                        ) : (
+                          <>
+                            {filteredPulses.map((pulse) => (
+                              <PulseCard
+                                key={pulse.id}
+                                pulse={pulse}
+                                isOwnPulse={sessionUser?.id === pulse.user_id}
+                                isFavorite={favoritePulseIds.includes(pulse.id)}
+                                onToggleFavorite={handleToggleFavorite}
+                                onDelete={handleDeletePulse}
+                                reporterId={sessionUser?.id}
+                                userIdentifier={sessionUser ? displayName : undefined}
+                              />
+                            ))}
 
-        {/* Disclaimer */}
-        <div className="mt-16 flex justify-center">
-          <div className="inline-block bg-slate-900/70 border border-slate-700 rounded-2xl px-4 py-3 max-w-xl text-center">
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              <strong>Disclaimer:</strong> Community Pulse displays user-submitted
-              content. Posts may be inaccurate, incomplete, or misleading. Do not
-              rely on this information for safety, travel, emergency, or
-              decision-making purposes. All posts reflect the views of individual
-              users, not the app’s creators. By using this service, you agree
-              that Community Pulse is not responsible for any actions taken based
-              on user content.
-            </p>
+                            {/* Load more button */}
+                            {hasMorePulses && tagFilter === "All" && (
+                              <div className="flex justify-center pt-4">
+                                <button
+                                  onClick={handleLoadMorePulses}
+                                  disabled={loadingMore}
+                                  className="px-6 py-2 rounded-lg bg-slate-800/60 border border-slate-700/50 text-sm text-slate-300 hover:bg-slate-700 hover:border-emerald-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                >
+                                  {loadingMore
+                                    ? "Loading..."
+                                    : "Load more pulses"}
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </section>
+                    </>
+                  );
+              }
+            })()}
           </div>
+
+          {/* Disclaimer */}
+          <div className="mt-8">
+            <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl px-4 py-3 text-center">
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                <strong>Disclaimer:</strong> Community Pulse displays user-submitted
+                content. Posts may be inaccurate, incomplete, or misleading. Do not
+                rely on this information for safety, travel, emergency, or
+                decision-making purposes. All posts reflect the views of individual
+                users, not the app&apos;s creators.
+              </p>
+            </div>
+          </div>
+
+          {/* Attribution Footer */}
+          <footer className="py-6 pb-24 text-center border-t border-slate-800 mt-6">
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Weather by{" "}
+              <a
+                href="https://openweathermap.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-slate-400 hover:text-emerald-400 transition"
+              >
+                OpenWeather
+              </a>
+              {" | "}
+              Events via{" "}
+              <a
+                href="https://www.ticketmaster.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-slate-400 hover:text-emerald-400 transition"
+              >
+                Ticketmaster
+              </a>
+              {" | "}
+              News by{" "}
+              <a
+                href="https://gnews.io/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-slate-400 hover:text-emerald-400 transition"
+              >
+                GNews
+              </a>
+              {" | "}
+              AI by{" "}
+              <a
+                href="https://www.anthropic.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-slate-400 hover:text-emerald-400 transition"
+              >
+                Anthropic Claude
+              </a>
+            </p>
+            <p className="text-[11px] text-slate-600 mt-2">
+              <a
+                href="/terms"
+                className="text-slate-500 hover:text-emerald-400 transition"
+              >
+                Terms of Service
+              </a>
+              {" | "}
+              <a
+                href="/privacy"
+                className="text-slate-500 hover:text-emerald-400 transition"
+              >
+                Privacy Policy
+              </a>
+            </p>
+          </footer>
         </div>
-      </div>
-    </main>
-  </div>
+      </main>
+
+      {/* FAB - Always visible for quick pulse creation */}
+      <FAB
+        onClick={() => {
+          if (!sessionUser) {
+            setShowAuthModal(true);
+          } else {
+            setShowPulseModal(true);
+          }
+        }}
+        visible={true}
+        animated={activeTab !== "pulse"}
+      />
+    </div>
   );
 }

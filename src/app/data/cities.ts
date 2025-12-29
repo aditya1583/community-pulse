@@ -518,6 +518,20 @@ export const US_CITIES: City[] = [
   { name: "Stamford", state: "CT", displayName: "Stamford, CT", lat: 41.0534, lng: -73.5387, population: 135000 },
 ];
 
+// Map state abbreviations to full names
+export const STATE_FULL_NAMES: Record<string, string> = {
+  tx: "Texas", ca: "California", ny: "New York", fl: "Florida",
+  il: "Illinois", pa: "Pennsylvania", oh: "Ohio", ga: "Georgia",
+  nc: "North Carolina", mi: "Michigan", nj: "New Jersey", va: "Virginia",
+  wa: "Washington", az: "Arizona", ma: "Massachusetts", tn: "Tennessee",
+  in: "Indiana", mo: "Missouri", md: "Maryland", wi: "Wisconsin",
+  co: "Colorado", mn: "Minnesota", sc: "South Carolina", al: "Alabama",
+  la: "Louisiana", ky: "Kentucky", or: "Oregon", ok: "Oklahoma",
+  ct: "Connecticut", ut: "Utah", ia: "Iowa", nv: "Nevada",
+  ar: "Arkansas", ms: "Mississippi", ks: "Kansas", nm: "New Mexico",
+  ne: "Nebraska", id: "Idaho", hi: "Hawaii", ak: "Alaska",
+};
+
 // Calculate distance between two coordinates using Haversine formula
 export function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 3959; // Earth's radius in miles
@@ -558,6 +572,169 @@ export function getNearbyCities(cityName: string, maxDistance: number = 50, minP
     }))
     .sort((a, b) => b.population - a.population) // Sort by population (larger first)
     .slice(0, 5); // Return top 5 nearby cities
+}
+
+// Metro area and county mappings for news fallback
+// When city-specific news is sparse, we search these broader regions
+export type MetroArea = {
+  name: string;           // "Austin-Round Rock"
+  searchTerms: string[];  // ["Austin area", "Central Texas", "Austin metro"]
+  majorCity: string;      // "Austin" - the anchor city for searches
+  state: string;
+};
+
+export type CountyMapping = {
+  city: string;
+  county: string;
+  state: string;
+};
+
+// Texas metro areas
+export const METRO_AREAS: MetroArea[] = [
+  {
+    name: "Austin-Round Rock",
+    searchTerms: ["Austin area", "Central Texas", "Greater Austin", "Austin metro"],
+    majorCity: "Austin",
+    state: "TX"
+  },
+  {
+    name: "Dallas-Fort Worth",
+    searchTerms: ["DFW", "Dallas area", "North Texas", "Dallas-Fort Worth metro"],
+    majorCity: "Dallas",
+    state: "TX"
+  },
+  {
+    name: "Houston-The Woodlands",
+    searchTerms: ["Houston area", "Greater Houston", "Houston metro"],
+    majorCity: "Houston",
+    state: "TX"
+  },
+  {
+    name: "San Antonio-New Braunfels",
+    searchTerms: ["San Antonio area", "Greater San Antonio", "San Antonio metro"],
+    majorCity: "San Antonio",
+    state: "TX"
+  },
+  // California
+  {
+    name: "Los Angeles-Long Beach",
+    searchTerms: ["LA area", "Greater Los Angeles", "Southern California"],
+    majorCity: "Los Angeles",
+    state: "CA"
+  },
+  {
+    name: "San Francisco-Oakland",
+    searchTerms: ["Bay Area", "San Francisco area", "SF metro"],
+    majorCity: "San Francisco",
+    state: "CA"
+  },
+  // Add more as needed...
+];
+
+// Map cities to their counties (Texas focus for now)
+export const COUNTY_MAPPINGS: CountyMapping[] = [
+  // Austin Metro
+  { city: "Leander", county: "Williamson County", state: "TX" },
+  { city: "Cedar Park", county: "Williamson County", state: "TX" },
+  { city: "Georgetown", county: "Williamson County", state: "TX" },
+  { city: "Round Rock", county: "Williamson County", state: "TX" },
+  { city: "Pflugerville", county: "Travis County", state: "TX" },
+  { city: "Austin", county: "Travis County", state: "TX" },
+  { city: "San Marcos", county: "Hays County", state: "TX" },
+  // Dallas Metro
+  { city: "Plano", county: "Collin County", state: "TX" },
+  { city: "Frisco", county: "Collin County", state: "TX" },
+  { city: "McKinney", county: "Collin County", state: "TX" },
+  { city: "Arlington", county: "Tarrant County", state: "TX" },
+  { city: "Fort Worth", county: "Tarrant County", state: "TX" },
+  { city: "Irving", county: "Dallas County", state: "TX" },
+  { city: "Dallas", county: "Dallas County", state: "TX" },
+  // Houston Metro
+  { city: "The Woodlands", county: "Montgomery County", state: "TX" },
+  { city: "Conroe", county: "Montgomery County", state: "TX" },
+  { city: "Sugar Land", county: "Fort Bend County", state: "TX" },
+  { city: "Pearland", county: "Brazoria County", state: "TX" },
+  { city: "Pasadena", county: "Harris County", state: "TX" },
+  { city: "Houston", county: "Harris County", state: "TX" },
+];
+
+// Get county for a city
+export function getCityCounty(cityName: string): CountyMapping | undefined {
+  const normalizedCity = cityName.toLowerCase().trim();
+  return COUNTY_MAPPINGS.find(m => m.city.toLowerCase() === normalizedCity);
+}
+
+// Get metro area for a city
+export function getCityMetroArea(cityName: string, state?: string): MetroArea | undefined {
+  const sourceCity = findCity(cityName);
+  if (!sourceCity) return undefined;
+
+  // Find the nearest metro area major city
+  for (const metro of METRO_AREAS) {
+    if (state && metro.state !== state) continue;
+
+    const majorCity = findCity(metro.majorCity);
+    if (!majorCity) continue;
+
+    const distance = calculateDistance(sourceCity.lat, sourceCity.lng, majorCity.lat, majorCity.lng);
+    // If within 60 miles of the metro's major city, it's part of that metro
+    if (distance <= 60) {
+      return metro;
+    }
+  }
+  return undefined;
+}
+
+// Get fallback search hierarchy for a city
+// Returns: [city, county, metro, state] - each with search terms
+export function getNewsFallbackHierarchy(cityName: string, state?: string): {
+  level: "city" | "county" | "metro" | "state";
+  searchTerm: string;
+  label: string; // For UI display
+}[] {
+  const hierarchy: { level: "city" | "county" | "metro" | "state"; searchTerm: string; label: string }[] = [];
+  const sourceCity = findCity(cityName);
+  const cityState = sourceCity?.state || state;
+  const stateFull = cityState ? (STATE_FULL_NAMES[cityState.toLowerCase()] || cityState) : undefined;
+
+  // 1. City level
+  hierarchy.push({
+    level: "city",
+    searchTerm: stateFull ? `${cityName} ${stateFull}` : cityName,
+    label: sourceCity?.displayName || cityName
+  });
+
+  // 2. County level
+  const county = getCityCounty(cityName);
+  if (county) {
+    hierarchy.push({
+      level: "county",
+      searchTerm: `${county.county} ${stateFull || county.state}`,
+      label: `${county.county}, ${county.state}`
+    });
+  }
+
+  // 3. Metro area level
+  const metro = getCityMetroArea(cityName, cityState);
+  if (metro) {
+    // Use the first search term as primary, but also try the major city
+    hierarchy.push({
+      level: "metro",
+      searchTerm: `${metro.majorCity} ${stateFull || metro.state}`,
+      label: `${metro.name} area`
+    });
+  }
+
+  // 4. State level (last resort - just get any news from the state)
+  if (stateFull) {
+    hierarchy.push({
+      level: "state",
+      searchTerm: stateFull,
+      label: stateFull
+    });
+  }
+
+  return hierarchy;
 }
 
 // Search cities for autocomplete
