@@ -1161,11 +1161,12 @@ export default function Home() {
           }),
         });
 
-        if (res.ok) {
-          const data = await res.json();
-          if (data.created > 0) {
-            console.log(`Created ${data.created} seed posts for ${city}`);
-            // Refetch pulses to show the new posts
+        const data = await res.json();
+        console.log("Auto-seed response:", res.status, data);
+
+        if (res.ok && data.created > 0) {
+          console.log(`Created ${data.created} seed posts for ${city}`);
+          // Refetch pulses to show the new posts
             const now = new Date();
             const start = startOfRecentWindow(now, 7);
             const end = startOfNextLocalDay(now);
@@ -1186,7 +1187,6 @@ export default function Home() {
               }));
               setPulses(mapped);
             }
-          }
         }
       } catch (err) {
         console.error("Auto-seed error:", err);

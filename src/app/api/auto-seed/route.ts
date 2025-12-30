@@ -11,7 +11,8 @@ import { createClient } from "@supabase/supabase-js";
  */
 
 const BOT_AUTHOR = "Community Bot";
-const BOT_USER_ID = "bot-system-001";
+// This UUID must exist in auth.users table - run the SQL migration to create it
+const BOT_USER_ID = "00000000-0000-0000-0000-000000000001";
 
 // Event-based post templates with personality
 const EVENT_TEMPLATES = [
@@ -155,12 +156,25 @@ function getTrafficCategory(): keyof typeof TRAFFIC_TEMPLATES {
   return "light";
 }
 
+function normalizeEventName(name: string): string {
+  return name.toLowerCase().trim().replace(/\s+/g, " ").replace(/[^\w\s]/g, "");
+}
+
 function generatePosts(data: AutoSeedRequest): Array<{ message: string; mood: string; tag: string }> {
   const posts: Array<{ message: string; mood: string; tag: string }> = [];
 
-  // 1. Event post (if events available)
+  // 1. Event post (if events available) - deduplicate first
   if (data.events && data.events.length > 0) {
-    const event = data.events[0]; // Pick first/soonest event
+    // Deduplicate events by normalized name
+    const seenNames = new Set<string>();
+    const uniqueEvents = data.events.filter(e => {
+      const normalized = normalizeEventName(e.name);
+      if (seenNames.has(normalized)) return false;
+      seenNames.add(normalized);
+      return true;
+    });
+
+    const event = uniqueEvents[0]; // Pick first/soonest unique event
     const template = getRandomItem(EVENT_TEMPLATES);
     posts.push({
       message: template.template(event.name, event.venue),
@@ -169,8 +183,8 @@ function generatePosts(data: AutoSeedRequest): Array<{ message: string; mood: st
     });
 
     // Add second event if available and different
-    if (data.events.length > 1) {
-      const event2 = data.events[1];
+    if (uniqueEvents.length > 1) {
+      const event2 = uniqueEvents[1];
       const template2 = getRandomItem(EVENT_TEMPLATES.filter(t => t !== template));
       posts.push({
         message: template2.template(event2.name, event2.venue),
@@ -327,7 +341,7 @@ export async function POST(req: NextRequest) {
     if (error) {
       console.error("Error inserting auto-seed pulses:", error);
       return NextResponse.json(
-        { error: "Failed to create pulses" },
+        { error: "Failed to create pulses", details: error.message, code: error.code },
         { status: 500 }
       );
     }
