@@ -14,89 +14,89 @@ const BOT_AUTHOR = "Community Bot";
 // This UUID must exist in auth.users table - run the SQL migration to create it
 const BOT_USER_ID = "00000000-0000-0000-0000-000000000001";
 
-// Event-based post templates with personality
+// Event-based post templates - designed to invite engagement
 const EVENT_TEMPLATES = [
-  { mood: "🤩", template: (name: string, venue: string) => `${name} is happening at ${venue}! Who's going?` },
-  { mood: "🎉", template: (name: string, venue: string) => `Excited for ${name} at ${venue} - should be a great time!` },
-  { mood: "🤔", template: (name: string, venue: string) => `Anyone checking out ${name} at ${venue}? Heard good things.` },
-  { mood: "😊", template: (name: string, venue: string) => `${name} tonight at ${venue}. Love when there's something fun happening locally!` },
+  { mood: "🤩", template: (name: string, venue: string) => `${name} at ${venue} - anyone been before? Worth checking out?` },
+  { mood: "🎉", template: (name: string, venue: string) => `Who's heading to ${name} at ${venue}? Looking for people to go with!` },
+  { mood: "🤔", template: (name: string, venue: string) => `Thinking about checking out ${name} at ${venue}. Anyone know if parking is tough there?` },
+  { mood: "😊", template: (name: string, venue: string) => `${name} at ${venue} tonight! What's everyone wearing to this kind of thing?` },
 ];
 
-// Farmers market templates
+// Farmers market templates - ask for recommendations
 const MARKET_TEMPLATES = [
-  { mood: "🤩", template: (name: string, day: string) => `${name} is open ${day}! Fresh produce and local vibes.` },
-  { mood: "😊", template: (name: string, day: string) => `Can't wait to hit up ${name} on ${day}. Best local finds!` },
-  { mood: "☀️", template: (name: string, day: string) => `${name} every ${day} - perfect way to support local farmers.` },
+  { mood: "🤩", template: (name: string, day: string) => `${name} on ${day} - what vendors should I check out first?` },
+  { mood: "😊", template: (name: string, day: string) => `Anyone know the best time to hit ${name}? Want to beat the crowds!` },
+  { mood: "☀️", template: (name: string, day: string) => `${name} every ${day} - favorite thing to buy there? I'm new to the area.` },
 ];
 
-// Weather-based templates
+// Weather-based templates - conversation starters
 const WEATHER_TEMPLATES: Record<string, { mood: string; templates: string[] }> = {
   clear: {
     mood: "☀️",
     templates: [
-      "Beautiful clear sky out there today. Perfect for a walk!",
-      "Sun's out! Great day to be outside in the neighborhood.",
-      "Gorgeous weather today - not a cloud in sight.",
+      "Perfect weather today! Anyone know good spots for an outdoor lunch around here?",
+      "Sun's out! What's everyone's favorite outdoor spot in the neighborhood?",
+      "Beautiful day - any good walking trails nearby? New to the area.",
     ],
   },
   clouds: {
     mood: "😌",
     templates: [
-      "Bit cloudy but nice out. Good day to run errands.",
-      "Overcast but comfortable temps. Not bad at all!",
-      "Cloudy skies but still pleasant outside.",
+      "Cloudy but nice out. Good coffee shop recommendations for working remotely?",
+      "Overcast vibes today. What's everyone up to this afternoon?",
+      "Perfect errand-running weather. Any hidden gem shops I should check out?",
     ],
   },
   rain: {
     mood: "🏠",
     templates: [
-      "Rain coming down - good day to stay cozy inside.",
-      "Rainy day vibes. Drive safe out there everyone!",
-      "Wet roads today. Take it slow if you're heading out.",
+      "Rainy day! Best cozy spots to grab a drink and read a book?",
+      "Rain's coming down - what indoor activities do y'all recommend around here?",
+      "Wet roads today. Anyone know which streets flood easily?",
     ],
   },
   cold: {
     mood: "🥶",
     templates: [
-      "Chilly out there today! Bundle up if you're heading out.",
-      "Cold snap hitting us. Perfect hot coffee weather.",
-      "Brrr! Definitely a jacket day today.",
+      "Cold out there! Where's the best hot chocolate in the neighborhood?",
+      "Brrr! Any warm indoor hangout spots people like around here?",
+      "Chilly day - perfect soup weather. Best pho or ramen nearby?",
     ],
   },
   hot: {
     mood: "🥵",
     templates: [
-      "Hot one today! Stay hydrated out there.",
-      "Summer heat is real today. AC is your friend!",
-      "Scorcher of a day - perfect for staying cool indoors.",
+      "Hot one today! Best places to cool off around here? Need AC!",
+      "Summer heat hitting hard. Anyone know good swimming spots nearby?",
+      "Scorcher! What's everyone's go-to for staying cool in this neighborhood?",
     ],
   },
 };
 
-// Traffic time-based templates
+// Traffic time-based templates - ask for tips
 const TRAFFIC_TEMPLATES: Record<string, { mood: string; templates: string[] }> = {
   morning_rush: {
     mood: "🏃",
     templates: [
-      "Morning commute traffic picking up. Leave a few minutes early!",
-      "Rush hour traffic building. Main roads are getting busy.",
-      "Typical morning congestion starting. Plan accordingly!",
+      "Morning commute building up. Any good shortcuts people know about?",
+      "Rush hour hitting. How long does it usually take to get downtown from here?",
+      "Traffic picking up - anyone know if the main roads are worse than side streets?",
     ],
   },
   evening_rush: {
     mood: "😤",
     templates: [
-      "Evening rush is on. Traffic getting heavy on the main roads.",
-      "5 o'clock traffic hitting. Patience required on the commute!",
-      "End of day traffic building up. Side streets might be better.",
+      "Evening rush is on. Best route to avoid the worst of it? Still learning the area.",
+      "5 o'clock traffic - anyone else stuck? What podcasts are y'all listening to?",
+      "Traffic building up. Worth waiting it out somewhere or just power through?",
     ],
   },
   light: {
     mood: "😌",
     templates: [
-      "Roads looking clear right now. Good time to run errands!",
-      "Traffic is light - smooth sailing out there.",
-      "No congestion to report. Easy driving today!",
+      "Roads are clear! Good time to explore - what part of town should I check out?",
+      "Light traffic right now. Perfect time to run errands. Any store recommendations?",
+      "Smooth sailing on the roads. Where's everyone heading today?",
     ],
   },
 };
@@ -312,11 +312,17 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Stagger creation times slightly for natural feel (0-10 min offsets)
+    // Spread posts naturally over 2-6 hours to avoid "bot burst" appearance
     const now = Date.now();
+    const totalPosts = posts.length;
     const records = posts.map((post, i) => {
-      const offsetMs = i * 2 * 60 * 1000 + Math.random() * 60 * 1000; // 2 min apart + random
-      const createdAt = new Date(now - offsetMs).toISOString();
+      // Spread posts across a 2-6 hour window with randomness
+      // Each post gets a base slot + random jitter
+      const hoursWindow = 2 + Math.random() * 4; // 2-6 hours total spread
+      const baseOffsetHours = (i / totalPosts) * hoursWindow;
+      const jitterMins = Math.random() * 30 - 15; // +/- 15 min jitter
+      const offsetMs = (baseOffsetHours * 60 + jitterMins) * 60 * 1000;
+      const createdAt = new Date(now - Math.max(0, offsetMs)).toISOString();
       const expiresAt = new Date(now + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
 
       return {
