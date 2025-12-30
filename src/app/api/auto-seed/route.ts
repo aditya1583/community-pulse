@@ -10,9 +10,24 @@ import { createClient } from "@supabase/supabase-js";
  * Posts are marked as bot posts and feel natural, not templated.
  */
 
-const BOT_AUTHOR = "Community Bot";
 // This UUID must exist in auth.users table - run the SQL migration to create it
 const BOT_USER_ID = "00000000-0000-0000-0000-000000000001";
+
+// Natural-sounding bot names by category - avoid "Community Bot" which screams empty app
+const BOT_NAMES_BY_TAG: Record<string, string[]> = {
+  Events: ["LocalEventScout", "WhatsHappening", "EventFinder", "NightOwl"],
+  Weather: ["WeatherWatcher", "SkyWatch", "LocalForecast", "StormTracker"],
+  Traffic: ["TrafficWatch", "RoadRunner", "CommuteTips", "DriveTime"],
+  General: ["LocalGuide", "TownTalk", "NeighborHelper", "AreaExplorer"],
+};
+
+function getBotName(tag: string, city: string): string {
+  const names = BOT_NAMES_BY_TAG[tag] || BOT_NAMES_BY_TAG.General;
+  const baseName = names[Math.floor(Math.random() * names.length)];
+  // Add city suffix for locality feel (e.g., "LocalGuide_Austin")
+  const citySlug = city.split(",")[0].trim().replace(/\s+/g, "");
+  return `${baseName}_${citySlug}`;
+}
 
 // Event-based post templates - designed to invite engagement
 const EVENT_TEMPLATES = [
@@ -339,7 +354,7 @@ export async function POST(req: NextRequest) {
         message: post.message,
         tag: post.tag,
         mood: post.mood,
-        author: BOT_AUTHOR,
+        author: getBotName(post.tag, body.city),
         user_id: BOT_USER_ID,
         is_bot: true,
         created_at: createdAt,
