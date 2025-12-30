@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import type { Pulse } from "./types";
 import { formatPulseDateTime } from "@/lib/pulses";
 import { useExpiryCountdown } from "@/hooks/useExpiryCountdown";
@@ -24,8 +24,29 @@ type PulseCardProps = {
 };
 
 /**
- * Expiry badge component showing remaining time
- * Displays with appropriate urgency styling based on status
+ * Clock icon SVG component
+ */
+function ClockIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
+}
+
+/**
+ * Expiry indicator - subtle clock icon with tap-to-reveal time remaining
  */
 function ExpiryBadge({
   remainingText,
@@ -36,30 +57,40 @@ function ExpiryBadge({
   isExpiringSoon: boolean;
   isFading: boolean;
 }) {
+  const [showTooltip, setShowTooltip] = useState(false);
+
   if (!remainingText) return null;
 
-  // Determine badge styling based on urgency
-  let badgeClasses =
-    "text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full font-medium";
-
+  // Determine icon color based on urgency
+  let iconColor = "text-slate-500";
   if (isFading) {
-    // Fading: muted orange/amber with pulsing animation
-    badgeClasses +=
-      " text-amber-400/70 bg-amber-500/10 border border-amber-500/20 animate-pulse";
+    iconColor = "text-amber-400/70 animate-pulse";
   } else if (isExpiringSoon) {
-    // Expiring soon: more urgent orange
-    badgeClasses +=
-      " text-orange-400 bg-orange-500/15 border border-orange-500/30";
-  } else {
-    // Active: subtle slate
-    badgeClasses +=
-      " text-slate-400 bg-slate-700/50 border border-slate-600/30";
+    iconColor = "text-orange-400";
   }
 
   return (
-    <span className={badgeClasses} title="Time until this pulse fades">
-      {remainingText}
-    </span>
+    <div className="relative">
+      <button
+        onClick={() => setShowTooltip(!showTooltip)}
+        onBlur={() => setTimeout(() => setShowTooltip(false), 150)}
+        className={`${iconColor} hover:text-slate-300 transition-colors p-1 -m-1`}
+        aria-label="Show time remaining"
+      >
+        <ClockIcon />
+      </button>
+
+      {showTooltip && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50">
+          <div className="bg-slate-800 text-slate-200 text-xs px-2.5 py-1.5 rounded-lg shadow-lg border border-slate-700 whitespace-nowrap">
+            {remainingText} left
+            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
+              <div className="border-4 border-transparent border-t-slate-800" />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -120,7 +151,12 @@ export default function PulseCard({
           <div className="flex items-center justify-between text-xs gap-3">
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-cyan-400 font-medium truncate">{pulse.author}</span>
-              <StatusIndicator rank={authorRank} level={authorLevel} />
+              {pulse.is_bot && (
+                <span className="text-[9px] px-1.5 py-0.5 bg-slate-700 text-slate-400 rounded font-medium uppercase tracking-wide">
+                  Bot
+                </span>
+              )}
+              {!pulse.is_bot && <StatusIndicator rank={authorRank} level={authorLevel} />}
             </div>
 
             <div className="flex items-center gap-3 flex-shrink-0">

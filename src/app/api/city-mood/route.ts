@@ -64,6 +64,38 @@ const MOOD_TO_EMOTION: Record<string, string> = {
   "🤩": "Thrilled",
 };
 
+// Tag-specific headline vocabulary - maps tags + sentiment to descriptive words
+// This creates the "gossip factor" headlines users want
+const TAG_HEADLINES: Record<string, { positive: string; negative: string; neutral: string }> = {
+  Traffic: {
+    positive: "Roads are Clear",
+    negative: "Gridlocked",
+    neutral: "On the Move",
+  },
+  Events: {
+    positive: "Festive",
+    negative: "Overbooked",
+    neutral: "Eventful",
+  },
+  Weather: {
+    positive: "Beautiful Day",
+    negative: "Weather Alert",
+    neutral: "Weather Watch",
+  },
+  General: {
+    positive: "Feeling Good",
+    negative: "Feeling Tense",
+    neutral: "Checking In",
+  },
+};
+
+// Mood sentiment scoring for tag-based headlines
+const MOOD_SENTIMENT: Record<string, number> = {
+  "😊": 1, "🤩": 1, "😌": 1, "🎉": 1, "☀️": 1,
+  "😐": 0, "🤔": 0, "😴": 0, "🏠": 0,
+  "😤": -1, "😢": -1, "😡": -1, "🛑": -1, "🏃": -0.5, "😅": -0.5, "🥵": -1, "🥶": -1,
+};
+
 // Maps traffic levels to emotions
 const TRAFFIC_TO_EMOTION: Record<string, { emotion: string; emoji: string }> = {
   Light: { emotion: "flowing", emoji: "🚗" },
@@ -117,14 +149,31 @@ function calculateVibeIntensity(
 }
 
 /**
+ * Calculate average sentiment from mood emojis in pulses
+ */
+function calculateMoodSentiment(moods: string[]): "positive" | "negative" | "neutral" {
+  if (moods.length === 0) return "neutral";
+
+  const totalSentiment = moods.reduce((sum, mood) => {
+    return sum + (MOOD_SENTIMENT[mood] ?? 0);
+  }, 0);
+
+  const avgSentiment = totalSentiment / moods.length;
+  if (avgSentiment > 0.3) return "positive";
+  if (avgSentiment < -0.3) return "negative";
+  return "neutral";
+}
+
+/**
  * Generates a compelling headline based on ALL city activity
  *
  * Priority order for headline generation:
- * 1. If we have pulses with strong mood signal -> use pulse emotion
- * 2. If we have events -> highlight event activity
- * 3. If we have traffic data -> mention traffic flow
- * 4. If we have weather -> use weather as fallback
- * 5. Only say "quiet" if we truly have NOTHING
+ * 1. If we have 5+ pulses about a specific tag -> use tag-specific vocabulary
+ * 2. If we have pulses with strong mood signal -> use pulse emotion
+ * 3. If we have events -> highlight event activity
+ * 4. If we have traffic data -> mention traffic flow
+ * 5. If we have weather -> use weather as fallback
+ * 6. Only say "quiet" if we truly have NOTHING
  */
 function generateVibeHeadline(
   cityName: string,
@@ -134,17 +183,36 @@ function generateVibeHeadline(
   dominantTagPercent: number,
   pulseCount: number,
   intensity: "quiet" | "active" | "buzzing" | "intense",
-  context: CityContext
+  context: CityContext,
+  allMoods: string[] = []
 ): { headline: string; subtext: string; emotion: string } {
   const shortCityName = cityName.split(",")[0].trim();
   const eventsCount = context.eventsCount ?? 0;
   const trafficLevel = context.trafficLevel;
   const weatherCondition = context.weatherCondition;
 
-  // === PULSE-BASED HEADLINES (highest priority when we have strong signal) ===
+  // === TAG-BASED HEADLINES (highest priority when 5+ pulses about same topic) ===
+  // This creates the "Gridlocked" / "Festive" headlines users want
 
-  // Strong pulse signal (70%+ concentration) - this IS the city's mood
-  if (pulseCount > 0 && dominantMoodPercent >= 70 && dominantMood) {
+  const tagPulseCount = Math.round((dominantTagPercent / 100) * pulseCount);
+  if (dominantTag && tagPulseCount >= 5 && dominantTagPercent >= 50) {
+    const tagHeadlines = TAG_HEADLINES[dominantTag] || TAG_HEADLINES.General;
+    const sentiment = calculateMoodSentiment(allMoods);
+    const tagWord = tagHeadlines[sentiment];
+
+    return {
+      headline: `${shortCityName} is ${tagWord}`,
+      subtext: `${tagPulseCount} ${dominantTag.toLowerCase()} reports from neighbors`,
+      emotion: sentiment === "positive" ? "happy" : sentiment === "negative" ? "frustrated" : "active",
+    };
+  }
+
+  // === PULSE-BASED HEADLINES (when we have strong mood signal but no tag dominance) ===
+  // IMPORTANT: Require significant volume before declaring city mood
+  // 1-4 posts should NOT define the city's emotional state
+
+  // Strong pulse signal: 5+ posts with 70%+ same mood - this IS the city's mood
+  if (pulseCount >= 5 && dominantMoodPercent >= 70 && dominantMood) {
     const emotion = MOOD_TO_EMOTION[dominantMood] || "Mixed";
     const tagContext = dominantTag && dominantTagPercent >= 50
       ? ` about ${dominantTag}`
@@ -154,18 +222,27 @@ function generateVibeHeadline(
       headline: `${shortCityName} is ${emotion}`,
       subtext: dominantTagPercent >= 50
         ? `${dominantMoodPercent}% of pulses are${tagContext}`
-        : `${pulseCount} ${pulseCount === 1 ? "pulse" : "pulses"} in the last 3 hours`,
+        : `${pulseCount} pulses in the last 3 hours`,
       emotion: emotion.toLowerCase(),
     };
   }
 
-  // Moderate pulse signal (50-70%) with good volume
-  if (pulseCount >= 3 && dominantMoodPercent >= 50 && dominantMood) {
+  // Moderate pulse signal: 8+ posts with 60%+ same mood
+  if (pulseCount >= 8 && dominantMoodPercent >= 60 && dominantMood) {
     const emotion = MOOD_TO_EMOTION[dominantMood] || "Mixed";
     return {
       headline: `${shortCityName} is feeling ${emotion.toLowerCase()}`,
-      subtext: `${pulseCount} ${pulseCount === 1 ? "thing" : "things"} happening right now`,
+      subtext: `${pulseCount} things happening right now`,
       emotion: emotion.toLowerCase(),
+    };
+  }
+
+  // With fewer posts, use neutral "activity" language instead of emotion
+  if (pulseCount > 0 && pulseCount < 5) {
+    return {
+      headline: `${pulseCount} ${pulseCount === 1 ? "thing" : "things"} happening in ${shortCityName}`,
+      subtext: "See what neighbors are sharing",
+      emotion: "active",
     };
   }
 
@@ -361,6 +438,9 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // Collect all moods for sentiment calculation
+    const allMoods: string[] = pulses.map((p) => p.mood || "😐");
+
     // Count moods
     const moodCounts: Record<string, number> = {};
     for (const p of pulses) {
@@ -410,7 +490,8 @@ export async function GET(req: NextRequest) {
       dominantTagPercent,
       total,
       intensity,
-      context
+      context,
+      allMoods
     );
 
     return NextResponse.json({

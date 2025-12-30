@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import type { TrafficLevel, Pulse } from "./types";
 
 type TrafficContentProps = {
@@ -11,11 +11,42 @@ type TrafficContentProps = {
   cityName: string;
 };
 
+// Traffic mood sentiment analysis
+// Maps mood emojis to sentiment scores (-1 = bad, 0 = neutral, 1 = good)
+const TRAFFIC_MOOD_SENTIMENT: Record<string, { score: number; label: string }> = {
+  "😤": { score: -1, label: "Frustrated" },
+  "🏃": { score: -0.5, label: "Rushed" },
+  "😌": { score: 1, label: "Chill" },
+  "🛑": { score: -1, label: "Stuck" },
+  // Fallback for other moods
+  "😊": { score: 0.5, label: "Good" },
+  "😐": { score: 0, label: "Neutral" },
+  "😢": { score: -0.5, label: "Frustrated" },
+  "😡": { score: -1, label: "Frustrated" },
+  "😴": { score: 0, label: "Slow" },
+  "🤩": { score: 1, label: "Great" },
+};
+
+type TrafficIntelligence = {
+  recentCount: number;
+  lastHourCount: number;
+  dominantMood: string | null;
+  dominantMoodLabel: string;
+  averageSentiment: number;
+  sentimentLabel: "Good" | "Mixed" | "Rough";
+  hasUserData: boolean;
+};
+
 /**
  * Traffic Tab Content
  *
  * Shows real-time traffic section with road conditions
  * Plus community traffic reports from pulses
+ *
+ * Intelligence features:
+ * - User-sourced traffic sentiment from pulse moods
+ * - Recent report counts with time-awareness
+ * - Fallback to time-based patterns when no user data
  */
 export default function TrafficContent({
   trafficLevel,
@@ -24,6 +55,76 @@ export default function TrafficContent({
   trafficPulses,
   cityName,
 }: TrafficContentProps) {
+  // Calculate traffic intelligence from user pulses
+  const intelligence = useMemo((): TrafficIntelligence => {
+    const now = Date.now();
+    const oneHourAgo = now - 60 * 60 * 1000;
+
+    // Filter pulses from the last hour
+    const lastHourPulses = trafficPulses.filter(
+      (p) => new Date(p.createdAt).getTime() > oneHourAgo
+    );
+
+    if (trafficPulses.length === 0) {
+      return {
+        recentCount: 0,
+        lastHourCount: 0,
+        dominantMood: null,
+        dominantMoodLabel: "",
+        averageSentiment: 0,
+        sentimentLabel: "Mixed",
+        hasUserData: false,
+      };
+    }
+
+    // Count mood occurrences
+    const moodCounts: Record<string, number> = {};
+    let totalSentiment = 0;
+    let sentimentCount = 0;
+
+    for (const pulse of lastHourPulses.length > 0 ? lastHourPulses : trafficPulses.slice(0, 10)) {
+      const mood = pulse.mood;
+      moodCounts[mood] = (moodCounts[mood] || 0) + 1;
+
+      const moodInfo = TRAFFIC_MOOD_SENTIMENT[mood];
+      if (moodInfo) {
+        totalSentiment += moodInfo.score;
+        sentimentCount++;
+      }
+    }
+
+    // Find dominant mood
+    let dominantMood: string | null = null;
+    let maxCount = 0;
+    for (const [mood, count] of Object.entries(moodCounts)) {
+      if (count > maxCount) {
+        maxCount = count;
+        dominantMood = mood;
+      }
+    }
+
+    const avgSentiment = sentimentCount > 0 ? totalSentiment / sentimentCount : 0;
+    const sentimentLabel: "Good" | "Mixed" | "Rough" =
+      avgSentiment > 0.3 ? "Good" : avgSentiment < -0.3 ? "Rough" : "Mixed";
+
+    return {
+      recentCount: trafficPulses.length,
+      lastHourCount: lastHourPulses.length,
+      dominantMood,
+      dominantMoodLabel: dominantMood
+        ? TRAFFIC_MOOD_SENTIMENT[dominantMood]?.label || "Unknown"
+        : "",
+      averageSentiment: avgSentiment,
+      sentimentLabel,
+      hasUserData: trafficPulses.length > 0,
+    };
+  }, [trafficPulses]);
+
+  // Get current hour for time-based patterns
+  const currentHour = new Date().getHours();
+  const isRushHour = (currentHour >= 7 && currentHour <= 9) || (currentHour >= 16 && currentHour <= 19);
+  const isLateNight = currentHour >= 22 || currentHour <= 5;
+
   // Traffic level config
   const getTrafficConfig = () => {
     switch (trafficLevel) {
@@ -92,42 +193,96 @@ export default function TrafficContent({
         )}
       </div>
 
-      {/* Traffic info cards */}
+      {/* Traffic intelligence cards */}
       <div className="grid grid-cols-2 gap-3">
+        {/* Recent Reports / Time Pattern Card */}
         <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 text-center">
-          <svg
-            className="w-6 h-6 mx-auto text-emerald-400 mb-2"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.5}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <p className="text-xs text-slate-400">Best Time</p>
-          <p className="text-sm font-medium text-white">Before 7am</p>
+          {intelligence.hasUserData ? (
+            <>
+              <div className="text-2xl font-bold text-emerald-400 mb-1">
+                {intelligence.lastHourCount > 0
+                  ? intelligence.lastHourCount
+                  : intelligence.recentCount}
+              </div>
+              <p className="text-xs text-slate-400">
+                {intelligence.lastHourCount > 0
+                  ? "reports this hour"
+                  : "recent reports"}
+              </p>
+              <p className="text-[10px] text-slate-500 mt-1">
+                from community
+              </p>
+            </>
+          ) : (
+            <>
+              <svg
+                className="w-6 h-6 mx-auto text-emerald-400 mb-2"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <p className="text-xs text-slate-400">Best Time</p>
+              <p className="text-sm font-medium text-white">
+                {isLateNight ? "Now (late night)" : "Before 7am"}
+              </p>
+            </>
+          )}
         </div>
 
+        {/* Traffic Mood / Rush Hour Card */}
         <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 text-center">
-          <svg
-            className="w-6 h-6 mx-auto text-amber-400 mb-2"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.5}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-            />
-          </svg>
-          <p className="text-xs text-slate-400">Rush Hour</p>
-          <p className="text-sm font-medium text-white">5pm - 7pm</p>
+          {intelligence.hasUserData && intelligence.dominantMood ? (
+            <>
+              <div className="text-2xl mb-1">{intelligence.dominantMood}</div>
+              <p className="text-xs text-slate-400">Traffic Mood</p>
+              <p
+                className={`text-sm font-medium ${
+                  intelligence.sentimentLabel === "Good"
+                    ? "text-emerald-400"
+                    : intelligence.sentimentLabel === "Rough"
+                    ? "text-red-400"
+                    : "text-amber-400"
+                }`}
+              >
+                {intelligence.sentimentLabel}
+              </p>
+            </>
+          ) : (
+            <>
+              <svg
+                className={`w-6 h-6 mx-auto mb-2 ${
+                  isRushHour ? "text-red-400" : "text-amber-400"
+                }`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                />
+              </svg>
+              <p className="text-xs text-slate-400">
+                {isRushHour ? "Rush Hour" : "Typical Rush"}
+              </p>
+              <p
+                className={`text-sm font-medium ${
+                  isRushHour ? "text-red-400" : "text-white"
+                }`}
+              >
+                {isRushHour ? "Active Now" : "7-9am, 5-7pm"}
+              </p>
+            </>
+          )}
         </div>
       </div>
 

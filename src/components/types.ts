@@ -80,6 +80,8 @@ export type Pulse = {
   user_id?: string;
   /** ISO timestamp when this pulse expires. Used for ephemeral content decay. */
   expiresAt?: string | null;
+  /** True if this pulse was created by a bot (for seeding) */
+  is_bot?: boolean;
 };
 
 /**

@@ -320,13 +320,33 @@ export default function Home() {
         setSummaryLoading(true);
         setSummaryError(null);
 
-        // Prepare events data for the summary
-        const eventsForSummary = ticketmasterEvents.slice(0, 10).map((e) => ({
-          name: e.name,
-          venue: e.venue,
-          date: e.date,
-          time: e.time,
-        }));
+        // Prepare events data for the summary (deduplicated by normalized name)
+        // Robust normalization: lowercase, trim, collapse whitespace, remove special chars
+        const normalizeEventName = (name: string): string => {
+          return name
+            .toLowerCase()
+            .trim()
+            .replace(/\s+/g, " ")           // Collapse multiple spaces
+            .replace(/[^\w\s]/g, "");       // Remove special characters
+        };
+
+        const seenEventNames = new Set<string>();
+        const eventsForSummary = ticketmasterEvents
+          .filter((e) => {
+            const normalizedName = normalizeEventName(e.name);
+            if (seenEventNames.has(normalizedName)) {
+              return false;
+            }
+            seenEventNames.add(normalizedName);
+            return true;
+          })
+          .slice(0, 10)
+          .map((e) => ({
+            name: e.name,
+            venue: e.venue,
+            date: e.date,
+            time: e.time,
+          }));
 
         // Prepare news data for the summary
         const newsForSummary = (newsData?.articles ?? []).slice(0, 5).map((a) => ({
@@ -1088,6 +1108,93 @@ export default function Home() {
       fetchPulses();
     }
   }, [city]);
+
+  // ========= AUTO-SEED EMPTY CITIES =========
+  // When a city has no pulses, automatically generate contextual bot posts
+  const [autoSeedAttempted, setAutoSeedAttempted] = useState<string | null>(null);
+
+  useEffect(() => {
+    const triggerAutoSeed = async () => {
+      // Only auto-seed if:
+      // 1. Initial fetch is complete
+      // 2. No pulses exist
+      // 3. We haven't already tried for this city
+      // 4. We have some context data (events or weather)
+      if (
+        !initialPulsesFetched ||
+        pulses.length > 0 ||
+        autoSeedAttempted === city ||
+        loading
+      ) {
+        return;
+      }
+
+      // Need at least events or weather to generate meaningful posts
+      if (ticketmasterEvents.length === 0 && !weather) {
+        return;
+      }
+
+      // Mark that we've attempted for this city
+      setAutoSeedAttempted(city);
+
+      try {
+        console.log(`Auto-seeding content for ${city}...`);
+
+        const res = await fetch("/api/auto-seed", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            city,
+            events: ticketmasterEvents.slice(0, 3).map((e) => ({
+              name: e.name,
+              venue: e.venue,
+              date: e.date,
+              category: e.category,
+            })),
+            weather: weather
+              ? {
+                  description: weather.description,
+                  temp: weather.temp,
+                  icon: weather.icon,
+                }
+              : null,
+          }),
+        });
+
+        const data = await res.json();
+        console.log("Auto-seed response:", res.status, data);
+
+        if (res.ok && data.created > 0) {
+          console.log(`Created ${data.created} seed posts for ${city}`);
+          // Refetch pulses to show the new posts
+            const now = new Date();
+            const start = startOfRecentWindow(now, 7);
+            const end = startOfNextLocalDay(now);
+
+            const { data: newData } = await supabase
+              .from("pulses")
+              .select("*")
+              .eq("city", city)
+              .gte("created_at", start.toISOString())
+              .lt("created_at", end.toISOString())
+              .order("created_at", { ascending: false })
+              .limit(PULSES_PAGE_SIZE);
+
+            if (newData) {
+              const mapped: Pulse[] = (newData as DBPulse[]).map((row) => ({
+                ...mapDBPulseToPulse(row),
+                author: row.author || "Anonymous",
+              }));
+              setPulses(mapped);
+            }
+        }
+      } catch (err) {
+        console.error("Auto-seed error:", err);
+      }
+    };
+
+    triggerAutoSeed();
+  }, [city, initialPulsesFetched, pulses.length, ticketmasterEvents, weather, autoSeedAttempted, loading]);
 
   // ========= FETCH AUTHOR STATS =========
   // Batch fetch level and rank for all unique authors when pulses change

@@ -125,17 +125,19 @@ export async function POST(req: Request) {
       }
 
       prompt = `
-You are summarizing the current state of ${displayCity} for a city dashboard called "Community Pulse".
+You are a friendly local who knows what's happening in ${displayCity}. Write like you're giving a quick heads-up to a neighbor - conversational, helpful, with local personality.
 
-Here is the available data:
+Here's what's going on:
 
 ${sections.join("\n\n")}
 
 Task:
-1. In 2-3 sentences, provide a comprehensive overview of what's happening in ${displayCity} right now.
-2. Synthesize information from all available sources (pulses, events, news, conditions).
-3. Prioritize the most interesting or impactful information.
-4. Keep it informative, engaging, and concise. No emojis.
+1. In 2-3 short sentences, give a natural overview of ${displayCity} right now.
+2. Lead with the most interesting or useful info (events, notable community chatter, conditions).
+3. Sound like a helpful neighbor, not a news anchor. Use casual phrasing.
+4. Skip the formal intro - jump right into what matters. No emojis.
+
+Example tone: "Heads up, traffic's building near downtown. Big show at the arena tonight so expect crowds. Weather's perfect for walking though!"
 
 Return ONLY the summary text, nothing else.
       `.trim();
@@ -261,7 +263,7 @@ Return ONLY the summary text, nothing else.
           {
             role: "system",
             content:
-              "You summarize local city information from multiple sources. Be concise, informative, and neutral.",
+              "You're a friendly local giving quick updates to neighbors. Be conversational, helpful, and personable - like texting a friend about what's happening in town. Skip formalities and get straight to the good stuff.",
           },
           { role: "user", content: prompt },
         ],
