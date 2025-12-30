@@ -55,6 +55,7 @@ export default function VenueVibeCheck({
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [submittedVibe, setSubmittedVibe] = useState<VenueVibeType | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -103,13 +104,17 @@ export default function VenueVibeCheck({
       }
 
       setSubmitSuccess(true);
+      setSubmittedVibe(vibeType);
       setIsOpen(false);
 
       // Refresh vibes
       await fetchVibes();
 
-      // Reset success state after animation
-      setTimeout(() => setSubmitSuccess(false), 2000);
+      // Reset success state after animation (longer for better feedback)
+      setTimeout(() => {
+        setSubmitSuccess(false);
+        setSubmittedVibe(null);
+      }, 3000);
     } catch (error) {
       console.error("Error submitting vibe:", error);
       setSubmitError("Failed to submit vibe. Please try again.");
@@ -130,12 +135,31 @@ export default function VenueVibeCheck({
     quality: VENUE_VIBE_TYPES.filter((v) => v.category === "quality"),
   };
 
+  // Get the submitted vibe info for feedback
+  const submittedVibeInfo = submittedVibe ? getVibeTypeInfo(submittedVibe) : null;
+  const submittedVibeCount = submittedVibe
+    ? (vibes.find(v => v.vibeType === submittedVibe)?.count || 1)
+    : 0;
+
   // Compact mode: just show the top vibe badge and a button
   if (compact) {
     return (
-      <div className="flex items-center gap-2">
-        {/* Current vibe badge */}
-        {topVibe && topVibeInfo && (
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Success feedback - shows after submitting */}
+        {submitSuccess && submittedVibeInfo && (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full animate-fade-in">
+            <span>{submittedVibeInfo.emoji}</span>
+            <span>
+              {submittedVibeCount > 1
+                ? `You + ${submittedVibeCount - 1} ${submittedVibeCount === 2 ? 'other' : 'others'}`
+                : 'You'
+              } say it's {submittedVibeInfo.label}!
+            </span>
+          </span>
+        )}
+
+        {/* Current vibe badge - hide when showing success */}
+        {!submitSuccess && topVibe && topVibeInfo && (
           <span className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-violet-500/20 text-violet-300 border border-violet-500/30 rounded-full">
             <span>{topVibeInfo.emoji}</span>
             <span>{topVibeInfo.label}</span>
@@ -152,9 +176,10 @@ export default function VenueVibeCheck({
             e.stopPropagation();
             setIsOpen(true);
           }}
+          disabled={submitSuccess}
           className={`group inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full transition-all duration-300 ${
             submitSuccess
-              ? "bg-emerald-500/30 text-emerald-300 border border-emerald-400/50 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
+              ? "bg-emerald-500/30 text-emerald-300 border border-emerald-400/50 shadow-[0_0_12px_rgba(16,185,129,0.3)] cursor-default"
               : "bg-gradient-to-r from-violet-600/80 to-fuchsia-600/80 text-white hover:from-violet-500 hover:to-fuchsia-500 shadow-[0_0_16px_rgba(139,92,246,0.4)] hover:shadow-[0_0_20px_rgba(139,92,246,0.6)] border border-violet-400/30 animate-subtle-pulse"
           }`}
         >
@@ -163,7 +188,7 @@ export default function VenueVibeCheck({
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
-              <span>Added!</span>
+              <span>Logged!</span>
             </>
           ) : (
             <>
@@ -193,6 +218,13 @@ export default function VenueVibeCheck({
           }
           .animate-subtle-pulse {
             animation: subtle-pulse 2s ease-in-out infinite;
+          }
+          @keyframes fade-in {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+          }
+          .animate-fade-in {
+            animation: fade-in 0.3s ease-out;
           }
         `}</style>
       </div>

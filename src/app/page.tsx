@@ -36,6 +36,7 @@ import PulseInput from "@/components/PulseInput";
 import FAB from "@/components/FAB";
 import PulseModal from "@/components/PulseModal";
 import TrafficContent from "@/components/TrafficContent";
+import LiveVibes from "@/components/LiveVibes";
 import { DASHBOARD_TABS, type TabId, type WeatherInfo, type Pulse, type CityMood, type TrafficLevel } from "@/components/types";
 import type { LocalNewsResponse } from "@/types/news";
 import { useGamification } from "@/hooks/useGamification";
@@ -2558,6 +2559,9 @@ export default function Home() {
               temperature={weather?.temp}
             />
           </div>
+
+          {/* Live Vibes - Real-time crowd-sourced venue sentiment */}
+          <LiveVibes city={city} />
 
           {/* Tab Content */}
           <div className="space-y-4">
