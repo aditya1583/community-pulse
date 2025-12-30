@@ -1,9 +1,25 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import type { TicketmasterEvent } from "@/hooks/useEvents";
 import type { TabId, TrafficLevel } from "./types";
 import ShareableSummaryCard from "./ShareableSummaryCard";
+
+/** Normalize event name for deduplication */
+function normalizeEventName(name: string): string {
+  return name.toLowerCase().trim().replace(/\s+/g, " ").replace(/[^\w\s]/g, "");
+}
+
+/** Deduplicate events by normalized name */
+function deduplicateEvents(events: TicketmasterEvent[]): TicketmasterEvent[] {
+  const seen = new Set<string>();
+  return events.filter(event => {
+    const normalized = normalizeEventName(event.name);
+    if (seen.has(normalized)) return false;
+    seen.add(normalized);
+    return true;
+  });
+}
 
 type NewsSummary = {
   paragraph: string;
@@ -100,10 +116,13 @@ export default function AISummaryCard({
 }: AISummaryCardProps) {
   const displayCity = cityName.split(",")[0]?.trim() || cityName;
 
-  const getEventSummary = (): string | null => {
-    if (events.length === 0) return null;
+  // Deduplicate events by name to avoid showing same event twice
+  const uniqueEvents = useMemo(() => deduplicateEvents(events), [events]);
 
-    const nextEvent = events[0];
+  const getEventSummary = (): string | null => {
+    if (uniqueEvents.length === 0) return null;
+
+    const nextEvent = uniqueEvents[0];
     const eventDate = nextEvent.date
       ? new Date(nextEvent.date + (nextEvent.time ? `T${nextEvent.time}` : ""))
       : null;
@@ -236,10 +255,10 @@ export default function AISummaryCard({
             Events
           </InlineLinkButton>
           {": "}
-          {events.length > 0 ? (
+          {uniqueEvents.length > 0 ? (
             <>
               Upcoming events include{" "}
-              {events.slice(0, 2).map((event, idx) => (
+              {uniqueEvents.slice(0, 2).map((event, idx) => (
                 <React.Fragment key={event.id}>
                   {idx > 0 ? " and " : ""}
                   <InlineLinkButton
