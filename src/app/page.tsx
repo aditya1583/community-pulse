@@ -1121,11 +1121,13 @@ export default function Home() {
       // 2. No pulses exist
       // 3. We haven't already tried for this city
       // 4. We have some context data (events or weather)
+      // 5. Events are NOT loading (prevents using stale events from previous city)
       if (
         !initialPulsesFetched ||
         pulses.length > 0 ||
         autoSeedAttempted === city ||
-        loading
+        loading ||
+        ticketmasterLoading // Don't seed while events are refreshing for new city
       ) {
         return;
       }
@@ -1195,7 +1197,7 @@ export default function Home() {
     };
 
     triggerAutoSeed();
-  }, [city, initialPulsesFetched, pulses.length, ticketmasterEvents, weather, autoSeedAttempted, loading]);
+  }, [city, initialPulsesFetched, pulses.length, ticketmasterEvents, ticketmasterLoading, weather, autoSeedAttempted, loading]);
 
   // ========= FETCH AUTHOR STATS =========
   // Batch fetch level and rank for all unique authors when pulses change
