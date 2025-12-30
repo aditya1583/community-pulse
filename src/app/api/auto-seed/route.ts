@@ -312,17 +312,26 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Spread posts naturally over 2-6 hours to avoid "bot burst" appearance
+    // Spread posts naturally over 3-6 hours to avoid "bot burst" appearance
+    // Posts appear as if they were submitted over the past several hours
     const now = Date.now();
     const totalPosts = posts.length;
+
+    // Calculate spread ONCE - random window between 3-6 hours
+    const spreadWindowHours = 3 + Math.random() * 3;
+    const spreadWindowMs = spreadWindowHours * 60 * 60 * 1000;
+
+    // Generate random offsets for each post, then sort to ensure proper ordering
+    const offsets = posts.map(() => Math.random() * spreadWindowMs);
+    offsets.sort((a, b) => a - b); // Sort ascending so post order is consistent
+
     const records = posts.map((post, i) => {
-      // Spread posts across a 2-6 hour window with randomness
-      // Each post gets a base slot + random jitter
-      const hoursWindow = 2 + Math.random() * 4; // 2-6 hours total spread
-      const baseOffsetHours = (i / totalPosts) * hoursWindow;
-      const jitterMins = Math.random() * 30 - 15; // +/- 15 min jitter
-      const offsetMs = (baseOffsetHours * 60 + jitterMins) * 60 * 1000;
-      const createdAt = new Date(now - Math.max(0, offsetMs)).toISOString();
+      // Each post gets a unique offset from 0 to spreadWindow
+      // Add minimum 30-minute gap from "now" so posts don't appear "just posted"
+      const minOffsetMs = 30 * 60 * 1000; // 30 minutes minimum
+      const offsetMs = minOffsetMs + offsets[i];
+
+      const createdAt = new Date(now - offsetMs).toISOString();
       const expiresAt = new Date(now + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
 
       return {
