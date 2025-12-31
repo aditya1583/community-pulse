@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { GeocodeApiResponse, GeocodedCity } from "@/lib/geocoding";
 
 type Options = {
@@ -21,8 +21,16 @@ export function useGeocodingAutocomplete(options: Options = {}) {
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
 
   const lastRequestId = useRef(0);
+  // Flag to skip the next search (used when setting input programmatically)
+  const skipNextSearch = useRef(false);
 
   useEffect(() => {
+    // Check if we should skip this search (programmatic input)
+    if (skipNextSearch.current) {
+      skipNextSearch.current = false;
+      return;
+    }
+
     const trimmed = inputValue.trim();
 
     if (trimmed.length < minLength) {
@@ -83,13 +91,15 @@ export function useGeocodingAutocomplete(options: Options = {}) {
     };
   }, [inputValue, minLength, debounceMs, limit]);
 
-  const selectCity = (city: GeocodedCity) => {
+  const selectCity = useCallback((city: GeocodedCity) => {
+    // Skip the search that would be triggered by setInputValue
+    skipNextSearch.current = true;
     setInputValue(city.displayName);
     setSuggestions([]);
     setNotFound(false);
     setHighlightedIndex(-1);
     setOpen(false);
-  };
+  }, []);
 
   const clearSuggestions = () => {
     setSuggestions([]);

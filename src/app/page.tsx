@@ -1054,8 +1054,9 @@ export default function Home() {
     };
 
     // Update city state with geolocation data
+    // Use applySuggestionSelection to set input without triggering autocomplete search
+    applySuggestionSelection(geoCity);
     setCity(geoCity.displayName);
-    setCityInput(geoCity.displayName);
     setSelectedCity(geoCity);
     setLastValidCity(geoCity);
   }, [
@@ -1066,7 +1067,7 @@ export default function Home() {
     geolocation.cityName,
     geolocation.stateCode,
     geolocation.loading,
-    setCityInput,
+    applySuggestionSelection,
   ]);
 
   // Handler for selecting a city from autocomplete
