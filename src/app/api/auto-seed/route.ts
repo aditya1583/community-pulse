@@ -13,28 +13,57 @@ import { createClient } from "@supabase/supabase-js";
 // This UUID must exist in auth.users table - run the SQL migration to create it
 const BOT_USER_ID = "00000000-0000-0000-0000-000000000001";
 
-// Natural-sounding bot names by category - avoid "Community Bot" which screams empty app
-const BOT_NAMES_BY_TAG: Record<string, string[]> = {
-  Events: ["LocalEventScout", "WhatsHappening", "EventFinder", "NightOwl"],
-  Weather: ["WeatherWatcher", "SkyWatch", "LocalForecast", "StormTracker"],
-  Traffic: ["TrafficWatch", "RoadRunner", "CommuteTips", "DriveTime"],
-  General: ["LocalGuide", "TownTalk", "NeighborHelper", "AreaExplorer"],
+/**
+ * BOT PERSONALITIES - Three distinct personas that feel human
+ *
+ * 1. The Complainer - Vents about traffic, potholes, delays (relatable frustration)
+ * 2. The Promoter - Hypes up events, excited about local happenings
+ * 3. The Helper - Warns about weather, shares safety tips, gives advice
+ */
+type BotPersonality = "complainer" | "promoter" | "helper";
+
+const BOT_PERSONAS: Record<BotPersonality, {
+  names: string[];
+  tags: string[];
+  mood: string;
+}> = {
+  complainer: {
+    names: ["TrafficGrump", "RoadRanter", "CommuteComplainer", "StuckInTraffic"],
+    tags: ["Traffic"],
+    mood: "😤",
+  },
+  promoter: {
+    names: ["EventHyper", "NightOwl", "LocalBuzz", "WeekendWarrior"],
+    tags: ["Events"],
+    mood: "🤩",
+  },
+  helper: {
+    names: ["WeatherWatch", "SafetyFirst", "LocalHelper", "NeighborTips"],
+    tags: ["Weather", "General"],
+    mood: "😊",
+  },
 };
 
+function getBotPersona(tag: string): BotPersonality {
+  if (tag === "Traffic") return "complainer";
+  if (tag === "Events") return "promoter";
+  return "helper";
+}
+
 function getBotName(tag: string, city: string): string {
-  const names = BOT_NAMES_BY_TAG[tag] || BOT_NAMES_BY_TAG.General;
-  const baseName = names[Math.floor(Math.random() * names.length)];
-  // Add city suffix for locality feel (e.g., "LocalGuide_Austin")
+  const personality = getBotPersona(tag);
+  const persona = BOT_PERSONAS[personality];
+  const baseName = persona.names[Math.floor(Math.random() * persona.names.length)];
   const citySlug = city.split(",")[0].trim().replace(/\s+/g, "");
   return `${baseName}_${citySlug}`;
 }
 
-// Event-based post templates - designed to invite engagement
+// Event-based post templates - THE PROMOTER personality (excited, hype!)
 const EVENT_TEMPLATES = [
-  { mood: "🤩", template: (name: string, venue: string) => `${name} at ${venue} - anyone been before? Worth checking out?` },
-  { mood: "🎉", template: (name: string, venue: string) => `Who's heading to ${name} at ${venue}? Looking for people to go with!` },
-  { mood: "🤔", template: (name: string, venue: string) => `Thinking about checking out ${name} at ${venue}. Anyone know if parking is tough there?` },
-  { mood: "😊", template: (name: string, venue: string) => `${name} at ${venue} tonight! What's everyone wearing to this kind of thing?` },
+  { mood: "🤩", template: (name: string, venue: string) => `OMG ${name} at ${venue}!! Who else is going?! This is gonna be GOOD 🔥` },
+  { mood: "🎉", template: (name: string, venue: string) => `${name} tonight at ${venue}! Finally something fun happening around here! Anyone need a plus one?` },
+  { mood: "🤩", template: (name: string, venue: string) => `Just found out about ${name} at ${venue} - why didn't anyone tell me sooner?! Who's in?` },
+  { mood: "🎉", template: (name: string, venue: string) => `${name} at ${venue}!! Been waiting for this all week. See y'all there! 🙌` },
 ];
 
 // Farmers market templates - ask for recommendations
@@ -44,83 +73,83 @@ const MARKET_TEMPLATES = [
   { mood: "☀️", template: (name: string, day: string) => `${name} every ${day} - favorite thing to buy there? I'm new to the area.` },
 ];
 
-// Weather-based templates - conversation starters
+// Weather-based templates - THE HELPER personality (warnings, tips, helpful advice)
 const WEATHER_TEMPLATES: Record<string, { mood: string; templates: string[] }> = {
   clear: {
     mood: "☀️",
     templates: [
-      "Perfect weather today! Anyone know good spots for an outdoor lunch around here?",
-      "Sun's out! What's everyone's favorite outdoor spot in the neighborhood?",
-      "Beautiful day - any good walking trails nearby? New to the area.",
+      "PSA: Beautiful weather today! Great day to get outside. Don't forget sunscreen if you're out long! ☀️",
+      "Heads up: Perfect conditions today. If you've been putting off outdoor errands, today's the day!",
+      "Tip: Clear skies all day. Great time to check those outdoor tasks off your list!",
     ],
   },
   clouds: {
-    mood: "😌",
+    mood: "😊",
     templates: [
-      "Cloudy but nice out. Good coffee shop recommendations for working remotely?",
-      "Overcast vibes today. What's everyone up to this afternoon?",
-      "Perfect errand-running weather. Any hidden gem shops I should check out?",
+      "FYI: Overcast but no rain expected. Good day for outdoor activities without the harsh sun!",
+      "Weather update: Cloudy but dry. Perfect if you don't like it too sunny. Enjoy!",
+      "Tip: Great weather for a walk - not too hot, not too cold. Take advantage! 🙂",
     ],
   },
   rain: {
     mood: "🏠",
     templates: [
-      "Rainy day! Best cozy spots to grab a drink and read a book?",
-      "Rain's coming down - what indoor activities do y'all recommend around here?",
-      "Wet roads today. Anyone know which streets flood easily?",
+      "⚠️ Rain alert! If you're driving, remember to slow down. Some streets flood around here!",
+      "Heads up: Getting wet out there! Don't forget your umbrella if you're heading out.",
+      "FYI: Rainy day - perfect excuse to support a local coffee shop. Stay dry everyone!",
     ],
   },
   cold: {
     mood: "🥶",
     templates: [
-      "Cold out there! Where's the best hot chocolate in the neighborhood?",
-      "Brrr! Any warm indoor hangout spots people like around here?",
-      "Chilly day - perfect soup weather. Best pho or ramen nearby?",
+      "Brrr! ❄️ Bundle up if you're heading out! Don't forget to check on elderly neighbors too.",
+      "Cold weather alert: Make sure pets aren't left outside too long! Stay warm everyone.",
+      "FYI: Chilly one today. Hot drinks at local cafes are calling! Any favorites to recommend?",
     ],
   },
   hot: {
     mood: "🥵",
     templates: [
-      "Hot one today! Best places to cool off around here? Need AC!",
-      "Summer heat hitting hard. Anyone know good swimming spots nearby?",
-      "Scorcher! What's everyone's go-to for staying cool in this neighborhood?",
+      "🔥 Heat advisory vibes! Stay hydrated and check on neighbors who might not have AC.",
+      "Hot weather tip: Avoid being outside 12-3pm if possible. Take care of yourselves!",
+      "PSA: It's a scorcher! Make sure to drink water and give pets shade. Stay cool! 💧",
     ],
   },
 };
 
-// Traffic time-based templates - ask for tips
+// Traffic time-based templates - THE COMPLAINER personality (venting, relatable frustration)
 const TRAFFIC_TEMPLATES: Record<string, { mood: string; templates: string[] }> = {
   morning_rush: {
-    mood: "🏃",
+    mood: "😤",
     templates: [
-      "Morning commute building up. Any good shortcuts people know about?",
-      "Rush hour hitting. How long does it usually take to get downtown from here?",
-      "Traffic picking up - anyone know if the main roads are worse than side streets?",
+      "Ugh, already backed up on the main road. WHY does everyone leave at the same time?! 🙄",
+      "This morning commute is killing me. There's gotta be a better route... anyone?",
+      "Stuck behind the slowest driver ever. Of course. How's everyone else's commute going?",
     ],
   },
   evening_rush: {
     mood: "😤",
     templates: [
-      "Evening rush is on. Best route to avoid the worst of it? Still learning the area.",
-      "5 o'clock traffic - anyone else stuck? What podcasts are y'all listening to?",
-      "Traffic building up. Worth waiting it out somewhere or just power through?",
+      "5pm traffic is NO JOKE today. I've moved 2 blocks in 15 minutes. Send help. 😩",
+      "Why is there ALWAYS an accident right at rush hour?! Anyone know what happened?",
+      "Bumper to bumper on every single road. This city needs better traffic planning fr fr",
     ],
   },
   light: {
     mood: "😌",
     templates: [
-      "Roads are clear! Good time to explore - what part of town should I check out?",
-      "Light traffic right now. Perfect time to run errands. Any store recommendations?",
-      "Smooth sailing on the roads. Where's everyone heading today?",
+      "Finally! Roads are actually clear for once. Quick, go run your errands NOW before it gets bad again!",
+      "Wow traffic is weirdly light right now. Is there a holiday I don't know about? 🤔",
+      "Smooth driving today! Enjoy it while it lasts, y'all know it won't stay this way 😅",
     ],
   },
 };
 
-// General local interest templates
+// General local interest templates - THE HELPER personality
 const LOCAL_TEMPLATES = [
-  { mood: "😊", message: "Love how this community comes together. What's everyone up to today?" },
-  { mood: "🤔", message: "Any good restaurant recommendations around here? Always looking for new spots." },
-  { mood: "☀️", message: "Great day to explore the neighborhood. Anyone know of hidden gems nearby?" },
+  { mood: "😊", message: "Tip: Support local businesses this week! Drop your favorite small shops below 👇" },
+  { mood: "😊", message: "PSA: Friendly reminder to keep an eye out for package thieves this time of year! Stay safe neighbors." },
+  { mood: "☀️", message: "FYI: If anyone's new to the area, feel free to ask questions! We're a helpful bunch around here 🙂" },
 ];
 
 type EventData = {

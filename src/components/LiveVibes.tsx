@@ -84,7 +84,7 @@ export default function LiveVibes({ city, onNavigateToLocal }: LiveVibesProps) {
         </button>
 
         <p className="text-[10px] text-slate-500 text-center mt-2">
-          Google knows it's open. You'll know if it's worth going.
+          Real vibes from real neighbors, right now.
         </p>
       </div>
     );
