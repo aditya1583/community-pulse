@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import { supabase } from "../../lib/supabaseClient";
 
 type PulseLikeButtonProps = {
   pulseId: number;
@@ -39,7 +40,42 @@ export default function PulseLikeButton({
 
   useEffect(() => {
     void load();
+
+    // Polling fallback every 10 seconds for reaction updates
+    // (Realtime may not be enabled for pulse_reactions table)
+    const pollInterval = setInterval(() => {
+      void load();
+    }, 10000);
+
+    return () => clearInterval(pollInterval);
   }, [load]);
+
+  // REALTIME: Subscribe to pulse_reactions for this pulse to get instant updates
+  // Note: Requires Realtime to be enabled for pulse_reactions in Supabase dashboard
+  useEffect(() => {
+    const channelName = `pulse-reactions-${pulseId}`;
+
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        "postgres_changes",
+        {
+          event: "*", // Listen for INSERT and DELETE
+          schema: "public",
+          table: "pulse_reactions",
+          filter: `pulse_id=eq.${pulseId}`,
+        },
+        () => {
+          // Reload reaction count when any change happens
+          void load();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [pulseId, load]);
 
   const toggle = useCallback(async () => {
     if (!userIdentifier) return;

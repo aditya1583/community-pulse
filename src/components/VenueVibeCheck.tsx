@@ -68,6 +68,7 @@ export default function VenueVibeCheck({
   const [submittedVibe, setSubmittedVibe] = useState<VenueVibeType | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showAuthPrompt, setShowAuthPrompt] = useState(false);
 
   // Fetch current vibes
   const fetchVibes = useCallback(async () => {
@@ -191,43 +192,65 @@ export default function VenueVibeCheck({
         )}
 
         {/* Vibe check button - vibrant and inviting */}
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!isAuthenticated) {
-              // Prompt sign-in if not authenticated
-              onSignInClick?.();
-              return;
-            }
-            setIsOpen(true);
-          }}
-          disabled={submitSuccess}
-          className={`group inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full transition-all duration-300 ${
-            submitSuccess
-              ? "bg-emerald-500/30 text-emerald-300 border border-emerald-400/50 shadow-[0_0_12px_rgba(16,185,129,0.3)] cursor-default"
-              : "bg-gradient-to-r from-violet-600/80 to-fuchsia-600/80 text-white hover:from-violet-500 hover:to-fuchsia-500 shadow-[0_0_16px_rgba(139,92,246,0.4)] hover:shadow-[0_0_20px_rgba(139,92,246,0.6)] border border-violet-400/30 animate-subtle-pulse"
-          }`}
-        >
-          {submitSuccess ? (
-            <>
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-              <span>Logged!</span>
-            </>
-          ) : !isAuthenticated ? (
-            <>
-              <span className="text-sm">🔒</span>
-              <span>Sign in to Log</span>
-            </>
-          ) : (
-            <>
-              <span className="text-sm">✨</span>
-              <span>Log Vibe</span>
-            </>
+        <div className="relative">
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (!isAuthenticated) {
+                // Show auth prompt popup
+                setShowAuthPrompt(true);
+                // Auto-hide after 3 seconds
+                setTimeout(() => setShowAuthPrompt(false), 3000);
+                return;
+              }
+              setIsOpen(true);
+            }}
+            disabled={submitSuccess}
+            className={`group inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full transition-all duration-300 ${
+              submitSuccess
+                ? "bg-emerald-500/30 text-emerald-300 border border-emerald-400/50 shadow-[0_0_12px_rgba(16,185,129,0.3)] cursor-default"
+                : "bg-gradient-to-r from-violet-600/80 to-fuchsia-600/80 text-white hover:from-violet-500 hover:to-fuchsia-500 shadow-[0_0_16px_rgba(139,92,246,0.4)] hover:shadow-[0_0_20px_rgba(139,92,246,0.6)] border border-violet-400/30 animate-subtle-pulse"
+            }`}
+          >
+            {submitSuccess ? (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Logged!</span>
+              </>
+            ) : (
+              <>
+                <span className="text-sm">✨</span>
+                <span>Log Vibe</span>
+              </>
+            )}
+          </button>
+
+          {/* Auth prompt popup */}
+          {showAuthPrompt && (
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 animate-fade-in">
+              <div className="bg-slate-800 border border-violet-500/30 rounded-lg shadow-lg p-3 whitespace-nowrap">
+                <p className="text-xs text-slate-300 mb-2">Sign in to log vibes</p>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowAuthPrompt(false);
+                    onSignInClick?.();
+                  }}
+                  className="w-full px-3 py-1.5 text-xs font-medium bg-violet-600 hover:bg-violet-500 text-white rounded-md transition"
+                >
+                  Sign In
+                </button>
+              </div>
+              <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1">
+                <div className="w-2 h-2 bg-slate-800 border-r border-b border-violet-500/30 rotate-45" />
+              </div>
+            </div>
           )}
-        </button>
+        </div>
 
         {/* Vibe picker modal */}
         {isOpen && (

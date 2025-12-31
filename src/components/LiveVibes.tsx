@@ -17,6 +17,12 @@ type LiveVibesProps = {
   onNavigateToLocal?: () => void;
 };
 
+type LiveVibesResponse = {
+  vibes: LiveVibe[];
+  hasVibes: boolean;
+  totalVenues: number;
+};
+
 function formatTimeAgo(dateStr: string): string {
   const now = new Date();
   const date = new Date(dateStr);
@@ -34,16 +40,20 @@ export default function LiveVibes({ city, onNavigateToLocal }: LiveVibesProps) {
   const [vibes, setVibes] = useState<LiveVibe[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasVibes, setHasVibes] = useState(false);
+  const [totalVenues, setTotalVenues] = useState(0);
 
-  // Fetch live vibes from API
+  // Fetch live vibes from API - limit to 2 venues for display
   const fetchLiveVibes = useCallback(async () => {
     if (!city) return;
 
     try {
-      const res = await fetch(`/api/live-vibes?city=${encodeURIComponent(city)}&limit=5`);
-      const data = await res.json();
-      setVibes(data.vibes || []);
+      // Request up to 10 to know total count, but we'll only display 2
+      const res = await fetch(`/api/live-vibes?city=${encodeURIComponent(city)}&limit=10`);
+      const data: LiveVibesResponse = await res.json();
+      // Only keep first 2 vibes for display
+      setVibes((data.vibes || []).slice(0, 2));
       setHasVibes(data.hasVibes || false);
+      setTotalVenues(data.totalVenues || 0);
     } catch (error) {
       console.error("Error fetching live vibes:", error);
     } finally {
@@ -133,7 +143,7 @@ export default function LiveVibes({ city, onNavigateToLocal }: LiveVibesProps) {
         </span>
       </div>
 
-      {/* Vibe cards */}
+      {/* Vibe cards - Max 2 venues + 1 summary */}
       <div className="space-y-2">
         {vibes.map((vibe) => {
           const info = getVibeTypeInfo(vibe.vibeType as VenueVibeType);
@@ -162,6 +172,24 @@ export default function LiveVibes({ city, onNavigateToLocal }: LiveVibesProps) {
             </div>
           );
         })}
+
+        {/* Category summary - shows when more than 2 venues have activity */}
+        {totalVenues > 2 && (
+          <div className="flex items-center justify-between bg-slate-800/30 rounded-lg px-3 py-2 border border-slate-700/20">
+            <div className="flex items-center gap-2">
+              <span className="text-base flex-shrink-0">📊</span>
+              <p className="text-xs text-slate-400">
+                <span className="text-violet-300 font-medium">{totalVenues - 2}</span> more spot{totalVenues - 2 !== 1 ? 's' : ''} reporting activity
+              </p>
+            </div>
+            <button
+              onClick={onNavigateToLocal}
+              className="text-[10px] text-violet-400 hover:text-violet-300 transition"
+            >
+              View all →
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Log Vibe CTA - always visible */}

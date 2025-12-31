@@ -55,12 +55,20 @@ export async function generateNewsSummary(
 
 City: ${city}
 
+CRITICAL RULES - MUST FOLLOW:
+- ONLY summarize what's actually in the headlines and descriptions below
+- NEVER invent facts, claims about laws, government actions, statistics, or policy changes
+- NEVER add details not present in the articles (you don't have the full text)
+- Use hedging language: "according to local reports" or "headlines indicate"
+- If headlines are unclear, keep the summary vague rather than inventing specifics
+- NEVER fabricate legislative claims - this is legally dangerous
+
 Recent local news articles:
 ${articlesList}
 
 Task:
-1. Write a 2-3 sentence summary paragraph capturing the overall "local news vibe" - what's happening in this area right now. Be informative, neutral, and conversational.
-2. Extract 3-5 key story bullet points (short, scannable headlines).
+1. Write a 2-3 sentence summary ONLY using what's in the headlines above. Be informative, neutral, and conversational.
+2. Extract 3-5 key story bullet points (use actual headline text, don't embellish).
 3. Focus on local relevance - what matters to residents.
 4. Avoid sensationalism and keep the tone friendly and informative.
 5. Do not include any emojis.
@@ -79,14 +87,14 @@ Return ONLY a JSON object in this exact format:
         {
           role: "system",
           content:
-            "You are a local news summarizer that outputs strict JSON. Be concise, neutral, and community-focused.",
+            "You are a local news summarizer that outputs strict JSON. CRITICAL: Only summarize what's in the provided headlines - never invent facts, legislation, or claims. If uncertain, be vague rather than specific. Use hedging language like 'reports indicate'. Be concise, neutral, and accurate.",
         },
         {
           role: "user",
           content: prompt,
         },
       ],
-      temperature: 0.4,
+      temperature: 0.3, // Lower temperature for more factual output
       max_tokens: 300,
     });
 

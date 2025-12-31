@@ -2605,7 +2605,10 @@ export default function Home() {
           </div>
 
           {/* Live Vibes - Real-time crowd-sourced venue sentiment */}
-          <LiveVibes city={city} onNavigateToLocal={() => setActiveTab("local")} />
+          <LiveVibes city={city} onNavigateToLocal={() => {
+            setLocalSection("deals"); // Reset to Deals tab (not Gas)
+            setActiveTab("local");
+          }} />
 
           {/* Tab Content */}
           <div className="space-y-4">

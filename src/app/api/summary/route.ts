@@ -125,19 +125,26 @@ export async function POST(req: Request) {
       }
 
       prompt = `
-You are a friendly local who knows what's happening in ${displayCity}. Write like you're giving a quick heads-up to a neighbor - conversational, helpful, with local personality.
+You are summarizing ONLY the data provided below for ${displayCity}. Write like you're giving a quick heads-up to a neighbor.
 
-Here's what's going on:
+CRITICAL RULES - MUST FOLLOW:
+- ONLY mention information explicitly present in the data below
+- NEVER invent facts, statistics, laws, legislation, government actions, or claims
+- NEVER speculate about causes or consequences not mentioned in the data
+- If a topic isn't in the data, don't mention it at all
+- Use phrases like "residents report" or "some neighbors say" when summarizing community posts
+
+Here's the ACTUAL data:
 
 ${sections.join("\n\n")}
 
 Task:
-1. In 2-3 short sentences, give a natural overview of ${displayCity} right now.
-2. Lead with the most interesting or useful info (events, notable community chatter, conditions).
+1. In 2-3 short sentences, summarize ONLY what's in the data above.
+2. Lead with the most interesting or useful info (events, community reports, conditions).
 3. Sound like a helpful neighbor, not a news anchor. Use casual phrasing.
-4. Skip the formal intro - jump right into what matters. No emojis.
+4. Skip formalities - get straight to the useful info. No emojis.
 
-Example tone: "Heads up, traffic's building near downtown. Big show at the arena tonight so expect crowds. Weather's perfect for walking though!"
+Example tone: "Heads up, a few neighbors are reporting traffic building near downtown. There's a show at the arena tonight. Weather's looking good."
 
 Return ONLY the summary text, nothing else.
       `.trim();
@@ -163,12 +170,18 @@ You are summarizing short, real-time status updates for a city board called "Com
 
 City: ${city}
 
+CRITICAL RULES - MUST FOLLOW:
+- ONLY summarize what's actually in the pulses below
+- NEVER invent facts, claims about laws, government actions, or statistics
+- NEVER speculate beyond what people actually said
+- Use "some neighbors report" or "residents are saying" language
+
 Here are recent pulses:
 ${pulseLines}
 
 Task:
-1. In 1-2 sentences, summarize the overall vibe in this city right now.
-2. Mention traffic / weather / events only if they appear in the pulses.
+1. In 1-2 sentences, summarize ONLY what's in the pulses above.
+2. Mention traffic / weather / events only if they explicitly appear in the pulses.
 3. Keep it neutral, informative, and concise. No emojis.
 
 Return ONLY the summary text, nothing else.
@@ -263,11 +276,11 @@ Return ONLY the summary text, nothing else.
           {
             role: "system",
             content:
-              "You're a friendly local giving quick updates to neighbors. Be conversational, helpful, and personable - like texting a friend about what's happening in town. Skip formalities and get straight to the good stuff.",
+              "You're a friendly local giving quick updates to neighbors. CRITICAL: You must ONLY summarize the data provided - never invent facts, legislation, statistics, or claims not in the input. If something isn't in the data, don't mention it. Use hedging language like 'neighbors report' or 'some are saying'. Be conversational but accurate.",
           },
           { role: "user", content: prompt },
         ],
-        temperature: 0.4,
+        temperature: 0.3, // Lower temperature for more factual output
         max_tokens: 150,
       }),
     });

@@ -84,6 +84,28 @@ function InlineLinkButton(props: {
   );
 }
 
+/** Provenance badge - shows data source attribution */
+function ProvenanceBadge({ source, count, timeframe }: {
+  source: string;
+  count?: number;
+  timeframe?: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1 ml-1.5 px-1.5 py-0.5 text-[10px] text-slate-500 bg-slate-800/50 rounded border border-slate-700/30">
+      {count !== undefined && count > 0 && (
+        <span className="text-slate-400">{count}</span>
+      )}
+      <span>{source}</span>
+      {timeframe && (
+        <>
+          <span className="text-slate-600">·</span>
+          <span>{timeframe}</span>
+        </>
+      )}
+    </span>
+  );
+}
+
 /**
  * AI Summary Card - Always visible below tabs
  *
@@ -223,7 +245,7 @@ export default function AISummaryCard({
         </span>
       </div>
 
-      {/* Summary content */}
+      {/* Summary content with provenance badges */}
       <div className="space-y-2">
         <p className="text-sm text-slate-300 leading-relaxed">
           <InlineLinkButton
@@ -234,6 +256,9 @@ export default function AISummaryCard({
           </InlineLinkButton>
           {": "}
           {pulseLine}
+          {pulsesCount > 0 && (
+            <ProvenanceBadge source="community reports" count={pulsesCount} timeframe="last 4h" />
+          )}
         </p>
 
         <p className="text-sm text-slate-300 leading-relaxed">
@@ -245,6 +270,9 @@ export default function AISummaryCard({
           </InlineLinkButton>
           {": "}
           {trafficLine}
+          {trafficLevel && !trafficLoading && !trafficError && (
+            <ProvenanceBadge source="TomTom API" timeframe="live" />
+          )}
         </p>
 
         <p className="text-sm text-slate-300 leading-relaxed">
@@ -270,6 +298,7 @@ export default function AISummaryCard({
                 </React.Fragment>
               ))}
               .
+              <ProvenanceBadge source="Ticketmaster" count={events.length} />
             </>
           ) : (
             eventsLine
@@ -285,6 +314,9 @@ export default function AISummaryCard({
           </InlineLinkButton>
           {": "}
           {newsLine}
+          {newsCount > 0 && !newsLoading && !newsError && (
+            <ProvenanceBadge source="articles" count={newsCount} />
+          )}
         </p>
 
         <p className="text-sm text-slate-300 leading-relaxed">
@@ -296,6 +328,7 @@ export default function AISummaryCard({
           </InlineLinkButton>
           {": "}
           {localLine}
+          <ProvenanceBadge source="Yelp" />
         </p>
       </div>
 
