@@ -9,6 +9,8 @@ type VenueVibeCheckProps = {
   venueName: string;
   venueLat?: number;
   venueLon?: number;
+  /** City name for filtering (e.g., "Austin, TX, US") */
+  city?: string;
   /** Compact mode shows only a button + top vibe badge */
   compact?: boolean;
 };
@@ -48,6 +50,7 @@ export default function VenueVibeCheck({
   venueName,
   venueLat,
   venueLon,
+  city,
   compact = false,
 }: VenueVibeCheckProps) {
   const [vibes, setVibes] = useState<VenueVibeAggregate[]>([]);
@@ -92,6 +95,7 @@ export default function VenueVibeCheck({
           vibeType,
           venueLat,
           venueLon,
+          city, // Pass city for filtering
           deviceFingerprint: getDeviceFingerprint(),
         }),
       });

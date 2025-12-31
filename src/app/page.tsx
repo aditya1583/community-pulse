@@ -259,6 +259,9 @@ export default function Home() {
   const [newsLoading, setNewsLoading] = useState(false);
   const [newsError, setNewsError] = useState<string | null>(null);
 
+  // Gas Prices (for quick view in Current Vibe section)
+  const [gasPrice, setGasPrice] = useState<number | null>(null);
+
   // City Autocomplete
   const {
     inputValue: cityInput,
@@ -605,6 +608,39 @@ export default function Home() {
       cancelled = true;
     };
   }, [city, selectedCity?.lat, selectedCity?.lon, selectedCity?.country, selectedCity?.state]);
+
+  // ========= GAS PRICES (for Current Vibe card) =========
+  useEffect(() => {
+    const stateCode = selectedCity?.state;
+    if (!stateCode) {
+      setGasPrice(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchGasPrice = async () => {
+      try {
+        const res = await fetch(`/api/gas-prices?state=${encodeURIComponent(stateCode)}`);
+        const data = await res.json();
+
+        if (cancelled) return;
+
+        if (data.regular) {
+          setGasPrice(data.regular);
+        }
+      } catch {
+        // Silently fail - gas price is supplementary info
+        if (!cancelled) setGasPrice(null);
+      }
+    };
+
+    fetchGasPrice();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCity?.state]);
 
   // ========= LOCAL NEWS =========
   useEffect(() => {
@@ -2511,6 +2547,8 @@ export default function Home() {
             onDropPulse={handleDropPulseJump}
             cityMood={cityMood}
             cityMoodLoading={cityMoodLoading}
+            gasPrice={gasPrice}
+            onGasPriceClick={() => setActiveTab("local")}
           />
 
           {/* Quick Stats */}

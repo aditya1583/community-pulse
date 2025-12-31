@@ -164,9 +164,18 @@ export default function LiveVibes({ city, onNavigateToLocal }: LiveVibesProps) {
         })}
       </div>
 
+      {/* Log Vibe CTA - always visible */}
+      <button
+        onClick={onNavigateToLocal}
+        className="w-full mt-3 py-2 px-4 bg-gradient-to-r from-violet-600/60 to-fuchsia-600/60 text-white text-sm font-medium rounded-lg hover:from-violet-500 hover:to-fuchsia-500 transition-all border border-violet-400/20 flex items-center justify-center gap-2"
+      >
+        <span>✨</span>
+        <span>Log a Vibe</span>
+      </button>
+
       {/* Footer */}
-      <p className="text-[10px] text-slate-500 text-center mt-3">
-        Real-time crowd-sourced vibes from your neighbors
+      <p className="text-[10px] text-slate-500 text-center mt-2">
+        Real vibes from real neighbors, right now
       </p>
     </div>
   );

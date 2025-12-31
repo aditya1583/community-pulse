@@ -11,6 +11,9 @@ type CurrentVibeCardProps = {
   // New props for pulse-based vibe system
   cityMood?: CityMood | null;
   cityMoodLoading?: boolean;
+  // Gas price quick view
+  gasPrice?: number | null;
+  onGasPriceClick?: () => void;
 };
 
 /**
@@ -30,6 +33,8 @@ export default function CurrentVibeCard({
   onDropPulse,
   cityMood,
   cityMoodLoading = false,
+  gasPrice,
+  onGasPriceClick,
 }: CurrentVibeCardProps) {
   const formatTempF = (temp: number) => `${Math.round(temp)}\u00B0F`;
 
@@ -270,6 +275,21 @@ export default function CurrentVibeCard({
           {getVibeEmoji()}
         </div>
       </div>
+
+      {/* Gas Price Quick View */}
+      {gasPrice && gasPrice > 0 && (
+        <button
+          onClick={onGasPriceClick}
+          className="mt-3 flex items-center gap-2 px-3 py-1.5 bg-slate-700/40 hover:bg-slate-700/60 border border-slate-600/30 rounded-lg transition-colors group"
+        >
+          <span className="text-base">⛽</span>
+          <span className="text-sm font-medium text-amber-400">${gasPrice.toFixed(2)}</span>
+          <span className="text-xs text-slate-500">Regular</span>
+          <svg className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-400 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }

@@ -240,6 +240,7 @@ export default function LocalDealsSection({
                     <VenueVibeCheck
                       venueId={deal.id}
                       venueName={deal.name}
+                      city={cityName}
                       compact
                     />
                   </div>

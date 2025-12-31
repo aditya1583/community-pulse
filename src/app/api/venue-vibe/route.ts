@@ -102,6 +102,7 @@ export async function POST(request: NextRequest) {
       venueLat,
       venueLon,
       deviceFingerprint,
+      city, // City where the venue is located
     } = body;
 
     // Validation
@@ -149,6 +150,7 @@ export async function POST(request: NextRequest) {
         venue_lat: venueLat || null,
         venue_lon: venueLon || null,
         device_fingerprint: deviceFingerprint || null,
+        city: city || null, // Store city for filtering
         expires_at: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(), // 4 hours
       })
       .select()

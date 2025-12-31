@@ -24,14 +24,20 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Get recent non-expired vibes
-    // We'll match vibes to the city by checking if venue_name or city patterns match
-    const { data, error } = await supabase
+    // Get recent non-expired vibes filtered by city
+    // Using .ilike for case-insensitive city matching
+    let query = supabase
       .from("venue_vibes")
-      .select("id, venue_id, venue_name, vibe_type, created_at, expires_at")
+      .select("id, venue_id, venue_name, vibe_type, created_at, expires_at, city")
       .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false })
       .limit(50); // Fetch more, then filter/aggregate
+
+    // Filter by city if provided - extract just the city name
+    const cityName = city.split(",")[0].trim();
+    query = query.ilike("city", `%${cityName}%`);
+
+    const { data, error } = await query;
 
     if (error) {
       // Table might not exist
