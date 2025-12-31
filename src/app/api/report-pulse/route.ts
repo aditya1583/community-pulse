@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { checkRateLimit, RATE_LIMITS, buildRateLimitHeaders } from "@/lib/rateLimit";
 
 /**
  * Report Pulse API Route
@@ -63,6 +64,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "Invalid or expired session" },
         { status: 401 }
+      );
+    }
+
+    // Rate limiting - 10 reports per day per user
+    const rateLimitResult = checkRateLimit(user.id, RATE_LIMITS.REPORT);
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        {
+          error: `You've reached the daily report limit. Try again tomorrow.`,
+        },
+        {
+          status: 429,
+          headers: buildRateLimitHeaders(rateLimitResult),
+        }
       );
     }
 

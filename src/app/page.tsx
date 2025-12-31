@@ -1152,9 +1152,11 @@ export default function Home() {
       const start = startOfRecentWindow(now, 7);
       const end = startOfNextLocalDay(now);
 
+      // Explicitly select only needed fields for privacy
+      // user_id is included for ownership check (is this my pulse?) - it's a UUID, not PII
       const { data, error } = await supabase
         .from("pulses")
-        .select("*")
+        .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at")
         .eq("city", city)
         .gte("created_at", start.toISOString())
         .lt("created_at", end.toISOString())

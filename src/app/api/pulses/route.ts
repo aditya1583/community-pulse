@@ -46,6 +46,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { runModerationPipeline, quickModerateContent } from "@/lib/moderationPipeline";
 import { detectPII, hashContentForLogging, logPIIDetection } from "@/lib/piiDetection";
+import { checkRateLimit, RATE_LIMITS, buildRateLimitHeaders } from "@/lib/rateLimit";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -124,6 +125,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "Invalid or expired session" },
         { status: 401 }
+      );
+    }
+
+    // Rate limiting - 5 pulses per hour per user
+    const rateLimitResult = checkRateLimit(user.id, RATE_LIMITS.PULSE_CREATE);
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        {
+          error: `Rate limit exceeded. You can post ${rateLimitResult.limit} pulses per hour. Try again in ${Math.ceil(rateLimitResult.resetInSeconds / 60)} minutes.`,
+        },
+        {
+          status: 429,
+          headers: buildRateLimitHeaders(rateLimitResult),
+        }
       );
     }
 

@@ -51,6 +51,7 @@ vi.mock("@supabase/supabase-js", () => ({
 import { POST } from "../route";
 import { runModerationPipeline, quickModerateContent } from "@/lib/moderationPipeline";
 import { detectPII } from "@/lib/piiDetection";
+import { clearAllRateLimits } from "@/lib/rateLimit";
 
 // Cast to mock for type safety
 const mockRunModerationPipeline = runModerationPipeline as ReturnType<typeof vi.fn>;
@@ -62,6 +63,9 @@ describe("/api/pulses POST route", () => {
 
   beforeEach(() => {
     vi.resetModules();
+    // Clear rate limits before each test to prevent interference
+    clearAllRateLimits();
+
     process.env = { ...originalEnv };
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
@@ -905,6 +909,9 @@ describe("/api/pulses - Fail-Closed Guarantee Tests", () => {
 
   beforeEach(() => {
     vi.resetModules();
+    // Clear rate limits before each test to prevent interference
+    clearAllRateLimits();
+
     process.env = { ...originalEnv };
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";

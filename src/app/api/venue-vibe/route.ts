@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { checkRateLimit, RATE_LIMITS, buildRateLimitHeaders } from "@/lib/rateLimit";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -111,6 +112,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Sign in required to log vibes" },
         { status: 401 }
+      );
+    }
+
+    // Global rate limiting - 5 vibes per hour per user (across all venues)
+    const rateLimitResult = checkRateLimit(userId, RATE_LIMITS.VENUE_VIBE);
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        {
+          error: `You've logged too many vibes recently. Try again in ${Math.ceil(rateLimitResult.resetInSeconds / 60)} minutes.`,
+        },
+        {
+          status: 429,
+          headers: buildRateLimitHeaders(rateLimitResult),
+        }
       );
     }
 
