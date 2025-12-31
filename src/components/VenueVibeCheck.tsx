@@ -13,6 +13,10 @@ type VenueVibeCheckProps = {
   city?: string;
   /** Compact mode shows only a button + top vibe badge */
   compact?: boolean;
+  /** User ID - if not provided, user must sign in to log vibes */
+  userId?: string | null;
+  /** Callback to show sign-in modal */
+  onSignInClick?: () => void;
 };
 
 // Generate a simple device fingerprint for rate limiting
@@ -52,7 +56,10 @@ export default function VenueVibeCheck({
   venueLon,
   city,
   compact = false,
+  userId,
+  onSignInClick,
 }: VenueVibeCheckProps) {
+  const isAuthenticated = !!userId;
   const [vibes, setVibes] = useState<VenueVibeAggregate[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -96,6 +103,7 @@ export default function VenueVibeCheck({
           venueLat,
           venueLon,
           city, // Pass city for filtering
+          userId, // Pass user ID for auth and tracking
           deviceFingerprint: getDeviceFingerprint(),
         }),
       });
@@ -145,10 +153,19 @@ export default function VenueVibeCheck({
     ? (vibes.find(v => v.vibeType === submittedVibe)?.count || 1)
     : 0;
 
+  // Prevent clicks from bubbling to parent anchor tags
+  const handleContainerClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
   // Compact mode: just show the top vibe badge and a button
   if (compact) {
     return (
-      <div className="flex items-center gap-2 flex-wrap">
+      <div
+        className="flex items-center gap-2 flex-wrap"
+        onClick={handleContainerClick}
+      >
         {/* Success feedback - shows after submitting */}
         {submitSuccess && submittedVibeInfo && (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full animate-fade-in">
@@ -178,6 +195,11 @@ export default function VenueVibeCheck({
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            if (!isAuthenticated) {
+              // Prompt sign-in if not authenticated
+              onSignInClick?.();
+              return;
+            }
             setIsOpen(true);
           }}
           disabled={submitSuccess}
@@ -193,6 +215,11 @@ export default function VenueVibeCheck({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
               <span>Logged!</span>
+            </>
+          ) : !isAuthenticated ? (
+            <>
+              <span className="text-sm">🔒</span>
+              <span>Sign in to Log</span>
             </>
           ) : (
             <>

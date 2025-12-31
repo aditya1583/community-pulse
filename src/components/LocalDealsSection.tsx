@@ -8,6 +8,10 @@ type LocalDealsSectionProps = {
   cityName: string;
   lat?: number;
   lon?: number;
+  /** User ID for vibe logging - if not provided, user must sign in */
+  userId?: string | null;
+  /** Callback to show sign-in modal */
+  onSignInClick?: () => void;
 };
 
 const CATEGORIES = [
@@ -24,6 +28,8 @@ export default function LocalDealsSection({
   cityName,
   lat,
   lon,
+  userId,
+  onSignInClick,
 }: LocalDealsSectionProps) {
   const [deals, setDeals] = useState<LocalDeal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -241,6 +247,8 @@ export default function LocalDealsSection({
                       venueId={deal.id}
                       venueName={deal.name}
                       city={cityName}
+                      userId={userId}
+                      onSignInClick={onSignInClick}
                       compact
                     />
                   </div>

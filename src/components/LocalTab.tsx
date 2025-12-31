@@ -15,6 +15,10 @@ type LocalTabProps = {
   section?: LocalSection;
   /** Callback when section changes */
   onSectionChange?: (section: LocalSection) => void;
+  /** User ID for vibe logging - if not provided, user must sign in */
+  userId?: string | null;
+  /** Callback to show sign-in modal */
+  onSignInClick?: () => void;
 };
 
 const SECTIONS: { id: LocalSection; label: string; emoji: string }[] = [
@@ -38,6 +42,8 @@ export default function LocalTab({
   lon,
   section,
   onSectionChange,
+  userId,
+  onSignInClick,
 }: LocalTabProps) {
   // Support both controlled and uncontrolled modes
   const [internalSection, setInternalSection] = useState<LocalSection>("deals");
@@ -78,6 +84,8 @@ export default function LocalTab({
             cityName={cityName}
             lat={lat}
             lon={lon}
+            userId={userId}
+            onSignInClick={onSignInClick}
           />
         )}
 

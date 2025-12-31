@@ -103,7 +103,16 @@ export async function POST(request: NextRequest) {
       venueLon,
       deviceFingerprint,
       city, // City where the venue is located
+      userId, // User ID for auth (required)
     } = body;
+
+    // Require authentication
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Sign in required to log vibes" },
+        { status: 401 }
+      );
+    }
 
     // Validation
     if (!venueId || !venueName || !vibeType) {
@@ -151,6 +160,7 @@ export async function POST(request: NextRequest) {
         venue_lon: venueLon || null,
         device_fingerprint: deviceFingerprint || null,
         city: city || null, // Store city for filtering
+        user_id: userId, // Track who submitted the vibe
         expires_at: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(), // 4 hours
       })
       .select()

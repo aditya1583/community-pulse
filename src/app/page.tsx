@@ -2648,6 +2648,8 @@ export default function Home() {
                       lon={localLon}
                       section={localSection}
                       onSectionChange={setLocalSection}
+                      userId={sessionUser?.id}
+                      onSignInClick={() => setShowAuthModal(true)}
                     />
                   );
                 case "status":
