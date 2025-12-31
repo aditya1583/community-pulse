@@ -41,6 +41,8 @@ import { DASHBOARD_TABS, type TabId, type WeatherInfo, type Pulse, type CityMood
 import type { LocalNewsResponse } from "@/types/news";
 import { useGamification } from "@/hooks/useGamification";
 import XPProgressBadge from "@/components/XPProgressBadge";
+import { useGeolocation } from "@/hooks/useGeolocation";
+import LocationPrompt from "@/components/LocationPrompt";
 
 // Real-time Live Updates
 type DBPulse = {
@@ -167,6 +169,10 @@ export default function Home() {
     weeklyRank: userRank,
     loading: gamificationLoading,
   } = useGamification(sessionUser?.id ?? null);
+
+  // Geolocation - true hyperlocal experience
+  const geolocation = useGeolocation();
+  const [useManualLocation, setUseManualLocation] = useState(false);
 
   // USER STREAK
   const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
@@ -1026,6 +1032,42 @@ export default function Home() {
       // Ignore storage errors
     }
   }, [city, selectedCity]);
+
+  // ========= GEOLOCATION → CITY SYNC =========
+  // When geolocation succeeds and we're not in manual mode, update city state
+  useEffect(() => {
+    // Skip if user chose manual mode
+    if (useManualLocation) return;
+    // Skip if geolocation doesn't have data yet
+    if (!geolocation.lat || !geolocation.lon || !geolocation.displayName) return;
+    // Skip if still loading
+    if (geolocation.loading) return;
+
+    // Build a GeocodedCity from geolocation
+    const geoCity: GeocodedCity = {
+      id: `geo-${geolocation.lat}-${geolocation.lon}`,
+      name: geolocation.cityName || "Near You",
+      state: geolocation.stateCode || undefined,
+      lat: geolocation.lat,
+      lon: geolocation.lon,
+      displayName: geolocation.displayName,
+    };
+
+    // Update city state with geolocation data
+    setCity(geoCity.displayName);
+    setCityInput(geoCity.displayName);
+    setSelectedCity(geoCity);
+    setLastValidCity(geoCity);
+  }, [
+    useManualLocation,
+    geolocation.lat,
+    geolocation.lon,
+    geolocation.displayName,
+    geolocation.cityName,
+    geolocation.stateCode,
+    geolocation.loading,
+    setCityInput,
+  ]);
 
   // Handler for selecting a city from autocomplete
   function handleCitySelect(chosenCity: GeocodedCity) {
@@ -2081,6 +2123,32 @@ export default function Home() {
 
     window.setTimeout(() => tryFocus(0), 0);
   }, [setActiveTab]);
+
+  // Show LocationPrompt if:
+  // 1. Not in manual mode
+  // 2. Geolocation permission is "prompt" (never asked)
+  // 3. No cached location (geolocation hasn't been granted before)
+  // 4. Not still loading
+  const showLocationPrompt =
+    !useManualLocation &&
+    !geolocation.loading &&
+    geolocation.permissionStatus === "prompt" &&
+    !geolocation.lat;
+
+  // If we need location prompt, show it instead of main app
+  if (showLocationPrompt) {
+    return (
+      <LocationPrompt
+        onRequestLocation={async () => {
+          const success = await geolocation.requestLocation();
+          return success;
+        }}
+        onUseManual={() => setUseManualLocation(true)}
+        loading={geolocation.loading}
+        error={geolocation.error}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen neon-grid-bg text-slate-50 flex flex-col">

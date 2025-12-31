@@ -19,8 +19,12 @@ type HeaderProps = {
  * providing visual proof that the app is actively monitoring the area.
  */
 export default function Header({ cityName, isLive = true, radiusMiles = 5 }: HeaderProps) {
-  // Extract just the city name without state/country
-  const displayCity = cityName.split(",")[0]?.trim() || cityName;
+  // Show full "City, ST" format to avoid Springfield trap
+  // Only strip country if it's included (e.g., "Austin, TX, US" → "Austin, TX")
+  const parts = cityName.split(",").map(p => p.trim());
+  const displayCity = parts.length > 2
+    ? `${parts[0]}, ${parts[1]}`  // "Austin, TX, US" → "Austin, TX"
+    : cityName;                    // Already "Austin, TX" or just "Austin"
 
   return (
     <header className="flex items-center justify-between px-4 py-3">
