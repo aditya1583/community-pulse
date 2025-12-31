@@ -151,6 +151,7 @@ export default function Home() {
 
   // Tab state for new Neon theme
   const [activeTab, setActiveTab] = useState<TabId>("pulse");
+  const [localSection, setLocalSection] = useState<"deals" | "gas" | "markets">("deals");
   const [showPulseModal, setShowPulseModal] = useState(false);
 
   // Auth + anon profile
@@ -2548,7 +2549,10 @@ export default function Home() {
             cityMood={cityMood}
             cityMoodLoading={cityMoodLoading}
             gasPrice={gasPrice}
-            onGasPriceClick={() => setActiveTab("local")}
+            onGasPriceClick={() => {
+              setLocalSection("gas");
+              setActiveTab("local");
+            }}
           />
 
           {/* Quick Stats */}
@@ -2642,6 +2646,8 @@ export default function Home() {
                       state={localState}
                       lat={localLat}
                       lon={localLon}
+                      section={localSection}
+                      onSectionChange={setLocalSection}
                     />
                   );
                 case "status":

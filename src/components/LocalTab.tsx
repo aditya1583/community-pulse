@@ -11,6 +11,10 @@ type LocalTabProps = {
   state: string;
   lat?: number;
   lon?: number;
+  /** Controlled section state (optional - will use internal state if not provided) */
+  section?: LocalSection;
+  /** Callback when section changes */
+  onSectionChange?: (section: LocalSection) => void;
 };
 
 const SECTIONS: { id: LocalSection; label: string; emoji: string }[] = [
@@ -32,8 +36,17 @@ export default function LocalTab({
   state,
   lat,
   lon,
+  section,
+  onSectionChange,
 }: LocalTabProps) {
-  const [activeSection, setActiveSection] = useState<LocalSection>("deals");
+  // Support both controlled and uncontrolled modes
+  const [internalSection, setInternalSection] = useState<LocalSection>("deals");
+  const activeSection = section ?? internalSection;
+
+  const handleSectionChange = (newSection: LocalSection) => {
+    setInternalSection(newSection);
+    onSectionChange?.(newSection);
+  };
 
   return (
     <div className="space-y-4">
@@ -44,7 +57,7 @@ export default function LocalTab({
           return (
             <button
               key={section.id}
-              onClick={() => setActiveSection(section.id)}
+              onClick={() => handleSectionChange(section.id)}
               className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
                 isActive
                   ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"
