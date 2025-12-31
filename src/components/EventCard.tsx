@@ -1,7 +1,51 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import type { TicketmasterEvent } from "@/hooks/useEvents";
+
+/**
+ * Generate an ICS calendar file for an event
+ */
+function generateICS(event: TicketmasterEvent): string {
+  const eventDate = event.date
+    ? new Date(event.date + (event.time ? `T${event.time}` : "T12:00:00"))
+    : new Date();
+
+  // End time is 3 hours after start (default for events)
+  const endDate = new Date(eventDate.getTime() + 3 * 60 * 60 * 1000);
+
+  const formatDate = (d: Date) => d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+
+  return `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Community Pulse//Events//EN
+BEGIN:VEVENT
+UID:${event.id}@communitypulse
+DTSTART:${formatDate(eventDate)}
+DTEND:${formatDate(endDate)}
+SUMMARY:${event.name.replace(/,/g, "\\,")}
+LOCATION:${event.venue?.replace(/,/g, "\\,") || ""}
+DESCRIPTION:${event.url ? `Get tickets: ${event.url}` : ""}
+URL:${event.url || ""}
+END:VEVENT
+END:VCALENDAR`;
+}
+
+/**
+ * Download ICS file
+ */
+function downloadICS(event: TicketmasterEvent) {
+  const ics = generateICS(event);
+  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${event.name.slice(0, 30).replace(/[^a-zA-Z0-9]/g, "_")}.ics`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
 type EventCardProps = {
   events: TicketmasterEvent[];
@@ -15,7 +59,7 @@ type EventCardProps = {
  *
  * Large card with category-based gradient
  * Date badge, event name, venue, price
- * Entire card is clickable
+ * Action buttons: Add to Calendar, Directions, Share
  */
 function FeaturedEventCard({ event }: { event: TicketmasterEvent }) {
   const eventDate = event.date
@@ -44,15 +88,46 @@ function FeaturedEventCard({ event }: { event: TicketmasterEvent }) {
     return "from-cyan-500/20 to-cyan-900/20 border-cyan-500/30";
   };
 
-  const handleClick = () => {
+  const handleCardClick = () => {
     if (event.url) {
       window.open(event.url, "_blank", "noopener,noreferrer");
     }
   };
 
+  const handleCalendar = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    downloadICS(event);
+  }, [event]);
+
+  const handleDirections = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const query = encodeURIComponent(event.venue || event.name);
+    window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, "_blank");
+  }, [event]);
+
+  const handleShare = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const shareData = {
+      title: event.name,
+      text: `${event.name} at ${event.venue}`,
+      url: event.url || window.location.href,
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch {
+        // User cancelled or error - fall back to clipboard
+        await navigator.clipboard.writeText(event.url || "");
+      }
+    } else {
+      await navigator.clipboard.writeText(event.url || "");
+    }
+  }, [event]);
+
   return (
     <article
-      onClick={handleClick}
+      onClick={handleCardClick}
       className={`bg-gradient-to-r ${getGradient()} border rounded-xl p-4 cursor-pointer hover:scale-[1.02] transition-transform duration-200`}
     >
       <div className="flex gap-4">
@@ -111,6 +186,38 @@ function FeaturedEventCard({ event }: { event: TicketmasterEvent }) {
             </span>
           )}
         </div>
+      </div>
+
+      {/* Action buttons */}
+      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-700/30">
+        <button
+          onClick={handleCalendar}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-xs text-slate-300 hover:text-white transition"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+          </svg>
+          Calendar
+        </button>
+        <button
+          onClick={handleDirections}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-xs text-slate-300 hover:text-white transition"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+          </svg>
+          Directions
+        </button>
+        <button
+          onClick={handleShare}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-xs text-slate-300 hover:text-white transition"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+          </svg>
+          Share
+        </button>
       </div>
     </article>
   );

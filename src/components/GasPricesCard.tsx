@@ -115,9 +115,14 @@ export default function GasPricesCard({ state }: GasPricesCardProps) {
         </div>
       )}
 
-      {/* Prices Card */}
+      {/* Prices Card - Clickable to find gas stations */}
       {!loading && !error && prices && (
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
+        <a
+          href={`https://www.google.com/maps/search/gas+stations+near+${encodeURIComponent(prices.regionName || state)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 hover:border-emerald-500/50 hover:bg-slate-800/80 transition-all cursor-pointer group"
+        >
           {/* Main Prices Grid */}
           <div className="grid grid-cols-4 gap-3 mb-4">
             {/* Regular */}
@@ -160,16 +165,24 @@ export default function GasPricesCard({ state }: GasPricesCardProps) {
             </div>
           </div>
 
-          {/* Last Updated */}
-          <p className="text-[10px] text-slate-500 mt-3 text-center">
-            Updated {new Date(prices.lastUpdated).toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-              hour: "numeric",
-              minute: "2-digit"
-            })}
-          </p>
-        </div>
+          {/* Last Updated + Find Stations hint */}
+          <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-700/30">
+            <p className="text-[10px] text-slate-500">
+              Updated {new Date(prices.lastUpdated).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit"
+              })}
+            </p>
+            <span className="text-[10px] text-emerald-400 flex items-center gap-1 group-hover:text-emerald-300">
+              Find stations
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </span>
+          </div>
+        </a>
       )}
 
       {/* EIA Attribution */}
