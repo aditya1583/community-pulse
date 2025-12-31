@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { supabase } from "../../lib/supabaseClient";
 import { getVibeTypeInfo, VenueVibeType } from "./types";
 
 type LiveVibe = {
@@ -34,27 +35,57 @@ export default function LiveVibes({ city, onNavigateToLocal }: LiveVibesProps) {
   const [loading, setLoading] = useState(true);
   const [hasVibes, setHasVibes] = useState(false);
 
+  // Fetch live vibes from API
+  const fetchLiveVibes = useCallback(async () => {
+    if (!city) return;
+
+    try {
+      const res = await fetch(`/api/live-vibes?city=${encodeURIComponent(city)}&limit=5`);
+      const data = await res.json();
+      setVibes(data.vibes || []);
+      setHasVibes(data.hasVibes || false);
+    } catch (error) {
+      console.error("Error fetching live vibes:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [city]);
+
+  // Initial fetch and polling fallback
   useEffect(() => {
-    const fetchLiveVibes = async () => {
-      if (!city) return;
-
-      try {
-        const res = await fetch(`/api/live-vibes?city=${encodeURIComponent(city)}&limit=5`);
-        const data = await res.json();
-        setVibes(data.vibes || []);
-        setHasVibes(data.hasVibes || false);
-      } catch (error) {
-        console.error("Error fetching live vibes:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchLiveVibes();
-    // Refresh every 2 minutes
+    // Fallback polling every 2 minutes (realtime is primary)
     const interval = setInterval(fetchLiveVibes, 120000);
     return () => clearInterval(interval);
-  }, [city]);
+  }, [fetchLiveVibes]);
+
+  // REALTIME: Subscribe to venue_vibes table for instant updates
+  useEffect(() => {
+    if (!city) return;
+
+    const channelName = `venue-vibes-realtime-${city.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "venue_vibes",
+        },
+        () => {
+          // Refetch vibes when a new one is added
+          // This aggregates properly via the API
+          fetchLiveVibes();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [city, fetchLiveVibes]);
 
   // Don't render while loading
   if (loading) return null;
