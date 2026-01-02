@@ -13,7 +13,7 @@ export const DASHBOARD_TABS = [
 
 export type TabId = (typeof DASHBOARD_TABS)[number]["id"];
 
-export type LocalSection = "deals" | "gas" | "markets";
+export type LocalSection = "gas" | "markets";
 
 export type LocalDeal = {
   id: string;

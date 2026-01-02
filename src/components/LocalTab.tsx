@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import type { LocalSection } from "./types";
-import LocalDealsSection from "./LocalDealsSection";
 import GasPricesCard from "./GasPricesCard";
 import FarmersMarketsSection from "./FarmersMarketsSection";
 
@@ -15,14 +14,9 @@ type LocalTabProps = {
   section?: LocalSection;
   /** Callback when section changes */
   onSectionChange?: (section: LocalSection) => void;
-  /** User ID for vibe logging - if not provided, user must sign in */
-  userId?: string | null;
-  /** Callback to show sign-in modal */
-  onSignInClick?: () => void;
 };
 
 const SECTIONS: { id: LocalSection; label: string; emoji: string }[] = [
-  { id: "deals", label: "Deals", emoji: "🏪" },
   { id: "gas", label: "Gas", emoji: "⛽" },
   { id: "markets", label: "Markets", emoji: "🥬" },
 ];
@@ -30,10 +24,9 @@ const SECTIONS: { id: LocalSection; label: string; emoji: string }[] = [
 /**
  * Local Tab Component
  *
- * Contains three sections accessible via segmented control:
- * - Deals: Yelp local business deals
- * - Gas: Regional gas prices
- * - Markets: Farmers markets nearby
+ * Contains two sections accessible via segmented control:
+ * - Gas: Regional gas prices (via EIA - free/public domain)
+ * - Markets: Farmers markets nearby (via USDA - free/public domain)
  */
 export default function LocalTab({
   cityName,
@@ -42,11 +35,9 @@ export default function LocalTab({
   lon,
   section,
   onSectionChange,
-  userId,
-  onSignInClick,
 }: LocalTabProps) {
   // Support both controlled and uncontrolled modes
-  const [internalSection, setInternalSection] = useState<LocalSection>("deals");
+  const [internalSection, setInternalSection] = useState<LocalSection>("gas");
   const activeSection = section ?? internalSection;
 
   const handleSectionChange = (newSection: LocalSection) => {
@@ -79,16 +70,6 @@ export default function LocalTab({
 
       {/* Section Content */}
       <div className="min-h-[300px]">
-        {activeSection === "deals" && (
-          <LocalDealsSection
-            cityName={cityName}
-            lat={lat}
-            lon={lon}
-            userId={userId}
-            onSignInClick={onSignInClick}
-          />
-        )}
-
         {activeSection === "gas" && (
           <GasPricesCard state={state} />
         )}

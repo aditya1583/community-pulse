@@ -153,7 +153,7 @@ export default function Home() {
 
   // Tab state for new Neon theme
   const [activeTab, setActiveTab] = useState<TabId>("pulse");
-  const [localSection, setLocalSection] = useState<"deals" | "gas" | "markets">("deals");
+  const [localSection, setLocalSection] = useState<"gas" | "markets">("gas");
   const [showPulseModal, setShowPulseModal] = useState(false);
 
   // Auth + anon profile
@@ -2677,7 +2677,7 @@ export default function Home() {
 
           {/* Live Vibes - Real-time crowd-sourced venue sentiment */}
           <LiveVibes city={city} onNavigateToLocal={() => {
-            setLocalSection("deals"); // Reset to Deals tab (not Gas)
+            setLocalSection("gas");
             setActiveTab("local");
           }} />
 
@@ -2722,8 +2722,6 @@ export default function Home() {
                       lon={localLon}
                       section={localSection}
                       onSectionChange={setLocalSection}
-                      userId={sessionUser?.id}
-                      onSignInClick={() => setShowAuthModal(true)}
                     />
                   );
                 case "status":

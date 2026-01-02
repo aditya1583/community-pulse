@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * Air Quality Index API Route
  *
- * Fetches AQI data from OpenWeather Air Pollution API
+ * Using Open-Meteo Air Quality API (100% free, no API key required)
+ * https://open-meteo.com/en/docs/air-quality-api
+ *
  * Returns AQI level (1-5), label, color coding, components, and health advice
  */
 
@@ -29,6 +31,15 @@ const AQI_CONFIG: Record<1 | 2 | 3 | 4 | 5, { label: AirQualityResponse["label"]
   5: { label: "Very Poor", color: "red", healthAdvice: "Health alert! Everyone may experience serious health effects. Avoid outdoor activity" },
 };
 
+// Convert European AQI (0-100+) to 1-5 scale
+function convertEuropeanAQI(eaqi: number): 1 | 2 | 3 | 4 | 5 {
+  if (eaqi <= 20) return 1;      // Good
+  if (eaqi <= 40) return 2;      // Fair
+  if (eaqi <= 60) return 3;      // Moderate
+  if (eaqi <= 80) return 4;      // Poor
+  return 5;                       // Very Poor
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const lat = searchParams.get("lat");
@@ -41,50 +52,35 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const apiKey = process.env.WEATHER_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "Weather API key not configured" },
-      { status: 500 }
-    );
-  }
-
   try {
-    const url = `https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${apiKey}`;
+    // Open-Meteo Air Quality API - completely free, no API key needed
+    const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=european_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,ozone`;
+
     const response = await fetch(url);
     const data = await response.json();
 
-    if (!response.ok) {
-      console.error("OpenWeather AQI error:", data);
+    if (!response.ok || !data.current) {
+      console.error("Open-Meteo AQI error:", data);
       return NextResponse.json(
-        { error: data.message || "Failed to fetch air quality data" },
+        { error: "Failed to fetch air quality data" },
         { status: 500 }
       );
     }
 
-    // OpenWeather returns list with current pollution data
-    const pollution = data.list?.[0];
-    if (!pollution) {
-      return NextResponse.json(
-        { error: "No air quality data available" },
-        { status: 404 }
-      );
-    }
-
-    const aqi = pollution.main?.aqi as 1 | 2 | 3 | 4 | 5;
-    const components = pollution.components || {};
-    const config = AQI_CONFIG[aqi] || AQI_CONFIG[3];
+    const current = data.current;
+    const aqi = convertEuropeanAQI(current.european_aqi || 0);
+    const config = AQI_CONFIG[aqi];
 
     const result: AirQualityResponse = {
       aqi,
       label: config.label,
       color: config.color,
       components: {
-        pm2_5: Math.round((components.pm2_5 || 0) * 10) / 10,
-        pm10: Math.round((components.pm10 || 0) * 10) / 10,
-        o3: Math.round((components.o3 || 0) * 10) / 10,
-        no2: Math.round((components.no2 || 0) * 10) / 10,
-        co: Math.round((components.co || 0) * 10) / 10,
+        pm2_5: Math.round((current.pm2_5 || 0) * 10) / 10,
+        pm10: Math.round((current.pm10 || 0) * 10) / 10,
+        o3: Math.round((current.ozone || 0) * 10) / 10,
+        no2: Math.round((current.nitrogen_dioxide || 0) * 10) / 10,
+        co: Math.round((current.carbon_monoxide || 0) * 10) / 10,
       },
       healthAdvice: config.healthAdvice,
     };
