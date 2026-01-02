@@ -71,7 +71,7 @@ export default function LocalTab({
       {/* Section Content */}
       <div className="min-h-[300px]">
         {activeSection === "gas" && (
-          <GasPricesCard state={state} cityName={cityName} />
+          <GasPricesCard state={state} cityName={cityName} lat={lat} lon={lon} />
         )}
 
         {activeSection === "markets" && (

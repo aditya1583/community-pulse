@@ -3,15 +3,31 @@
 import React, { useEffect, useState, useCallback } from "react";
 import type { GasPrices } from "./types";
 
+type GasStation = {
+  id: string;
+  name: string;
+  brand: string | null;
+  address: string | null;
+  distanceMiles: number;
+  lat: number;
+  lon: number;
+  amenities: string[];
+};
+
 type GasPricesCardProps = {
   state: string;
   cityName?: string;
+  lat?: number;
+  lon?: number;
 };
 
-export default function GasPricesCard({ state, cityName }: GasPricesCardProps) {
+export default function GasPricesCard({ state, cityName, lat, lon }: GasPricesCardProps) {
   const [prices, setPrices] = useState<GasPrices | null>(null);
+  const [stations, setStations] = useState<GasStation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [stationsLoading, setStationsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showStations, setShowStations] = useState(false);
 
   const fetchPrices = useCallback(async () => {
     try {
@@ -36,16 +52,37 @@ export default function GasPricesCard({ state, cityName }: GasPricesCardProps) {
     }
   }, [state]);
 
+  const fetchStations = useCallback(async () => {
+    if (!lat || !lon) return;
+
+    try {
+      setStationsLoading(true);
+      const response = await fetch(`/api/gas-stations?lat=${lat}&lon=${lon}&limit=8`);
+      const data = await response.json();
+
+      if (data.stations) {
+        setStations(data.stations);
+      }
+    } catch (err) {
+      console.error("Error fetching stations:", err);
+    } finally {
+      setStationsLoading(false);
+    }
+  }, [lat, lon]);
+
   useEffect(() => {
     fetchPrices();
   }, [fetchPrices]);
 
-  // Format price
-  const formatPrice = (price: number) => {
-    return `$${price.toFixed(2)}`;
-  };
+  // Fetch stations when expanded
+  useEffect(() => {
+    if (showStations && stations.length === 0 && lat && lon) {
+      fetchStations();
+    }
+  }, [showStations, stations.length, lat, lon, fetchStations]);
 
-  // Get change indicator
+  const formatPrice = (price: number) => `$${price.toFixed(2)}`;
+
   const getChangeIndicator = (change: number | null | undefined) => {
     if (!change || change === 0) return null;
     if (change > 0) {
@@ -66,6 +103,11 @@ export default function GasPricesCard({ state, cityName }: GasPricesCardProps) {
         {change.toFixed(2)}
       </span>
     );
+  };
+
+  const openDirections = (station: GasStation) => {
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${station.lat},${station.lon}`;
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -116,36 +158,24 @@ export default function GasPricesCard({ state, cityName }: GasPricesCardProps) {
         </div>
       )}
 
-      {/* Prices Card - Clickable to find gas stations */}
+      {/* Prices Card */}
       {!loading && !error && prices && (
-        <a
-          href={`https://www.google.com/maps/search/gas+stations+near+${encodeURIComponent(cityName ? `${cityName}, ${state}` : state)}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 hover:border-emerald-500/50 hover:bg-slate-800/80 transition-all cursor-pointer group"
-        >
+        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
           {/* Main Prices Grid */}
           <div className="grid grid-cols-4 gap-3 mb-4">
-            {/* Regular */}
             <div className="text-center">
               <p className="text-xs text-slate-400 mb-1">Regular</p>
               <p className="text-lg font-bold text-white">{formatPrice(prices.regular)}</p>
               {getChangeIndicator(prices.regularChange)}
             </div>
-
-            {/* Midgrade */}
             <div className="text-center">
               <p className="text-xs text-slate-400 mb-1">Midgrade</p>
               <p className="text-lg font-bold text-slate-300">{formatPrice(prices.midgrade)}</p>
             </div>
-
-            {/* Premium */}
             <div className="text-center">
               <p className="text-xs text-slate-400 mb-1">Premium</p>
               <p className="text-lg font-bold text-slate-300">{formatPrice(prices.premium)}</p>
             </div>
-
-            {/* Diesel */}
             <div className="text-center">
               <p className="text-xs text-slate-400 mb-1">Diesel</p>
               <p className="text-lg font-bold text-amber-400">{formatPrice(prices.diesel)}</p>
@@ -166,7 +196,7 @@ export default function GasPricesCard({ state, cityName }: GasPricesCardProps) {
             </div>
           </div>
 
-          {/* Last Updated + Find Stations hint */}
+          {/* Last Updated */}
           <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-700/30">
             <p className="text-[10px] text-slate-500">
               Updated {new Date(prices.lastUpdated).toLocaleDateString("en-US", {
@@ -176,14 +206,112 @@ export default function GasPricesCard({ state, cityName }: GasPricesCardProps) {
                 minute: "2-digit"
               })}
             </p>
-            <span className="text-[10px] text-emerald-400 flex items-center gap-1 group-hover:text-emerald-300">
-              Find stations
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </span>
           </div>
-        </a>
+        </div>
+      )}
+
+      {/* Nearby Stations Toggle */}
+      {lat && lon && (
+        <button
+          onClick={() => setShowStations(!showStations)}
+          className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-sm font-medium transition"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          {showStations ? "Hide nearby stations" : "Find nearby stations"}
+          <svg
+            className={`w-4 h-4 transition-transform ${showStations ? "rotate-180" : ""}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      )}
+
+      {/* Stations List */}
+      {showStations && (
+        <div className="space-y-2">
+          {stationsLoading && (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-slate-800/60 border border-slate-700/50 rounded-lg p-3 animate-pulse">
+                  <div className="h-4 w-32 bg-slate-700/50 rounded mb-2" />
+                  <div className="h-3 w-48 bg-slate-700/50 rounded" />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!stationsLoading && stations.length === 0 && (
+            <div className="bg-slate-800/60 border border-slate-700/50 rounded-lg p-4 text-center">
+              <p className="text-slate-400 text-sm">No gas stations found nearby</p>
+              <a
+                href={`https://www.google.com/maps/search/gas+stations+near+${encodeURIComponent(cityName || state)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block mt-2 text-xs text-emerald-400 hover:text-emerald-300"
+              >
+                Search on Google Maps →
+              </a>
+            </div>
+          )}
+
+          {!stationsLoading && stations.length > 0 && (
+            <>
+              {stations.map((station) => (
+                <button
+                  key={station.id}
+                  onClick={() => openDirections(station)}
+                  className="w-full text-left bg-slate-800/60 border border-slate-700/50 rounded-lg p-3 hover:border-emerald-500/30 hover:bg-slate-800/80 transition group"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-medium text-white text-sm truncate">
+                        {station.name}
+                      </h4>
+                      {station.address && (
+                        <p className="text-xs text-slate-400 truncate mt-0.5">
+                          {station.address}
+                        </p>
+                      )}
+                      {station.amenities.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {station.amenities.slice(0, 3).map((amenity, i) => (
+                            <span
+                              key={i}
+                              className="px-1.5 py-0.5 text-[9px] bg-slate-700/50 text-slate-400 rounded"
+                            >
+                              {amenity}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="text-xs text-slate-400">
+                        {station.distanceMiles} mi
+                      </span>
+                      <span className="text-[10px] text-emerald-400 opacity-0 group-hover:opacity-100 transition flex items-center gap-0.5">
+                        Directions
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+              <p className="text-center text-[10px] text-slate-500 pt-1">
+                Station data from OpenStreetMap
+              </p>
+            </>
+          )}
+        </div>
       )}
 
       {/* EIA Attribution */}
