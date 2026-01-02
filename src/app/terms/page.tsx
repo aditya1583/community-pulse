@@ -45,7 +45,7 @@ export default function TermsPage() {
             <ul className="list-disc list-inside space-y-1 text-slate-400 ml-4">
               <li>
                 <strong className="text-slate-300">Weather data</strong> provided
-                by OpenWeather API
+                by Open-Meteo API
               </li>
               <li>
                 <strong className="text-slate-300">Event information</strong>{" "}
@@ -53,7 +53,15 @@ export default function TermsPage() {
               </li>
               <li>
                 <strong className="text-slate-300">News articles</strong> via
-                Currents API and other news aggregators
+                GNews API
+              </li>
+              <li>
+                <strong className="text-slate-300">Gas prices</strong> from
+                U.S. Energy Information Administration (EIA)
+              </li>
+              <li>
+                <strong className="text-slate-300">Farmers markets</strong> from
+                USDA Local Food Directories
               </li>
               <li>
                 <strong className="text-slate-300">AI-powered features</strong>{" "}

@@ -5,9 +5,10 @@ import type { GasPrices } from "./types";
 
 type GasPricesCardProps = {
   state: string;
+  cityName?: string;
 };
 
-export default function GasPricesCard({ state }: GasPricesCardProps) {
+export default function GasPricesCard({ state, cityName }: GasPricesCardProps) {
   const [prices, setPrices] = useState<GasPrices | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -118,7 +119,7 @@ export default function GasPricesCard({ state }: GasPricesCardProps) {
       {/* Prices Card - Clickable to find gas stations */}
       {!loading && !error && prices && (
         <a
-          href={`https://www.google.com/maps/search/gas+stations+near+${encodeURIComponent(prices.regionName || state)}`}
+          href={`https://www.google.com/maps/search/gas+stations+near+${encodeURIComponent(cityName ? `${cityName}, ${state}` : state)}`}
           target="_blank"
           rel="noopener noreferrer"
           className="block bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 hover:border-emerald-500/50 hover:bg-slate-800/80 transition-all cursor-pointer group"

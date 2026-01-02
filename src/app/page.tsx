@@ -2869,12 +2869,12 @@ export default function Home() {
             <p className="text-[11px] text-slate-500 leading-relaxed">
               Weather by{" "}
               <a
-                href="https://openweathermap.org/"
+                href="https://open-meteo.com/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-slate-400 hover:text-emerald-400 transition"
               >
-                OpenWeather
+                Open-Meteo
               </a>
               {" | "}
               Events via{" "}

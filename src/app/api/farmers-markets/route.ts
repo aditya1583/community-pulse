@@ -149,12 +149,13 @@ export async function GET(req: NextRequest) {
     if (!response.ok) {
       console.error("USDA API error:", response.status);
 
-      // Return mock data for graceful degradation
+      // Return empty results with helpful message instead of fake data
       return NextResponse.json({
-        markets: generateMockMarkets(city),
-        total: 5,
+        markets: [],
+        total: 0,
         region: city || "your area",
-        note: "Showing sample markets - USDA service temporarily unavailable",
+        error: "Unable to fetch farmers market data. Try searching for farmers markets in your area.",
+        searchUrl: `https://www.google.com/maps/search/farmers+markets+near+${encodeURIComponent(city || "me")}`,
       });
     }
 
@@ -229,53 +230,13 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error("Error fetching farmers markets:", error);
 
-    // Return mock data for graceful degradation
+    // Return empty results with helpful message instead of fake data
     return NextResponse.json({
-      markets: generateMockMarkets(city),
-      total: 5,
+      markets: [],
+      total: 0,
       region: city || "your area",
-      error: "Unable to fetch markets - showing sample data",
+      error: "Unable to fetch farmers market data. Try searching for farmers markets in your area.",
+      searchUrl: `https://www.google.com/maps/search/farmers+markets+near+${encodeURIComponent(city || "me")}`,
     });
   }
-}
-
-// Generate mock markets for graceful degradation
-function generateMockMarkets(city: string): FarmersMarketData[] {
-  const today = getTodayDayName();
-
-  return [
-    {
-      id: "mock-1",
-      name: `${city} Downtown Farmers Market`,
-      address: `Main Street, ${city}`,
-      schedule: `${today}s 8am - 1pm`,
-      products: ["Vegetables", "Fruits", "Organic", "Baked Goods"],
-      isOpenToday: true,
-      distance: 1.2,
-      website: null,
-      facebook: null,
-    },
-    {
-      id: "mock-2",
-      name: `${city} Community Market`,
-      address: `Oak Plaza, ${city}`,
-      schedule: "Saturdays 9am - 2pm",
-      products: ["Fresh Produce", "Honey", "Eggs"],
-      isOpenToday: new Date().getDay() === 6,
-      distance: 2.5,
-      website: null,
-      facebook: null,
-    },
-    {
-      id: "mock-3",
-      name: `${city} Organic Farmers Collective`,
-      address: `Green Street, ${city}`,
-      schedule: "Sundays 10am - 3pm",
-      products: ["Organic", "Vegetables", "Dairy"],
-      isOpenToday: new Date().getDay() === 0,
-      distance: 3.8,
-      website: null,
-      facebook: null,
-    },
-  ];
 }

@@ -19,11 +19,13 @@ export default function FarmersMarketsSection({
   const [markets, setMarkets] = useState<FarmersMarket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchUrl, setSearchUrl] = useState<string | null>(null);
 
   const fetchMarkets = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
+      setSearchUrl(null);
 
       let url = `/api/farmers-markets?city=${encodeURIComponent(cityName)}`;
       if (state) url += `&state=${encodeURIComponent(state)}`;
@@ -32,7 +34,11 @@ export default function FarmersMarketsSection({
       const response = await fetch(url);
       const data = await response.json();
 
-      if (data.error && data.markets.length === 0) {
+      if (data.searchUrl) {
+        setSearchUrl(data.searchUrl);
+      }
+
+      if (data.error && (!data.markets || data.markets.length === 0)) {
         setError(data.error);
         setMarkets([]);
       } else {
@@ -41,6 +47,7 @@ export default function FarmersMarketsSection({
     } catch (err) {
       console.error("Error fetching markets:", err);
       setError("Unable to load farmers markets");
+      setSearchUrl(`https://www.google.com/maps/search/farmers+markets+near+${encodeURIComponent(cityName)}`);
       setMarkets([]);
     } finally {
       setLoading(false);
@@ -88,10 +95,23 @@ export default function FarmersMarketsSection({
       {!loading && error && (
         <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-8 text-center">
           <div className="text-3xl mb-3">🌽</div>
-          <p className="text-slate-400 text-sm">{error}</p>
+          <p className="text-slate-400 text-sm mb-3">No farmers markets found in the USDA database for this area.</p>
+          {searchUrl && (
+            <a
+              href={searchUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-sm rounded-lg transition"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              Search on Google Maps
+            </a>
+          )}
           <button
             onClick={fetchMarkets}
-            className="mt-3 text-xs text-emerald-400 hover:text-emerald-300"
+            className="block mx-auto mt-3 text-xs text-slate-500 hover:text-slate-400"
           >
             Try again
           </button>
@@ -102,8 +122,18 @@ export default function FarmersMarketsSection({
       {!loading && !error && markets.length === 0 && (
         <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-8 text-center">
           <div className="text-3xl mb-3">🔍</div>
-          <p className="text-slate-400 text-sm">No farmers markets found nearby</p>
-          <p className="text-slate-500 text-xs mt-1">Try expanding your search area</p>
+          <p className="text-slate-400 text-sm mb-3">No farmers markets found in the USDA database for this area.</p>
+          <a
+            href={`https://www.google.com/maps/search/farmers+markets+near+${encodeURIComponent(cityName)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-sm rounded-lg transition"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            Search on Google Maps
+          </a>
         </div>
       )}
 

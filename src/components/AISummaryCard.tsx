@@ -220,7 +220,7 @@ export default function AISummaryCard({
       : "News summary is unavailable right now.";
   })();
 
-  const localLine = `Local essentials (deals, gas, and markets) for ${displayCity}.`;
+  const localLine = `Local essentials (gas prices and farmers markets) for ${displayCity}.`;
 
   return (
     <div className="bg-gradient-to-r from-emerald-900/30 to-slate-900/80 border border-emerald-500/30 rounded-xl p-4">
@@ -328,7 +328,7 @@ export default function AISummaryCard({
           </InlineLinkButton>
           {": "}
           {localLine}
-          <ProvenanceBadge source="Yelp" />
+          <ProvenanceBadge source="EIA & USDA" />
         </p>
       </div>
 

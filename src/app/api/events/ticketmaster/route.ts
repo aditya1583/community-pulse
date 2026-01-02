@@ -325,9 +325,16 @@ export async function GET(req: NextRequest) {
     const data: TicketmasterApiResponse = await response.json();
     const apiEvents = data._embedded?.events || [];
 
-    // Normalize events to our format
+    // Get today's date string in YYYY-MM-DD format for comparison
+    const today = new Date().toISOString().split("T")[0];
+
+    // Normalize events to our format and filter out past events
     const events = apiEvents
-      .filter((e) => e.dates?.start?.localDate) // Only include events with dates
+      .filter((e) => {
+        const eventDate = e.dates?.start?.localDate;
+        // Only include events with dates that are today or in the future
+        return eventDate && eventDate >= today;
+      })
       .map(normalizeEvent);
 
     // Cache the results
