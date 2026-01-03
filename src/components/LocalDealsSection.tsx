@@ -1,0 +1,405 @@
+"use client";
+
+import React, { useEffect, useState, useCallback } from "react";
+
+type LocalPlace = {
+  id: string;
+  name: string;
+  category: string;
+  categoryIcon?: string;
+  address: string;
+  distance: number | null;
+  rating?: number;
+  price?: number;
+  hours?: {
+    isOpen: boolean;
+    openNow: string;
+  };
+  photos?: string[];
+  url?: string;
+  phone?: string;
+  lat: number;
+  lon: number;
+};
+
+type LocalDealsSectionProps = {
+  cityName: string;
+  state: string;
+  lat?: number;
+  lon?: number;
+};
+
+const DEAL_CATEGORIES = [
+  { id: "all", label: "All", query: "", osmCategory: "all", emoji: "🏪" },
+  { id: "coffee", label: "Coffee", query: "coffee", osmCategory: "coffee", emoji: "☕" },
+  { id: "food", label: "Food", query: "restaurants", osmCategory: "restaurants", emoji: "🍽️" },
+  { id: "bars", label: "Bars", query: "bars", osmCategory: "bars", emoji: "🍺" },
+  { id: "groceries", label: "Grocery", query: "grocery", osmCategory: "grocery", emoji: "🛒" },
+] as const;
+
+// Category-based icons and colors for places without photos
+const CATEGORY_ICONS: Record<string, { emoji: string; gradient: string }> = {
+  // Coffee
+  "Coffee Shop": { emoji: "☕", gradient: "from-amber-600 to-orange-700" },
+  "Cafe": { emoji: "☕", gradient: "from-amber-600 to-orange-700" },
+  "cafe": { emoji: "☕", gradient: "from-amber-600 to-orange-700" },
+  // Restaurants
+  "Restaurant": { emoji: "🍽️", gradient: "from-red-600 to-rose-700" },
+  "restaurant": { emoji: "🍽️", gradient: "from-red-600 to-rose-700" },
+  "Fast Food": { emoji: "🍔", gradient: "from-yellow-600 to-amber-700" },
+  "fast_food": { emoji: "🍔", gradient: "from-yellow-600 to-amber-700" },
+  // Bars
+  "Bar": { emoji: "🍸", gradient: "from-purple-600 to-violet-700" },
+  "bar": { emoji: "🍸", gradient: "from-purple-600 to-violet-700" },
+  "Pub": { emoji: "🍺", gradient: "from-amber-700 to-yellow-800" },
+  "pub": { emoji: "🍺", gradient: "from-amber-700 to-yellow-800" },
+  "Nightclub": { emoji: "🎵", gradient: "from-indigo-600 to-purple-700" },
+  "nightclub": { emoji: "🎵", gradient: "from-indigo-600 to-purple-700" },
+  // Grocery
+  "Supermarket": { emoji: "🛒", gradient: "from-emerald-600 to-green-700" },
+  "supermarket": { emoji: "🛒", gradient: "from-emerald-600 to-green-700" },
+  "Convenience Store": { emoji: "🏪", gradient: "from-blue-600 to-cyan-700" },
+  "convenience": { emoji: "🏪", gradient: "from-blue-600 to-cyan-700" },
+  "Grocery Store": { emoji: "🥬", gradient: "from-green-600 to-emerald-700" },
+  "grocery": { emoji: "🥬", gradient: "from-green-600 to-emerald-700" },
+  "greengrocer": { emoji: "🥬", gradient: "from-green-600 to-emerald-700" },
+  // Other
+  "Bakery": { emoji: "🥐", gradient: "from-orange-500 to-amber-600" },
+  "bakery": { emoji: "🥐", gradient: "from-orange-500 to-amber-600" },
+  "Ice Cream": { emoji: "🍦", gradient: "from-pink-500 to-rose-600" },
+  "ice_cream": { emoji: "🍦", gradient: "from-pink-500 to-rose-600" },
+};
+
+type CategoryId = (typeof DEAL_CATEGORIES)[number]["id"];
+type DataSource = "foursquare" | "openstreetmap" | null;
+
+// Get category icon info with fallback
+function getCategoryIcon(category: string): { emoji: string; gradient: string } {
+  return CATEGORY_ICONS[category] || { emoji: "🏪", gradient: "from-slate-600 to-slate-700" };
+}
+
+export default function LocalDealsSection({
+  cityName,
+  state,
+  lat,
+  lon,
+}: LocalDealsSectionProps) {
+  const [places, setPlaces] = useState<LocalPlace[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<CategoryId>("all");
+  const [dataSource, setDataSource] = useState<DataSource>(null);
+
+  const fetchPlaces = useCallback(async (category: CategoryId) => {
+    if (!lat || !lon) {
+      setError("Location required");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setDataSource(null);
+
+    const categoryConfig = DEAL_CATEGORIES.find(c => c.id === category);
+
+    // Try Foursquare first
+    try {
+      const query = categoryConfig?.query || "";
+      const params = new URLSearchParams({
+        lat: lat.toString(),
+        lon: lon.toString(),
+        limit: "12",
+      });
+
+      if (query) {
+        params.set("query", query);
+      }
+
+      const response = await fetch(`/api/foursquare/places?${params.toString()}`);
+      const data = await response.json();
+
+      // If Foursquare works and has places, use it
+      if (!data.error && data.places?.length > 0) {
+        setPlaces(data.places);
+        setDataSource("foursquare");
+        setLoading(false);
+        return;
+      }
+
+      // Foursquare failed or returned empty - try OSM fallback
+      console.log("[LocalDeals] Foursquare failed or empty, trying OSM fallback");
+    } catch (err) {
+      console.log("[LocalDeals] Foursquare error, trying OSM fallback:", err);
+    }
+
+    // Fallback to OpenStreetMap
+    try {
+      const osmParams = new URLSearchParams({
+        lat: lat.toString(),
+        lon: lon.toString(),
+        category: categoryConfig?.osmCategory || "all",
+        limit: "12",
+        radius: "5000", // 5km radius
+      });
+
+      const osmResponse = await fetch(`/api/osm/places?${osmParams.toString()}`);
+      const osmData = await osmResponse.json();
+
+      if (osmData.places?.length > 0) {
+        // Transform OSM data to match our LocalPlace format
+        const osmPlaces: LocalPlace[] = osmData.places.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          category: p.category,
+          address: p.address,
+          distance: p.distance,
+          lat: p.lat,
+          lon: p.lon,
+          phone: p.phone,
+          url: p.website,
+        }));
+        setPlaces(osmPlaces);
+        setDataSource("openstreetmap");
+        setError(null);
+      } else {
+        setError("No places found nearby");
+        setPlaces([]);
+      }
+    } catch (osmErr) {
+      console.error("[LocalDeals] OSM fallback also failed:", osmErr);
+      setError("Unable to load places");
+      setPlaces([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [lat, lon]);
+
+  useEffect(() => {
+    fetchPlaces(activeCategory);
+  }, [activeCategory, fetchPlaces]);
+
+  const handleCategoryChange = (category: CategoryId) => {
+    setActiveCategory(category);
+  };
+
+  const openPlace = (place: LocalPlace) => {
+    // Always use Google Maps for directions - more useful than Foursquare/Yelp pages
+    const query = place.address
+      ? `${place.name} ${place.address}`
+      : `${place.name}`;
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const formatDistance = (meters: number | null) => {
+    if (meters === null) return null;
+    const miles = meters / 1609.34;
+    return `${miles.toFixed(1)} mi`;
+  };
+
+  const renderPriceLevel = (price?: number) => {
+    if (!price) return null;
+    return (
+      <span className="text-emerald-400 text-xs">
+        {"$".repeat(price)}
+        <span className="text-slate-600">{"$".repeat(4 - price)}</span>
+      </span>
+    );
+  };
+
+  const renderRating = (rating?: number) => {
+    if (!rating) return null;
+    return (
+      <div className="flex items-center gap-1">
+        <span className="text-amber-400 text-xs">★</span>
+        <span className="text-slate-300 text-xs">{rating.toFixed(1)}</span>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Category Pills */}
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+        {DEAL_CATEGORIES.map((category) => {
+          const isActive = activeCategory === category.id;
+          return (
+            <button
+              key={category.id}
+              onClick={() => handleCategoryChange(category.id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+                isActive
+                  ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"
+                  : "bg-slate-800/60 text-slate-400 hover:text-white hover:bg-slate-700/50"
+              }`}
+            >
+              <span>{category.emoji}</span>
+              <span>{category.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Loading State */}
+      {loading && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 animate-pulse"
+            >
+              <div className="flex gap-3">
+                <div className="w-16 h-16 bg-slate-700/50 rounded-lg shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-3/4 bg-slate-700/50 rounded" />
+                  <div className="h-3 w-1/2 bg-slate-700/50 rounded" />
+                  <div className="h-3 w-2/3 bg-slate-700/50 rounded" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Error State */}
+      {!loading && error && (
+        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-6 text-center">
+          <div className="text-2xl mb-2">🏪</div>
+          <p className="text-slate-400 text-sm">{error}</p>
+          <a
+            href={`https://www.google.com/maps/search/${encodeURIComponent(
+              DEAL_CATEGORIES.find(c => c.id === activeCategory)?.query || "places"
+            )}+near+${encodeURIComponent(cityName || "me")}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block mt-3 text-xs text-emerald-400 hover:text-emerald-300"
+          >
+            Search on Google Maps →
+          </a>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!loading && !error && places.length === 0 && (
+        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-6 text-center">
+          <div className="text-2xl mb-2">🔍</div>
+          <p className="text-slate-400 text-sm">
+            No places found for this category
+          </p>
+          <button
+            onClick={() => fetchPlaces(activeCategory)}
+            className="mt-3 text-xs text-emerald-400 hover:text-emerald-300"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
+      {/* Places Grid */}
+      {!loading && !error && places.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {places.map((place) => (
+            <button
+              key={place.id}
+              onClick={() => openPlace(place)}
+              className="w-full text-left bg-slate-800/60 border border-slate-700/50 rounded-xl p-3 hover:border-emerald-500/30 hover:bg-slate-800/80 transition group"
+            >
+              <div className="flex gap-3">
+                {/* Image or Icon */}
+                {(() => {
+                  const iconInfo = getCategoryIcon(place.category);
+                  return (
+                    <div className={`w-16 h-16 shrink-0 rounded-lg overflow-hidden flex items-center justify-center ${
+                      place.photos?.[0] ? "" : `bg-gradient-to-br ${iconInfo.gradient}`
+                    }`}>
+                      {place.photos?.[0] ? (
+                        <img
+                          src={place.photos[0]}
+                          alt={place.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : place.categoryIcon ? (
+                        <img
+                          src={place.categoryIcon}
+                          alt={place.category}
+                          className="w-8 h-8"
+                        />
+                      ) : (
+                        <span className="text-2xl drop-shadow-md">{iconInfo.emoji}</span>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Details */}
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium text-white text-sm truncate pr-2">
+                    {place.name}
+                  </h4>
+
+                  <p className="text-xs text-slate-500 truncate mt-0.5">
+                    {place.category}
+                  </p>
+
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                    {renderRating(place.rating)}
+                    {renderPriceLevel(place.price)}
+                    {place.hours && (
+                      <span
+                        className={`text-xs ${
+                          place.hours.isOpen ? "text-emerald-400" : "text-slate-500"
+                        }`}
+                      >
+                        {place.hours.isOpen ? "Open" : "Closed"}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between mt-1.5">
+                    {place.address && (
+                      <p className="text-[10px] text-slate-500 truncate max-w-[140px]">
+                        {place.address}
+                      </p>
+                    )}
+                    {place.distance !== null && (
+                      <span className="text-[10px] text-slate-400 shrink-0">
+                        {formatDistance(place.distance)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Attribution */}
+      <div className="text-center pt-2">
+        <p className="text-[10px] text-slate-500">
+          Powered by{" "}
+          {dataSource === "openstreetmap" ? (
+            <a
+              href="https://www.openstreetmap.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-400 hover:text-emerald-400 transition"
+            >
+              OpenStreetMap
+            </a>
+          ) : (
+            <a
+              href="https://foursquare.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-400 hover:text-emerald-400 transition"
+            >
+              Foursquare
+            </a>
+          )}
+        </p>
+      </div>
+    </div>
+  );
+}

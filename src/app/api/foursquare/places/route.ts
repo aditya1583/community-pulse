@@ -142,6 +142,7 @@ export async function GET(req: NextRequest) {
     const results = data.results || [];
 
     // Transform to our format
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const places: FoursquarePlace[] = results.map((place: any) => {
       const primaryCategory = place.categories?.[0];
       const location = place.location || {};

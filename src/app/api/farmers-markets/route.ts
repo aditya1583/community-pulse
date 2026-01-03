@@ -19,7 +19,7 @@ export type FarmersMarketData = {
   distance: number | null;
   website: string | null;
   facebook: string | null;
-  source: "usda" | "foursquare";
+  source: "usda" | "foursquare" | "osm";
 };
 
 export type FarmersMarketsResponse = {
@@ -78,6 +78,128 @@ function parseProducts(productsString: string): string[] {
   return products.length > 0 ? products : ["Fresh Produce"];
 }
 
+// Fallback: Fetch from OpenStreetMap Overpass API (FREE, no API key!)
+async function fetchFromOSM(
+  lat: number,
+  lon: number,
+  city: string
+): Promise<FarmersMarketData[]> {
+  console.log(`[FarmersMarkets] OSM fallback: Searching near ${lat},${lon}`);
+
+  try {
+    // Query for marketplaces, farm shops, and places with "market" in name
+    const radiusMeters = 25000; // ~15 miles
+    const query = `
+      [out:json][timeout:15];
+      (
+        node["amenity"="marketplace"](around:${radiusMeters},${lat},${lon});
+        way["amenity"="marketplace"](around:${radiusMeters},${lat},${lon});
+        node["shop"="farm"](around:${radiusMeters},${lat},${lon});
+        way["shop"="farm"](around:${radiusMeters},${lat},${lon});
+        node["name"~"farmer|market|produce",i]["shop"](around:${radiusMeters},${lat},${lon});
+        way["name"~"farmer|market|produce",i]["shop"](around:${radiusMeters},${lat},${lon});
+      );
+      out center body 20;
+    `.trim();
+
+    const overpassMirrors = [
+      "https://overpass-api.de/api/interpreter",
+      "https://overpass.kumi.systems/api/interpreter",
+    ];
+
+    let response: Response | null = null;
+
+    for (const overpassUrl of overpassMirrors) {
+      try {
+        response = await fetch(overpassUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "CommunityPulse/1.0",
+          },
+          body: `data=${encodeURIComponent(query)}`,
+          signal: AbortSignal.timeout(12000),
+        });
+
+        if (response.ok) break;
+      } catch {
+        response = null;
+      }
+    }
+
+    if (!response || !response.ok) {
+      console.log("[FarmersMarkets] OSM fallback failed");
+      return [];
+    }
+
+    const data = await response.json();
+    const elements = data.elements || [];
+
+    console.log(`[FarmersMarkets] OSM found ${elements.length} results`);
+
+    // Calculate distance using haversine
+    const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+      const R = 6371; // km
+      const dLat = ((lat2 - lat1) * Math.PI) / 180;
+      const dLon = ((lon2 - lon1) * Math.PI) / 180;
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) ** 2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c * 0.621371; // Convert to miles
+    };
+
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    return elements
+      .filter((el: any) => el.tags?.name)
+      .map((el: any) => {
+        /* eslint-enable @typescript-eslint/no-explicit-any */
+        const elLat = el.lat ?? el.center?.lat;
+        const elLon = el.lon ?? el.center?.lon;
+        if (!elLat || !elLon) return null;
+
+        const tags = el.tags || {};
+
+        // Build address
+        const addressParts: string[] = [];
+        if (tags["addr:housenumber"] && tags["addr:street"]) {
+          addressParts.push(`${tags["addr:housenumber"]} ${tags["addr:street"]}`);
+        } else if (tags["addr:street"]) {
+          addressParts.push(tags["addr:street"]);
+        }
+        if (tags["addr:city"]) {
+          addressParts.push(tags["addr:city"]);
+        }
+
+        // Parse opening hours
+        const openingHours = tags.opening_hours || "Schedule varies";
+        const isOpen = openingHours !== "Schedule varies" && checkIfOpenToday(openingHours);
+
+        // Determine products based on tags
+        const products: string[] = ["Fresh Produce"];
+        if (tags.organic === "yes") products.push("Organic");
+        if (tags.cuisine) products.push("Prepared Foods");
+
+        return {
+          id: `osm-${el.type}-${el.id}`,
+          name: tags.name,
+          address: addressParts.join(", ") || city,
+          schedule: openingHours,
+          products,
+          isOpenToday: isOpen,
+          distance: Math.round(haversineDistance(lat, lon, elLat, elLon) * 10) / 10,
+          website: tags.website || tags["contact:website"] || null,
+          facebook: tags["contact:facebook"] || null,
+          source: "osm" as const,
+        };
+      })
+      .filter(Boolean);
+  } catch (error) {
+    console.error("[FarmersMarkets] OSM fallback error:", error);
+    return [];
+  }
+}
+
 // Fallback: Fetch from Foursquare Places API
 async function fetchFromFoursquare(
   lat: number,
@@ -85,15 +207,22 @@ async function fetchFromFoursquare(
   city: string
 ): Promise<FarmersMarketData[]> {
   const apiKey = process.env.FOURSQUARE_API_KEY;
-  if (!apiKey) return [];
+
+  if (!apiKey) {
+    console.log("Foursquare fallback: No API key configured");
+    return [];
+  }
+
+  console.log(`Foursquare fallback: Searching near ${lat},${lon} for ${city}`);
 
   try {
     // Foursquare category ID for Farmers Markets: 17069
+    // Also include: 17070 (Flea Markets), 17068 (Food & Drink Markets)
     const params = new URLSearchParams({
       ll: `${lat},${lon}`,
-      radius: "16000", // ~10 miles in meters
-      categories: "17069", // Farmers Markets
-      limit: "10",
+      radius: "25000", // ~15 miles in meters (expanded search)
+      categories: "17069,17070,17068", // Farmers Markets, Flea Markets, Food Markets
+      limit: "15",
       fields: "fsq_id,name,location,distance,hours,website,tel",
     });
 
@@ -104,18 +233,22 @@ async function fetchFromFoursquare(
           Authorization: apiKey,
           Accept: "application/json",
         },
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(10000),
       }
     );
 
     if (!response.ok) {
-      console.error("Foursquare fallback error:", response.status);
+      const errorText = await response.text();
+      console.error("Foursquare fallback error:", response.status, errorText);
       return [];
     }
 
     const data = await response.json();
     const results = data.results || [];
 
+    console.log(`Foursquare fallback: Found ${results.length} results`);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return results.map((place: any) => {
       const location = place.location || {};
       const hours = place.hours;
@@ -279,6 +412,15 @@ export async function GET(req: NextRequest) {
       markets = await fetchFromFoursquare(coords.lat, coords.lon, city);
       if (markets.length > 0) {
         source = "foursquare";
+      }
+    }
+
+    // If Foursquare also failed, try OpenStreetMap (FREE!)
+    if (markets.length === 0 && coords) {
+      console.log("Foursquare returned no results, trying OSM fallback...");
+      markets = await fetchFromOSM(coords.lat, coords.lon, city);
+      if (markets.length > 0) {
+        source = "osm";
       }
     }
 

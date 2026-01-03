@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import type { TicketmasterEvent } from "@/hooks/useEvents";
+import type { TicketmasterEvent, EventsFallback } from "@/hooks/useEvents";
 
 /**
  * Generate an ICS calendar file for an event
@@ -52,6 +52,7 @@ type EventCardProps = {
   isLoading: boolean;
   error: string | null;
   hasLocation: boolean;
+  fallback?: EventsFallback | null;
 };
 
 /**
@@ -288,6 +289,7 @@ export default function EventCard({
   isLoading,
   error,
   hasLocation,
+  fallback,
 }: EventCardProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -378,6 +380,34 @@ export default function EventCard({
 
   return (
     <div className="space-y-3">
+      {/* Metro Fallback Banner */}
+      {fallback && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+          <svg
+            className="w-4 h-4 text-amber-400 flex-shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"
+            />
+          </svg>
+          <p className="text-sm text-amber-300">
+            Events in <span className="font-medium">{fallback.metro}</span>{" "}
+            <span className="text-amber-400/70">({fallback.distance} mi away)</span>
+          </p>
+        </div>
+      )}
+
       {/* Featured Event */}
       <FeaturedEventCard event={featuredEvent} />
 

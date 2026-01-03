@@ -20,12 +20,14 @@ export default function FarmersMarketsSection({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchUrl, setSearchUrl] = useState<string | null>(null);
+  const [dataSource, setDataSource] = useState<"usda" | "foursquare" | "osm" | null>(null);
 
   const fetchMarkets = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       setSearchUrl(null);
+      setDataSource(null);
 
       let url = `/api/farmers-markets?city=${encodeURIComponent(cityName)}`;
       if (state) url += `&state=${encodeURIComponent(state)}`;
@@ -43,6 +45,9 @@ export default function FarmersMarketsSection({
         setMarkets([]);
       } else {
         setMarkets(data.markets || []);
+        if (data.source) {
+          setDataSource(data.source);
+        }
       }
     } catch (err) {
       console.error("Error fetching markets:", err);
@@ -165,8 +170,13 @@ export default function FarmersMarketsSection({
                 <span>{market.schedule}</span>
               </div>
 
-              {/* Address */}
-              <div className="flex items-center gap-2 text-xs text-slate-500 mb-3">
+              {/* Address - Clickable to Google Maps */}
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(market.name + ' ' + market.address)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-xs text-slate-500 mb-3 hover:text-emerald-400 transition group"
+              >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
@@ -175,7 +185,10 @@ export default function FarmersMarketsSection({
                 {market.distance && (
                   <span className="flex-shrink-0 text-slate-400">. {market.distance.toFixed(1)} mi</span>
                 )}
-              </div>
+                <svg className="w-3 h-3 opacity-0 group-hover:opacity-100 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                </svg>
+              </a>
 
               {/* Products */}
               <div className="flex flex-wrap gap-1.5">
@@ -189,56 +202,87 @@ export default function FarmersMarketsSection({
                 ))}
               </div>
 
-              {/* Links */}
-              {(market.website || market.facebook) && (
-                <div className="flex gap-3 mt-3 pt-3 border-t border-slate-700/50">
-                  {market.website && (
-                    <a
-                      href={market.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-slate-400 hover:text-emerald-400 flex items-center gap-1"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.193-9.193a4.5 4.5 0 00-6.364 6.364l4.5 4.5a4.5 4.5 0 006.364-6.364l-1.757-1.757" />
-                      </svg>
-                      Website
-                    </a>
-                  )}
-                  {market.facebook && (
-                    <a
-                      href={market.facebook}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-slate-400 hover:text-blue-400 flex items-center gap-1"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                      </svg>
-                      Facebook
-                    </a>
-                  )}
-                </div>
-              )}
+              {/* Links - Always show Directions */}
+              <div className="flex gap-3 mt-3 pt-3 border-t border-slate-700/50">
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(market.name + ' ' + market.address)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-slate-400 hover:text-emerald-400 flex items-center gap-1"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z" />
+                  </svg>
+                  Directions
+                </a>
+                {market.website && (
+                  <a
+                    href={market.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-slate-400 hover:text-emerald-400 flex items-center gap-1"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.193-9.193a4.5 4.5 0 00-6.364 6.364l4.5 4.5a4.5 4.5 0 006.364-6.364l-1.757-1.757" />
+                    </svg>
+                    Website
+                  </a>
+                )}
+                {market.facebook && (
+                  <a
+                    href={market.facebook}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-slate-400 hover:text-blue-400 flex items-center gap-1"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                    </svg>
+                    Facebook
+                  </a>
+                )}
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* USDA Attribution */}
-      <div className="text-center pt-2">
-        <p className="text-[10px] text-slate-500">
-          Market data from{" "}
-          <a
-            href="https://www.usdalocalfoodportal.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-slate-400 hover:text-emerald-400 transition"
-          >
-            USDA Local Food Directories
-          </a>
-        </p>
-      </div>
+      {/* Data Source Attribution */}
+      {markets.length > 0 && (
+        <div className="text-center pt-2">
+          <p className="text-[10px] text-slate-500">
+            Market data from{" "}
+            {dataSource === "osm" ? (
+              <a
+                href="https://www.openstreetmap.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-slate-400 hover:text-emerald-400 transition"
+              >
+                OpenStreetMap
+              </a>
+            ) : dataSource === "foursquare" ? (
+              <a
+                href="https://foursquare.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-slate-400 hover:text-emerald-400 transition"
+              >
+                Foursquare
+              </a>
+            ) : (
+              <a
+                href="https://www.usdalocalfoodportal.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-slate-400 hover:text-emerald-400 transition"
+              >
+                USDA Local Food Directories
+              </a>
+            )}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

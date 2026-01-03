@@ -37,7 +37,7 @@ import FAB from "@/components/FAB";
 import PulseModal from "@/components/PulseModal";
 import TrafficContent from "@/components/TrafficContent";
 import LiveVibes from "@/components/LiveVibes";
-import { DASHBOARD_TABS, type TabId, type WeatherInfo, type Pulse, type CityMood, type TrafficLevel } from "@/components/types";
+import { DASHBOARD_TABS, type TabId, type WeatherInfo, type Pulse, type CityMood, type TrafficLevel, type LocalSection } from "@/components/types";
 import type { LocalNewsResponse } from "@/types/news";
 import { useGamification } from "@/hooks/useGamification";
 import XPProgressBadge from "@/components/XPProgressBadge";
@@ -153,7 +153,7 @@ export default function Home() {
 
   // Tab state for new Neon theme
   const [activeTab, setActiveTab] = useState<TabId>("pulse");
-  const [localSection, setLocalSection] = useState<"gas" | "markets">("gas");
+  const [localSection, setLocalSection] = useState<LocalSection>("deals");
   const [showPulseModal, setShowPulseModal] = useState(false);
 
   // Auth + anon profile
@@ -236,6 +236,7 @@ export default function Home() {
     events: ticketmasterEvents,
     isLoading: ticketmasterLoading,
     error: ticketmasterError,
+    fallback: ticketmasterFallback,
   } = useEvents(selectedCity?.lat ?? null, selectedCity?.lon ?? null, {
     radius: 25,
     city: city,
@@ -1198,28 +1199,64 @@ export default function Home() {
 
   useEffect(() => {
     const triggerAutoSeed = async () => {
+      // Debug logging
+      console.log("[Auto-Seed Client] Checking conditions:", {
+        city,
+        initialPulsesFetched,
+        pulsesCount: pulses.length,
+        autoSeedAttempted,
+        loading,
+        ticketmasterLoading,
+      });
+
       // Only auto-seed if:
       // 1. Initial fetch is complete
+      if (!initialPulsesFetched) {
+        console.log("[Auto-Seed Client] Skipping - initial fetch not complete");
+        return;
+      }
       // 2. No pulses exist
+      if (pulses.length > 0) {
+        console.log("[Auto-Seed Client] Skipping - city has pulses:", pulses.length);
+        return;
+      }
       // 3. We haven't already tried for this city
-      // 4. We have some context data (events or weather)
-      // 5. Events are NOT loading (prevents using stale events from previous city)
-      if (
-        !initialPulsesFetched ||
-        pulses.length > 0 ||
-        autoSeedAttempted === city ||
-        loading ||
-        ticketmasterLoading // Don't seed while events are refreshing for new city
-      ) {
+      if (autoSeedAttempted === city) {
+        console.log("[Auto-Seed Client] Skipping - already attempted for this city");
+        return;
+      }
+      // 4. Not currently loading
+      if (loading) {
+        console.log("[Auto-Seed Client] Skipping - still loading pulses");
         return;
       }
 
-      // Need at least events or weather to generate meaningful posts
-      if (ticketmasterEvents.length === 0 && !weather) {
+      // Wait for events AND weather to finish loading
+      // This prevents using stale data from a previous city
+      if (ticketmasterLoading) {
+        console.log("[Auto-Seed Client] Skipping - waiting for events to load");
+        return;
+      }
+      if (weatherLoading) {
+        console.log("[Auto-Seed Client] Skipping - waiting for weather to load");
+        return;
+      }
+
+      // CRITICAL: Verify weather data matches current city to prevent stale data
+      // This catches the race condition when switching cities quickly
+      const cityNamePart = city.split(",")[0].toLowerCase().trim();
+      const weatherMatchesCity = weather?.cityName?.toLowerCase().includes(cityNamePart);
+
+      if (weather && !weatherMatchesCity) {
+        console.log("[Auto-Seed Client] Skipping - weather data is stale (from different city)", {
+          weatherCity: weather.cityName,
+          currentCity: city,
+        });
         return;
       }
 
       // Mark that we've attempted for this city
+      console.log("[Auto-Seed Client] All conditions met! Triggering seed for:", city);
       setAutoSeedAttempted(city);
 
       try {
@@ -1236,7 +1273,8 @@ export default function Home() {
               date: e.date,
               category: e.category,
             })),
-            weather: weather
+            // Only include weather if it matches the current city
+            weather: weather && weatherMatchesCity
               ? {
                   description: weather.description,
                   temp: weather.temp,
@@ -1247,10 +1285,15 @@ export default function Home() {
         });
 
         const data = await res.json();
-        console.log("Auto-seed response:", res.status, data);
+        console.log("[Auto-Seed Client] API Response:", res.status, data);
 
-        if (res.ok && data.created > 0) {
-          console.log(`Created ${data.created} seed posts for ${city}`);
+        if (!res.ok) {
+          console.error("[Auto-Seed Client] API Error:", data);
+          return;
+        }
+
+        if (data.created > 0) {
+          console.log(`[Auto-Seed Client] SUCCESS! Created ${data.created} seed posts for ${city}`);
           // Refetch pulses to show the new posts
             const now = new Date();
             const start = startOfRecentWindow(now, 7);
@@ -1279,7 +1322,7 @@ export default function Home() {
     };
 
     triggerAutoSeed();
-  }, [city, initialPulsesFetched, pulses.length, ticketmasterEvents, ticketmasterLoading, weather, autoSeedAttempted, loading]);
+  }, [city, initialPulsesFetched, pulses.length, ticketmasterEvents, ticketmasterLoading, weather, weatherLoading, autoSeedAttempted, loading]);
 
   // ========= FETCH AUTHOR STATS =========
   // Batch fetch level and rank for all unique authors when pulses change
@@ -2692,6 +2735,7 @@ export default function Home() {
                       isLoading={ticketmasterLoading}
                       error={ticketmasterError}
                       hasLocation={!!(selectedCity?.lat && selectedCity?.lon)}
+                      fallback={ticketmasterFallback}
                     />
                   );
                 case "traffic":

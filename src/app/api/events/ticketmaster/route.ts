@@ -5,7 +5,149 @@ import { NextRequest, NextResponse } from "next/server";
 // ============================================================================
 // Fetches real events from Ticketmaster Discovery API to solve cold-start.
 // Uses in-memory caching with 5-minute TTL to reduce API calls.
+// For small towns with no events, falls back to nearest major metro.
 // ============================================================================
+
+// --- Metro Fallback Map ---
+// Maps states to their major metros with coordinates for event fallback
+// Used when small towns have no events within 100 miles
+const STATE_METRO_FALLBACK: Record<string, { name: string; lat: number; lng: number }[]> = {
+  // Illinois - Chicago dominates, but St. Louis serves southern IL
+  IL: [
+    { name: "Chicago", lat: 41.8781, lng: -87.6298 },
+    { name: "St. Louis", lat: 38.627, lng: -90.1994 },
+  ],
+  // Indiana
+  IN: [
+    { name: "Indianapolis", lat: 39.7684, lng: -86.1581 },
+    { name: "Chicago", lat: 41.8781, lng: -87.6298 },
+  ],
+  // Texas - large state needs multiple metros
+  TX: [
+    { name: "Austin", lat: 30.2672, lng: -97.7431 },
+    { name: "Dallas", lat: 32.7767, lng: -96.797 },
+    { name: "Houston", lat: 29.7604, lng: -95.3698 },
+    { name: "San Antonio", lat: 29.4241, lng: -98.4936 },
+  ],
+  // California
+  CA: [
+    { name: "Los Angeles", lat: 34.0522, lng: -118.2437 },
+    { name: "San Francisco", lat: 37.7749, lng: -122.4194 },
+    { name: "San Diego", lat: 32.7157, lng: -117.1611 },
+  ],
+  // New York
+  NY: [
+    { name: "New York City", lat: 40.7128, lng: -74.006 },
+    { name: "Buffalo", lat: 42.8864, lng: -78.8784 },
+  ],
+  // Florida
+  FL: [
+    { name: "Miami", lat: 25.7617, lng: -80.1918 },
+    { name: "Orlando", lat: 28.5383, lng: -81.3792 },
+    { name: "Tampa", lat: 27.9506, lng: -82.4572 },
+  ],
+  // Nevada
+  NV: [
+    { name: "Las Vegas", lat: 36.1699, lng: -115.1398 },
+    { name: "Reno", lat: 39.5296, lng: -119.8138 },
+  ],
+  // Arizona
+  AZ: [
+    { name: "Phoenix", lat: 33.4484, lng: -112.074 },
+    { name: "Tucson", lat: 32.2226, lng: -110.9747 },
+  ],
+  // Georgia
+  GA: [
+    { name: "Atlanta", lat: 33.749, lng: -84.388 },
+  ],
+  // Pennsylvania
+  PA: [
+    { name: "Philadelphia", lat: 39.9526, lng: -75.1652 },
+    { name: "Pittsburgh", lat: 40.4406, lng: -79.9959 },
+  ],
+  // Ohio
+  OH: [
+    { name: "Columbus", lat: 39.9612, lng: -82.9988 },
+    { name: "Cleveland", lat: 41.4993, lng: -81.6944 },
+    { name: "Cincinnati", lat: 39.1031, lng: -84.512 },
+  ],
+  // Michigan
+  MI: [
+    { name: "Detroit", lat: 42.3314, lng: -83.0458 },
+    { name: "Grand Rapids", lat: 42.9634, lng: -85.6681 },
+  ],
+  // North Carolina
+  NC: [
+    { name: "Charlotte", lat: 35.2271, lng: -80.8431 },
+    { name: "Raleigh", lat: 35.7796, lng: -78.6382 },
+  ],
+  // Washington
+  WA: [
+    { name: "Seattle", lat: 47.6062, lng: -122.3321 },
+  ],
+  // Colorado
+  CO: [
+    { name: "Denver", lat: 39.7392, lng: -104.9903 },
+  ],
+  // Massachusetts
+  MA: [
+    { name: "Boston", lat: 42.3601, lng: -71.0589 },
+  ],
+  // Tennessee
+  TN: [
+    { name: "Nashville", lat: 36.1627, lng: -86.7816 },
+    { name: "Memphis", lat: 35.1495, lng: -90.049 },
+  ],
+  // Missouri
+  MO: [
+    { name: "St. Louis", lat: 38.627, lng: -90.1994 },
+    { name: "Kansas City", lat: 39.0997, lng: -94.5786 },
+  ],
+  // Minnesota
+  MN: [
+    { name: "Minneapolis", lat: 44.9778, lng: -93.265 },
+  ],
+  // Oregon
+  OR: [
+    { name: "Portland", lat: 45.5152, lng: -122.6784 },
+  ],
+  // Louisiana
+  LA: [
+    { name: "New Orleans", lat: 29.9511, lng: -90.0715 },
+  ],
+};
+
+// Helper to calculate distance between two points (Haversine formula)
+function getDistanceMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 3959; // Earth's radius in miles
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// Find nearest metro for a given location and state
+function findNearestMetro(lat: number, lng: number, state: string): { name: string; lat: number; lng: number; distance: number } | null {
+  const metros = STATE_METRO_FALLBACK[state];
+  if (!metros || metros.length === 0) return null;
+
+  let nearest = metros[0];
+  let minDistance = getDistanceMiles(lat, lng, nearest.lat, nearest.lng);
+
+  for (const metro of metros.slice(1)) {
+    const distance = getDistanceMiles(lat, lng, metro.lat, metro.lng);
+    if (distance < minDistance) {
+      minDistance = distance;
+      nearest = metro;
+    }
+  }
+
+  return { ...nearest, distance: Math.round(minDistance) };
+}
 
 // --- Types ---
 
@@ -22,9 +164,23 @@ export type TicketmasterEvent = {
   imageUrl: string | null;
 };
 
+// Response type with optional fallback info
+export type TicketmasterResponse = {
+  events: TicketmasterEvent[];
+  cached?: boolean;
+  total?: number;
+  error?: string;
+  // Fallback info when events come from a nearby metro
+  fallback?: {
+    metro: string;
+    distance: number; // miles
+  };
+};
+
 type CacheEntry = {
   events: TicketmasterEvent[];
   timestamp: number;
+  fallback?: { metro: string; distance: number };
 };
 
 // --- In-Memory Cache ---
@@ -44,7 +200,7 @@ function getCacheKey(params: {
   return params.city?.toLowerCase().trim() ?? "unknown";
 }
 
-function getCachedEvents(key: string): TicketmasterEvent[] | null {
+function getCachedEntry(key: string): CacheEntry | null {
   const entry = eventCache.get(key);
   if (!entry) return null;
 
@@ -54,13 +210,14 @@ function getCachedEvents(key: string): TicketmasterEvent[] | null {
     return null;
   }
 
-  return entry.events;
+  return entry;
 }
 
-function setCachedEvents(key: string, events: TicketmasterEvent[]): void {
+function setCachedEntry(key: string, events: TicketmasterEvent[], fallback?: { metro: string; distance: number }): void {
   eventCache.set(key, {
     events,
     timestamp: Date.now(),
+    fallback,
   });
 
   // Limit cache size to prevent memory issues
@@ -247,9 +404,44 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const parsedLat = lat ? parseFloat(lat) : undefined;
-  const parsedLng = lng ? parseFloat(lng) : undefined;
+  let parsedLat = lat ? parseFloat(lat) : undefined;
+  let parsedLng = lng ? parseFloat(lng) : undefined;
   const parsedRadius = radius ? parseInt(radius, 10) : 25; // Default 25 miles
+
+  // If only city is provided, geocode it to get lat/lng
+  // Ticketmaster API doesn't have a "city" parameter - it only supports latlong
+  // Use Nominatim directly (avoids server-to-server API call issues)
+  if (parsedLat === undefined && parsedLng === undefined && city) {
+    try {
+      console.log(`[Ticketmaster] Geocoding city via Nominatim: ${city}`);
+      const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1&countrycodes=us`;
+      const geocodeRes = await fetch(nominatimUrl, {
+        headers: {
+          "User-Agent": "CommunityPulse/1.0",
+        },
+      });
+
+      if (geocodeRes.ok) {
+        const geoData = await geocodeRes.json();
+        if (geoData && geoData.length > 0) {
+          parsedLat = parseFloat(geoData[0].lat);
+          parsedLng = parseFloat(geoData[0].lon);
+          console.log(`[Ticketmaster] Geocoded ${city} → ${parsedLat}, ${parsedLng}`);
+        }
+      }
+    } catch (err) {
+      console.error(`[Ticketmaster] Geocoding failed for ${city}:`, err);
+    }
+
+    // If geocoding failed, return empty events gracefully
+    if (parsedLat === undefined || parsedLng === undefined) {
+      console.warn(`[Ticketmaster] Could not geocode city: ${city}`);
+      return NextResponse.json({
+        events: [],
+        error: "Could not determine location coordinates",
+      });
+    }
+  }
 
   // Check cache first
   const cacheKey = getCacheKey({
@@ -259,33 +451,41 @@ export async function GET(req: NextRequest) {
     city: city || undefined,
   });
 
-  const cachedEvents = getCachedEvents(cacheKey);
-  if (cachedEvents) {
-    return NextResponse.json({
-      events: cachedEvents,
+  const cachedEntry = getCachedEntry(cacheKey);
+  if (cachedEntry) {
+    const response: TicketmasterResponse = {
+      events: cachedEntry.events,
       cached: true,
-    });
+    };
+    if (cachedEntry.fallback) {
+      response.fallback = cachedEntry.fallback;
+    }
+    return NextResponse.json(response);
   }
 
   try {
     // Build Ticketmaster API URL
     const baseUrl = "https://app.ticketmaster.com/discovery/v2/events.json";
+
+    // Get today's date in Ticketmaster format: YYYY-MM-DDTHH:mm:ssZ
+    const now = new Date();
+    const startDateTime = now.toISOString().split(".")[0] + "Z";
+
     const params = new URLSearchParams({
       apikey: apiKey,
       size: "20", // Limit to 20 events
       sort: "date,asc", // Sort by date, soonest first
+      startDateTime: startDateTime, // Only get future events
     });
+    console.log(`[Ticketmaster] Using startDateTime: ${startDateTime}`);
 
-    // Use lat/lng for geo-based search, or city for keyword search
+    // Always use latlong - we geocode cities above if needed
+    // Ticketmaster doesn't support a "city" parameter
     if (parsedLat !== undefined && parsedLng !== undefined) {
       params.set("latlong", `${parsedLat},${parsedLng}`);
       params.set("radius", String(Math.min(parsedRadius, 100))); // Cap at 100 miles
       params.set("unit", "miles");
-    } else if (city) {
-      // Extract city name for keyword search
-      const cityName = city.split(",")[0].trim();
-      params.set("keyword", cityName);
-      params.set("locale", "*"); // Search all locales
+      console.log(`[Ticketmaster] Searching at ${parsedLat},${parsedLng} radius ${parsedRadius}mi`);
     }
 
     const url = `${baseUrl}?${params.toString()}`;
@@ -325,26 +525,116 @@ export async function GET(req: NextRequest) {
     const data: TicketmasterApiResponse = await response.json();
     const apiEvents = data._embedded?.events || [];
 
-    // Get today's date string in YYYY-MM-DD format for comparison
-    const today = new Date().toISOString().split("T")[0];
+    console.log(`[Ticketmaster] Raw API returned ${apiEvents.length} events`);
 
-    // Normalize events to our format and filter out past events
-    const events = apiEvents
-      .filter((e) => {
-        const eventDate = e.dates?.start?.localDate;
-        // Only include events with dates that are today or in the future
-        return eventDate && eventDate >= today;
-      })
+    // Normalize events to our format
+    // Note: We already filter by startDateTime in the API request, so no client-side date filtering needed
+    let events = apiEvents
+      .filter((e) => e.dates?.start?.localDate) // Just ensure date exists
       .map(normalizeEvent);
 
-    // Cache the results
-    setCachedEvents(cacheKey, events);
+    console.log(`[Ticketmaster] Final events count: ${events.length}`);
 
-    return NextResponse.json({
+    // --- METRO FALLBACK for small towns ---
+    // If no events found, try nearest major metro
+    let fallbackInfo: { metro: string; distance: number } | undefined;
+
+    if (events.length === 0 && parsedLat !== undefined && parsedLng !== undefined) {
+      // Extract state from city parameter (e.g., "Irwin, Illinois, US" → "IL")
+      let stateCode: string | null = null;
+      if (city) {
+        // Try to find state name or code in the city string
+        const STATE_NAMES: Record<string, string> = {
+          alabama: "AL", alaska: "AK", arizona: "AZ", arkansas: "AR", california: "CA",
+          colorado: "CO", connecticut: "CT", delaware: "DE", florida: "FL", georgia: "GA",
+          hawaii: "HI", idaho: "ID", illinois: "IL", indiana: "IN", iowa: "IA",
+          kansas: "KS", kentucky: "KY", louisiana: "LA", maine: "ME", maryland: "MD",
+          massachusetts: "MA", michigan: "MI", minnesota: "MN", mississippi: "MS", missouri: "MO",
+          montana: "MT", nebraska: "NE", nevada: "NV", "new hampshire": "NH", "new jersey": "NJ",
+          "new mexico": "NM", "new york": "NY", "north carolina": "NC", "north dakota": "ND",
+          ohio: "OH", oklahoma: "OK", oregon: "OR", pennsylvania: "PA", "rhode island": "RI",
+          "south carolina": "SC", "south dakota": "SD", tennessee: "TN", texas: "TX", utah: "UT",
+          vermont: "VT", virginia: "VA", washington: "WA", "west virginia": "WV",
+          wisconsin: "WI", wyoming: "WY",
+        };
+
+        const cityLower = city.toLowerCase();
+        // Check for state name
+        for (const [name, code] of Object.entries(STATE_NAMES)) {
+          if (cityLower.includes(name)) {
+            stateCode = code;
+            break;
+          }
+        }
+        // Also check for state code (e.g., ", IL," or ", IL" at end)
+        if (!stateCode) {
+          const stateMatch = city.match(/,\s*([A-Z]{2})(?:\s*[,\s]|$)/i);
+          if (stateMatch) {
+            stateCode = stateMatch[1].toUpperCase();
+          }
+        }
+      }
+
+      if (stateCode) {
+        const nearestMetro = findNearestMetro(parsedLat, parsedLng, stateCode);
+
+        if (nearestMetro) {
+          console.log(`[Ticketmaster] No local events, trying metro fallback: ${nearestMetro.name} (${nearestMetro.distance}mi away)`);
+
+          // Search the metro area
+          const metroParams = new URLSearchParams({
+            apikey: apiKey,
+            size: "20",
+            sort: "date,asc",
+            startDateTime: startDateTime,
+            latlong: `${nearestMetro.lat},${nearestMetro.lng}`,
+            radius: "50",
+            unit: "miles",
+          });
+
+          try {
+            const metroResponse = await fetch(`${baseUrl}?${metroParams.toString()}`, {
+              headers: { Accept: "application/json" },
+              signal: AbortSignal.timeout(10000),
+            });
+
+            if (metroResponse.ok) {
+              const metroData: TicketmasterApiResponse = await metroResponse.json();
+              const metroApiEvents = metroData._embedded?.events || [];
+
+              events = metroApiEvents
+                .filter((e) => e.dates?.start?.localDate)
+                .map(normalizeEvent);
+
+              if (events.length > 0) {
+                fallbackInfo = {
+                  metro: nearestMetro.name,
+                  distance: nearestMetro.distance,
+                };
+                console.log(`[Ticketmaster] Found ${events.length} events from ${nearestMetro.name}`);
+              }
+            }
+          } catch (metroErr) {
+            console.error(`[Ticketmaster] Metro fallback failed:`, metroErr);
+          }
+        }
+      }
+    }
+
+    // Cache the results (including fallback info)
+    setCachedEntry(cacheKey, events, fallbackInfo);
+
+    const response_data: TicketmasterResponse = {
       events,
       cached: false,
       total: data.page?.totalElements ?? events.length,
-    });
+    };
+
+    if (fallbackInfo) {
+      response_data.fallback = fallbackInfo;
+    }
+
+    return NextResponse.json(response_data);
   } catch (error) {
     // Handle timeout and other errors gracefully
     if (error instanceof Error && error.name === "TimeoutError") {

@@ -97,6 +97,7 @@ export async function GET(req: NextRequest) {
     const elements = data.elements || [];
 
     // Transform OSM elements to our format
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const stations: GasStation[] = elements
       .map((element: any) => {
         const tags = element.tags || {};

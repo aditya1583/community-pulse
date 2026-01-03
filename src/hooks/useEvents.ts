@@ -12,11 +12,18 @@ import type { TicketmasterEvent } from "@/app/api/events/ticketmaster/route";
 
 export type { TicketmasterEvent };
 
+// Fallback info when events come from a nearby metro
+export type EventsFallback = {
+  metro: string;
+  distance: number; // miles
+};
+
 type UseEventsResult = {
   events: TicketmasterEvent[];
   isLoading: boolean;
   error: string | null;
   refetch: () => void;
+  fallback: EventsFallback | null;
 };
 
 type UseEventsOptions = {
@@ -38,6 +45,7 @@ export function useEvents(
   const [events, setEvents] = useState<TicketmasterEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fallback, setFallback] = useState<EventsFallback | null>(null);
 
   // Track the last fetch to prevent stale updates
   const lastRequestId = useRef(0);
@@ -48,6 +56,7 @@ export function useEvents(
     if (skip || (lat === null && lng === null && !city)) {
       setEvents([]);
       setError(null);
+      setFallback(null);
       setIsLoading(false);
       return;
     }
@@ -92,6 +101,7 @@ export function useEvents(
 
       setEvents(data.events || []);
       setError(data.error || null);
+      setFallback(data.fallback || null);
     } catch (err) {
       // Ignore aborted requests
       if (err instanceof Error && err.name === "AbortError") return;
@@ -104,6 +114,7 @@ export function useEvents(
       console.error("useEvents error:", err);
       setError(message);
       setEvents([]);
+      setFallback(null);
     } finally {
       if (requestId === lastRequestId.current) {
         setIsLoading(false);
@@ -134,5 +145,6 @@ export function useEvents(
     isLoading,
     error,
     refetch,
+    fallback,
   };
 }

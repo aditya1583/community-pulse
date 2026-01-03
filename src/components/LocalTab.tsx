@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import type { LocalSection } from "./types";
 import GasPricesCard from "./GasPricesCard";
 import FarmersMarketsSection from "./FarmersMarketsSection";
+import LocalDealsSection from "./LocalDealsSection";
 
 type LocalTabProps = {
   cityName: string;
@@ -17,6 +18,7 @@ type LocalTabProps = {
 };
 
 const SECTIONS: { id: LocalSection; label: string; emoji: string }[] = [
+  { id: "deals", label: "Explore", emoji: "🏪" },
   { id: "gas", label: "Gas", emoji: "⛽" },
   { id: "markets", label: "Markets", emoji: "🥬" },
 ];
@@ -24,7 +26,8 @@ const SECTIONS: { id: LocalSection; label: string; emoji: string }[] = [
 /**
  * Local Tab Component
  *
- * Contains two sections accessible via segmented control:
+ * Contains three sections accessible via segmented control:
+ * - Explore: Local businesses & places (via Foursquare)
  * - Gas: Regional gas prices (via EIA - free/public domain)
  * - Markets: Farmers markets nearby (via USDA - free/public domain)
  */
@@ -37,7 +40,7 @@ export default function LocalTab({
   onSectionChange,
 }: LocalTabProps) {
   // Support both controlled and uncontrolled modes
-  const [internalSection, setInternalSection] = useState<LocalSection>("gas");
+  const [internalSection, setInternalSection] = useState<LocalSection>("deals");
   const activeSection = section ?? internalSection;
 
   const handleSectionChange = (newSection: LocalSection) => {
@@ -70,6 +73,15 @@ export default function LocalTab({
 
       {/* Section Content */}
       <div className="min-h-[300px]">
+        {activeSection === "deals" && (
+          <LocalDealsSection
+            cityName={cityName}
+            state={state}
+            lat={lat}
+            lon={lon}
+          />
+        )}
+
         {activeSection === "gas" && (
           <GasPricesCard state={state} cityName={cityName} lat={lat} lon={lon} />
         )}

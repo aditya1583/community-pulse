@@ -74,12 +74,12 @@ export default function GasPricesCard({ state, cityName, lat, lon }: GasPricesCa
     fetchPrices();
   }, [fetchPrices]);
 
-  // Fetch stations when expanded
+  // Fetch closest station automatically on mount (for main card display)
   useEffect(() => {
-    if (showStations && stations.length === 0 && lat && lon) {
+    if (lat && lon && stations.length === 0) {
       fetchStations();
     }
-  }, [showStations, stations.length, lat, lon, fetchStations]);
+  }, [lat, lon, fetchStations, stations.length]);
 
   const formatPrice = (price: number) => `$${price.toFixed(2)}`;
 
@@ -207,20 +207,61 @@ export default function GasPricesCard({ state, cityName, lat, lon }: GasPricesCa
               })}
             </p>
           </div>
+
+          {/* Closest Station - Featured */}
+          {stations.length > 0 && (
+            <button
+              onClick={() => openDirections(stations[0])}
+              className="w-full mt-4 pt-3 border-t border-slate-700/50 flex items-center justify-between group hover:bg-slate-700/20 -mx-4 px-4 pb-1 rounded-b-xl transition"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                  <span className="text-emerald-400 text-sm">⛽</span>
+                </div>
+                <div className="text-left">
+                  <p className="text-xs text-slate-400">Closest Station</p>
+                  <p className="text-sm font-medium text-white truncate max-w-[180px]">
+                    {stations[0].name}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-emerald-400 font-medium">
+                  {stations[0].distanceMiles} mi
+                </span>
+                <svg
+                  className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 transition"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </button>
+          )}
+
+          {/* Loading closest station */}
+          {stationsLoading && stations.length === 0 && (
+            <div className="mt-4 pt-3 border-t border-slate-700/50 flex items-center gap-2 animate-pulse">
+              <div className="w-8 h-8 rounded-lg bg-slate-700/50" />
+              <div className="flex-1">
+                <div className="h-3 w-20 bg-slate-700/50 rounded mb-1" />
+                <div className="h-4 w-32 bg-slate-700/50 rounded" />
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* Nearby Stations Toggle */}
-      {lat && lon && (
+      {lat && lon && stations.length > 1 && (
         <button
           onClick={() => setShowStations(!showStations)}
-          className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-sm font-medium transition"
+          className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-slate-800/40 hover:bg-slate-800/60 text-slate-400 hover:text-white text-sm transition"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          {showStations ? "Hide nearby stations" : "Find nearby stations"}
+          {showStations ? "Hide other stations" : `See ${stations.length - 1} more stations nearby`}
           <svg
             className={`w-4 h-4 transition-transform ${showStations ? "rotate-180" : ""}`}
             fill="none"
@@ -261,9 +302,9 @@ export default function GasPricesCard({ state, cityName, lat, lon }: GasPricesCa
             </div>
           )}
 
-          {!stationsLoading && stations.length > 0 && (
+          {!stationsLoading && stations.length > 1 && (
             <>
-              {stations.map((station) => (
+              {stations.slice(1).map((station) => (
                 <button
                   key={station.id}
                   onClick={() => openDirections(station)}

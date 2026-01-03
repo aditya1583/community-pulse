@@ -10,7 +10,8 @@ import { createClient } from "@supabase/supabase-js";
  * Posts are marked as bot posts and feel natural, not templated.
  */
 
-// This UUID must exist in auth.users table - run the SQL migration to create it
+// Bot user ID - this must exist in auth.users table
+// Run the SQL migration to create this user if it doesn't exist
 const BOT_USER_ID = "00000000-0000-0000-0000-000000000001";
 
 /**
@@ -176,6 +177,7 @@ type AutoSeedRequest = {
   events?: EventData[];
   farmersMarkets?: MarketData[];
   weather?: WeatherData | null;
+  force?: boolean; // Bypass cooldown for testing
 };
 
 function getRandomItem<T>(arr: T[]): T {
@@ -249,9 +251,10 @@ function generatePosts(data: AutoSeedRequest): Array<{ message: string; mood: st
     });
   }
 
-  // 3. Weather post
-  if (data.weather) {
+  // 3. Weather post - only if we have VALID weather data
+  if (data.weather && data.weather.temp !== undefined) {
     const category = getWeatherCategory(data.weather);
+    console.log(`[Auto-Seed] Weather: ${data.weather.temp}°F "${data.weather.description}" → category: ${category}`);
     const weatherData = WEATHER_TEMPLATES[category];
     posts.push({
       message: getRandomItem(weatherData.templates),
@@ -260,7 +263,7 @@ function generatePosts(data: AutoSeedRequest): Array<{ message: string; mood: st
     });
   }
 
-  // 4. Traffic post (time-based)
+  // 4. Traffic post (time-based) - ALWAYS include regardless of other data
   const trafficCategory = getTrafficCategory();
   const trafficData = TRAFFIC_TEMPLATES[trafficCategory];
   posts.push({
@@ -269,13 +272,26 @@ function generatePosts(data: AutoSeedRequest): Array<{ message: string; mood: st
     tag: "Traffic",
   });
 
-  // 5. General local post (if we have fewer than 4 posts)
-  if (posts.length < 4) {
-    const local = getRandomItem(LOCAL_TEMPLATES);
+  // 5. General local post - ALWAYS include to ensure minimum content
+  const local = getRandomItem(LOCAL_TEMPLATES);
+  posts.push({
+    message: local.message,
+    mood: local.mood,
+    tag: "General",
+  });
+
+  // 6. Add a second traffic or general post if we have fewer than 3 posts
+  // This ensures even cities with NO events/weather get meaningful content
+  if (posts.length < 3) {
+    const otherTraffic = getRandomItem(
+      TRAFFIC_TEMPLATES[getTrafficCategory()].templates.filter(
+        t => t !== posts.find(p => p.tag === "Traffic")?.message
+      )
+    );
     posts.push({
-      message: local.message,
-      mood: local.mood,
-      tag: "General",
+      message: otherTraffic,
+      mood: trafficData.mood,
+      tag: "Traffic",
     });
   }
 
@@ -307,41 +323,36 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if city already has recent pulses (avoid duplicate seeding)
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { data: existingPulses } = await supabase
-      .from("pulses")
-      .select("id")
-      .eq("city", body.city)
-      .gte("created_at", oneHourAgo)
-      .limit(1);
+    console.log(`[Auto-Seed] Starting for city: ${body.city}`);
 
-    if (existingPulses && existingPulses.length > 0) {
+    // Check if city already has ANY pulses in the last 4 hours (user or bot)
+    const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+    const { data: existingPulses, error: checkError } = await supabase
+      .from("pulses")
+      .select("id, is_bot, created_at")
+      .eq("city", body.city)
+      .gte("created_at", fourHoursAgo)
+      .limit(5);
+
+    if (checkError) {
+      console.error("[Auto-Seed] Error checking existing pulses:", checkError);
+    }
+
+    console.log(`[Auto-Seed] Found ${existingPulses?.length || 0} existing pulses in last 4 hours`);
+
+    if (existingPulses && existingPulses.length > 0 && !body.force) {
+      console.log(`[Auto-Seed] Skipping - city has recent activity (use force=true to override)`);
       return NextResponse.json({
         success: true,
         message: "City already has recent pulses, skipping seed",
         created: 0,
+        existingCount: existingPulses.length,
         pulses: [],
       });
     }
 
-    // Check if we already seeded this city recently (24 hours)
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { data: recentBotPulses } = await supabase
-      .from("pulses")
-      .select("id")
-      .eq("city", body.city)
-      .eq("is_bot", true)
-      .gte("created_at", oneDayAgo)
-      .limit(1);
-
-    if (recentBotPulses && recentBotPulses.length > 0) {
-      return NextResponse.json({
-        success: true,
-        message: "City was seeded recently, skipping",
-        created: 0,
-        pulses: [],
-      });
+    if (body.force) {
+      console.log(`[Auto-Seed] Force mode - bypassing cooldown`);
     }
 
     // Generate contextual posts
@@ -356,27 +367,16 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Spread posts naturally over 3-6 hours to avoid "bot burst" appearance
-    // Posts appear as if they were submitted over the past several hours
+    // Create posts with recent timestamps
     const now = Date.now();
-    const totalPosts = posts.length;
 
-    // Calculate spread ONCE - random window between 3-6 hours
-    const spreadWindowHours = 3 + Math.random() * 3;
-    const spreadWindowMs = spreadWindowHours * 60 * 60 * 1000;
-
-    // Generate random offsets for each post, then sort to ensure proper ordering
-    const offsets = posts.map(() => Math.random() * spreadWindowMs);
-    offsets.sort((a, b) => a - b); // Sort ascending so post order is consistent
-
-    const records = posts.map((post, i) => {
-      // Each post gets a unique offset from 0 to spreadWindow
-      // Add minimum 30-minute gap from "now" so posts don't appear "just posted"
-      const minOffsetMs = 30 * 60 * 1000; // 30 minutes minimum
-      const offsetMs = minOffsetMs + offsets[i];
+    const records = posts.map((post) => {
+      // Spread posts over last 1-2 hours to look natural (not all at once)
+      const spreadMs = (1 + Math.random()) * 60 * 60 * 1000; // 1-2 hours
+      const offsetMs = Math.random() * spreadMs;
 
       const createdAt = new Date(now - offsetMs).toISOString();
-      const expiresAt = new Date(now + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
+      const expiresAt = new Date(now + 24 * 60 * 60 * 1000).toISOString(); // 24 hours from now
 
       return {
         city: body.city,
@@ -391,6 +391,8 @@ export async function POST(req: NextRequest) {
       };
     });
 
+    console.log(`[Auto-Seed] Creating ${records.length} posts for ${body.city}`);
+
     // Insert into database
     const { data, error } = await supabase
       .from("pulses")
@@ -398,14 +400,20 @@ export async function POST(req: NextRequest) {
       .select("id, city, message, tag, mood, created_at");
 
     if (error) {
-      console.error("Error inserting auto-seed pulses:", error);
+      console.error("[Auto-Seed] Database insert error:", error);
+      console.error("[Auto-Seed] Error details - code:", error.code, "message:", error.message);
       return NextResponse.json(
-        { error: "Failed to create pulses", details: error.message, code: error.code },
+        {
+          error: "Failed to create pulses",
+          details: error.message,
+          code: error.code,
+          hint: error.code === "23503" ? "Foreign key constraint - check if user_id is valid" : undefined
+        },
         { status: 500 }
       );
     }
 
-    console.log(`Auto-seeded ${data.length} pulses for ${body.city}`);
+    console.log(`[Auto-Seed] SUCCESS! Created ${data.length} pulses for ${body.city}`);
 
     return NextResponse.json({
       success: true,
@@ -414,10 +422,108 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (err) {
-    console.error("Error in auto-seed:", err);
+    console.error("[Auto-Seed] Unexpected error:", err);
     return NextResponse.json(
-      { error: "Invalid request" },
+      { error: "Invalid request", details: String(err) },
       { status: 400 }
     );
   }
+}
+
+// GET endpoint for debugging - manually trigger seed for a city
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const city = searchParams.get("city");
+  const force = searchParams.get("force") === "true";
+
+  if (!city) {
+    return NextResponse.json({
+      error: "City parameter required. Usage: /api/auto-seed?city=Leander, TX&force=true"
+    }, { status: 400 });
+  }
+
+  console.log(`[Auto-Seed GET] Manual trigger for: ${city}, force: ${force}`);
+
+  // First, geocode the city to get lat/lng for accurate API calls
+  let lat: number | null = null;
+  let lon: number | null = null;
+
+  try {
+    const geocodeRes = await fetch(
+      `${req.nextUrl.origin}/api/geocode?city=${encodeURIComponent(city)}`
+    );
+    if (geocodeRes.ok) {
+      const geoData = await geocodeRes.json();
+      if (geoData.lat && geoData.lon) {
+        lat = geoData.lat;
+        lon = geoData.lon;
+        console.log(`[Auto-Seed GET] Geocoded ${city} → ${lat}, ${lon}`);
+      }
+    }
+  } catch (err) {
+    console.log(`[Auto-Seed GET] Geocoding failed: ${err}`);
+  }
+
+  // Fetch events using lat/lng (most accurate method)
+  let events: EventData[] = [];
+  if (lat && lon) {
+    try {
+      const eventsRes = await fetch(
+        `${req.nextUrl.origin}/api/events/ticketmaster?lat=${lat}&lng=${lon}&radius=50`
+      );
+      if (eventsRes.ok) {
+        const eventsData = await eventsRes.json();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        events = (eventsData.events || []).slice(0, 5).map((e: any) => ({
+          name: e.name,
+          venue: e.venue || "Local Venue",
+          date: e.date,
+          category: e.category,
+        }));
+        console.log(`[Auto-Seed GET] Found ${events.length} events via lat/lng for ${city}`);
+      }
+    } catch (err) {
+      console.log(`[Auto-Seed GET] Events fetch failed: ${err}`);
+    }
+  }
+
+  console.log(`[Auto-Seed GET] Total events collected: ${events.length}`);
+
+  // Also fetch current weather for accurate posts (use lat/lng if available)
+  let weather: WeatherData | null = null;
+  try {
+    const weatherUrl = lat && lon
+      ? `${req.nextUrl.origin}/api/weather?lat=${lat}&lon=${lon}`
+      : `${req.nextUrl.origin}/api/weather?city=${encodeURIComponent(city)}`;
+
+    const weatherRes = await fetch(weatherUrl);
+    if (weatherRes.ok) {
+      const weatherData = await weatherRes.json();
+      console.log(`[Auto-Seed GET] Weather API response:`, JSON.stringify(weatherData).slice(0, 200));
+
+      if (weatherData.temp !== undefined) {
+        weather = {
+          description: weatherData.description || weatherData.weather || "clear",
+          temp: weatherData.temp,
+          icon: weatherData.icon,
+        };
+        console.log(`[Auto-Seed GET] Weather for ${city}: ${weather.temp}°F, ${weather.description}`);
+      }
+    } else {
+      console.log(`[Auto-Seed GET] Weather API returned ${weatherRes.status}`);
+    }
+  } catch (err) {
+    console.log(`[Auto-Seed GET] Could not fetch weather: ${err}`);
+  }
+
+  // Forward to POST handler with events and weather
+  const response = await POST(
+    new NextRequest(req.url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ city, events, weather, force }),
+    })
+  );
+
+  return response;
 }
