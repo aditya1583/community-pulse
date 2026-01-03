@@ -2720,7 +2720,7 @@ export default function Home() {
 
           {/* Live Vibes - Real-time crowd-sourced venue sentiment */}
           <LiveVibes city={city} onNavigateToLocal={() => {
-            setLocalSection("gas");
+            setLocalSection("deals");
             setActiveTab("local");
           }} />
 
