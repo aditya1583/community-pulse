@@ -1,7 +1,7 @@
 # Community Pulse - Technical Documentation
 
-> **Version:** 0.5.1
-> **Last Updated:** December 31, 2025
+> **Version:** 0.6.0
+> **Last Updated:** January 3, 2026
 > **Stack:** Next.js 14 + Supabase + OpenAI + Tailwind CSS
 
 ---
@@ -10,16 +10,18 @@
 
 1. [Overview](#overview)
 2. [Architecture](#architecture)
-3. [API Reference](#api-reference)
-4. [Database Schema](#database-schema)
-5. [Components](#components)
-6. [Hooks](#hooks)
-7. [Libraries & Utilities](#libraries--utilities)
-8. [Security & Moderation](#security--moderation)
-9. [Gamification System](#gamification-system)
-10. [Environment Variables](#environment-variables)
-11. [Version History](#version-history)
-12. [Deployment Checklist](#deployment-checklist)
+3. [Data Sources & Legal Compliance](#data-sources--legal-compliance)
+4. [API Reference](#api-reference)
+5. [Fallback Systems](#fallback-systems)
+6. [Database Schema](#database-schema)
+7. [Components](#components)
+8. [Hooks](#hooks)
+9. [Libraries & Utilities](#libraries--utilities)
+10. [Security & Moderation](#security--moderation)
+11. [Gamification System](#gamification-system)
+12. [Environment Variables](#environment-variables)
+13. [Version History](#version-history)
+14. [Deployment Checklist](#deployment-checklist)
 
 ---
 
@@ -39,6 +41,7 @@ Community Pulse is a hyperlocal community app that surfaces real-time city vibes
 2. **Fail-closed moderation** - If moderation service fails, content is rejected
 3. **Ephemeral content** - Pulses expire (2-24 hours based on tag)
 4. **Privacy-first** - No PII in pulses, anonymous usernames
+5. **Legal compliance** - Only use APIs with permissive terms of service
 
 ---
 
@@ -60,10 +63,12 @@ Community Pulse is a hyperlocal community app that surfaces real-time city vibes
 │                      API ROUTES (/api/*)                        │
 ├─────────────────────────────────────────────────────────────────┤
 │  /pulses         POST → Moderation Pipeline → Supabase Insert   │
-│  /weather        → OpenWeatherMap API                           │
-│  /events         → Ticketmaster API                             │
-│  /news           → GNews / NewsAPI                              │
-│  /gas-prices     → EIA API                                      │
+│  /weather        → Open-Meteo API (FREE)                        │
+│  /events         → Ticketmaster API (with metro fallback)       │
+│  /news           → GNews API                                    │
+│  /gas-prices     → EIA API + OSM Gas Stations                   │
+│  /local-deals    → Foursquare → OSM Overpass (fallback)         │
+│  /farmers-markets→ USDA → Foursquare → OSM (fallback chain)     │
 │  /summary        → OpenAI GPT-4o-mini                           │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -89,6 +94,220 @@ Community Pulse is a hyperlocal community app that surfaces real-time city vibes
 
 ---
 
+## Data Sources & Legal Compliance
+
+### Why We Removed Yelp
+
+**Yelp Fusion API was removed in v0.6.0** due to Terms of Service restrictions:
+
+| Issue | Risk |
+|-------|------|
+| **Commercial use restrictions** | Yelp prohibits use in apps that compete with their core business |
+| **Display requirements** | Must show Yelp branding prominently, can't mix with other data sources |
+| **Caching limitations** | 24-hour max cache, complicates offline/PWA functionality |
+| **Attribution requirements** | Complex logo/link requirements for every data display |
+| **Lawsuit history** | Yelp has sued companies for TOS violations |
+
+**Resolution:** Replaced with OpenStreetMap (completely free, open data) and Foursquare (permissive API terms).
+
+---
+
+### Current Data Sources
+
+| Data Type | Primary Source | Fallback 1 | Fallback 2 | License |
+|-----------|---------------|------------|------------|---------|
+| **Weather** | Open-Meteo | - | - | Free, no API key |
+| **Air Quality** | Open-Meteo | - | - | Free, no API key |
+| **Events** | Ticketmaster | Metro fallback | - | API key required |
+| **News** | GNews | Google News search | - | API key required |
+| **Gas Prices** | EIA (federal) | - | - | Public domain |
+| **Gas Stations** | OpenStreetMap | - | - | ODbL (free) |
+| **Local Places** | Foursquare | OpenStreetMap | - | API key / ODbL |
+| **Farmers Markets** | USDA | Foursquare | OpenStreetMap | Public domain / ODbL |
+| **Traffic** | TomTom | Community pulses | - | API key required |
+| **Geocoding** | OpenCage | - | - | API key required |
+
+---
+
+### OpenStreetMap (OSM) Integration
+
+**Why OSM?**
+- **Completely free** - No API costs, no rate limits (reasonable use)
+- **Open data** - ODbL license allows commercial use with attribution
+- **Global coverage** - Community-maintained worldwide
+- **No API key** - Uses Overpass API for queries
+
+**Implementation:**
+```
+src/app/api/osm/places/route.ts     - Local places via Overpass API
+src/app/api/gas-stations/route.ts   - Gas stations with OSM fallback
+src/app/api/farmers-markets/route.ts - Markets with OSM fallback
+```
+
+**Overpass API Mirrors (for reliability):**
+1. `https://overpass-api.de/api/interpreter` (primary)
+2. `https://overpass.kumi.systems/api/interpreter` (backup)
+
+**Attribution Requirement:**
+All OSM data displays include: "Powered by OpenStreetMap" with link to openstreetmap.org
+
+---
+
+### Open-Meteo Weather Integration
+
+**Replaced OpenWeatherMap** in v0.6.0:
+
+| Feature | Open-Meteo | OpenWeatherMap |
+|---------|------------|----------------|
+| **Cost** | Free forever | $0 for 1K calls/day, then paid |
+| **API Key** | Not required | Required |
+| **Rate Limits** | 10K/day (generous) | 1K/day free tier |
+| **AQI Data** | Included free | Separate paid API |
+| **Forecast** | 16 days free | 5 days free |
+
+**Data provided:**
+- Current temperature, feels-like, humidity
+- Weather conditions and icons
+- Air Quality Index (US EPA standard)
+- AQI category and health recommendations
+
+---
+
+### Foursquare Places API
+
+**Why Foursquare over Yelp?**
+- More permissive TOS for aggregator apps
+- No strict display requirements
+- Better international coverage
+- Cleaner API design
+
+**Current Status:** API key returning 401 errors (invalid key issue)
+
+**Fallback:** OpenStreetMap Overpass API provides full coverage when Foursquare fails
+
+---
+
+### Google Maps Integration
+
+**Usage:** Deep links only (no API calls)
+- **No API key required** - Using URL scheme, not Maps API
+- **No cost** - Public URL format
+- **No TOS issues** - Standard web links
+
+**URL Patterns:**
+```
+Search:     https://www.google.com/maps/search/?api=1&query=ENCODED_QUERY
+Directions: https://www.google.com/maps/dir/?api=1&destination=ENCODED_DEST
+```
+
+**Used in:**
+- Gas station "Get Directions" buttons
+- Farmers market address links
+- Local deals venue cards
+- Event venue directions
+
+---
+
+## Fallback Systems
+
+### Events (Ticketmaster Metro Fallback)
+
+**Problem:** Small towns (e.g., Leander, TX; Irwin, IL) return 0 events
+
+**Solution:** Detect state, find nearest major metro, search there
+
+```typescript
+// State → Metro mapping
+const STATE_TO_METROS = {
+  TX: [
+    { name: "Austin", lat: 30.2672, lon: -97.7431 },
+    { name: "Houston", lat: 29.7604, lon: -95.3698 },
+    { name: "Dallas", lat: 32.7767, lon: -96.7970 },
+    // ...
+  ],
+  IL: [
+    { name: "Chicago", lat: 41.8781, lon: -87.6298 },
+    { name: "St. Louis", lat: 38.6270, lon: -90.1994 },
+    // ...
+  ],
+  // 50 states covered
+};
+```
+
+**Flow:**
+1. Search user's city (25mi radius)
+2. If 0 results → detect state
+3. Find nearest metro using Haversine distance
+4. Search metro (50mi radius)
+5. Return events with attribution: "Events near Chicago (111 mi away)"
+
+**Caching:** In-memory cache stores fallback metadata for UI display
+
+---
+
+### Local Places (Foursquare → OSM)
+
+**Fallback Chain:**
+```
+1. Try Foursquare Places API
+   ↓ (if 401/error/empty)
+2. Query OpenStreetMap Overpass API
+   - Amenities: cafe, restaurant, bar, fast_food, pub, nightclub
+   - Shops: supermarket, convenience, grocery, greengrocer
+   ↓ (if empty)
+3. Show "No places found" with Google Maps search link
+```
+
+**Category Mapping:**
+| UI Category | Foursquare | OSM Amenity | OSM Shop |
+|-------------|------------|-------------|----------|
+| All | various | cafe, restaurant, bar, fast_food | - |
+| Coffee | 13035 | cafe | - |
+| Food | 13065 | restaurant, fast_food | - |
+| Bars | 13003 | bar, pub, nightclub | - |
+| Grocery | 17069 | - | supermarket, convenience, grocery |
+
+---
+
+### Farmers Markets (USDA → Foursquare → OSM)
+
+**Triple Fallback:**
+```
+1. USDA Local Food Directories API (authoritative federal data)
+   ↓ (if empty - common for many cities)
+2. Foursquare Places API (category 17069)
+   ↓ (if 401/error/empty)
+3. OpenStreetMap Overpass API
+   - amenity=marketplace
+   - shop=farm
+   - name~"farmer|market|produce"
+   ↓ (if empty)
+4. Show Google Maps search link
+```
+
+**Note:** OSM may return general "markets" (convenience stores with "market" in name) rather than true farmers markets. Attribution indicates data source.
+
+---
+
+### News (GNews → Google News)
+
+**Hierarchical Fallback:**
+```
+1. Search: "City, State" (e.g., "Leander, TX")
+   ↓ (if < 3 articles)
+2. Search: "County, State" (e.g., "Williamson County, TX")
+   ↓ (if < 3 articles)
+3. Search: "Metro area" (e.g., "Austin area")
+   ↓ (if < 3 articles)
+4. Search: "State news" (e.g., "Texas")
+   ↓ (if still empty)
+5. Show Google News fallback link
+```
+
+**Deduplication:** Articles deduplicated by normalized title to prevent showing same story from multiple sources.
+
+---
+
 ## API Reference
 
 ### Core Content APIs
@@ -106,9 +325,9 @@ Content-Type: application/json
 ```json
 {
   "city": "Austin",
-  "neighborhood": "Downtown",  // optional
+  "neighborhood": "Downtown",
   "mood": "frustrated",
-  "tag": "Traffic",            // Traffic | Weather | Events | General
+  "tag": "Traffic",
   "message": "I-35 is a parking lot right now",
   "author": "LocalCommuter"
 }
@@ -123,8 +342,8 @@ Content-Type: application/json
   "tag": "Traffic",
   "message": "I-35 is a parking lot right now",
   "author": "LocalCommuter",
-  "created_at": "2025-12-31T10:00:00Z",
-  "expires_at": "2025-12-31T12:00:00Z"
+  "created_at": "2026-01-03T10:00:00Z",
+  "expires_at": "2026-01-03T12:00:00Z"
 }
 ```
 
@@ -136,59 +355,119 @@ Content-Type: application/json
 
 ---
 
-#### GET /api/city-mood
-Get aggregated city vibe analysis.
+#### GET /api/events/ticketmaster
+Events with metro fallback for small towns.
 
-**Query:**
-```
-?city=Austin&eventsCount=5&trafficLevel=moderate&weatherCondition=sunny
-```
+**Query:** `?city=Leander&state=TX&lat=30.5788&lon=-97.8531&radius=25`
 
 **Response:**
 ```json
 {
-  "dominantMood": "happy",
-  "vibeHeadline": "Austin is Buzzing",
-  "vibeSubtext": "5 events happening today",
-  "vibeIntensity": 0.75,
-  "tagScores": {
-    "Traffic": 0.3,
-    "Events": 0.5,
-    "Weather": 0.2
+  "events": [...],
+  "total": 20,
+  "cached": true,
+  "fallback": {
+    "metro": "Austin",
+    "distance": 26
   }
 }
 ```
 
+**Fallback info** included when events are from nearby metro, not user's city.
+
 ---
 
-#### GET /api/traffic
-Get traffic level classification.
+#### GET /api/osm/places
+Local places via OpenStreetMap (free fallback).
 
-**Query:** `?city=Austin`
+**Query:** `?lat=30.2672&lon=-97.7431&category=coffee&radius=5000`
+
+**Categories:** `all`, `coffee`, `restaurants`, `bars`, `grocery`
 
 **Response:**
 ```json
 {
-  "level": "Moderate",
-  "source": "ai",
-  "pulseCount": 12,
-  "dominantMood": "frustrated"
+  "places": [
+    {
+      "id": "osm-node-123456",
+      "name": "Starbucks",
+      "category": "cafe",
+      "address": "123 Congress Ave, Austin",
+      "lat": 30.2650,
+      "lon": -97.7420,
+      "distance": 245,
+      "openingHours": "Mo-Fr 06:00-20:00"
+    }
+  ],
+  "source": "openstreetmap"
 }
 ```
 
 ---
 
+#### GET /api/gas-stations
+Nearby gas stations via OpenStreetMap.
+
+**Query:** `?lat=30.2672&lon=-97.7431`
+
+**Response:**
+```json
+{
+  "stations": [
+    {
+      "id": "osm-node-789",
+      "name": "7-Eleven",
+      "brand": "7-Eleven",
+      "address": "500 E 6th St, Austin",
+      "lat": 30.2680,
+      "lon": -97.7380,
+      "distance": 0.3,
+      "amenities": ["convenience_store", "atm"]
+    }
+  ],
+  "source": "openstreetmap"
+}
+```
+
+---
+
+#### GET /api/farmers-markets
+Markets with triple fallback (USDA → Foursquare → OSM).
+
+**Query:** `?city=Austin&state=TX&lat=30.2672&lon=-97.7431`
+
+**Response:**
+```json
+{
+  "markets": [
+    {
+      "id": "usda-123",
+      "name": "Austin Farmers Market",
+      "address": "422 Guadalupe St",
+      "schedule": "Sat 9am-1pm",
+      "products": ["Organic", "Vegetables", "Eggs"],
+      "isOpenToday": true,
+      "distance": 1.2,
+      "source": "usda"
+    }
+  ],
+  "total": 5,
+  "source": "usda"
+}
+```
+
+**Source values:** `usda`, `foursquare`, `osm`
+
+---
+
 #### POST /api/weather
-Get weather data for location.
+Weather and AQI via Open-Meteo (free, no API key).
 
 **Body:**
 ```json
 {
-  "city": "Austin",
   "lat": 30.2672,
-  "lon": -97.7431,
-  "country": "US",
-  "state": "TX"
+  "lon": -97.7431
 }
 ```
 
@@ -197,240 +476,42 @@ Get weather data for location.
 {
   "temp": 75,
   "feelsLike": 78,
+  "humidity": 45,
   "description": "Partly cloudy",
   "icon": "02d",
-  "cityName": "Austin"
+  "aqi": {
+    "value": 42,
+    "category": "Good",
+    "color": "#00e400"
+  }
 }
 ```
 
 ---
 
-#### POST /api/summary
-Generate AI summary of city data.
+### Auto-Seeding Bot API
+
+#### POST /api/auto-seed
+Generate realistic bot pulses for empty cities.
+
+**Headers:** `x-cron-secret: <CRON_SECRET>`
 
 **Body:**
 ```json
 {
-  "city": "Austin",
-  "context": "all",  // "all" | "pulse" | "events" | "traffic" | "news"
-  "pulses": [...],
-  "events": [...],
-  "news": [...],
-  "weather": {...}
+  "city": "Leander",
+  "state": "TX",
+  "lat": 30.5788,
+  "lon": -97.8531
 }
 ```
 
-**Response:**
-```json
-{
-  "summary": "Austin is having a busy Tuesday..."
-}
-```
-
----
-
-### Information APIs
-
-#### GET /api/news
-Local news articles.
-
-**Query:** `?city=Austin&state=TX`
-
-**Response:**
-```json
-{
-  "articles": [
-    {
-      "title": "...",
-      "description": "...",
-      "url": "https://...",
-      "source": "Austin American-Statesman",
-      "publishedAt": "2025-12-31T08:00:00Z"
-    }
-  ],
-  "provider": "gnews"
-}
-```
-
----
-
-#### GET /api/events/ticketmaster
-Events from Ticketmaster.
-
-**Query:** `?city=Austin&lat=30.2672&lon=-97.7431&radius=25`
-
-**Response:**
-```json
-{
-  "events": [
-    {
-      "id": "...",
-      "name": "Austin City Limits",
-      "date": "2025-12-31",
-      "time": "19:00:00",
-      "venue": "Zilker Park",
-      "category": "Music",
-      "priceRange": "$50 - $150",
-      "url": "https://ticketmaster.com/..."
-    }
-  ],
-  "cached": false
-}
-```
-
----
-
-#### GET /api/gas-prices
-Regional gas prices.
-
-**Query:** `?state=TX`
-
-**Response:**
-```json
-{
-  "regular": 2.89,
-  "midgrade": 3.29,
-  "premium": 3.69,
-  "diesel": 3.49,
-  "regularChange": -0.05,
-  "stateAvg": 2.95,
-  "nationalAvg": 3.15,
-  "regionName": "Texas",
-  "lastUpdated": "2025-12-31T00:00:00Z"
-}
-```
-
----
-
-### Gamification APIs
-
-#### GET /api/gamification/stats
-User statistics and badges.
-
-**Query:** `?userId=<uuid>`
-
-**Response:**
-```json
-{
-  "stats": {
-    "pulse_count_total": 42,
-    "pulse_count_traffic": 15,
-    "reactions_received_total": 128,
-    "current_streak_days": 7,
-    "level": 12,
-    "xp_total": 1450
-  },
-  "badges": [
-    {
-      "name": "Traffic Titan",
-      "description": "Posted 10 traffic reports",
-      "icon": "🚗",
-      "earned_at": "2025-12-25T10:00:00Z"
-    }
-  ],
-  "tier": "Gold",
-  "weeklyRank": 8
-}
-```
-
----
-
-#### GET /api/gamification/leaderboard
-Leaderboard rankings.
-
-**Query:** `?period=weekly&city=Austin&limit=10`
-
-**Response:**
-```json
-{
-  "entries": [
-    {
-      "rank": 1,
-      "username": "CityExplorer",
-      "score": 450,
-      "pulseCount": 35,
-      "reactionCount": 180
-    }
-  ],
-  "userRank": 8,
-  "totalUsers": 156
-}
-```
-
----
-
-### Engagement APIs
-
-#### POST /api/venue-vibe
-Submit venue atmosphere check-in.
-
-**Body:**
-```json
-{
-  "venue_id": "yelp-abc123",
-  "venue_name": "Jo's Coffee",
-  "vibe_type": "busy",
-  "venue_lat": 30.2500,
-  "venue_lon": -97.7500,
-  "city": "Austin"
-}
-```
-
-**Valid vibe_type values:**
-- `busy`, `quiet`, `moderate`
-- `live_music`, `great_vibes`, `chill`
-- `long_wait`, `fast_service`
-- `worth_it`, `skip_it`
-
-**Rate Limits:**
-- 1 vibe per venue per 30 minutes (per device)
-- 5 vibes per hour globally (per user)
-
----
-
-#### POST /api/report-pulse
-Report inappropriate content.
-
-**Body:**
-```json
-{
-  "pulse_id": "uuid",
-  "reason": "harassment"
-}
-```
-
----
-
-### Admin APIs
-
-#### GET /api/admin/reports
-List reported pulses (mod queue).
-
-**Headers:** `x-admin-key: <ADMIN_API_KEY>`
-
-**Query:** `?status=pending&page=1&limit=20`
-
-**Response:**
-```json
-{
-  "reports": [...],
-  "total": 45,
-  "page": 1,
-  "hasMore": true
-}
-```
-
----
-
-#### POST /api/admin/reports/[id]
-Take action on report.
-
-**Body:**
-```json
-{
-  "action": "approve"  // "approve" | "dismiss" | "ban_user"
-}
-```
+**Features:**
+- Weather-aware messages (checks actual conditions)
+- Time-of-day appropriate content (commute times, lunch, evening)
+- Varied bot personas with distinct voices
+- Traffic pulse frequency based on time
+- Never seeds duplicate content
 
 ---
 
@@ -458,12 +539,6 @@ CREATE TABLE pulses (
 ALTER TABLE pulses ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public read" ON pulses FOR SELECT USING (true);
 CREATE POLICY "Owner delete" ON pulses FOR DELETE USING (auth.uid() = user_id);
--- No INSERT policy - service role only
-
--- Indexes
-CREATE INDEX idx_pulses_city_created ON pulses(city, created_at DESC);
-CREATE INDEX idx_pulses_tag ON pulses(tag);
-CREATE INDEX idx_pulses_user_id ON pulses(user_id);
 ```
 
 ### Gamification Tables
@@ -477,31 +552,10 @@ CREATE TABLE user_stats (
   pulse_count_events INT DEFAULT 0,
   pulse_count_general INT DEFAULT 0,
   reactions_received_total INT DEFAULT 0,
-  reactions_received_fire INT DEFAULT 0,
-  reactions_received_eyes INT DEFAULT 0,
-  reactions_received_check INT DEFAULT 0,
   current_streak_days INT DEFAULT 0,
   longest_streak_days INT DEFAULT 0,
-  last_pulse_date DATE,
   level INT DEFAULT 1,
-  xp_total INT DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE badge_definitions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL UNIQUE,
-  description TEXT NOT NULL,
-  icon TEXT NOT NULL,
-  category TEXT CHECK (category IN ('category', 'achievement', 'streak', 'milestone')),
-  required_tag TEXT,
-  tier INT DEFAULT 1,
-  required_pulse_count INT,
-  required_reaction_count INT,
-  required_streak_days INT,
-  special_condition TEXT,
-  display_order INT DEFAULT 0
+  xp_total INT DEFAULT 0
 );
 
 CREATE TABLE user_badges (
@@ -509,8 +563,6 @@ CREATE TABLE user_badges (
   user_id UUID REFERENCES auth.users(id),
   badge_id UUID REFERENCES badge_definitions(id),
   earned_at TIMESTAMPTZ DEFAULT now(),
-  expires_at TIMESTAMPTZ,
-  current_progress INT DEFAULT 0,
   UNIQUE(user_id, badge_id)
 );
 ```
@@ -525,9 +577,7 @@ CREATE TABLE venue_vibes (
   vibe_type TEXT NOT NULL,
   venue_lat DOUBLE PRECISION,
   venue_lon DOUBLE PRECISION,
-  device_fingerprint TEXT,
   city TEXT,
-  user_id UUID REFERENCES auth.users(id),
   created_at TIMESTAMPTZ DEFAULT now(),
   expires_at TIMESTAMPTZ DEFAULT now() + INTERVAL '4 hours'
 );
@@ -537,17 +587,8 @@ CREATE TABLE pulse_reports (
   pulse_id UUID REFERENCES pulses(id) ON DELETE CASCADE,
   reporter_id UUID REFERENCES auth.users(id),
   reason TEXT NOT NULL,
-  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'dismissed')),
+  status TEXT DEFAULT 'pending',
   created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE pulse_reactions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  pulse_id UUID REFERENCES pulses(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES auth.users(id),
-  reaction_type TEXT CHECK (reaction_type IN ('fire', 'eyes', 'check')),
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(pulse_id, user_id, reaction_type)
 );
 ```
 
@@ -559,36 +600,20 @@ CREATE TABLE pulse_reactions (
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| `PulseCard` | `src/components/PulseCard.tsx` | Individual pulse with expiry, reactions, delete/report |
-| `EventCard` | `src/components/EventCard.tsx` | Event with Calendar/Directions/Share actions |
+| `PulseCard` | `src/components/PulseCard.tsx` | Individual pulse with expiry, reactions |
+| `EventCard` | `src/components/EventCard.tsx` | Event with Calendar/Directions/Share + metro fallback |
 | `NewsCard` | `src/components/NewsCard.tsx` | Clickable news article |
-| `GasPricesCard` | `src/components/GasPricesCard.tsx` | Gas prices with "Find stations" link |
+| `GasPricesCard` | `src/components/GasPricesCard.tsx` | Gas prices + nearby stations |
+| `LocalDealsSection` | `src/components/LocalDealsSection.tsx` | Local places with OSM fallback |
+| `FarmersMarketsSection` | `src/components/FarmersMarketsSection.tsx` | Markets with Google Maps links |
 | `VenueVibeCheck` | `src/components/VenueVibeCheck.tsx` | Atmosphere check-in modal |
-
-### Input & Forms
-
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| `PulseInput` | `src/components/PulseInput.tsx` | Create pulse form |
-| `PulseModal` | `src/components/PulseModal.tsx` | Modal wrapper for pulse creation |
-| `SuggestionChips` | `src/components/SuggestionChips.tsx` | Time-based prompt suggestions |
 
 ### Navigation & Layout
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| `TabNavigation` | `src/components/TabNavigation.tsx` | Main tab bar (Pulse/Events/Local/News) |
-| `Header` | `src/components/Header.tsx` | App header with city selector |
-| `FAB` | `src/components/FAB.tsx` | Floating action button |
-
-### Gamification
-
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| `Leaderboard` | `src/components/Leaderboard.tsx` | Weekly/monthly rankings |
-| `BadgeDisplay` | `src/components/BadgeDisplay.tsx` | Earned badges grid |
-| `XPProgressBadge` | `src/components/XPProgressBadge.tsx` | Level/XP indicator |
-| `StatusRing` | `src/components/StatusRing.tsx` | Tier visual indicator |
+| `LocalTab` | `src/components/LocalTab.tsx` | Explore/Gas/Markets segmented control |
+| `LiveVibes` | `src/components/LiveVibes.tsx` | Venue vibe display + "Log Vibe" CTA |
 
 ---
 
@@ -598,72 +623,9 @@ CREATE TABLE pulse_reactions (
 |------|----------|---------|
 | `useGamification` | `src/hooks/useGamification.ts` | Fetch user stats, badges, tier |
 | `useLeaderboard` | `src/hooks/useLeaderboard.ts` | Fetch leaderboard with pagination |
-| `useUserRank` | `src/hooks/useUserRank.ts` | Get single user's rank |
 | `useGeolocation` | `src/hooks/useGeolocation.ts` | Browser geolocation API |
-| `useGeocodingAutocomplete` | `src/hooks/useGeocodingAutocomplete.ts` | City name autocomplete |
-| `useEvents` | `src/hooks/useEvents.ts` | Fetch events for city |
+| `useEvents` | `src/hooks/useEvents.ts` | Fetch events with fallback info |
 | `usePushNotifications` | `src/hooks/usePushNotifications.ts` | Push notification management |
-| `useExpiryCountdown` | `src/hooks/useExpiryCountdown.ts` | Time remaining for ephemeral content |
-
----
-
-## Libraries & Utilities
-
-### Moderation (`src/lib/`)
-
-| File | Purpose |
-|------|---------|
-| `moderationPipeline.ts` | Orchestrates all moderation layers |
-| `piiDetection.ts` | Detects emails, phones, SSNs, addresses, social handles |
-| `aiModeration.ts` | OpenAI Moderation API integration |
-| `perspectiveModeration.ts` | Google Perspective API (toxicity) |
-| `blocklist.ts` | Dynamic blocked terms from database |
-| `moderation.ts` | Local heuristics (profanity, obfuscations, leetspeak) |
-
-### Rate Limiting (`src/lib/rateLimit.ts`)
-
-```typescript
-// Rate limit configurations
-RATE_LIMITS = {
-  PULSE_CREATE: { limit: 5, windowSeconds: 3600 },      // 5/hour
-  REPORT: { limit: 10, windowSeconds: 86400 },          // 10/day
-  VENUE_VIBE: { limit: 5, windowSeconds: 3600 },        // 5/hour
-  GLOBAL: { limit: 100, windowSeconds: 60 }             // 100/min
-}
-```
-
-### Gamification (`src/lib/gamification.ts`)
-
-```typescript
-// XP rewards
-PULSE_XP = 10
-REACTION_XP = { fire: 5, eyes: 3, check: 2 }
-
-// Level calculation (sqrt curve)
-calculateLevel(xp) = Math.floor(Math.sqrt(xp / 10)) + 1
-
-// Tiers (based on weekly rank)
-TIERS = {
-  Diamond: ranks 1-3,
-  Gold: ranks 4-10,
-  Silver: ranks 11-25,
-  Bronze: ranks 26-50,
-  None: ranks 51+
-}
-```
-
-### Content Lifespan (`src/lib/pulses.ts`)
-
-```typescript
-PULSE_LIFESPAN = {
-  Traffic: 2 hours,
-  Weather: 24 hours,
-  Events: 24 hours,
-  General: 24 hours
-}
-
-GRACE_PERIOD = 30 minutes  // Before expiry warning
-```
 
 ---
 
@@ -677,9 +639,7 @@ User Input
     ▼
 ┌─────────────────────────────────────┐
 │ 1. PII Detection                    │
-│    - Emails (including obfuscated)  │
-│    - Phone numbers                  │
-│    - SSNs                           │
+│    - Emails, phones, SSNs           │
 │    - Physical addresses             │
 │    - Social media handles           │
 └─────────────────────────────────────┘
@@ -689,38 +649,18 @@ User Input
 │ 2. Local Heuristics                 │
 │    - Blocklist terms                │
 │    - Profanity (with leetspeak)     │
-│    - Threats ("kys", "kill you")    │
-│    - Obfuscation detection          │
+│    - Threat detection               │
 └─────────────────────────────────────┘
     │ PASS
     ▼
 ┌─────────────────────────────────────┐
 │ 3. AI Moderation (OpenAI)           │
-│    - Hate speech                    │
-│    - Violence                       │
-│    - Sexual content                 │
-│    - Self-harm                      │
-└─────────────────────────────────────┘
-    │ PASS
-    ▼
-┌─────────────────────────────────────┐
-│ 4. Perspective API (optional)       │
-│    - Toxicity scoring               │
-│    - Severe toxicity                │
+│    - Hate speech, violence          │
+│    - Sexual content, self-harm      │
 └─────────────────────────────────────┘
     │ PASS
     ▼
   ALLOWED
-```
-
-### Fail-Closed Guarantee
-
-```typescript
-// In production, if any moderation service fails:
-if (process.env.NODE_ENV === 'production') {
-  // ALWAYS reject - never allow unmoderated content
-  return { allowed: false, reason: 'Moderation unavailable' };
-}
 ```
 
 ### Rate Limiting
@@ -730,36 +670,6 @@ if (process.env.NODE_ENV === 'production') {
 | POST /api/pulses | 5 | 1 hour |
 | POST /api/report-pulse | 10 | 24 hours |
 | POST /api/venue-vibe | 5 | 1 hour |
-
----
-
-## Gamification System
-
-### Levels
-
-- XP earned from pulses (10 XP) and reactions received (2-5 XP)
-- Level = √(XP/10) + 1
-- Max level: 100
-
-### Tiers
-
-Based on weekly leaderboard rank:
-
-| Tier | Rank Range | Visual |
-|------|------------|--------|
-| Diamond | 1-3 | 💎 |
-| Gold | 4-10 | 🥇 |
-| Silver | 11-25 | 🥈 |
-| Bronze | 26-50 | 🥉 |
-| None | 51+ | - |
-
-### Badges
-
-Categories:
-- **Category**: Tag-specific achievements (Traffic Titan, Weather Watcher)
-- **Achievement**: Special accomplishments
-- **Streak**: Consecutive day posting
-- **Milestone**: Cumulative totals
 
 ---
 
@@ -773,107 +683,80 @@ NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
 
-# OpenAI (required for moderation)
+# OpenAI (required for moderation + summaries)
 OPENAI_API_KEY=sk-...
 ```
 
 ### External APIs
 
 ```env
-# Weather
-WEATHER_API_KEY=xxx
-
 # Events
 TICKETMASTER_API_KEY=xxx
 
 # News
-NEWS_API_KEY=xxx
 GNEWS_API_KEY=xxx
 
 # Geocoding
 NEXT_PUBLIC_GEOCODING_API_KEY=xxx
 
-# Gas Prices
-EIA_API_KEY=xxx
-
-# Maps
+# Traffic
 TOMTOM_API_KEY=xxx
+
+# Local Places (optional - OSM fallback available)
+FOURSQUARE_API_KEY=xxx
 ```
 
-### Moderation (optional)
+### Free APIs (No Key Required)
 
 ```env
-# Google Perspective (optional toxicity layer)
-PERSPECTIVE_API_KEY=xxx
-PERSPECTIVE_TOXICITY_THRESHOLD=0.8
-PERSPECTIVE_SEVERE_TOXICITY_THRESHOLD=0.5
-PERSPECTIVE_TIMEOUT_MS=2000
-
-# Moderation behavior
-MODERATION_FAIL_OPEN=false  # NEVER true in production
-MODERATION_TIMEOUT_MS=2000
-```
-
-### Admin
-
-```env
-ADMIN_API_KEY=xxx
-ADMIN_SECRET=xxx
-CRON_SECRET=xxx
-```
-
-### Notifications
-
-```env
-NEXT_PUBLIC_VAPID_PUBLIC_KEY=xxx
-VAPID_PRIVATE_KEY=xxx
+# These don't need API keys:
+# - Open-Meteo (weather + AQI)
+# - OpenStreetMap Overpass (places, gas stations)
+# - USDA Local Food Directories (farmers markets)
+# - EIA (gas prices - public domain)
 ```
 
 ---
 
 ## Version History
 
+### v0.6.0 - The Data Independence Update (Jan 3, 2026)
+
+**Major Changes:**
+- **Removed Yelp integration** - TOS compliance concerns
+- **Added OpenStreetMap** as primary fallback for all location data
+- **Switched to Open-Meteo** for weather/AQI (free, no API key)
+- **Implemented triple fallback** for farmers markets (USDA → Foursquare → OSM)
+- **Added metro fallback** for Ticketmaster events in small towns
+- **Google Maps deep links** throughout (free, no API)
+
+**New Features:**
+- Colorful category-based thumbnails for places (gradient backgrounds)
+- "Directions" button on all venue cards
+- Clickable addresses open Google Maps
+- Metro attribution for fallback events ("Events near Austin, 26 mi away")
+- Bot seeding for empty cities with weather-aware content
+
+**Legal/Compliance:**
+- All data sources now have permissive licenses
+- OSM attribution displayed where required
+- No scraping or TOS-violating API usage
+
 ### v0.5.1 - Clickable Actions (Dec 31, 2025)
 - Gas prices card → opens Google Maps for nearby stations
 - Event cards → Add to Calendar / Directions / Share buttons
 - ICS file generation for calendar events
 
-### v0.5.0 - Safety, Moderation & Privacy Hardening (Dec 31, 2025)
-- Rate limiting: 5 pulses/hour, 10 reports/day, 5 vibes/hour
-- Mod queue admin API (GET/POST /api/admin/reports)
-- Explicit field selection (no SELECT * for privacy)
+### v0.5.0 - Safety & Moderation Hardening (Dec 31, 2025)
+- Rate limiting: 5 pulses/hour, 10 reports/day
+- Mod queue admin API
 - 191 comprehensive moderation tests
 
-### v0.4.9 - Device Geolocation & Location Accuracy (Dec 30, 2025)
-- Browser geolocation API integration
-- Reverse geocoding to city name
-- Location accuracy indicators
-
-### v0.4.8 - Trust, Provenance & UX Polish (Dec 29, 2025)
-- Pulse metadata (is_bot flag)
-- Enhanced timestamps
-- UI polish fixes
-
-### v0.4.3 - Engagement Prompts (Dec 28, 2025)
-- Tappable suggestion chips
-- Time-based prompts (morning, lunch, evening)
-- 6-hour cooldown between prompts
-
-### v0.4.2 - UX Polish & Smart News Fallback (Dec 27, 2025)
-- Vibrant "Log Vibe" button with gradient
-- Fixed vibe modal click issue (React Portal)
-- Hierarchical news fallback (City → County → Metro → State)
-
-### v0.4.1 - Venue Vibe Checks (Dec 26, 2025)
-- Real-time crowd-sourced atmosphere reporting
-- Vibe picker modal with categories
-- Integration with Yelp venue cards
-
-### v0.4.0 - The Engagement Update (Dec 25, 2025)
-- Local tab UI restoration
-- Hyperlocal API endpoints
-- Pulse reports migration
-- News deduplication system
+### v0.4.x - The Engagement Update (Dec 25-30, 2025)
+- Venue vibe checks
+- Suggestion chips
+- News fallback hierarchy
+- Device geolocation
 
 ---
 
@@ -884,31 +767,23 @@ VAPID_PRIVATE_KEY=xxx
 - [ ] All environment variables set in Vercel
 - [ ] Supabase RLS policies verified
 - [ ] MODERATION_FAIL_OPEN=false in production
-- [ ] ADMIN_API_KEY set and secured
 - [ ] Rate limiting tested
-- [ ] All 569 tests passing
+- [ ] OSM attribution visible on all maps/places
 
 ### External Services
 
 - [ ] OpenAI API key with sufficient quota
 - [ ] Ticketmaster API approved for production
-- [ ] NewsAPI/GNews API keys active
-- [ ] OpenWeatherMap API key
-- [ ] VAPID keys for push notifications
+- [ ] GNews API key active
+- [ ] (Optional) Foursquare API key
 
-### Monitoring
+### Free Services (No Setup)
 
-- [ ] Vercel Analytics enabled
-- [ ] OpenAI usage alerts configured
-- [ ] Supabase query performance monitored
-- [ ] Error tracking (optional: Sentry)
-
-### Post-Launch
-
-- [ ] Seed one city with 5-10 real users
-- [ ] Kill AI sample pulses
-- [ ] Track D1/D7 retention
-- [ ] Monitor moderation queue
+- [x] Open-Meteo - works without key
+- [x] OpenStreetMap Overpass - works without key
+- [x] USDA Local Food - works without key
+- [x] EIA Gas Prices - works without key
+- [x] Google Maps links - no API needed
 
 ---
 
@@ -920,28 +795,31 @@ community-pulse/
 │   ├── app/
 │   │   ├── api/
 │   │   │   ├── pulses/
-│   │   │   ├── events/
+│   │   │   ├── events/ticketmaster/    # With metro fallback
+│   │   │   ├── osm/places/             # NEW: OpenStreetMap places
+│   │   │   ├── gas-stations/           # With OSM fallback
+│   │   │   ├── farmers-markets/        # Triple fallback
+│   │   │   ├── weather/                # Open-Meteo
 │   │   │   ├── news/
-│   │   │   ├── weather/
-│   │   │   ├── gamification/
-│   │   │   ├── admin/
+│   │   │   ├── auto-seed/              # Bot seeding
 │   │   │   └── ...
-│   │   ├── page.tsx          # Main dashboard
+│   │   ├── page.tsx
 │   │   ├── privacy/
 │   │   └── terms/
-│   ├── components/           # 37 React components
-│   ├── hooks/                # 8 custom hooks
-│   ├── lib/                  # 16 utility modules
-│   └── types/
-├── supabase/
-│   └── migrations/           # Database migrations
-├── public/
-│   └── sw.js                 # Service worker
-├── CLAUDE.md                 # AI assistant instructions
-├── DOCUMENTATION.md          # This file
+│   ├── components/
+│   │   ├── LocalDealsSection.tsx       # NEW: With OSM fallback
+│   │   ├── FarmersMarketsSection.tsx   # Updated: Google Maps links
+│   │   ├── EventCard.tsx               # Updated: Metro fallback display
+│   │   └── ...
+│   ├── hooks/
+│   │   ├── useEvents.ts                # Updated: Fallback info
+│   │   └── ...
+│   └── lib/
+├── CLAUDE.md
+├── DOCUMENTATION.md
 └── package.json
 ```
 
 ---
 
-*Generated with Claude Code - December 31, 2025*
+*Generated with Claude Code - January 3, 2026*
