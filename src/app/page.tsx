@@ -26,7 +26,8 @@ import Header from "@/components/Header";
 import CurrentVibeCard from "@/components/CurrentVibeCard";
 import QuickStats from "@/components/QuickStats";
 import TabNavigation from "@/components/TabNavigation";
-import AISummaryCard from "@/components/AISummaryCard";
+import BottomNavigation from "@/components/BottomNavigation";
+import AISummaryStories from "@/components/AISummaryStories";
 import NewsTab from "@/components/NewsTab";
 import EventCard from "@/components/EventCard";
 import PulseCard from "@/components/PulseCard";
@@ -2690,33 +2691,31 @@ export default function Home() {
           />
 
           {/* Tab Navigation */}
-          <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+          <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} secondaryOnly />
 
-          {/* AI Summary Card + News Preview */}
-          <div>
-            <AISummaryCard
-              activeTab={activeTab}
-              summary={summary}
-              summaryLoading={summaryLoading}
-              summaryError={summaryError}
-              pulsesCount={pulses.length}
-              cityName={city}
-              events={ticketmasterEvents}
-              eventsLoading={ticketmasterLoading}
-              eventsError={ticketmasterError}
-              trafficLevel={trafficLevel}
-              trafficLoading={trafficLoading}
-              trafficError={trafficError}
-              newsSummary={newsData?.aiSummary}
-              newsLoading={newsLoading}
-              newsError={newsError}
-              newsCount={newsData?.articles?.length ?? 0}
-              onNavigateTab={setActiveTab}
-              vibeHeadline={cityMood?.vibeHeadline}
-              vibeEmoji={cityMood?.dominantMood ?? undefined}
-              temperature={weather?.temp}
-            />
-          </div>
+          {/* AI Summary Stories - Swipeable quick brief */}
+          <AISummaryStories
+            activeTab={activeTab}
+            summary={summary}
+            summaryLoading={summaryLoading}
+            summaryError={summaryError}
+            pulsesCount={pulses.length}
+            cityName={city}
+            events={ticketmasterEvents}
+            eventsLoading={ticketmasterLoading}
+            eventsError={ticketmasterError}
+            trafficLevel={trafficLevel}
+            trafficLoading={trafficLoading}
+            trafficError={trafficError}
+            newsSummary={newsData?.aiSummary}
+            newsLoading={newsLoading}
+            newsError={newsError}
+            newsCount={newsData?.articles?.length ?? 0}
+            onNavigateTab={setActiveTab}
+            vibeHeadline={cityMood?.vibeHeadline}
+            vibeEmoji={cityMood?.dominantMood ?? undefined}
+            temperature={weather?.temp}
+          />
 
           {/* Live Vibes - Real-time crowd-sourced venue sentiment */}
           <LiveVibes city={city} onNavigateToLocal={() => {
@@ -2909,7 +2908,7 @@ export default function Home() {
           </div>
 
           {/* Attribution Footer */}
-          <footer className="py-6 pb-24 text-center border-t border-slate-800 mt-6">
+          <footer className="py-6 pb-32 text-center border-t border-slate-800 mt-6">
             <p className="text-[11px] text-slate-500 leading-relaxed">
               Weather by{" "}
               <a
@@ -2970,17 +2969,17 @@ export default function Home() {
         </div>
       </main>
 
-      {/* FAB - Always visible for quick pulse creation */}
-      <FAB
-        onClick={() => {
+      {/* Bottom Navigation - Primary navigation with 44px touch targets */}
+      <BottomNavigation
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onPostPulse={() => {
           if (!sessionUser) {
             setShowAuthModal(true);
           } else {
             setShowPulseModal(true);
           }
         }}
-        visible={true}
-        animated={activeTab !== "pulse"}
       />
     </div>
   );

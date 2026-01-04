@@ -11,6 +11,15 @@ export const DASHBOARD_TABS = [
   { id: "status", label: "Status" },
 ] as const;
 
+// Primary tabs shown in bottom navigation
+export const PRIMARY_TABS = ["pulse", "events", "traffic", "local"] as const;
+
+// Secondary tabs shown in inline tab bar
+export const SECONDARY_TABS = [
+  { id: "news", label: "News" },
+  { id: "status", label: "Status" },
+] as const;
+
 export type TabId = (typeof DASHBOARD_TABS)[number]["id"];
 
 export type LocalSection = "deals" | "gas" | "markets";
