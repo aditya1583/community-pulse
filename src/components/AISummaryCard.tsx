@@ -223,7 +223,7 @@ export default function AISummaryCard({
   const localLine = `Local essentials (gas prices and farmers markets) for ${displayCity}.`;
 
   return (
-    <div className="bg-gradient-to-r from-emerald-900/30 to-slate-900/80 border border-emerald-500/30 rounded-xl p-4">
+    <div className="bg-gradient-to-r from-emerald-900/30 to-[var(--background-card)] border border-emerald-500/30 rounded-2xl p-4 elevation-1">
       {/* Header */}
       <div className="flex items-center gap-2 mb-3">
         {/* Zap icon */}

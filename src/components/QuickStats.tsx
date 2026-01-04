@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import type { TrafficLevel, CityMood } from "./types";
-import StatCard from "@/components/StatCard";
+import type { TrafficLevel, CityMood, MoodScore } from "./types";
+import BentoStatCard from "@/components/BentoStatCard";
 
 type QuickStatsProps = {
   trafficLevel: TrafficLevel | null;
@@ -15,6 +15,214 @@ type QuickStatsProps = {
   onEventsClick: () => void;
   onMoodClick: () => void;
 };
+
+/**
+ * Expanded Traffic Content - Shows detailed traffic info
+ */
+function TrafficExpandedContent({
+  level,
+  onViewDetails
+}: {
+  level: TrafficLevel | null;
+  onViewDetails?: () => void;
+}) {
+  const trafficInfo = {
+    Light: {
+      color: "text-emerald-400",
+      bg: "bg-emerald-500/20",
+      description: "Roads are clear. Great time to drive!",
+      tip: "Enjoy the smooth commute",
+      icon: "🚗",
+    },
+    Moderate: {
+      color: "text-amber-400",
+      bg: "bg-amber-500/20",
+      description: "Some congestion on main routes.",
+      tip: "Consider alternate routes",
+      icon: "🚙",
+    },
+    Heavy: {
+      color: "text-red-400",
+      bg: "bg-red-500/20",
+      description: "Significant delays expected.",
+      tip: "Delay travel if possible",
+      icon: "🚦",
+    },
+  };
+
+  const info = level ? trafficInfo[level] : null;
+
+  if (!info) {
+    return (
+      <div className="text-center py-8 text-slate-400">
+        <p>Traffic data unavailable</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Status indicator */}
+      <div className={`${info.bg} rounded-xl p-4 text-center`}>
+        <span className="text-4xl">{info.icon}</span>
+        <h3 className={`text-2xl font-bold mt-2 ${info.color}`}>{level} Traffic</h3>
+        <p className="text-slate-300 mt-1">{info.description}</p>
+      </div>
+
+      {/* Tip */}
+      <div className="flex items-start gap-3 bg-white/5 rounded-lg p-3">
+        <span className="text-lg">💡</span>
+        <div>
+          <p className="text-sm font-medium text-slate-200">Pro tip</p>
+          <p className="text-sm text-slate-400">{info.tip}</p>
+        </div>
+      </div>
+
+      {/* View more button */}
+      <button
+        className="w-full py-3 bg-white/5 hover:bg-white/10 rounded-lg text-sm text-slate-300 transition-colors"
+        onClick={onViewDetails}
+      >
+        View full traffic details →
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Expanded Events Content - Shows event count and quick preview
+ */
+function EventsExpandedContent({
+  count,
+  onExplore
+}: {
+  count: number;
+  onExplore?: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      {/* Count display */}
+      <div className="bg-purple-500/20 rounded-xl p-4 text-center">
+        <span className="text-5xl font-bold text-purple-400">{count}</span>
+        <p className="text-slate-300 mt-1">
+          {count === 1 ? "Event happening today" : "Events happening today"}
+        </p>
+      </div>
+
+      {/* Categories preview */}
+      <div className="grid grid-cols-2 gap-2">
+        {["🎵 Music", "🎭 Arts", "🏃 Sports", "🍔 Food"].map((cat) => (
+          <button
+            key={cat}
+            onClick={onExplore}
+            className="bg-white/5 hover:bg-white/10 rounded-lg p-2.5 text-sm text-slate-300 text-center transition-colors"
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      {/* Explore button */}
+      <button
+        className="w-full py-3 bg-purple-500/20 hover:bg-purple-500/30 rounded-lg text-sm text-purple-300 transition-colors"
+        onClick={onExplore}
+      >
+        Explore all events →
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Expanded Mood Content - Shows mood breakdown
+ */
+function MoodExpandedContent({
+  mood,
+  onSetVibe
+}: {
+  mood: CityMood | null;
+  onSetVibe?: () => void;
+}) {
+  if (!mood || mood.pulseCount === 0) {
+    return (
+      <div className="text-center py-8">
+        <span className="text-5xl">😐</span>
+        <p className="text-slate-400 mt-3">No mood data yet</p>
+        <button
+          onClick={onSetVibe}
+          className="text-sm text-emerald-400 hover:text-emerald-300 mt-1 underline underline-offset-2 transition-colors"
+        >
+          Be the first to set the vibe!
+        </button>
+      </div>
+    );
+  }
+
+  const moodLabels: Record<string, string> = {
+    "😊": "Happy",
+    "😐": "Neutral",
+    "😢": "Sad",
+    "😡": "Angry",
+    "😴": "Sleepy",
+    "🤩": "Excited",
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Dominant mood */}
+      <div className="bg-amber-500/20 rounded-xl p-4 text-center">
+        <span className="text-5xl">{mood.dominantMood}</span>
+        <h3 className="text-xl font-bold text-amber-400 mt-2">
+          {moodLabels[mood.dominantMood || ""] || "Mixed"} Vibes
+        </h3>
+        <p className="text-sm text-slate-400 mt-1">
+          Based on {mood.pulseCount} {mood.pulseCount === 1 ? "pulse" : "pulses"}
+        </p>
+      </div>
+
+      {/* Mood breakdown bars */}
+      {mood.scores && mood.scores.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-wider text-slate-500 font-medium">
+            Mood breakdown
+          </p>
+          {mood.scores.slice(0, 5).map((score: MoodScore) => (
+            <div key={score.mood} className="flex items-center gap-3">
+              <span className="text-lg w-8">{score.mood}</span>
+              <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full transition-all duration-500"
+                  style={{ width: `${score.percent}%` }}
+                />
+              </div>
+              <span className="text-xs text-slate-400 w-10 text-right">
+                {score.percent}%
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Vibe headline */}
+      {mood.vibeHeadline && (
+        <div className="bg-white/5 rounded-lg p-3 text-center">
+          <p className="text-sm text-slate-300">{mood.vibeHeadline}</p>
+          {mood.vibeSubtext && (
+            <p className="text-xs text-slate-500 mt-1">{mood.vibeSubtext}</p>
+          )}
+        </div>
+      )}
+
+      {/* Add vibe button */}
+      <button
+        className="w-full py-3 bg-amber-500/20 hover:bg-amber-500/30 rounded-lg text-sm text-amber-300 transition-colors"
+        onClick={onSetVibe}
+      >
+        Drop your pulse →
+      </button>
+    </div>
+  );
+}
 
 /**
  * Quick Stats Row - 3 equal columns showing Traffic, Events, and Mood
@@ -86,7 +294,7 @@ export default function QuickStats({
 
   return (
     <div className="grid grid-cols-3 gap-3">
-      <StatCard
+      <BentoStatCard
         icon={
           <svg
             className={`w-6 h-6 ${getTrafficColor()}`}
@@ -107,9 +315,19 @@ export default function QuickStats({
         label="Traffic"
         onClick={onTrafficClick}
         accentColor="emerald"
+        expandedTitle="Traffic Conditions"
+        expandedContent={(closeModal) => (
+          <TrafficExpandedContent
+            level={trafficLevel}
+            onViewDetails={() => {
+              closeModal();
+              onTrafficClick();
+            }}
+          />
+        )}
       />
 
-      <StatCard
+      <BentoStatCard
         icon={
           <svg
             className="w-6 h-6 text-purple-400"
@@ -130,9 +348,19 @@ export default function QuickStats({
         label="Events"
         onClick={onEventsClick}
         accentColor="purple"
+        expandedTitle="Today's Events"
+        expandedContent={(closeModal) => (
+          <EventsExpandedContent
+            count={eventsCount}
+            onExplore={() => {
+              closeModal();
+              onEventsClick();
+            }}
+          />
+        )}
       />
 
-      <StatCard
+      <BentoStatCard
         icon={
           cityMoodLoading ? (
             <div
@@ -157,6 +385,16 @@ export default function QuickStats({
         onClick={onMoodClick}
         accentColor={hasMoodData ? "amber" : "emerald"}
         ariaLabel={hasMoodData ? `Mood: ${getMoodLabel()}` : "Set the vibe"}
+        expandedTitle="City Mood"
+        expandedContent={(closeModal) => (
+          <MoodExpandedContent
+            mood={cityMood}
+            onSetVibe={() => {
+              closeModal();
+              onMoodClick();
+            }}
+          />
+        )}
       />
     </div>
   );

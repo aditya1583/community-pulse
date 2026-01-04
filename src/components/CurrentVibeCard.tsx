@@ -247,10 +247,10 @@ export default function CurrentVibeCard({
   const isLoading = weatherLoading || cityMoodLoading;
 
   return (
-    <div className={`rounded-2xl bg-slate-800/60 border p-4 shadow-lg transition-all duration-500 ${getBorderGlow()}`}>
+    <div className={`bento-card elevation-2 p-4 transition-all duration-500 ${getBorderGlow()}`}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">
+          <p className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-1">
             Current Vibe
           </p>
 
