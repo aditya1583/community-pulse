@@ -747,6 +747,26 @@ export default function Home() {
     }
 
     loadUser();
+
+    // Listen for auth state changes (session refresh, sign in/out)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === "TOKEN_REFRESHED" || event === "SIGNED_IN") {
+          setSessionUser(session?.user ?? null);
+          if (session?.user) {
+            setAuthStatus("signed_in");
+          }
+        } else if (event === "SIGNED_OUT") {
+          setSessionUser(null);
+          setProfile(null);
+          setAuthStatus("signed_out");
+        }
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const identityReady =
@@ -2765,6 +2785,8 @@ export default function Home() {
                       lon={localLon}
                       section={localSection}
                       onSectionChange={setLocalSection}
+                      userId={sessionUser?.id ?? null}
+                      onSignInClick={() => setShowAuthModal(true)}
                     />
                   );
                 case "status":

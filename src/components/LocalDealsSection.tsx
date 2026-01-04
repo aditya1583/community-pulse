@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import VenueVibeCheck from "./VenueVibeCheck";
 
 type LocalPlace = {
   id: string;
@@ -27,6 +28,10 @@ type LocalDealsSectionProps = {
   state: string;
   lat?: number;
   lon?: number;
+  /** Current user ID for vibe logging */
+  userId?: string | null;
+  /** Callback to show sign-in modal */
+  onSignInClick?: () => void;
 };
 
 const DEAL_CATEGORIES = [
@@ -83,6 +88,8 @@ export default function LocalDealsSection({
   state,
   lat,
   lon,
+  userId,
+  onSignInClick,
 }: LocalDealsSectionProps) {
   const [places, setPlaces] = useState<LocalPlace[]>([]);
   const [loading, setLoading] = useState(true);
@@ -300,77 +307,96 @@ export default function LocalDealsSection({
       {!loading && !error && places.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {places.map((place) => (
-            <button
+            <div
               key={place.id}
-              onClick={() => openPlace(place)}
-              className="w-full text-left bg-slate-800/60 border border-slate-700/50 rounded-xl p-3 hover:border-emerald-500/30 hover:bg-slate-800/80 transition group"
+              className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3 hover:border-emerald-500/30 hover:bg-slate-800/80 transition group"
             >
-              <div className="flex gap-3">
-                {/* Image or Icon */}
-                {(() => {
-                  const iconInfo = getCategoryIcon(place.category);
-                  return (
-                    <div className={`w-16 h-16 shrink-0 rounded-lg overflow-hidden flex items-center justify-center ${
-                      place.photos?.[0] ? "" : `bg-gradient-to-br ${iconInfo.gradient}`
-                    }`}>
-                      {place.photos?.[0] ? (
-                        <img
-                          src={place.photos[0]}
-                          alt={place.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : place.categoryIcon ? (
-                        <img
-                          src={place.categoryIcon}
-                          alt={place.category}
-                          className="w-8 h-8"
-                        />
-                      ) : (
-                        <span className="text-2xl drop-shadow-md">{iconInfo.emoji}</span>
+              {/* Clickable area for navigation */}
+              <button
+                onClick={() => openPlace(place)}
+                className="w-full text-left"
+              >
+                <div className="flex gap-3">
+                  {/* Image or Icon */}
+                  {(() => {
+                    const iconInfo = getCategoryIcon(place.category);
+                    return (
+                      <div className={`w-16 h-16 shrink-0 rounded-lg overflow-hidden flex items-center justify-center ${
+                        place.photos?.[0] ? "" : `bg-gradient-to-br ${iconInfo.gradient}`
+                      }`}>
+                        {place.photos?.[0] ? (
+                          <img
+                            src={place.photos[0]}
+                            alt={place.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : place.categoryIcon ? (
+                          <img
+                            src={place.categoryIcon}
+                            alt={place.category}
+                            className="w-8 h-8"
+                          />
+                        ) : (
+                          <span className="text-2xl drop-shadow-md">{iconInfo.emoji}</span>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Details */}
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-medium text-white text-sm truncate pr-2">
+                      {place.name}
+                    </h4>
+
+                    <p className="text-xs text-slate-500 truncate mt-0.5">
+                      {place.category}
+                    </p>
+
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      {renderRating(place.rating)}
+                      {renderPriceLevel(place.price)}
+                      {place.hours && (
+                        <span
+                          className={`text-xs ${
+                            place.hours.isOpen ? "text-emerald-400" : "text-slate-500"
+                          }`}
+                        >
+                          {place.hours.isOpen ? "Open" : "Closed"}
+                        </span>
                       )}
                     </div>
-                  );
-                })()}
 
-                {/* Details */}
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-medium text-white text-sm truncate pr-2">
-                    {place.name}
-                  </h4>
-
-                  <p className="text-xs text-slate-500 truncate mt-0.5">
-                    {place.category}
-                  </p>
-
-                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                    {renderRating(place.rating)}
-                    {renderPriceLevel(place.price)}
-                    {place.hours && (
-                      <span
-                        className={`text-xs ${
-                          place.hours.isOpen ? "text-emerald-400" : "text-slate-500"
-                        }`}
-                      >
-                        {place.hours.isOpen ? "Open" : "Closed"}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between mt-1.5">
-                    {place.address && (
-                      <p className="text-[10px] text-slate-500 truncate max-w-[140px]">
-                        {place.address}
-                      </p>
-                    )}
-                    {place.distance !== null && (
-                      <span className="text-[10px] text-slate-400 shrink-0">
-                        {formatDistance(place.distance)}
-                      </span>
-                    )}
+                    <div className="flex items-center justify-between mt-1.5">
+                      {place.address && (
+                        <p className="text-[10px] text-slate-500 truncate max-w-[140px]">
+                          {place.address}
+                        </p>
+                      )}
+                      {place.distance !== null && (
+                        <span className="text-[10px] text-slate-400 shrink-0">
+                          {formatDistance(place.distance)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
+              </button>
+
+              {/* Vibe Check - separate from navigation */}
+              <div className="mt-2 pt-2 border-t border-slate-700/30">
+                <VenueVibeCheck
+                  venueId={place.id}
+                  venueName={place.name}
+                  venueLat={place.lat}
+                  venueLon={place.lon}
+                  city={cityName}
+                  compact={true}
+                  userId={userId}
+                  onSignInClick={onSignInClick}
+                />
               </div>
-            </button>
+            </div>
           ))}
         </div>
       )}

@@ -237,3 +237,79 @@ export type VenueVibeAggregate = {
 export function getVibeTypeInfo(vibeType: VenueVibeType) {
   return VENUE_VIBE_TYPES.find(v => v.id === vibeType) || VENUE_VIBE_TYPES[0];
 }
+
+// =====================================================
+// TRUST & VERIFICATION SYSTEM
+// =====================================================
+// "The Waze for Lifestyle" - gamification through verification
+// Users confirm or contradict existing vibes, building reputation
+
+export type ConfirmationAction = "confirm" | "contradict" | "update";
+
+export type TrustBadge = "local_hero" | "trusted_local" | "regular" | "newcomer" | "learning";
+
+export const TRUST_BADGE_INFO: Record<TrustBadge, { emoji: string; label: string; minScore: number; color: string }> = {
+  local_hero: { emoji: "🏆", label: "Local Hero", minScore: 90, color: "text-amber-400" },
+  trusted_local: { emoji: "⭐", label: "Trusted Local", minScore: 75, color: "text-emerald-400" },
+  regular: { emoji: "✓", label: "Regular", minScore: 60, color: "text-blue-400" },
+  newcomer: { emoji: "👋", label: "Newcomer", minScore: 40, color: "text-slate-400" },
+  learning: { emoji: "🌱", label: "Learning", minScore: 0, color: "text-slate-500" },
+};
+
+export type UserTrustScore = {
+  userId: string;
+  city: string;
+  totalVibesSubmitted: number;
+  vibesConfirmed: number;
+  vibesContradicted: number;
+  confirmationsGiven: number;
+  contradictionsGiven: number;
+  confirmationAccuracy: number | null;
+  trustScore: number;
+  badges: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type VibeConfirmation = {
+  id: string;
+  vibeId: string;
+  venueId: string;
+  originalVibeType: VenueVibeType;
+  confirmerUserId: string;
+  action: ConfirmationAction;
+  updatedVibeType?: VenueVibeType;
+  city?: string;
+  createdAt: string;
+};
+
+export type VibeWithTrust = VenueVibe & {
+  authorTrustScore?: number;
+  authorBadge?: TrustBadge;
+  confirmCount: number;
+  contradictCount: number;
+};
+
+export type VibeConfirmationStats = {
+  confirms: number;
+  contradicts: number;
+  majorityAction: "confirm" | "contradict" | "split";
+};
+
+/**
+ * Get trust badge based on score
+ */
+export function getTrustBadge(trustScore: number): TrustBadge {
+  if (trustScore >= 90) return "local_hero";
+  if (trustScore >= 75) return "trusted_local";
+  if (trustScore >= 60) return "regular";
+  if (trustScore >= 40) return "newcomer";
+  return "learning";
+}
+
+/**
+ * Get trust badge display info
+ */
+export function getTrustBadgeInfo(badge: TrustBadge) {
+  return TRUST_BADGE_INFO[badge];
+}
