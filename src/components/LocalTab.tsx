@@ -5,6 +5,7 @@ import type { LocalSection } from "./types";
 import GasPricesCard from "./GasPricesCard";
 import FarmersMarketsSection from "./FarmersMarketsSection";
 import LocalDealsSection from "./LocalDealsSection";
+import SentimentHeatmap from "./SentimentHeatmap";
 
 type LocalTabProps = {
   cityName: string;
@@ -23,6 +24,7 @@ type LocalTabProps = {
 
 const SECTIONS: { id: LocalSection; label: string; emoji: string }[] = [
   { id: "deals", label: "Explore", emoji: "🏪" },
+  { id: "heatmap", label: "Heatmap", emoji: "🗺️" },
   { id: "gas", label: "Gas", emoji: "⛽" },
   { id: "markets", label: "Markets", emoji: "🥬" },
 ];
@@ -30,8 +32,9 @@ const SECTIONS: { id: LocalSection; label: string; emoji: string }[] = [
 /**
  * Local Tab Component
  *
- * Contains three sections accessible via segmented control:
- * - Explore: Local businesses & places (via Foursquare)
+ * Contains four sections accessible via segmented control:
+ * - Explore: Local businesses & places (via Foursquare/OSM)
+ * - Heatmap: Real-time vibe heatmap (via Leaflet/OSM - FREE)
  * - Gas: Regional gas prices (via EIA - free/public domain)
  * - Markets: Farmers markets nearby (via USDA - free/public domain)
  */
@@ -87,6 +90,14 @@ export default function LocalTab({
             lon={lon}
             userId={userId}
             onSignInClick={onSignInClick}
+          />
+        )}
+
+        {activeSection === "heatmap" && lat && lon && (
+          <SentimentHeatmap
+            lat={lat}
+            lon={lon}
+            city={cityName}
           />
         )}
 

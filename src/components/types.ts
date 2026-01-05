@@ -22,7 +22,7 @@ export const SECONDARY_TABS = [
 
 export type TabId = (typeof DASHBOARD_TABS)[number]["id"];
 
-export type LocalSection = "deals" | "gas" | "markets";
+export type LocalSection = "deals" | "gas" | "markets" | "heatmap";
 
 export type LocalDeal = {
   id: string;
