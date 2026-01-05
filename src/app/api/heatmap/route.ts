@@ -95,6 +95,8 @@ export async function GET(request: NextRequest) {
   try {
     const cutoffTime = new Date(Date.now() - TIME_WINDOWS[timeWindow]).toISOString();
 
+    console.log(`[heatmap] Query params: lat=${lat}, lon=${lon}, city="${city}", timeWindow=${timeWindow}`);
+
     // Calculate bounding box from center + radius
     // 1 degree latitude ≈ 111km
     // 1 degree longitude ≈ 111km * cos(latitude)
@@ -118,12 +120,17 @@ export async function GET(request: NextRequest) {
       .not("venue_lat", "is", null)
       .not("venue_lon", "is", null);
 
-    // Optional city filter
+    // Optional city filter - use ILIKE for partial match since city names vary
+    // e.g., "Austin" vs "Austin, Texas, US" vs "Austin, TX"
     if (city) {
-      query = query.eq("city", city);
+      // Extract first part of city name (before comma) for flexible matching
+      const cityBase = city.split(",")[0].trim();
+      query = query.ilike("city", `%${cityBase}%`);
     }
 
     const { data: vibes, error } = await query;
+
+    console.log(`[heatmap] Query returned ${vibes?.length ?? 0} vibes, error: ${error?.message ?? 'none'}`);
 
     if (error) {
       // Handle table not existing gracefully

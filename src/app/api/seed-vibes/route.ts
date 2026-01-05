@@ -79,6 +79,8 @@ export async function GET(request: NextRequest) {
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+  console.log(`[seed-vibes] Starting seed for ${city} at (${lat}, ${lon}) with ${count} vibes`);
+
   try {
     // Generate random venue vibes clustered around the center
     const vibes = [];
@@ -119,6 +121,9 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    console.log(`[seed-vibes] Generated ${vibes.length} vibes across ${numClusters} clusters`);
+    console.log(`[seed-vibes] Sample vibe:`, JSON.stringify(vibes[0], null, 2));
+
     // Insert into database
     const { data, error } = await supabase
       .from("venue_vibes")
@@ -132,6 +137,8 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    console.log(`[seed-vibes] SUCCESS! Inserted ${data.length} vibes for ${city}`);
 
     return NextResponse.json({
       success: true,
