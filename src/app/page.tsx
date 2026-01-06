@@ -542,6 +542,12 @@ export default function Home() {
     }
   }, [city, setCityInput]);
 
+  // Reset tag filter to "All" when city changes
+  // Prevents confusing "No pulses yet" when user switches cities with a filter active
+  useEffect(() => {
+    setTagFilter("All");
+  }, [city]);
+
   // ========= WEATHER =========
   useEffect(() => {
     if (!city.trim()) {
@@ -2792,11 +2798,26 @@ export default function Home() {
                           </div>
                         ) : filteredPulses.length === 0 ? (
                           <div className="bg-slate-800/60 border border-dashed border-slate-700/50 rounded-xl px-4 py-10 text-center text-sm text-slate-400">
-                            No pulses yet for{" "}
-                            <span className="font-semibold text-white">
-                              {city}
-                            </span>
-                            . Be the first to set the vibe.
+                            {tagFilter === "All" ? (
+                              <>
+                                No pulses yet for{" "}
+                                <span className="font-semibold text-white">
+                                  {city}
+                                </span>
+                                . Be the first to set the vibe.
+                              </>
+                            ) : (
+                              <>
+                                No <span className="font-semibold text-white">{tagFilter}</span> pulses in{" "}
+                                <span className="font-semibold text-white">{city}</span>.{" "}
+                                <button
+                                  onClick={() => setTagFilter("All")}
+                                  className="text-emerald-400 hover:text-emerald-300 underline underline-offset-2"
+                                >
+                                  Show all
+                                </button>
+                              </>
+                            )}
                           </div>
                         ) : (
                           <>
