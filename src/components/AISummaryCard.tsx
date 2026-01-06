@@ -271,7 +271,16 @@ export default function AISummaryCard({
           {": "}
           {trafficLine}
           {trafficLevel && !trafficLoading && !trafficError && (
-            <ProvenanceBadge source="TomTom API" timeframe="live" />
+            <a
+              href="https://www.tomtom.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 ml-1.5 px-1.5 py-0.5 text-[10px] text-slate-500 bg-slate-800/50 rounded border border-slate-700/30 hover:text-slate-400 hover:border-slate-600/50 transition"
+            >
+              Traffic by TomTom
+              <span className="text-slate-600">·</span>
+              <span>live</span>
+            </a>
           )}
         </p>
 

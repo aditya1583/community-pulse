@@ -7,7 +7,40 @@ import { NextRequest, NextResponse } from "next/server";
  * - Traffic flow (current speed vs free flow speed)
  * - Traffic incidents (accidents, road work, closures)
  * - Calculated traffic level based on flow percentage
+ *
+ * TOMTOM ToS COMPLIANCE:
+ * - Cache TTL: 5 min HTTP + 1 min in-memory (compliant with 30-day max)
+ * - Real-time data: No historical storage, ephemeral only
+ * - Attribution: "Traffic by TomTom" link required in UI
+ * - Request deduplication: Same-area requests share cache (QPS protection)
+ * - Graceful fallback: Returns estimated data if API fails
  */
+
+// --- In-Memory Cache for QPS Protection ---
+// TomTom has 5-50 QPS limits. During "pulse events" (local emergency, festival),
+// hundreds of users may open the app simultaneously. This cache prevents
+// thundering herd by deduplicating requests for the same ~1km area.
+type TrafficCacheEntry = {
+  data: TrafficLiveResponse;
+  timestamp: number;
+};
+const trafficCache = new Map<string, TrafficCacheEntry>();
+const CACHE_TTL_MS = 60 * 1000; // 1 minute in-memory cache
+
+// Generate cache key from coordinates (rounded to ~1km precision)
+function getCacheKey(lat: number, lon: number): string {
+  return `${lat.toFixed(2)},${lon.toFixed(2)}`;
+}
+
+// Clean expired cache entries periodically
+function cleanExpiredCache() {
+  const now = Date.now();
+  for (const [key, entry] of trafficCache.entries()) {
+    if (now - entry.timestamp > CACHE_TTL_MS) {
+      trafficCache.delete(key);
+    }
+  }
+}
 
 // City coordinates for common cities (fallback when no lat/lon provided)
 const CITY_COORDINATES: Record<string, { lat: number; lon: number }> = {
@@ -117,6 +150,20 @@ export async function GET(req: NextRequest) {
         lastUpdated: new Date().toISOString(),
         source: "tomtom",
         message: "Using estimated data - city coordinates not found"
+      });
+    }
+
+    // --- QPS Protection: Check in-memory cache first ---
+    // This prevents thundering herd when many users request same area simultaneously
+    cleanExpiredCache();
+    const cacheKey = getCacheKey(coords.lat, coords.lon);
+    const cached = trafficCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      return NextResponse.json(cached.data, {
+        headers: {
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=60",
+          "X-Cache": "HIT"
+        }
       });
     }
 
@@ -235,9 +282,13 @@ export async function GET(req: NextRequest) {
       source: "tomtom"
     };
 
+    // --- QPS Protection: Cache the response ---
+    trafficCache.set(cacheKey, { data: response, timestamp: Date.now() });
+
     return NextResponse.json(response, {
       headers: {
-        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=60" // Cache for 5 minutes
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=60", // 5 min CDN cache
+        "X-Cache": "MISS"
       }
     });
 
