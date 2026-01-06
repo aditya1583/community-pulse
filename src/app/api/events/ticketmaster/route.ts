@@ -185,8 +185,15 @@ type CacheEntry = {
 
 // --- In-Memory Cache ---
 // Key format: "lat,lng,radius" or "city"
+//
+// TICKETMASTER ToS COMPLIANCE:
+// - No permanent storage of event data allowed
+// - Cache TTL must be < 24 hours (we use 5 minutes for freshness)
+// - All event links must go directly to Ticketmaster
+// - Attribution required in UI ("Event data provided by Ticketmaster")
+//
 const eventCache = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes - compliant with ToS (< 24h)
 
 function getCacheKey(params: {
   lat?: number;

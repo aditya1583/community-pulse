@@ -1,7 +1,14 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
+import { createClient } from "@supabase/supabase-js";
 import type { TicketmasterEvent, EventsFallback } from "@/hooks/useEvents";
+
+// Supabase client for fetching vibe counts
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 /**
  * Generate an ICS calendar file for an event
@@ -61,8 +68,10 @@ type EventCardProps = {
  * Large card with category-based gradient
  * Date badge, event name, venue, price
  * Action buttons: Add to Calendar, Directions, Share
+ *
+ * PROPRIETARY CONTEXT: Shows venue vibe count - data Ticketmaster doesn't have
  */
-function FeaturedEventCard({ event }: { event: TicketmasterEvent }) {
+function FeaturedEventCard({ event, vibeCount }: { event: TicketmasterEvent; vibeCount?: number }) {
   const eventDate = event.date
     ? new Date(event.date + (event.time ? `T${event.time}` : ""))
     : null;
@@ -186,6 +195,16 @@ function FeaturedEventCard({ event }: { event: TicketmasterEvent }) {
               {event.category}
             </span>
           )}
+
+          {/* PROPRIETARY CONTEXT: Venue vibe data - unique value we provide */}
+          {vibeCount !== undefined && vibeCount > 0 && (
+            <div className="flex items-center gap-1.5 mt-2">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-medium border border-emerald-500/30">
+                <span>🔥</span>
+                <span>{vibeCount} vibe{vibeCount !== 1 ? "s" : ""} nearby</span>
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -283,6 +302,9 @@ function SmallEventCard({ event }: { event: TicketmasterEvent }) {
 
 /**
  * Event Card component with featured event + accordion for more
+ *
+ * Fetches venue vibes to show proprietary context alongside Ticketmaster events.
+ * This differentiates us from Ticketmaster - we show real-time crowd data they don't have.
  */
 export default function EventCard({
   events,
@@ -292,6 +314,41 @@ export default function EventCard({
   fallback,
 }: EventCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [venueVibeCount, setVenueVibeCount] = useState<number>(0);
+
+  // Fetch venue vibes for the featured event's venue
+  useEffect(() => {
+    const fetchVenueVibes = async () => {
+      if (!events || events.length === 0) {
+        setVenueVibeCount(0);
+        return;
+      }
+
+      const featuredEvent = events[0];
+      if (!featuredEvent.venue) {
+        setVenueVibeCount(0);
+        return;
+      }
+
+      try {
+        const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+
+        // Query for vibes near the venue (by name match)
+        const { count } = await supabase
+          .from("venue_vibes")
+          .select("id", { count: "exact", head: true })
+          .ilike("venue_name", `%${featuredEvent.venue.split(",")[0].trim()}%`)
+          .gte("created_at", fourHoursAgo);
+
+        setVenueVibeCount(count || 0);
+      } catch (err) {
+        console.error("[EventCard] Error fetching venue vibes:", err);
+        setVenueVibeCount(0);
+      }
+    };
+
+    fetchVenueVibes();
+  }, [events]);
 
   // Loading state
   if (isLoading) {
@@ -408,8 +465,8 @@ export default function EventCard({
         </div>
       )}
 
-      {/* Featured Event */}
-      <FeaturedEventCard event={featuredEvent} />
+      {/* Featured Event - with proprietary vibe context */}
+      <FeaturedEventCard event={featuredEvent} vibeCount={venueVibeCount} />
 
       {/* Accordion for more events */}
       {remainingEvents.length > 0 && (
@@ -451,10 +508,19 @@ export default function EventCard({
         </>
       )}
 
-      {/* Attribution */}
-      <p className="text-center text-[10px] text-slate-500 pt-1">
-        Events via Ticketmaster
-      </p>
+      {/* Attribution & Disclaimer - Ticketmaster ToS Compliance */}
+      <div className="text-center text-[10px] text-slate-500 mt-3 pt-2 border-t border-slate-800/50">
+        <a
+          href="https://ticketmaster.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-slate-400 transition"
+        >
+          Event data provided by Ticketmaster
+        </a>
+        <span className="mx-1">·</span>
+        <span>Details may change</span>
+      </div>
     </div>
   );
 }
