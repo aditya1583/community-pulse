@@ -10,9 +10,8 @@ import { createClient } from "@supabase/supabase-js";
  * Posts are marked as bot posts and feel natural, not templated.
  */
 
-// Bot user ID - this must exist in auth.users table
-// Run the SQL migration to create this user if it doesn't exist
-const BOT_USER_ID = "00000000-0000-0000-0000-000000000001";
+// Bot pulses use null user_id to avoid foreign key constraint issues
+// They are identified by is_bot = true instead
 
 /**
  * BOT PERSONALITIES - Three distinct personas that feel human
@@ -384,8 +383,9 @@ export async function POST(req: NextRequest) {
         tag: post.tag,
         mood: post.mood,
         author: getBotName(post.tag, body.city),
-        user_id: BOT_USER_ID,
+        user_id: null, // Bot pulses don't have a user - identified by is_bot flag
         is_bot: true,
+        hidden: false, // Explicitly set to ensure RLS allows reading
         created_at: createdAt,
         expires_at: expiresAt,
       };

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import VenueVibeCheck from "./VenueVibeCheck";
 
 type LocalPlace = {
@@ -91,6 +92,7 @@ export default function LocalDealsSection({
   userId,
   onSignInClick,
 }: LocalDealsSectionProps) {
+  const router = useRouter();
   const [places, setPlaces] = useState<LocalPlace[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -190,13 +192,26 @@ export default function LocalDealsSection({
     setActiveCategory(category);
   };
 
-  const openPlace = (place: LocalPlace) => {
-    // Always use Google Maps for directions - more useful than Foursquare/Yelp pages
-    const query = place.address
-      ? `${place.name} ${place.address}`
-      : `${place.name}`;
-    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
+  // Navigate to venue detail page
+  const openVenueDetail = (place: LocalPlace) => {
+    // Create URL-friendly slug from venue name
+    const slug = place.name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .trim();
+
+    // Pass venue data via URL params for venues not in DB
+    const params = new URLSearchParams({
+      name: place.name,
+      category: place.category || "",
+      address: place.address || "",
+      lat: place.lat?.toString() || "",
+      lon: place.lon?.toString() || "",
+    });
+
+    router.push(`/venue/${slug}?${params.toString()}`);
   };
 
   const formatDistance = (meters: number | null) => {
@@ -311,9 +326,9 @@ export default function LocalDealsSection({
               key={place.id}
               className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3 hover:border-emerald-500/30 hover:bg-slate-800/80 transition group"
             >
-              {/* Clickable area for navigation */}
+              {/* Clickable area for venue detail page */}
               <button
-                onClick={() => openPlace(place)}
+                onClick={() => openVenueDetail(place)}
                 className="w-full text-left"
               >
                 <div className="flex gap-3">

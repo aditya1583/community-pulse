@@ -55,6 +55,8 @@ type DBPulse = {
   created_at: string;
   user_id?: string;
   expires_at?: string | null;
+  is_bot?: boolean;
+  hidden?: boolean;
 };
 
 // Pagination constants
@@ -72,6 +74,7 @@ function mapDBPulseToPulse(row: DBPulse): Pulse {
     createdAt: row.created_at,
     user_id: row.user_id,
     expiresAt: row.expires_at ?? null,
+    is_bot: row.is_bot ?? false,
   };
 }
 
@@ -1117,9 +1120,10 @@ export default function Home() {
 
       // Explicitly select only needed fields for privacy
       // user_id is included for ownership check (is this my pulse?) - it's a UUID, not PII
+      // is_bot is included to identify seeded content
       const { data, error } = await supabase
         .from("pulses")
-        .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at")
+        .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot")
         .eq("city", city)
         .gte("created_at", start.toISOString())
         .lt("created_at", end.toISOString())
@@ -2660,7 +2664,7 @@ export default function Home() {
             summary={summary}
             summaryLoading={summaryLoading}
             summaryError={summaryError}
-            pulsesCount={pulses.length}
+            pulsesCount={visiblePulses.length}
             cityName={city}
             events={ticketmasterEvents}
             eventsLoading={ticketmasterLoading}

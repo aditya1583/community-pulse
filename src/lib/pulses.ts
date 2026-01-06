@@ -164,12 +164,23 @@ export function calculateExpiryTime(
  * Returns negative if expired, null if no expiry
  */
 export function getRemainingSeconds(
-  expiresAt: string | Date | null | undefined,
+  expiresAt: string | Date | number | null | undefined,
   now: Date = new Date()
 ): number | null {
   if (!expiresAt) return null;
 
-  const expires = expiresAt instanceof Date ? expiresAt : new Date(expiresAt);
+  let expires: Date;
+
+  if (expiresAt instanceof Date) {
+    expires = expiresAt;
+  } else if (typeof expiresAt === "number") {
+    // Handle Unix timestamps - if less than year 2000, assume it's seconds not milliseconds
+    const isSeconds = expiresAt < 946684800000; // Jan 1, 2000 in ms
+    expires = isSeconds ? new Date(expiresAt * 1000) : new Date(expiresAt);
+  } else {
+    expires = new Date(expiresAt);
+  }
+
   if (Number.isNaN(expires.getTime())) return null;
 
   return Math.floor((expires.getTime() - now.getTime()) / 1000);
