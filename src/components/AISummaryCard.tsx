@@ -21,11 +21,6 @@ function deduplicateEvents(events: TicketmasterEvent[]): TicketmasterEvent[] {
   });
 }
 
-type NewsSummary = {
-  paragraph: string;
-  bulletPoints: string[];
-} | null;
-
 type AISummaryCardProps = {
   activeTab: TabId;
   summary: string | null;
@@ -39,10 +34,6 @@ type AISummaryCardProps = {
   trafficLevel: TrafficLevel | null;
   trafficLoading: boolean;
   trafficError: string | null;
-  newsSummary?: NewsSummary;
-  newsLoading?: boolean;
-  newsError?: string | null;
-  newsCount?: number;
   onNavigateTab?: (tab: TabId) => void;
   /** Optional vibe headline from city mood */
   vibeHeadline?: string;
@@ -127,10 +118,6 @@ export default function AISummaryCard({
   trafficLevel,
   trafficLoading,
   trafficError,
-  newsSummary,
-  newsLoading = false,
-  newsError = null,
-  newsCount = 0,
   onNavigateTab,
   vibeHeadline,
   vibeEmoji,
@@ -181,11 +168,6 @@ export default function AISummaryCard({
     }`;
   };
 
-  const getNewsSummary = (): string | null => {
-    if (!newsSummary) return null;
-    return newsSummary.paragraph;
-  };
-
   const hasNavigate = !!onNavigateTab;
 
   const pulseLine = (() => {
@@ -208,16 +190,6 @@ export default function AISummaryCard({
     if (trafficError) return trafficError;
     const s = getTrafficSummary();
     return s ? firstSentence(s) : "Traffic data is unavailable right now.";
-  })();
-
-  const newsLine = (() => {
-    if (newsLoading) return "Loading news…";
-    if (newsError) return newsError;
-    const s = getNewsSummary();
-    if (s) return firstSentence(s);
-    return newsCount === 0
-      ? `No local news found for ${displayCity}.`
-      : "News summary is unavailable right now.";
   })();
 
   const localLine = `Local essentials (gas prices and farmers markets) for ${displayCity}.`;
@@ -311,20 +283,6 @@ export default function AISummaryCard({
             </>
           ) : (
             eventsLine
-          )}
-        </p>
-
-        <p className="text-sm text-slate-300 leading-relaxed">
-          <InlineLinkButton
-            onClick={hasNavigate ? () => onNavigateTab?.("news") : undefined}
-            disabled={activeTab === "news"}
-          >
-            News
-          </InlineLinkButton>
-          {": "}
-          {newsLine}
-          {newsCount > 0 && !newsLoading && !newsError && (
-            <ProvenanceBadge source="articles" count={newsCount} />
           )}
         </p>
 

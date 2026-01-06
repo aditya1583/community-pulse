@@ -28,7 +28,6 @@ import QuickStats from "@/components/QuickStats";
 import TabNavigation from "@/components/TabNavigation";
 import BottomNavigation from "@/components/BottomNavigation";
 import AISummaryStories from "@/components/AISummaryStories";
-import NewsTab from "@/components/NewsTab";
 import EventCard from "@/components/EventCard";
 import PulseCard from "@/components/PulseCard";
 import LocalTab from "@/components/LocalTab";
@@ -39,7 +38,6 @@ import PulseModal from "@/components/PulseModal";
 import TrafficContent from "@/components/TrafficContent";
 import LiveVibes from "@/components/LiveVibes";
 import { DASHBOARD_TABS, type TabId, type WeatherInfo, type Pulse, type CityMood, type TrafficLevel, type LocalSection } from "@/components/types";
-import type { LocalNewsResponse } from "@/types/news";
 import { useGamification } from "@/hooks/useGamification";
 import XPProgressBadge from "@/components/XPProgressBadge";
 import { useGeolocation } from "@/hooks/useGeolocation";
@@ -263,11 +261,6 @@ export default function Home() {
   const [cityMoodLoading, setCityMoodLoading] = useState(false);
   const [cityMoodError, setCityMoodError] = useState<string | null>(null);
 
-  // News
-  const [newsData, setNewsData] = useState<LocalNewsResponse | null>(null);
-  const [newsLoading, setNewsLoading] = useState(false);
-  const [newsError, setNewsError] = useState<string | null>(null);
-
   // Gas Prices (for quick view in Current Vibe section)
   const [gasPrice, setGasPrice] = useState<number | null>(null);
 
@@ -317,7 +310,7 @@ export default function Home() {
   // ========= AI SUMMARY =========
   useEffect(() => {
     // Need at least some data to generate a summary
-    const hasData = pulses.length > 0 || ticketmasterEvents.length > 0 || (newsData?.articles?.length ?? 0) > 0;
+    const hasData = pulses.length > 0 || ticketmasterEvents.length > 0;
 
     if (!hasData) {
       setSummary(null);
@@ -361,12 +354,6 @@ export default function Home() {
             time: e.time,
           }));
 
-        // Prepare news data for the summary
-        const newsForSummary = (newsData?.articles ?? []).slice(0, 5).map((a) => ({
-          title: a.title,
-          source: a.source,
-        }));
-
         // Get weather condition if available
         const weatherCondition = weather
           ? `${weather.description}, ${Math.round(weather.temp)}F`
@@ -380,7 +367,6 @@ export default function Home() {
             context: "all",
             pulses,
             events: eventsForSummary,
-            news: newsForSummary,
             trafficLevel,
             weatherCondition,
           }),
@@ -414,7 +400,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [city, pulses, ticketmasterEvents, newsData, trafficLevel, weather]);
+  }, [city, pulses, ticketmasterEvents, trafficLevel, weather]);
 
   // ========= REAL-TIME FEED =========
   useEffect(() => {
@@ -501,11 +487,6 @@ export default function Home() {
           params.set("weatherCondition", `${weather.description}, ${Math.round(weather.temp)}F`);
         }
 
-        // Include news count for noteworthy happenings
-        if (newsData?.articles?.length) {
-          params.set("newsCount", String(newsData.articles.length));
-        }
-
         const res = await fetch(`/api/city-mood?${params.toString()}`);
         if (!res.ok) {
           throw new Error("Failed to fetch city mood");
@@ -534,7 +515,7 @@ export default function Home() {
     }
 
     fetchCityMood();
-  }, [city, pulses.length, ticketmasterEvents.length, trafficLevel, weather, newsData?.articles?.length]);
+  }, [city, pulses.length, ticketmasterEvents.length, trafficLevel, weather]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -650,52 +631,6 @@ export default function Home() {
       cancelled = true;
     };
   }, [selectedCity?.state]);
-
-  // ========= LOCAL NEWS =========
-  useEffect(() => {
-    if (!city.trim()) {
-      setNewsData(null);
-      setNewsError(null);
-      return;
-    }
-
-    let cancelled = false;
-
-    const fetchNews = async () => {
-      try {
-        setNewsLoading(true);
-        setNewsError(null);
-
-        const res = await fetch(`/api/local-news?city=${encodeURIComponent(city)}`);
-        const data: LocalNewsResponse = await res.json();
-
-        if (cancelled) return;
-
-        if (!res.ok) {
-          setNewsError("Unable to load news.");
-          setNewsData(null);
-          return;
-        }
-
-        setNewsData(data);
-      } catch {
-        if (!cancelled) {
-          setNewsError("Unable to load news.");
-          setNewsData(null);
-        }
-      } finally {
-        if (!cancelled) {
-          setNewsLoading(false);
-        }
-      }
-    };
-
-    fetchNews();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [city]);
 
   // ========= LOAD SESSION + PROFILE =========
   useEffect(() => {
@@ -2727,10 +2662,6 @@ export default function Home() {
             trafficLevel={trafficLevel}
             trafficLoading={trafficLoading}
             trafficError={trafficError}
-            newsSummary={newsData?.aiSummary}
-            newsLoading={newsLoading}
-            newsError={newsError}
-            newsCount={newsData?.articles?.length ?? 0}
             onNavigateTab={setActiveTab}
             vibeHeadline={cityMood?.vibeHeadline}
             vibeEmoji={cityMood?.dominantMood ?? undefined}
@@ -2765,15 +2696,6 @@ export default function Home() {
                       trafficError={trafficError}
                       trafficPulses={trafficPulses}
                       cityName={city}
-                    />
-                  );
-                case "news":
-                  return (
-                    <NewsTab
-                      city={city}
-                      data={newsData}
-                      loading={newsLoading}
-                      error={newsError}
                     />
                   );
                 case "local":
@@ -2950,16 +2872,6 @@ export default function Home() {
                 className="text-slate-400 hover:text-emerald-400 transition"
               >
                 Ticketmaster
-              </a>
-              {" | "}
-              News by{" "}
-              <a
-                href="https://gnews.io/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-slate-400 hover:text-emerald-400 transition"
-              >
-                GNews
               </a>
               {" | "}
               AI by{" "}

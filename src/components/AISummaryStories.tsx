@@ -16,11 +16,6 @@ function deduplicateEvents(events: TicketmasterEvent[]): TicketmasterEvent[] {
   });
 }
 
-type NewsSummary = {
-  paragraph: string;
-  bulletPoints: string[];
-} | null;
-
 type AISummaryStoriesProps = {
   activeTab: TabId;
   summary: string | null;
@@ -34,10 +29,6 @@ type AISummaryStoriesProps = {
   trafficLevel: TrafficLevel | null;
   trafficLoading: boolean;
   trafficError: string | null;
-  newsSummary?: NewsSummary;
-  newsLoading?: boolean;
-  newsError?: string | null;
-  newsCount?: number;
   onNavigateTab?: (tab: TabId) => void;
   vibeHeadline?: string;
   vibeEmoji?: string;
@@ -73,10 +64,6 @@ export default function AISummaryStories({
   trafficLevel,
   trafficLoading,
   trafficError,
-  newsSummary,
-  newsLoading = false,
-  newsError = null,
-  newsCount = 0,
   onNavigateTab,
   vibeHeadline,
   vibeEmoji,
@@ -156,25 +143,6 @@ export default function AISummaryStories({
       bgGradient: "from-purple-500/20 to-purple-600/10",
     });
 
-    // News card
-    cards.push({
-      id: "news",
-      icon: "📰",
-      title: "News",
-      value: newsLoading ? "..." : `${newsCount}`,
-      subtitle: newsLoading
-        ? "Loading news..."
-        : newsError
-        ? "Unable to load"
-        : newsSummary?.paragraph
-        ? newsSummary.paragraph.split(".")[0].slice(0, 50) + "..."
-        : newsCount > 0
-        ? `${newsCount} articles`
-        : "No local news",
-      color: "text-pink-400",
-      bgGradient: "from-pink-500/20 to-pink-600/10",
-    });
-
     // Local card
     cards.push({
       id: "local",
@@ -191,7 +159,6 @@ export default function AISummaryStories({
     pulsesCount, summary, summaryLoading, summaryError,
     trafficLevel, trafficLoading, trafficError,
     uniqueEvents, eventsLoading, eventsError,
-    newsCount, newsSummary, newsLoading, newsError,
     displayCity,
   ]);
 

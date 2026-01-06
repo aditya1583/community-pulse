@@ -59,7 +59,7 @@ export default function LocationPrompt({
             </div>
             <div className="flex items-center gap-3 text-sm">
               <span className="text-emerald-400 text-lg">⚡</span>
-              <span className="text-slate-300">Real-time traffic, events & news</span>
+              <span className="text-slate-300">Real-time traffic, events & vibes</span>
             </div>
             <div className="flex items-center gap-3 text-sm">
               <span className="text-emerald-400 text-lg">🏘️</span>
