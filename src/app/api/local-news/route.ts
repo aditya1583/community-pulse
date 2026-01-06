@@ -10,10 +10,28 @@ import type {
 
 export type { LocalNewsArticle, LocalNewsResponse, LocalNewsSummary } from "@/types/news";
 
-// GNews API (primary)
+/**
+ * NEWS API ToS COMPLIANCE WARNING
+ *
+ * GNews Free Tier: "The free subscription cannot be used for commercial projects"
+ * NewsAPI Developer Plan: "For development and testing... only"
+ *
+ * PRODUCTION USE OF FREE TIERS IS A ToS VIOLATION.
+ *
+ * Options for production:
+ * 1. Upgrade to GNews Business (~$25-50/month)
+ * 2. Switch to NewsData.io (free tier allows commercial use, 200 req/day)
+ * 3. Use Google News RSS (free, commercial OK, no API key)
+ * 4. Remove news feature and show Google News fallback link (current default)
+ *
+ * The implementation gracefully handles missing API keys by returning
+ * { notConfigured: true } and the UI shows a Google News search link.
+ */
+
+// GNews API (primary) - DO NOT SET IN PRODUCTION WITHOUT PAID PLAN
 const GNEWS_API_KEY = process.env.GNEWS_API_KEY;
 
-// NewsAPI (fallback)
+// NewsAPI (fallback) - DO NOT SET IN PRODUCTION WITHOUT BUSINESS PLAN
 const NEWS_API_KEY = process.env.NEWS_API_KEY;
 
 // API endpoints
