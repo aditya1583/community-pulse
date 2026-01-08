@@ -228,37 +228,69 @@ const MOOD_BY_CATEGORY: Record<string, string[]> = {
 // BOT NAME GENERATOR
 // ============================================================================
 
-const BOT_PERSONAS: Record<PostType, string[]> = {
+// Extended post types to include engagement
+export type ExtendedPostType = PostType | "Engagement" | "SchoolTraffic" | "VenueCheck" | "Local";
+
+interface BotPersona {
+  name: string;
+  emoji: string;  // Consistent emoji for this bot type
+}
+
+const BOT_PERSONAS: Record<ExtendedPostType, BotPersona[]> = {
   Traffic: [
-    "Road Reporter",
-    "Commute Buddy",
-    "Traffic Tipster",
-    "Route Scout",
+    { name: "road_runner_bot", emoji: "🚗" },
+    { name: "commute_buddy_bot", emoji: "🛣️" },
+    { name: "traffic_whisperer_bot", emoji: "🚦" },
   ],
   Weather: [
-    "Weather Watcher",
-    "Sky Spotter",
-    "Forecast Friend",
-    "Climate Checker",
+    { name: "sky_watcher_bot", emoji: "🌤️" },
+    { name: "weather_vibes_bot", emoji: "☀️" },
+    { name: "forecast_friend_bot", emoji: "🌡️" },
   ],
   Events: [
-    "Event Enthusiast",
-    "Local Guide",
-    "Scene Scout",
-    "Happenings Helper",
+    { name: "scene_scout_bot", emoji: "🎉" },
+    { name: "event_hype_bot", emoji: "🎭" },
+    { name: "whats_poppin_bot", emoji: "🎸" },
   ],
   General: [
-    "Neighborhood News",
-    "Local Loop",
-    "Community Connect",
-    "Pulse Patrol",
+    { name: "neighborhood_pulse_bot", emoji: "💜" },
+    { name: "local_loop_bot", emoji: "🏘️" },
+    { name: "community_vibes_bot", emoji: "✨" },
+  ],
+  // Engagement bots for polls and recommendations
+  Engagement: [
+    { name: "poll_master_bot", emoji: "📊" },
+    { name: "curious_neighbor_bot", emoji: "🤔" },
+    { name: "local_insider_bot", emoji: "💡" },
+  ],
+  // School traffic specialist
+  SchoolTraffic: [
+    { name: "school_zone_alert_bot", emoji: "🏫" },
+    { name: "parent_pickup_pal_bot", emoji: "🚸" },
+  ],
+  // Venue check-in bot
+  VenueCheck: [
+    { name: "venue_vibes_bot", emoji: "📍" },
+    { name: "spot_checker_bot", emoji: "👀" },
+  ],
+  // Local/foodie bot (munching bot!)
+  Local: [
+    { name: "munching_bot", emoji: "🍔" },
+    { name: "foodie_finder_bot", emoji: "🌮" },
+    { name: "local_eats_bot", emoji: "😋" },
   ],
 };
 
-function getBotName(postType: PostType, cityName: string): string {
-  const personas = BOT_PERSONAS[postType];
+function getBotName(postType: PostType | ExtendedPostType, cityName: string): string {
+  const personas = BOT_PERSONAS[postType as ExtendedPostType] || BOT_PERSONAS.General;
   const persona = personas[Math.floor(Math.random() * personas.length)];
-  return `${cityName} ${persona}`;
+  // Format: "Leander munching_bot 🍔" with consistent emoji
+  return `${cityName} ${persona.name} ${persona.emoji}`;
+}
+
+function getBotPersona(postType: PostType | ExtendedPostType): BotPersona {
+  const personas = BOT_PERSONAS[postType as ExtendedPostType] || BOT_PERSONAS.General;
+  return personas[Math.floor(Math.random() * personas.length)];
 }
 
 function getMood(templateCategory: string): string {
