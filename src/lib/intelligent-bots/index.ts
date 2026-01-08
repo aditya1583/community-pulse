@@ -63,6 +63,22 @@ export {
   generateSeedPosts,
   getCuisineFact,
 } from "./template-engine";
+export type { ExtendedPostType } from "./template-engine";
+
+// Engagement Posts - Polls, Recommendations, Venue Check-ins
+export {
+  generateEngagementPost,
+  generateEngagementSeedPosts,
+  generatePollPost,
+  generateRecommendationPost,
+  generateVenueCheckinPost,
+  generateSchoolAlertPost,
+  generateLocalSpotlightPost,
+  analyzeForEngagement,
+  type EngagementPost,
+  type EngagementType,
+  type EngagementDecision,
+} from "./engagement-posts";
 
 // AI-Powered Fun Facts
 export {
@@ -93,13 +109,15 @@ import { fetchTrafficData, fetchWeatherData, fetchEventData } from "./data-fetch
 import { buildSituationContext, analyzeForPost, getSituationSummary } from "./situation-analyzer";
 import { generatePost, generateSeedPosts } from "./template-engine";
 import { checkCooldown, recordPost, checkColdStartAllowed, recordColdStart } from "./cooldown";
+import { generateEngagementSeedPosts, analyzeForEngagement, generateEngagementPost } from "./engagement-posts";
 import type { GeneratedPost, CityCoords, PostType } from "./types";
+import type { EngagementPost } from "./engagement-posts";
 
 export interface IntelligentPostResult {
   success: boolean;
   posted: boolean;
   reason: string;
-  post?: GeneratedPost;
+  post?: GeneratedPost | EngagementPost;
   situationSummary?: string;
   cooldownStatus?: {
     allowed: boolean;
@@ -116,7 +134,7 @@ export interface IntelligentPostResult {
  */
 export async function generateIntelligentPost(
   cityName: string,
-  options: { force?: boolean; coords?: CityCoords } = {}
+  options: { force?: boolean; coords?: CityCoords; includeEngagement?: boolean } = {}
 ): Promise<IntelligentPostResult> {
   // Get city config
   const config = getCityConfig(cityName) ||
@@ -140,6 +158,23 @@ export async function generateIntelligentPost(
   // Build situation context
   const ctx = buildSituationContext(config, traffic, weather, events);
   const situationSummary = getSituationSummary(ctx);
+
+  // Check for engagement post opportunity first (if enabled)
+  if (options.includeEngagement !== false) {
+    const engagementDecision = analyzeForEngagement(ctx);
+    if (engagementDecision.shouldPost && engagementDecision.engagementType) {
+      const engagementPost = await generateEngagementPost(ctx, engagementDecision.engagementType);
+      if (engagementPost) {
+        return {
+          success: true,
+          posted: true,
+          reason: engagementDecision.reason,
+          post: engagementPost,
+          situationSummary,
+        };
+      }
+    }
+  }
 
   // Analyze what to post
   const decision = analyzeForPost(ctx);
@@ -197,19 +232,21 @@ export async function generateIntelligentPost(
 /**
  * Generate seed posts for a city with no content (cold-start)
  *
- * Creates 3 varied posts based on real conditions.
+ * Creates varied posts based on real conditions.
+ * Includes both informational and engagement posts.
  * Bypasses regular cooldown but respects cold-start limits.
  */
 export async function generateColdStartPosts(
   cityName: string,
-  options: { coords?: CityCoords; count?: number; force?: boolean } = {}
+  options: { coords?: CityCoords; count?: number; force?: boolean; includeEngagement?: boolean } = {}
 ): Promise<{
   success: boolean;
-  posts: GeneratedPost[];
+  posts: (GeneratedPost | EngagementPost)[];
   reason: string;
   situationSummary?: string;
 }> {
   const count = options.count || 3;
+  const includeEngagement = options.includeEngagement !== false;
 
   // Check cold-start is allowed (unless forced)
   if (!options.force) {
@@ -248,9 +285,17 @@ export async function generateColdStartPosts(
   const situationSummary = getSituationSummary(ctx);
 
   // Generate varied posts (now with AI-powered fun facts!)
-  const posts = await generateSeedPosts(ctx, count);
+  const regularPosts = await generateSeedPosts(ctx, Math.ceil(count * 0.6)); // 60% regular posts
 
-  if (posts.length === 0) {
+  // Generate engagement posts if enabled
+  let engagementPosts: EngagementPost[] = [];
+  if (includeEngagement) {
+    engagementPosts = await generateEngagementSeedPosts(ctx, Math.ceil(count * 0.4)); // 40% engagement
+  }
+
+  const allPosts = [...regularPosts, ...engagementPosts];
+
+  if (allPosts.length === 0) {
     return {
       success: false,
       posts: [],
@@ -260,12 +305,12 @@ export async function generateColdStartPosts(
   }
 
   // Record in cooldown
-  recordColdStart(cityName, posts.map(p => ({ tag: p.tag as PostType })));
+  recordColdStart(cityName, regularPosts.map(p => ({ tag: p.tag as PostType })));
 
   return {
     success: true,
-    posts,
-    reason: `Generated ${posts.length} cold-start posts`,
+    posts: allPosts,
+    reason: `Generated ${allPosts.length} cold-start posts (${regularPosts.length} regular, ${engagementPosts.length} engagement)`,
     situationSummary,
   };
 }
