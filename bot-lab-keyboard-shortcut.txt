@@ -1,0 +1,14 @@
+// Add keyboard shortcut: Press Ctrl+Shift+B to open Bot Lab
+
+// Add this to layout.tsx or a useEffect in a client component:
+
+useEffect(() => {
+  const handleKeyPress = (e: KeyboardEvent) => {
+    if (e.ctrlKey && e.shiftKey && e.key === 'B') {
+      router.push('/bot-lab');
+    }
+  };
+
+  window.addEventListener('keydown', handleKeyPress);
+  return () => window.removeEventListener('keydown', handleKeyPress);
+}, []);

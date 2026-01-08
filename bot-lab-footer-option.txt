@@ -1,0 +1,14 @@
+// Add this to the footer links in layout.tsx:
+
+<div className="flex justify-center gap-4 text-foreground/60 sm:justify-end">
+  {process.env.NODE_ENV === 'development' && (
+    <a
+      href="/bot-lab"
+      className="transition hover:text-foreground/80 flex items-center gap-1"
+    >
+      🧠 Bot Lab
+    </a>
+  )}
+  <a href="/privacy" className="...">Privacy</a>
+  <a href="/terms" className="...">Terms</a>
+</div>

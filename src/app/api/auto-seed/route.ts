@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { hasIntelligentBotConfig, generateColdStartPosts } from "@/lib/intelligent-bots";
 
 /**
  * Auto-Seed API - Generates contextual bot posts for empty cities
  *
  * When a user visits a city with 0 pulses, this endpoint creates
  * 3-5 relevant posts based on REAL data (events, weather, farmers markets).
+ *
+ * For cities with intelligent bot configuration (Leander, Cedar Park, Austin),
+ * this uses the hyperlocal intelligent-seed system with real road names.
  *
  * Posts are marked as bot posts and feel natural, not templated.
  */
@@ -323,6 +327,83 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`[Auto-Seed] Starting for city: ${body.city}`);
+
+    // Check if this city has intelligent bot configuration
+    // If so, use the hyperlocal system with real road names
+    const cityName = body.city.split(",")[0].trim();
+    if (hasIntelligentBotConfig(cityName)) {
+      console.log(`[Auto-Seed] City "${cityName}" has intelligent bot config - using hyperlocal system`);
+
+      // Check for recent posts first
+      const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+      const { data: existingPulses } = await supabase
+        .from("pulses")
+        .select("id")
+        .eq("city", body.city)
+        .gte("created_at", fourHoursAgo)
+        .limit(1);
+
+      if (existingPulses && existingPulses.length > 0 && !body.force) {
+        return NextResponse.json({
+          success: true,
+          message: "City already has recent pulses, skipping seed",
+          created: 0,
+          existingCount: existingPulses.length,
+          pulses: [],
+        });
+      }
+
+      // Use intelligent bot system (force=true since we already checked DB for recent posts)
+      // Generate 4 varied posts (Traffic, Weather, Events x2) - no redundancy
+      const result = await generateColdStartPosts(cityName, { count: 4, force: true });
+
+      if (!result.success || result.posts.length === 0) {
+        console.log(`[Auto-Seed] Intelligent bots returned no posts: ${result.reason}`);
+        // Fall through to generic system below
+      } else {
+        // Insert intelligent bot posts
+        const now = Date.now();
+        const records = result.posts.map((post, index) => {
+          const createdAt = new Date(now - index * 5 * 60 * 1000).toISOString();
+          const expiresAt = new Date(now + 24 * 60 * 60 * 1000).toISOString();
+
+          return {
+            city: body.city,
+            message: post.message,
+            tag: post.tag,
+            mood: post.mood,
+            author: post.author,
+            user_id: null,
+            is_bot: true,
+            hidden: false,
+            created_at: createdAt,
+            expires_at: expiresAt,
+          };
+        });
+
+        const { data, error } = await supabase
+          .from("pulses")
+          .insert(records)
+          .select("id, city, message, tag, mood, created_at");
+
+        if (error) {
+          console.error("[Auto-Seed] Intelligent bot insert error:", error);
+          return NextResponse.json(
+            { error: "Failed to create pulses", details: error.message },
+            { status: 500 }
+          );
+        }
+
+        console.log(`[Auto-Seed] SUCCESS! Created ${data.length} intelligent bot pulses for ${body.city}`);
+        return NextResponse.json({
+          success: true,
+          created: data.length,
+          pulses: data,
+          mode: "intelligent",
+          situationSummary: result.situationSummary,
+        });
+      }
+    }
 
     // Check if city already has ANY pulses in the last 4 hours (user or bot)
     const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
