@@ -285,7 +285,9 @@ const SOCIAL_HANDLE_PATTERNS: RegExp[] = [
   /\b(?:tiktok|tt)\s*[:\-]?\s*@?\s*[a-zA-Z0-9_.]+/i,
   /\b(?:facebook|fb)\s*[:\-]?\s*@?\s*[a-zA-Z0-9_.]+/i,
   /\b(?:telegram|tg)\s*[:\-]?\s*@?\s*[a-zA-Z0-9_.]+/i,
-  /\b(?:whatsapp|wa)\s*[:\-]?\s*[@+]?\s*[a-zA-Z0-9_.]+/i,
+  // WhatsApp - require delimiter after "wa" to avoid false positives like "watch"
+  /\b(?:whatsapp)\s*[:\-]?\s*[@+]?\s*[a-zA-Z0-9_.]+/i,
+  /\bwa\s*[:\-@+]\s*[a-zA-Z0-9_.]+/i,
   /\b(?:discord)\s*[:\-]?\s*@?\s*[a-zA-Z0-9_.#]+/i,
   // Platform context + "is" + handle: "IG is @myhandle" or "IG is @ myhandle"
   /\b(?:ig|instagram|snap|snapchat|tt|tiktok|twitter|x|fb|facebook|telegram|tg)\s+is\s+@?\s*[a-zA-Z0-9_]+/i,

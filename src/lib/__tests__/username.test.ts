@@ -2,24 +2,20 @@ import { describe, expect, it } from "vitest";
 import {
   generateFunUsername,
   generateUniqueUsername,
-  USERNAME_MOODS,
-  USERNAME_ANIMALS,
+  containsProfanity,
+  sanitizeForUsername,
+  USERNAME_ADJECTIVES,
+  USERNAME_NOUNS,
 } from "@/lib/username";
 
 describe("username generation", () => {
   describe("generateFunUsername", () => {
-    it("generates username in correct format", () => {
+    it("generates username in PascalCase format without spaces", () => {
       const username = generateFunUsername();
 
-      // Should be in format "Mood Animal NN"
-      const parts = username.split(" ");
-      expect(parts.length).toBe(3);
-
-      const [mood, animal, num] = parts;
-      expect(USERNAME_MOODS).toContain(mood);
-      expect(USERNAME_ANIMALS).toContain(animal);
-      expect(parseInt(num, 10)).toBeGreaterThanOrEqual(10);
-      expect(parseInt(num, 10)).toBeLessThanOrEqual(99);
+      // Should be PascalCase with no spaces (e.g., "ChillOtter42")
+      expect(username).not.toContain(" ");
+      expect(username).toMatch(/^[A-Z][a-zA-Z]+[A-Z][a-zA-Z]+\d{2}$/);
     });
 
     it("generates different usernames on each call (probabilistically)", () => {
@@ -28,24 +24,16 @@ describe("username generation", () => {
         usernames.add(generateFunUsername());
       }
 
-      // With 24 moods * 24 animals * 90 numbers = 51,840 combinations
-      // 100 random picks should produce mostly unique values
+      // With expanded word lists, should produce mostly unique values
       expect(usernames.size).toBeGreaterThan(80);
     });
 
-    it("uses only valid mood words", () => {
+    it("ends with a 2-digit number", () => {
       for (let i = 0; i < 50; i++) {
         const username = generateFunUsername();
-        const mood = username.split(" ")[0];
-        expect(USERNAME_MOODS).toContain(mood);
-      }
-    });
-
-    it("uses only valid animal words", () => {
-      for (let i = 0; i < 50; i++) {
-        const username = generateFunUsername();
-        const animal = username.split(" ")[1];
-        expect(USERNAME_ANIMALS).toContain(animal);
+        const num = parseInt(username.slice(-2), 10);
+        expect(num).toBeGreaterThanOrEqual(10);
+        expect(num).toBeLessThanOrEqual(99);
       }
     });
   });
@@ -65,7 +53,7 @@ describe("username generation", () => {
 
       const username = await generateUniqueUsername(mockSupabase);
       expect(username).toBeTruthy();
-      expect(username.split(" ").length).toBe(3);
+      expect(username).not.toContain(" ");
     });
 
     it("retries on collision and eventually finds unique name", async () => {
@@ -111,28 +99,91 @@ describe("username generation", () => {
 
       // Fallback format removes trailing number and adds unique suffix
       expect(username).toBeTruthy();
-      // The fallback username won't have a number at the end like "22"
-      // It will have a base36 suffix instead
+      expect(username).not.toContain(" ");
+    });
+  });
+
+  describe("profanity detection", () => {
+    it("detects common profanity", () => {
+      expect(containsProfanity("fuck")).toBe(true);
+      expect(containsProfanity("FUCK")).toBe(true);
+      expect(containsProfanity("FuCk")).toBe(true);
+      expect(containsProfanity("shit")).toBe(true);
+      expect(containsProfanity("ass")).toBe(true);
+    });
+
+    it("detects obfuscated profanity", () => {
+      expect(containsProfanity("fuk")).toBe(true);
+      expect(containsProfanity("f@ck")).toBe(true);
+      expect(containsProfanity("sh1t")).toBe(true);
+      expect(containsProfanity("a$$")).toBe(true);
+    });
+
+    it("allows clean words", () => {
+      expect(containsProfanity("happy")).toBe(false);
+      expect(containsProfanity("sunshine")).toBe(false);
+      expect(containsProfanity("chill vibes")).toBe(false);
+      expect(containsProfanity("coffee lover")).toBe(false);
+    });
+
+    it("detects profanity within longer text", () => {
+      expect(containsProfanity("what the fuck")).toBe(true);
+      expect(containsProfanity("holy shit man")).toBe(true);
+    });
+  });
+
+  describe("sanitizeForUsername", () => {
+    it("removes profane words from input", () => {
+      const result = sanitizeForUsername("fucking fucker mama");
+      expect(result).not.toContain("fucking");
+      expect(result).not.toContain("fucker");
+      expect(result).toContain("mama");
+    });
+
+    it("keeps clean words", () => {
+      const result = sanitizeForUsername("happy coffee lover");
+      expect(result).toEqual(["happy", "coffee", "lover"]);
+    });
+
+    it("returns empty array for all-profane input", () => {
+      const result = sanitizeForUsername("fuck shit damn");
+      expect(result).toEqual([]);
+    });
+
+    it("removes special characters but keeps word structure", () => {
+      const result = sanitizeForUsername("hello! world? test123");
+      expect(result.length).toBe(3);
     });
   });
 
   describe("word lists", () => {
     it("has sufficient variety for uniqueness", () => {
-      // 24 moods * 24 animals * 90 numbers = 51,840 possible combinations
-      const combinations = USERNAME_MOODS.length * USERNAME_ANIMALS.length * 90;
-      expect(combinations).toBeGreaterThan(50000);
+      // Expanded: more adjectives * more nouns * 90 numbers
+      const combinations = USERNAME_ADJECTIVES.length * USERNAME_NOUNS.length * 90;
+      expect(combinations).toBeGreaterThan(100000);
     });
 
     it("contains only appropriate words", () => {
-      const allWords = [...USERNAME_MOODS, ...USERNAME_ANIMALS];
+      const allWords = [...USERNAME_ADJECTIVES, ...USERNAME_NOUNS];
 
-      // Check no profanity (basic check)
-      const badWords = ["fuck", "shit", "ass", "damn", "bitch"];
+      // Check no profanity using the actual profanity filter
+      // This is better than substring matching which would flag "Sassy" for containing "ass"
       for (const word of allWords) {
-        for (const bad of badWords) {
-          expect(word.toLowerCase()).not.toContain(bad);
-        }
+        expect(containsProfanity(word)).toBe(false);
       }
+    });
+
+    it("has expanded adjective list", () => {
+      expect(USERNAME_ADJECTIVES.length).toBeGreaterThan(24);
+      expect(USERNAME_ADJECTIVES).toContain("Caffeinated");
+      expect(USERNAME_ADJECTIVES).toContain("Cosmic");
+    });
+
+    it("has expanded noun list", () => {
+      expect(USERNAME_NOUNS.length).toBeGreaterThan(24);
+      expect(USERNAME_NOUNS).toContain("Narwhal");
+      expect(USERNAME_NOUNS).toContain("Phoenix");
+      expect(USERNAME_NOUNS).toContain("Wizard");
     });
   });
 });

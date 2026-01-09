@@ -13,6 +13,8 @@ interface Comment {
 interface PulseCommentsProps {
   pulseId: number;
   userIdentifier?: string;
+  /** Reporter ID for flagging comments */
+  reporterId?: string;
   /** Initial comment count to show before expanding */
   initialCount?: number;
 }
@@ -50,6 +52,7 @@ function formatRelativeTime(dateString: string): string {
 export default function PulseComments({
   pulseId,
   userIdentifier,
+  reporterId,
   initialCount = 0,
 }: PulseCommentsProps) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -61,6 +64,9 @@ export default function PulseComments({
   const [newComment, setNewComment] = useState("");
   const [showSignInPrompt, setShowSignInPrompt] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [reportingComment, setReportingComment] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState<string | null>(null);
 
   // Refs
   const inputRef = useRef<HTMLInputElement>(null);
@@ -186,6 +192,65 @@ export default function PulseComments({
     setShowSignInPrompt(false);
   }, []);
 
+  // Delete a comment (own comments only)
+  const handleDeleteComment = useCallback(async (commentId: string) => {
+    if (!userIdentifier) return;
+
+    try {
+      const res = await fetch(`/api/pulses/${pulseId}/comments/${commentId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userIdentifier }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Failed to delete comment");
+        return;
+      }
+
+      // Remove from local state
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+      setTotalCount((prev) => Math.max(0, prev - 1));
+      setActiveMenu(null);
+    } catch (err) {
+      console.error("[PulseComments] Delete error:", err);
+      setError("Failed to delete comment");
+    }
+  }, [pulseId, userIdentifier]);
+
+  // Report a comment
+  const handleReportComment = useCallback(async (commentId: string, reason: string) => {
+    if (!reporterId) {
+      setShowSignInPrompt(true);
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/pulses/${pulseId}/comments/${commentId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reporterId, reason }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Failed to report comment");
+        return;
+      }
+
+      setReportingComment(null);
+      setReportReason(null);
+      setActiveMenu(null);
+      // Show success briefly
+      setError("Report submitted. Thank you!");
+      setTimeout(() => setError(null), 3000);
+    } catch (err) {
+      console.error("[PulseComments] Report error:", err);
+      setError("Failed to report comment");
+    }
+  }, [pulseId, reporterId]);
+
   // Character count
   const charCount = newComment.length;
   const isOverLimit = charCount > 500;
@@ -241,27 +306,105 @@ export default function PulseComments({
           {/* Comments List */}
           {!isLoading && comments.length > 0 && (
             <div className="space-y-2" role="list" aria-label="Comment list">
-              {comments.map((comment) => (
-                <div
-                  key={comment.id}
-                  className="bg-slate-800/50 rounded-lg px-3 py-2 border border-slate-700/30"
-                  role="listitem"
-                >
-                  <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
-                    <span className="font-medium text-cyan-400">{comment.user_identifier}</span>
-                    <span aria-hidden="true">•</span>
-                    <time
-                      dateTime={comment.created_at}
-                      className="text-slate-500"
-                    >
-                      {formatRelativeTime(comment.created_at)}
-                    </time>
+              {comments.map((comment) => {
+                const isOwnComment = comment.user_identifier === userIdentifier;
+                const isMenuOpen = activeMenu === comment.id;
+                const isReporting = reportingComment === comment.id;
+
+                return (
+                  <div
+                    key={comment.id}
+                    className="bg-slate-800/50 rounded-lg px-3 py-2 border border-slate-700/30 relative group"
+                    role="listitem"
+                  >
+                    <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-cyan-400">{comment.user_identifier}</span>
+                        <span aria-hidden="true">•</span>
+                        <time dateTime={comment.created_at} className="text-slate-500">
+                          {formatRelativeTime(comment.created_at)}
+                        </time>
+                      </div>
+
+                      {/* Action Menu Button */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setActiveMenu(isMenuOpen ? null : comment.id)}
+                          className="p-1 text-slate-500 hover:text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label="Comment actions"
+                        >
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                          </svg>
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {isMenuOpen && !isReporting && (
+                          <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-lg py-1 z-10 min-w-[120px]">
+                            {isOwnComment && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteComment(comment.id)}
+                                className="w-full px-3 py-1.5 text-left text-xs text-red-400 hover:bg-slate-700/50 flex items-center gap-2"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                </svg>
+                                Delete
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setReportingComment(comment.id);
+                              }}
+                              className="w-full px-3 py-1.5 text-left text-xs text-amber-400 hover:bg-slate-700/50 flex items-center gap-2"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v1.5M3 21v-6m0 0l2.77-.693a9 9 0 016.208.682l.108.054a9 9 0 006.086.71l3.114-.732a48.524 48.524 0 01-.005-10.499l-3.11.732a9 9 0 01-6.085-.711l-.108-.054a9 9 0 00-6.208-.682L3 4.5M3 15V4.5" />
+                              </svg>
+                              Report
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Report Reason Selector */}
+                        {isReporting && (
+                          <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-lg py-1 z-10 min-w-[150px]">
+                            <div className="px-3 py-1 text-xs text-slate-400 border-b border-slate-700">
+                              Why report?
+                            </div>
+                            {["spam", "harassment", "inappropriate", "misinformation"].map((reason) => (
+                              <button
+                                key={reason}
+                                type="button"
+                                onClick={() => handleReportComment(comment.id, reason)}
+                                className="w-full px-3 py-1.5 text-left text-xs text-slate-300 hover:bg-slate-700/50 capitalize"
+                              >
+                                {reason}
+                              </button>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setReportingComment(null);
+                                setActiveMenu(null);
+                              }}
+                              className="w-full px-3 py-1.5 text-left text-xs text-slate-500 hover:bg-slate-700/50 border-t border-slate-700"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-sm text-slate-200 leading-snug">
+                      {comment.message}
+                    </p>
                   </div>
-                  <p className="text-sm text-slate-200 leading-snug">
-                    {comment.message}
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 

@@ -269,6 +269,7 @@ export default function PulseCard({
           <PulseComments
             pulseId={pulse.id}
             userIdentifier={userIdentifier}
+            reporterId={reporterId}
           />
         </div>
       </div>
