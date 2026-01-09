@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { sendCityNotification } from "@/lib/pushNotifications";
+import { logger } from "@/lib/logger";
 import type { EngagementPromptPayload } from "@/lib/batSignal";
 
 export const dynamic = "force-dynamic";
@@ -67,10 +68,13 @@ function isAuthorized(req: NextRequest): boolean {
     return true;
   }
 
-  if (process.env.NODE_ENV === "development") {
+  // Check for service role key (internal calls)
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (serviceKey && authHeader === `Bearer ${serviceKey}`) {
     return true;
   }
 
+  // Development bypass removed for security - always require authentication
   return false;
 }
 
@@ -79,13 +83,29 @@ function getRandomPrompt(promptType: PromptType): string {
   return prompts[Math.floor(Math.random() * prompts.length)];
 }
 
-function determinePromptType(): PromptType {
+/**
+ * Determine prompt type based on time in a specific timezone
+ * Vercel crons run in UTC, so we need to convert to target timezone
+ */
+function determinePromptType(timezone: string = "America/Chicago"): PromptType {
+  // Get current time in the target timezone
   const now = new Date();
-  const hour = now.getHours();
-  const dayOfWeek = now.getDay(); // 0 = Sunday, 6 = Saturday
+  const options: Intl.DateTimeFormatOptions = {
+    hour: "numeric",
+    hour12: false,
+    weekday: "short",
+    timeZone: timezone,
+  };
+
+  const formatter = new Intl.DateTimeFormat("en-US", options);
+  const parts = formatter.formatToParts(now);
+
+  const hour = parseInt(parts.find(p => p.type === "hour")?.value || "12", 10);
+  const weekday = parts.find(p => p.type === "weekday")?.value || "";
+  const isWeekend = weekday === "Sat" || weekday === "Sun";
 
   // Weekend (Saturday or Sunday) before noon
-  if ((dayOfWeek === 0 || dayOfWeek === 6) && hour < 14) {
+  if (isWeekend && hour < 14) {
     return "weekend_plans";
   }
 
@@ -108,6 +128,11 @@ function determinePromptType(): PromptType {
   return "lunch_check";
 }
 
+type DailyPromptsBody = {
+  promptType?: PromptType;
+  timezone?: string;
+};
+
 export async function POST(req: NextRequest) {
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -122,9 +147,19 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Determine which type of prompt to send based on time
-    const promptType = determinePromptType();
+    // Parse request body for optional overrides
+    const body: DailyPromptsBody = await req.json().catch(() => ({}));
+
+    // Allow explicit prompt type override, or determine from timezone
+    const timezone = body.timezone || "America/Chicago";
+    const promptType = body.promptType || determinePromptType(timezone);
     const promptText = getRandomPrompt(promptType);
+
+    logger.info("Sending daily prompts", {
+      action: "daily_prompts",
+      promptType,
+      timezone,
+    });
 
     // Get all cities with active push subscribers
     const { data: activeCities } = await supabase
@@ -185,7 +220,10 @@ export async function POST(req: NextRequest) {
       failed: totalFailed,
     });
   } catch (err) {
-    console.error("[daily-prompts] Error:", err);
+    logger.error("Daily prompts error", {
+      action: "daily_prompts",
+      error: err instanceof Error ? err.message : "Unknown error",
+    });
     return NextResponse.json(
       { error: "An unexpected error occurred" },
       { status: 500 }

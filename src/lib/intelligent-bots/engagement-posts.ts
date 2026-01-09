@@ -17,7 +17,15 @@ import { ExtendedPostType } from "./template-engine";
 // ENGAGEMENT POST TYPES
 // ============================================================================
 
-export type EngagementType = "poll" | "recommendation" | "venue_checkin" | "school_alert" | "local_spotlight";
+export type EngagementType =
+  | "poll"
+  | "recommendation"
+  | "venue_checkin"
+  | "school_alert"
+  | "local_spotlight"
+  | "this_or_that"      // NEW: Binary choice polls
+  | "fomo_alert"        // NEW: Time-sensitive urgency posts
+  | "weekly_roundup";   // NEW: Weekly summary posts
 
 export interface EngagementPost extends Omit<GeneratedPost, "tag"> {
   tag: PostType | "General";
@@ -89,6 +97,118 @@ const RECOMMENDATION_TEMPLATES = [
   "🙋 Quick question: Your favorite place for {query}?",
   "🔍 On the hunt for {query}. What's your pick?",
   "💭 Been craving {query}. Where should I go?",
+];
+
+// ============================================================================
+// THIS OR THAT - Binary choice polls (one-tap engagement)
+// ============================================================================
+
+const THIS_OR_THAT_CHOICES = [
+  // Food battles
+  { a: "🌮 Tacos", b: "🌯 Burritos", category: "food" },
+  { a: "🍔 Burgers", b: "🌭 Hot Dogs", category: "food" },
+  { a: "🍕 Pizza", b: "🍝 Pasta", category: "food" },
+  { a: "☕ Coffee", b: "🍵 Tea", category: "food" },
+  { a: "🍖 BBQ", b: "🍗 Fried Chicken", category: "food" },
+  { a: "🥞 Pancakes", b: "🧇 Waffles", category: "food" },
+  { a: "🍦 Ice Cream", b: "🧁 Cupcakes", category: "food" },
+  { a: "🥑 Guac", b: "🫘 Queso", category: "food" },
+  { a: "🍟 Fries", b: "🧅 Onion Rings", category: "food" },
+  { a: "🌶️ Spicy", b: "🧂 Mild", category: "food" },
+  // Local preferences
+  { a: "🏠 Cook at home", b: "🍽️ Eat out", category: "lifestyle" },
+  { a: "☀️ Morning person", b: "🌙 Night owl", category: "lifestyle" },
+  { a: "🏃 Gym", b: "🌳 Outdoor workout", category: "lifestyle" },
+  { a: "📚 Book", b: "📺 Netflix", category: "lifestyle" },
+  { a: "🎸 Live music", b: "🎬 Movies", category: "lifestyle" },
+  { a: "🐕 Dogs", b: "🐈 Cats", category: "lifestyle" },
+  { a: "🏖️ Beach trip", b: "⛰️ Mountain trip", category: "lifestyle" },
+  // Texas-specific
+  { a: "🤠 Whataburger", b: "🍔 In-N-Out", category: "texas" },
+  { a: "🧊 Blue Bell", b: "🍨 Amy's Ice Cream", category: "texas" },
+  { a: "🌅 Sunrise hike", b: "🌇 Sunset patio", category: "texas" },
+  { a: "💨 AC blast", b: "🪟 Windows down", category: "texas" },
+  { a: "🚗 Toll road", b: "🛣️ Frontage road", category: "texas" },
+];
+
+const THIS_OR_THAT_TEMPLATES = [
+  "⚔️ {a} vs {b} — Choose your fighter!",
+  "🤔 Settle this: {a} or {b}?",
+  "⬅️ {a}  OR  {b} ➡️",
+  "🔥 Hot take time: {a} vs {b}",
+  "📊 {city} poll: {a} or {b}?",
+  "👆 This or that: {a} vs {b}",
+  "🎯 Pick one: {a} or {b}",
+  "💭 Be honest: {a} or {b}?",
+];
+
+// ============================================================================
+// FOMO ALERTS - Time-sensitive urgency posts
+// ============================================================================
+
+const FOMO_TEMPLATES = {
+  happyHour: [
+    "🍻 Happy hour at {restaurant} starts in {minutes} min! Who's in?",
+    "⏰ ALERT: {restaurant} happy hour kicks off in {minutes} min. Don't miss it!",
+    "🍺 {minutes} min until happy hour at {restaurant}. Just saying...",
+    "🎉 {restaurant} happy hour countdown: {minutes} minutes. See you there?",
+    "💸 Cheap drinks incoming! {restaurant} happy hour in {minutes} min.",
+  ],
+  eventStarting: [
+    "🎸 {event} at {venue} starts in {minutes} min! Still time to make it!",
+    "⏰ {minutes} min until {event} kicks off at {venue}. You coming?",
+    "🎭 Don't miss it! {event} at {venue} in {minutes} min.",
+    "🚨 Last call! {event} starts in {minutes} min at {venue}.",
+    "🏃 {event} at {venue} - {minutes} min away. Move it!",
+  ],
+  lunchRush: [
+    "🍽️ Beat the lunch rush! {restaurant} is probably empty for the next {minutes} min.",
+    "⏰ Pro tip: Hit {restaurant} now. Lunch crowd incoming in {minutes} min.",
+    "🎯 {minutes} min window before {restaurant} gets slammed. Go now!",
+  ],
+  weatherWindow: [
+    "☀️ Perfect weather window! Next {minutes} min are gorgeous for {activity}.",
+    "🌤️ Quick! {minutes} min of perfect weather before it changes. Get outside!",
+    "⛅ Weather alert: Great conditions for {activity} for the next {minutes} min.",
+  ],
+  sunsetAlert: [
+    "🌅 Sunset in ~{minutes} min! Best spots: {venue} or any west-facing patio.",
+    "📸 Golden hour alert! Sunset in {minutes} min. Grab your camera!",
+    "✨ {minutes} min to sunset. Perfect time for a {venue} patio moment.",
+  ],
+};
+
+// ============================================================================
+// WEEKLY ROUNDUP - Summary posts
+// ============================================================================
+
+const WEEKLY_ROUNDUP_TEMPLATES = [
+  `📊 This Week in {city}
+
+🔥 Trending topic: {trending}
+🌡️ Weather recap: {weatherSummary}
+🚗 Traffic MVP: {trafficTip}
+🎉 Coming up: {upcomingEvents}
+
+What was YOUR highlight this week?`,
+
+  `✨ {city} Weekly Pulse
+
+📈 Hot conversations: {trending}
+☀️ Weather vibes: {weatherSummary}
+🚦 Road report: {trafficTip}
+📅 Don't miss: {upcomingEvents}
+
+Drop your weekly wins below! 👇`,
+
+  `🗓️ Week in Review: {city}
+
+💬 Y'all talked about: {trending}
+🌤️ Weather check: {weatherSummary}
+🛣️ Traffic intel: {trafficTip}
+🎭 On deck: {upcomingEvents}
+
+How was your week, neighbors?`,
 ];
 
 // ============================================================================
@@ -339,6 +459,229 @@ export async function generateLocalSpotlightPost(
 }
 
 // ============================================================================
+// NEW ENGAGEMENT TYPES
+// ============================================================================
+
+/**
+ * Generate a "This or That" binary choice poll
+ * Super easy one-tap engagement - no typing required!
+ */
+export async function generateThisOrThatPost(
+  ctx: SituationContext
+): Promise<EngagementPost | null> {
+  const { city, time, weather } = ctx;
+
+  // Filter choices based on context
+  let choices = THIS_OR_THAT_CHOICES;
+
+  // Food choices during meal times
+  if ((time.hour >= 7 && time.hour <= 10) || (time.hour >= 11 && time.hour <= 14) || (time.hour >= 17 && time.hour <= 21)) {
+    choices = choices.filter(c => c.category === "food" || c.category === "texas");
+  }
+
+  // Weekend - more lifestyle choices
+  if (time.isWeekend) {
+    choices = THIS_OR_THAT_CHOICES; // All choices available
+  }
+
+  // Hot weather - specific Texas choices
+  if (weather.temperature > 85) {
+    const texasChoices = choices.filter(c => c.category === "texas");
+    if (texasChoices.length > 0 && Math.random() < 0.5) {
+      choices = texasChoices;
+    }
+  }
+
+  const choice = choices[Math.floor(Math.random() * choices.length)];
+  const template = THIS_OR_THAT_TEMPLATES[Math.floor(Math.random() * THIS_OR_THAT_TEMPLATES.length)];
+
+  const message = template
+    .replace("{a}", choice.a)
+    .replace("{b}", choice.b)
+    .replace("{city}", city.name);
+
+  return {
+    message,
+    tag: "General",
+    mood: "⚔️",
+    author: `${city.name} poll_master_bot 📊`,
+    is_bot: true,
+    hidden: false,
+    engagementType: "this_or_that",
+    options: [choice.a, choice.b],
+  };
+}
+
+/**
+ * Generate a FOMO (time-sensitive) alert post
+ * Creates urgency around events, happy hours, weather windows, etc.
+ */
+export async function generateFomoAlertPost(
+  ctx: SituationContext
+): Promise<EngagementPost | null> {
+  const { city, time, events, weather } = ctx;
+  const hour = time.hour;
+
+  // Determine what type of FOMO alert to generate
+  let fomoType: keyof typeof FOMO_TEMPLATES | undefined = undefined;
+  let templates: string[] | undefined = undefined;
+  let variables: Record<string, string> = {};
+
+  // Event starting soon (if we have events)
+  if (events.length > 0) {
+    const event = events[0];
+    const eventTime = new Date(event.startTime);
+    const now = new Date();
+    const minutesUntil = Math.floor((eventTime.getTime() - now.getTime()) / 60000);
+
+    if (minutesUntil > 15 && minutesUntil < 90) {
+      fomoType = "eventStarting";
+      templates = FOMO_TEMPLATES.eventStarting;
+      variables = {
+        event: event.name,
+        venue: event.venue,
+        minutes: String(minutesUntil),
+      };
+    }
+  }
+
+  // Happy hour alert (3:30-5:30 PM on weekdays)
+  if (!fomoType && time.isWeekday && hour >= 15 && hour <= 17) {
+    const minutesUntil = hour < 16 ? (16 - hour) * 60 - new Date().getMinutes() : 30;
+    if (minutesUntil > 0 && minutesUntil <= 45) {
+      fomoType = "happyHour";
+      templates = FOMO_TEMPLATES.happyHour;
+      const restaurant = city.landmarks.restaurants[Math.floor(Math.random() * city.landmarks.restaurants.length)];
+      variables = {
+        restaurant,
+        minutes: String(minutesUntil),
+      };
+    }
+  }
+
+  // Lunch rush warning (11:00-11:30 AM)
+  if (!fomoType && hour === 11 && new Date().getMinutes() < 30) {
+    fomoType = "lunchRush";
+    templates = FOMO_TEMPLATES.lunchRush;
+    const restaurant = city.landmarks.restaurants[Math.floor(Math.random() * city.landmarks.restaurants.length)];
+    variables = {
+      restaurant,
+      minutes: String(30 - new Date().getMinutes()),
+    };
+  }
+
+  // Sunset alert (calculate approximate sunset time)
+  if (!fomoType && hour >= 17 && hour <= 19) {
+    // Approximate sunset check (varies by season, simplified)
+    const sunsetHour = 19; // Approximate for Texas
+    const minutesUntilSunset = (sunsetHour * 60 + 30) - (hour * 60 + new Date().getMinutes());
+    if (minutesUntilSunset > 15 && minutesUntilSunset < 60) {
+      fomoType = "sunsetAlert";
+      templates = FOMO_TEMPLATES.sunsetAlert;
+      const venue = city.landmarks.venues[Math.floor(Math.random() * city.landmarks.venues.length)];
+      variables = {
+        venue,
+        minutes: String(minutesUntilSunset),
+      };
+    }
+  }
+
+  // Perfect weather window
+  if (!fomoType && weather.condition === "clear" && weather.temperature >= 65 && weather.temperature <= 85) {
+    fomoType = "weatherWindow";
+    templates = FOMO_TEMPLATES.weatherWindow;
+    const activities = ["a walk", "outdoor dining", "the park", "a patio hang"];
+    variables = {
+      activity: activities[Math.floor(Math.random() * activities.length)],
+      minutes: String(60 + Math.floor(Math.random() * 60)), // 60-120 min window
+    };
+  }
+
+  // If no FOMO opportunity, return null
+  if (!fomoType || !templates) {
+    return null;
+  }
+
+  const template = templates[Math.floor(Math.random() * templates.length)];
+  let message = template;
+  for (const [key, value] of Object.entries(variables)) {
+    message = message.replace(new RegExp(`\\{${key}\\}`, "g"), value);
+  }
+
+  return {
+    message,
+    tag: "General",
+    mood: "⏰",
+    author: `${city.name} fomo_alert_bot ⚡`,
+    is_bot: true,
+    hidden: false,
+    engagementType: "fomo_alert",
+  };
+}
+
+/**
+ * Generate a Weekly Roundup post
+ * Summarizes the week's highlights and asks for community input
+ */
+export async function generateWeeklyRoundupPost(
+  ctx: SituationContext
+): Promise<EngagementPost | null> {
+  const { city, time, weather, events } = ctx;
+
+  // Only generate on Sundays or Saturdays
+  if (time.dayOfWeek !== 0 && time.dayOfWeek !== 6) {
+    return null;
+  }
+
+  // Build summary content (would ideally pull from actual data)
+  const trendingTopics = [
+    "traffic on 183A",
+    "new restaurant openings",
+    "school events",
+    "weekend brunch spots",
+    "local business shoutouts",
+    "weather updates",
+    "community events",
+  ];
+
+  const weatherSummaries = [
+    `Averaged ${weather.temperature}°F this week`,
+    `Mostly ${weather.condition} skies`,
+    `${weather.temperature > 80 ? "Hot" : weather.temperature < 60 ? "Cool" : "Perfect"} temps all week`,
+  ];
+
+  const trafficTips = [
+    "183A was clutch during rush hour",
+    "School zones cleared up by 4pm",
+    "Morning commute was smoother than usual",
+    "Ronald Reagan Blvd held up well",
+    "Crystal Falls was the move this week",
+  ];
+
+  const upcomingEventsText = events.length > 0
+    ? events.slice(0, 2).map(e => e.name).join(", ")
+    : "Check the Events tab for what's coming!";
+
+  const template = WEEKLY_ROUNDUP_TEMPLATES[Math.floor(Math.random() * WEEKLY_ROUNDUP_TEMPLATES.length)];
+  const message = template
+    .replace("{city}", city.name)
+    .replace("{trending}", trendingTopics[Math.floor(Math.random() * trendingTopics.length)])
+    .replace("{weatherSummary}", weatherSummaries[Math.floor(Math.random() * weatherSummaries.length)])
+    .replace("{trafficTip}", trafficTips[Math.floor(Math.random() * trafficTips.length)])
+    .replace("{upcomingEvents}", upcomingEventsText);
+
+  return {
+    message,
+    tag: "General",
+    mood: "📊",
+    author: `${city.name} weekly_pulse_bot 📰`,
+    is_bot: true,
+    hidden: false,
+    engagementType: "weekly_roundup",
+  };
+}
+
+// ============================================================================
 // HIGH-LEVEL ENGAGEMENT GENERATOR
 // ============================================================================
 
@@ -355,6 +698,17 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
   const { time, events, weather } = ctx;
   const hour = time.hour;
 
+  // Weekly roundup on weekends (high priority)
+  if ((time.dayOfWeek === 0 || time.dayOfWeek === 6) && hour >= 10 && hour <= 14) {
+    if (Math.random() < 0.4) { // 40% chance on weekend mornings
+      return {
+        shouldPost: true,
+        engagementType: "weekly_roundup",
+        reason: "Weekend - time for weekly roundup",
+      };
+    }
+  }
+
   // School alert takes priority during school dismissal window
   if (time.isWeekday) {
     const dismissalHour = ctx.city.rushHours.schoolDismissal;
@@ -366,6 +720,26 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
         reason: "School dismissal approaching - traffic alert time",
       };
     }
+  }
+
+  // FOMO alerts - time-sensitive opportunities
+  if (time.isWeekday && hour >= 15 && hour <= 18) {
+    if (Math.random() < 0.35) { // 35% chance during happy hour window
+      return {
+        shouldPost: true,
+        engagementType: "fomo_alert",
+        reason: "Happy hour / event window - FOMO time!",
+      };
+    }
+  }
+
+  // This or That - quick engagement polls (high frequency)
+  if (Math.random() < 0.3) { // 30% chance anytime
+    return {
+      shouldPost: true,
+      engagementType: "this_or_that",
+      reason: "Quick engagement - This or That poll",
+    };
   }
 
   // Venue check-in during evening hours or when events happening
@@ -392,7 +766,7 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
 
   // Weekend - higher chance for fun engagement
   if (time.isWeekend && Math.random() < 0.35) {
-    const types: EngagementType[] = ["poll", "local_spotlight", "recommendation"];
+    const types: EngagementType[] = ["poll", "local_spotlight", "recommendation", "this_or_that"];
     return {
       shouldPost: true,
       engagementType: types[Math.floor(Math.random() * types.length)],
@@ -448,6 +822,12 @@ export async function generateEngagementPost(
       return generateSchoolAlertPost(ctx);
     case "local_spotlight":
       return generateLocalSpotlightPost(ctx);
+    case "this_or_that":
+      return generateThisOrThatPost(ctx);
+    case "fomo_alert":
+      return generateFomoAlertPost(ctx);
+    case "weekly_roundup":
+      return generateWeeklyRoundupPost(ctx);
     default:
       return null;
   }
@@ -466,6 +846,11 @@ export async function generateEngagementSeedPosts(
   // Prioritize based on context
   const priorities: EngagementType[] = [];
 
+  // Weekly roundup on weekends
+  if (ctx.time.dayOfWeek === 0 || ctx.time.dayOfWeek === 6) {
+    priorities.push("weekly_roundup");
+  }
+
   // School alert if applicable
   if (ctx.time.isWeekday) {
     const dismissalHour = ctx.city.rushHours.schoolDismissal;
@@ -475,10 +860,18 @@ export async function generateEngagementSeedPosts(
     }
   }
 
+  // FOMO alerts during happy hour window
+  if (ctx.time.isWeekday && ctx.time.hour >= 15 && ctx.time.hour <= 18) {
+    priorities.push("fomo_alert");
+  }
+
   // Evening venue check
   if (ctx.time.hour >= 17 && ctx.time.hour <= 22) {
     priorities.push("venue_checkin");
   }
+
+  // This or That is always good - high engagement, low friction
+  priorities.push("this_or_that");
 
   // Always include poll and spotlight as options
   priorities.push("poll", "local_spotlight", "recommendation");

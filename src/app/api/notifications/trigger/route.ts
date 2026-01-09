@@ -67,10 +67,8 @@ function isAuthorized(req: NextRequest): boolean {
     return true;
   }
 
-  // In development, allow unauthenticated access
-  if (process.env.NODE_ENV === "development") {
-    return true;
-  }
+  // Development bypass removed for security - always require authentication
+  // Use CRON_SECRET or SUPABASE_SERVICE_ROLE_KEY even in development
 
   return false;
 }

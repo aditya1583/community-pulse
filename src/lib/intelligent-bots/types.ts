@@ -132,6 +132,8 @@ export interface GeneratedPost {
   author: string;
   is_bot: true;
   hidden: false;
+  /** Poll options for "This or That" posts (e.g., ["🍖 BBQ", "🍗 Fried Chicken"]) */
+  options?: string[];
 }
 
 export interface CooldownState {

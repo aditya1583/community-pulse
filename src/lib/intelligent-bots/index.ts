@@ -65,7 +65,7 @@ export {
 } from "./template-engine";
 export type { ExtendedPostType } from "./template-engine";
 
-// Engagement Posts - Polls, Recommendations, Venue Check-ins
+// Engagement Posts - Polls, Recommendations, Venue Check-ins, This or That, FOMO, Weekly Roundup
 export {
   generateEngagementPost,
   generateEngagementSeedPosts,
@@ -74,6 +74,9 @@ export {
   generateVenueCheckinPost,
   generateSchoolAlertPost,
   generateLocalSpotlightPost,
+  generateThisOrThatPost,      // NEW: Binary choice polls
+  generateFomoAlertPost,       // NEW: Time-sensitive alerts
+  generateWeeklyRoundupPost,   // NEW: Weekly summary
   analyzeForEngagement,
   type EngagementPost,
   type EngagementType,

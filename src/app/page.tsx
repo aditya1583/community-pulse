@@ -57,6 +57,7 @@ type DBPulse = {
   expires_at?: string | null;
   is_bot?: boolean;
   hidden?: boolean;
+  poll_options?: string[] | null;
 };
 
 // Pagination constants
@@ -75,6 +76,7 @@ function mapDBPulseToPulse(row: DBPulse): Pulse {
     user_id: row.user_id,
     expiresAt: row.expires_at ?? null,
     is_bot: row.is_bot ?? false,
+    poll_options: row.poll_options ?? null,
   };
 }
 
@@ -1123,7 +1125,7 @@ export default function Home() {
       // is_bot is included to identify seeded content
       const { data, error } = await supabase
         .from("pulses")
-        .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot")
+        .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, poll_options")
         .eq("city", city)
         .gte("created_at", start.toISOString())
         .lt("created_at", end.toISOString())

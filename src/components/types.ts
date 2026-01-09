@@ -89,6 +89,8 @@ export type Pulse = {
   expiresAt?: string | null;
   /** True if this pulse was created by a bot (for seeding) */
   is_bot?: boolean;
+  /** Poll options for "This or That" style voting (e.g., ["🤠 Whataburger", "🍔 In-N-Out"]) */
+  poll_options?: string[] | null;
 };
 
 /**
