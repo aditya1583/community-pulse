@@ -47,6 +47,7 @@ import { createClient } from "@supabase/supabase-js";
 import { runModerationPipeline, quickModerateContent } from "@/lib/moderationPipeline";
 import { detectPII, hashContentForLogging, logPIIDetection } from "@/lib/piiDetection";
 import { checkRateLimit, RATE_LIMITS, buildRateLimitHeaders } from "@/lib/rateLimit";
+import { logger } from "@/lib/logger";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -58,10 +59,10 @@ function getServiceRoleClient() {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !serviceRoleKey) {
-    console.error(
-      "[/api/pulses] CRITICAL: SUPABASE_SERVICE_ROLE_KEY is not set. " +
-      "Server cannot write to database. All pulse creation will fail."
-    );
+    logger.error("SUPABASE_SERVICE_ROLE_KEY not set - pulse creation will fail", {
+      service: "supabase",
+      action: "config_check",
+    });
     return null;
   }
   return createClient(supabaseUrl, serviceRoleKey, {
@@ -145,7 +146,7 @@ export async function POST(req: NextRequest) {
     // Get service role client for database writes
     const serviceClient = getServiceRoleClient();
     if (!serviceClient) {
-      console.error("[/api/pulses] Service role client not available");
+      logger.error("Service role client not available", { service: "supabase" });
       return NextResponse.json(
         { error: "Server configuration error. Please try again later." },
         { status: 500 }
@@ -249,9 +250,10 @@ export async function POST(req: NextRequest) {
       if (moderationResult.serviceError) {
         // Service unavailable - return 503 with generic message
         // Do NOT reveal the specific error to prevent information disclosure
-        console.error(
-          "[/api/pulses] Moderation service unavailable - failing closed"
-        );
+        logger.error("Moderation service unavailable - failing closed", {
+          service: "moderation",
+          action: "content_check",
+        });
         return NextResponse.json(
           {
             error: "Posting is temporarily unavailable. Please try again.",
@@ -296,15 +298,6 @@ export async function POST(req: NextRequest) {
     // INSERT PULSE using SERVICE ROLE (bypasses RLS)
     // The user_id is explicitly set from the verified auth context
     // =========================================================================
-      console.error("[/api/pulses] ABOUT TO INSERT", {
-        trimmedMessage,
-        city,
-        mood,
-        tag,
-        author,
-        user_id: user?.id,
-      });
-
     const { data, error: insertError } = await serviceClient
       .from("pulses")
       .insert([
@@ -322,10 +315,12 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (insertError) {
-      console.error(
-        "[/api/pulses] Insert error:",
-        JSON.stringify(insertError, null, 2)
-      );
+      logger.error("Pulse insert failed", {
+        service: "supabase",
+        action: "pulse_insert",
+        error: insertError.message,
+        code: insertError.code,
+      });
       return NextResponse.json(
         { error: insertError.message },
         { status: 500 }
@@ -334,7 +329,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ pulse: data });
   } catch (err) {
-    console.error("[/api/pulses] Unexpected error:", err);
+    logger.error("Unexpected error in pulse creation", {
+      action: "pulse_create",
+      error: err instanceof Error ? err.message : "Unknown error",
+    });
     return NextResponse.json(
       { error: "An unexpected error occurred" },
       { status: 500 }
@@ -377,8 +375,6 @@ export async function DELETE(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
-    console.log("Attempting to delete pulse with ID:", id, "Type:", typeof id);
-
     const numericId = id ? parseInt(id, 10) : NaN;
 
     if (!id) {
@@ -403,10 +399,12 @@ export async function DELETE(req: NextRequest) {
       .single();
 
     if (fetchError) {
-      console.error(
-        "[/api/pulses] Fetch pulse for delete error:",
-        JSON.stringify(fetchError, null, 2)
-      );
+      logger.error("Failed to fetch pulse for deletion", {
+        service: "supabase",
+        action: "pulse_fetch",
+        error: fetchError.message,
+        code: fetchError.code,
+      });
       if (fetchError.code === "PGRST116") {
         return NextResponse.json({ error: "Pulse not found" }, { status: 404 });
       }
@@ -431,10 +429,11 @@ export async function DELETE(req: NextRequest) {
       .eq("id", numericId);
 
     if (deleteError) {
-      console.error(
-        "[/api/pulses] Supabase delete error:",
-        JSON.stringify(deleteError, null, 2)
-      );
+      logger.error("Pulse deletion failed", {
+        service: "supabase",
+        action: "pulse_delete",
+        error: deleteError.message,
+      });
       return NextResponse.json(
         { error: deleteError.message },
         { status: 500 }
@@ -443,7 +442,10 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("[/api/pulses] Unexpected error:", err);
+    logger.error("Unexpected error in pulse deletion", {
+      action: "pulse_delete",
+      error: err instanceof Error ? err.message : "Unknown error",
+    });
     return NextResponse.json(
       { error: "An unexpected error occurred" },
       { status: 500 }
