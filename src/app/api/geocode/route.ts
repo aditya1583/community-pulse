@@ -1,6 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GeocodedCity, mapOpenWeatherResult } from "@/lib/geocoding";
 
+// US state abbreviation to full name mapping
+const US_STATE_ABBREVIATIONS: Record<string, string> = {
+  AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California",
+  CO: "Colorado", CT: "Connecticut", DE: "Delaware", FL: "Florida", GA: "Georgia",
+  HI: "Hawaii", ID: "Idaho", IL: "Illinois", IN: "Indiana", IA: "Iowa",
+  KS: "Kansas", KY: "Kentucky", LA: "Louisiana", ME: "Maine", MD: "Maryland",
+  MA: "Massachusetts", MI: "Michigan", MN: "Minnesota", MS: "Mississippi", MO: "Missouri",
+  MT: "Montana", NE: "Nebraska", NV: "Nevada", NH: "New Hampshire", NJ: "New Jersey",
+  NM: "New Mexico", NY: "New York", NC: "North Carolina", ND: "North Dakota", OH: "Ohio",
+  OK: "Oklahoma", OR: "Oregon", PA: "Pennsylvania", RI: "Rhode Island", SC: "South Carolina",
+  SD: "South Dakota", TN: "Tennessee", TX: "Texas", UT: "Utah", VT: "Vermont",
+  VA: "Virginia", WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming",
+  DC: "District of Columbia",
+};
+
+/**
+ * Expand US state abbreviations in city queries
+ * "Leander, TX" -> "Leander, Texas"
+ * "Austin, tx" -> "Austin, Texas"
+ */
+function expandStateAbbreviation(query: string): string {
+  // Match pattern: "City, XX" where XX is 2 letters
+  const match = query.match(/^(.+),\s*([A-Za-z]{2})$/);
+  if (!match) return query;
+
+  const [, city, stateAbbr] = match;
+  const fullState = US_STATE_ABBREVIATIONS[stateAbbr.toUpperCase()];
+
+  if (fullState) {
+    return `${city}, ${fullState}`;
+  }
+
+  return query;
+}
+
 const GEOCODING_API_KEY =
   process.env.NEXT_PUBLIC_GEOCODING_API_KEY ||
   process.env.OPENWEATHER_API_KEY ||
@@ -32,13 +67,13 @@ function isValidGeoResult(entry: OpenWeatherGeoResultPartial): entry is OpenWeat
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const query = searchParams.get("query")?.trim();
+  const rawQuery = searchParams.get("query")?.trim();
   const limitParam = Number(searchParams.get("limit") || "7");
   const limit = Number.isFinite(limitParam)
     ? Math.max(1, Math.min(limitParam, 10))
     : 7;
 
-  if (!query || query.length < 2) {
+  if (!rawQuery || rawQuery.length < 2) {
     return NextResponse.json({ results: [] });
   }
 
@@ -48,6 +83,9 @@ export async function GET(req: NextRequest) {
       { status: 500 }
     );
   }
+
+  // Expand US state abbreviations: "Leander, TX" -> "Leander, Texas"
+  const query = expandStateAbbreviation(rawQuery);
 
   const url = `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(
     query
