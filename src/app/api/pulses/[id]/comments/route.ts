@@ -13,7 +13,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { quickModerateContent } from "@/lib/moderationPipeline";
+import { runModerationPipeline } from "@/lib/moderationPipeline";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -230,21 +230,21 @@ export async function POST(
       return NextResponse.json({ error: "Cannot comment on expired pulses" }, { status: 410 });
     }
 
-    // Content moderation (quick local check)
-    const moderationResult = quickModerateContent(message);
+    // Content moderation (full pipeline with AI for multilingual support)
+    const moderationResult = await runModerationPipeline(message);
     if (!moderationResult.allowed) {
       return NextResponse.json(
         { error: moderationResult.reason || "Comment violates content guidelines", code: "MODERATION_FAILED" },
-        { status: 400 }
+        { status: moderationResult.serviceError ? 503 : 400 }
       );
     }
 
     // Also moderate the user identifier
-    const authorModeration = quickModerateContent(userIdentifier);
+    const authorModeration = await runModerationPipeline(userIdentifier);
     if (!authorModeration.allowed) {
       return NextResponse.json(
         { error: "Username violates content guidelines", code: "MODERATION_FAILED" },
-        { status: 400 }
+        { status: authorModeration.serviceError ? 503 : 400 }
       );
     }
 
