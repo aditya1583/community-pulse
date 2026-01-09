@@ -210,12 +210,13 @@ export default function Home() {
 
   // Auth form state
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
+  const [authMode, setAuthMode] = useState<"signin" | "signup" | "forgot">("signin");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authPasswordConfirm, setAuthPasswordConfirm] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [authSuccess, setAuthSuccess] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -1803,6 +1804,50 @@ export default function Home() {
     }
   }
 
+  async function handleForgotPassword(e: React.FormEvent) {
+    e.preventDefault();
+
+    const email = authEmail.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!email) {
+      setAuthError("Please enter your email address.");
+      return;
+    }
+
+    if (!emailRegex.test(email)) {
+      setAuthError("Please enter a valid email address.");
+      return;
+    }
+
+    try {
+      setAuthLoading(true);
+      setAuthError(null);
+      setAuthSuccess(null);
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/`,
+      });
+
+      if (error) {
+        setAuthError(error.message || "Could not send reset email. Please try again.");
+        return;
+      }
+
+      setAuthSuccess("Check your email for a password reset link.");
+      setAuthEmail("");
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Something went wrong. Please try again.";
+      console.error("Forgot password error:", err);
+      setAuthError(message);
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
   // ========= AI USERNAME GENERATOR HANDLERS =========
   async function handleGenerateUsername() {
     const prompt = usernamePrompt.trim();
@@ -2252,41 +2297,48 @@ export default function Home() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowAuthModal(false)}>
           <div className="bg-slate-900 border border-slate-700/50 rounded-2xl p-6 max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthMode("signin");
-                    setAuthError(null);
-                    setAuthPasswordConfirm("");
-                  }}
-                  className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
-                    authMode === "signin"
-                      ? "bg-emerald-500 text-slate-950"
-                      : "bg-slate-800/60 text-slate-400 hover:text-white"
-                  }`}
-                >
-                  Sign In
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthMode("signup");
-                    setAuthError(null);
-                  }}
-                  className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
-                    authMode === "signup"
-                      ? "bg-emerald-500 text-slate-950"
-                      : "bg-slate-800/60 text-slate-400 hover:text-white"
-                  }`}
-                >
-                  Create Account
-                </button>
-              </div>
+              {authMode === "forgot" ? (
+                <h2 className="text-lg font-semibold text-white">Reset Password</h2>
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode("signin");
+                      setAuthError(null);
+                      setAuthSuccess(null);
+                      setAuthPasswordConfirm("");
+                    }}
+                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
+                      authMode === "signin"
+                        ? "bg-emerald-500 text-slate-950"
+                        : "bg-slate-800/60 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode("signup");
+                      setAuthError(null);
+                      setAuthSuccess(null);
+                    }}
+                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
+                      authMode === "signup"
+                        ? "bg-emerald-500 text-slate-950"
+                        : "bg-slate-800/60 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Create Account
+                  </button>
+                </div>
+              )}
               <button
                 onClick={() => {
                   setShowAuthModal(false);
                   setAuthError(null);
+                  setAuthSuccess(null);
                   setAuthEmail("");
                   setAuthPassword("");
                   setAuthPasswordConfirm("");
@@ -2300,7 +2352,7 @@ export default function Home() {
               </button>
             </div>
 
-            <form onSubmit={handleAuth} className="flex flex-col gap-4">
+            <form onSubmit={authMode === "forgot" ? handleForgotPassword : handleAuth} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="auth-email" className="text-xs text-slate-400 uppercase tracking-wide">
                   Email
@@ -2320,28 +2372,44 @@ export default function Home() {
                 />
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="auth-password" className="text-xs text-slate-400 uppercase tracking-wide">
-                  Password
-                </label>
-                <input
-                  id="auth-password"
-                  type="password"
-                  value={authPassword}
-                  onChange={(e) => {
-                    setAuthPassword(e.target.value);
-                    setAuthError(null);
-                  }}
-                  placeholder={authMode === "signup" ? "Create a strong password" : "Enter your password"}
-                  className="rounded-lg bg-slate-800/70 border border-slate-700/50 px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:border-transparent"
-                  disabled={authLoading}
-                />
-                {authMode === "signup" && (
-                  <p className="text-[10px] text-slate-500">
-                    Must be 8+ characters with uppercase, lowercase, and number
-                  </p>
-                )}
-              </div>
+              {authMode !== "forgot" && (
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="auth-password" className="text-xs text-slate-400 uppercase tracking-wide">
+                    Password
+                  </label>
+                  <input
+                    id="auth-password"
+                    type="password"
+                    value={authPassword}
+                    onChange={(e) => {
+                      setAuthPassword(e.target.value);
+                      setAuthError(null);
+                    }}
+                    placeholder={authMode === "signup" ? "Create a strong password" : "Enter your password"}
+                    className="rounded-lg bg-slate-800/70 border border-slate-700/50 px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:border-transparent"
+                    disabled={authLoading}
+                  />
+                  {authMode === "signup" && (
+                    <p className="text-[10px] text-slate-500">
+                      Must be 8+ characters with uppercase, lowercase, and number
+                    </p>
+                  )}
+                  {authMode === "signin" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode("forgot");
+                        setAuthError(null);
+                        setAuthSuccess(null);
+                        setAuthPassword("");
+                      }}
+                      className="text-[11px] text-emerald-400 hover:text-emerald-300 text-left mt-1 transition"
+                    >
+                      Forgot password?
+                    </button>
+                  )}
+                </div>
+              )}
 
               {authMode === "signup" && (
                 <div className="flex flex-col gap-1.5">
@@ -2369,17 +2437,45 @@ export default function Home() {
                 </p>
               )}
 
+              {authSuccess && (
+                <p className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/40 rounded-lg px-3 py-2">
+                  {authSuccess}
+                </p>
+              )}
+
               <button
                 type="submit"
                 disabled={authLoading}
                 className="w-full px-4 py-2.5 bg-gradient-to-r from-emerald-400 to-emerald-600 text-slate-950 font-medium text-sm rounded-lg shadow-lg shadow-emerald-500/30 hover:from-emerald-300 hover:to-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
-                {authLoading ? "Please wait..." : authMode === "signup" ? "Create Account" : "Sign In"}
+                {authLoading
+                  ? "Please wait..."
+                  : authMode === "signup"
+                  ? "Create Account"
+                  : authMode === "forgot"
+                  ? "Send Reset Link"
+                  : "Sign In"}
               </button>
+
+              {authMode === "forgot" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode("signin");
+                    setAuthError(null);
+                    setAuthSuccess(null);
+                  }}
+                  className="text-xs text-slate-400 hover:text-white text-center transition"
+                >
+                  Back to Sign In
+                </button>
+              )}
 
               <p className="text-[11px] text-slate-500 text-center">
                 {authMode === "signup"
                   ? "We'll assign you a fun anonymous username after you create your account."
+                  : authMode === "forgot"
+                  ? "Enter the email you used to sign up and we'll send you a reset link."
                   : "Your password is securely encrypted."}
               </p>
             </form>
