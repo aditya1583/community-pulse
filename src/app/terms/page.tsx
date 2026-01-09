@@ -25,7 +25,7 @@ export default function TermsPage() {
                 d="M10 19l-7-7m0 0l7-7m-7 7h18"
               />
             </svg>
-            Back to Community Pulse
+            Back to Voxlo
           </Link>
           <h1 className="text-3xl font-bold text-white">Terms of Service</h1>
           <p className="text-sm text-slate-500 mt-2">
@@ -40,7 +40,7 @@ export default function TermsPage() {
               1. Data Sources Disclosure
             </h2>
             <p className="mb-3">
-              Community Pulse aggregates data from multiple third-party sources:
+              Voxlo aggregates data from multiple third-party sources:
             </p>
             <ul className="list-disc list-inside space-y-1 text-slate-400 ml-4">
               <li>
@@ -236,7 +236,7 @@ export default function TermsPage() {
         {/* Footer */}
         <div className="mt-12 pt-8 border-t border-slate-800">
           <p className="text-xs text-slate-500 text-center">
-            By using Community Pulse, you agree to these Terms of Service.
+            By using Voxlo, you agree to these Terms of Service.
           </p>
         </div>
       </div>

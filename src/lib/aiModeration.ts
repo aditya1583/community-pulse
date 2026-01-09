@@ -140,11 +140,11 @@ function sleep(ms: number): Promise<void> {
 /**
  * Build the system prompt for Haiku moderation
  *
- * This prompt encodes Community Pulse's specific content policies.
+ * This prompt encodes Voxlo's specific content policies.
  * It's designed to catch content that fixed-category APIs miss.
  */
 function buildSystemPrompt(): string {
-  return `You are a content moderator for Community Pulse, a hyper-local social app where users post short messages about what's happening in their city.
+  return `You are a content moderator for Voxlo, a hyper-local social app where users post short messages about what's happening in their city.
 
 Your job is to classify user-submitted content as ALLOW or BLOCK.
 

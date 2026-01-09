@@ -140,6 +140,9 @@ export async function fetchWeatherData(coords: CityCoords): Promise<WeatherData>
 /**
  * Fetch upcoming events from Ticketmaster
  * Searches by lat/lng with 30-mile radius for better coverage in suburbs
+ *
+ * IMPORTANT: Includes sanity checking to filter out nonsensical event-venue pairings
+ * (e.g., "VIP Backstage Experience" at a library is clearly wrong data)
  */
 export async function fetchEventData(
   cityName: string,
@@ -185,7 +188,7 @@ export async function fetchEventData(
     const data = await response.json();
     const events = data._embedded?.events || [];
 
-    return events.map((event: Record<string, unknown>) => {
+    const mappedEvents = events.map((event: Record<string, unknown>) => {
       const venue = (event._embedded as Record<string, unknown[]>)?.venues?.[0] as Record<string, string> | undefined;
       const dates = event.dates as Record<string, Record<string, string>>;
 
@@ -196,10 +199,98 @@ export async function fetchEventData(
         category: ((event.classifications as Record<string, Record<string, string>>[])?.[0]?.segment?.name) || "Event",
       };
     });
+
+    // Filter out nonsensical event-venue pairings
+    return mappedEvents.filter((event: EventData) => isValidEventVenuePairing(event));
   } catch (error) {
     console.error("[IntelligentBots] Failed to fetch events:", error);
     return [];
   }
+}
+
+/**
+ * Sanity check for event-venue pairings
+ *
+ * Filters out obviously wrong combinations like:
+ * - "VIP Backstage Experience" at a library (VIP packages without real venues)
+ * - Entertainment events at civic/government buildings
+ * - Concert packages at non-entertainment venues
+ *
+ * This prevents bot posts from looking nonsensical to users.
+ */
+function isValidEventVenuePairing(event: EventData): boolean {
+  const nameLower = event.name.toLowerCase();
+  const venueLower = event.venue.toLowerCase();
+
+  // Patterns that indicate "add-on" packages (often have wrong/missing venues)
+  const addOnPatterns = [
+    "vip",
+    "backstage",
+    "meet & greet",
+    "meet and greet",
+    "m&g",
+    "upgrade",
+    "premium",
+    "package",
+    "bundle",
+    "experience only",
+    "add-on",
+    "parking pass",
+  ];
+
+  // Venues that should NOT host entertainment events
+  const nonEntertainmentVenues = [
+    "library",
+    "city hall",
+    "municipal",
+    "courthouse",
+    "dmv",
+    "post office",
+    "police station",
+    "fire station",
+    "school",
+    "elementary",
+    "middle school",
+    "high school",
+    "church", // unless explicitly a concert at a church
+    "hospital",
+    "clinic",
+    "bank",
+    "unknown venue",
+  ];
+
+  // Check if this looks like an add-on package
+  const isAddOn = addOnPatterns.some(pattern => nameLower.includes(pattern));
+
+  // Check if venue is non-entertainment
+  const isNonEntertainmentVenue = nonEntertainmentVenues.some(pattern =>
+    venueLower.includes(pattern)
+  );
+
+  // Add-on packages at non-entertainment venues are always suspicious
+  if (isAddOn && isNonEntertainmentVenue) {
+    console.log(`[IntelligentBots] Filtered suspicious event: "${event.name}" at "${event.venue}"`);
+    return false;
+  }
+
+  // Entertainment events at clearly wrong venues
+  const entertainmentCategories = ["music", "concert", "comedy", "sports", "theatre", "festival"];
+  const isEntertainment = entertainmentCategories.some(cat =>
+    event.category.toLowerCase().includes(cat)
+  );
+
+  if (isEntertainment && isNonEntertainmentVenue) {
+    // Exception: Some churches host concerts, community centers host events
+    const exceptions = ["community center", "civic center", "amphitheater", "auditorium"];
+    const hasException = exceptions.some(ex => venueLower.includes(ex));
+
+    if (!hasException) {
+      console.log(`[IntelligentBots] Filtered mismatched event: "${event.name}" at "${event.venue}"`);
+      return false;
+    }
+  }
+
+  return true;
 }
 
 // ============================================================================

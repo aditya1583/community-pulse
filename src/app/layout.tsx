@@ -37,7 +37,7 @@ export default function RootLayout({
           <footer className="border-t border-foreground/10 bg-foreground/5 text-sm text-foreground/70">
             <div className="mx-auto flex max-w-5xl flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-center sm:text-left">
-                Community Pulse · v0.3 · Built for local vibes
+                Voxlo · v0.3 · Built for local vibes
               </span>
 
               <div className="flex justify-center gap-4 text-foreground/60 sm:justify-end">

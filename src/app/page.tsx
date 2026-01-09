@@ -2965,7 +2965,7 @@ export default function Home() {
           <div className="mt-8">
             <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl px-4 py-3 text-center">
               <p className="text-[11px] text-slate-500 leading-relaxed">
-                <strong>Disclaimer:</strong> Community Pulse displays user-submitted
+                <strong>Disclaimer:</strong> Voxlo displays user-submitted
                 content. Posts may be inaccurate, incomplete, or misleading. Do not
                 rely on this information for safety, travel, emergency, or
                 decision-making purposes. All posts reflect the views of individual

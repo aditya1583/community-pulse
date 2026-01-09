@@ -4,7 +4,7 @@ export default function PrivacyPage() {
       <h1 className="text-3xl font-bold mb-4">Privacy Policy</h1>
 
       <p className="mb-4">
-        Community Pulse (“the Service”) values your privacy. This policy explains what information
+        Voxlo ("the Service") values your privacy. This policy explains what information
         we collect and how it is used.
       </p>
 

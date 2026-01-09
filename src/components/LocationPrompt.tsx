@@ -45,7 +45,7 @@ export default function LocationPrompt({
         {/* Main Card */}
         <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6 backdrop-blur-sm">
           <h1 className="text-2xl font-bold text-white text-center mb-2">
-            Community Pulse
+            Voxlo
           </h1>
           <p className="text-slate-400 text-center mb-6">
             Your hyperlocal neighborhood companion

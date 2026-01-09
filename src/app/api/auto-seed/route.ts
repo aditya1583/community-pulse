@@ -361,10 +361,22 @@ export async function POST(req: NextRequest) {
         console.log(`[Auto-Seed] Intelligent bots returned no posts: ${result.reason}`);
         // Fall through to generic system below
       } else {
-        // Insert intelligent bot posts
+        // Insert intelligent bot posts with natural timing variation
+        // Real users don't post at exact intervals - add organic randomness
         const now = Date.now();
+        let cumulativeOffset = 0;
+
         const records = result.posts.map((post, index) => {
-          const createdAt = new Date(now - index * 5 * 60 * 1000).toISOString();
+          // First post is "now", subsequent posts are staggered backwards in time
+          // Each post is 3-7 minutes apart (varies per post) to feel organic
+          if (index > 0) {
+            const minGapMs = 3 * 60 * 1000; // 3 minutes minimum
+            const maxGapMs = 7 * 60 * 1000; // 7 minutes maximum
+            const randomGap = minGapMs + Math.random() * (maxGapMs - minGapMs);
+            cumulativeOffset += randomGap;
+          }
+
+          const createdAt = new Date(now - cumulativeOffset).toISOString();
           const expiresAt = new Date(now + 24 * 60 * 60 * 1000).toISOString();
 
           return {
@@ -448,15 +460,22 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Create posts with recent timestamps
+    // Create posts with natural timing variation
+    // Posts should feel like they were written by different people at different times
     const now = Date.now();
+    let cumulativeOffset = 0;
 
-    const records = posts.map((post) => {
-      // Spread posts over last 1-2 hours to look natural (not all at once)
-      const spreadMs = (1 + Math.random()) * 60 * 60 * 1000; // 1-2 hours
-      const offsetMs = Math.random() * spreadMs;
+    const records = posts.map((post, index) => {
+      // Stagger posts backwards in time with natural variation
+      // Each post is 4-12 minutes apart (wider variance for non-intelligent seeds)
+      if (index > 0) {
+        const minGapMs = 4 * 60 * 1000;  // 4 minutes minimum
+        const maxGapMs = 12 * 60 * 1000; // 12 minutes maximum
+        const randomGap = minGapMs + Math.random() * (maxGapMs - minGapMs);
+        cumulativeOffset += randomGap;
+      }
 
-      const createdAt = new Date(now - offsetMs).toISOString();
+      const createdAt = new Date(now - cumulativeOffset).toISOString();
       const expiresAt = new Date(now + 24 * 60 * 60 * 1000).toISOString(); // 24 hours from now
 
       return {

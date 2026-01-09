@@ -174,14 +174,14 @@ export async function POST(request: NextRequest) {
 </head>
 <body>
   <div class="card">
-    <div class="logo">Community Pulse</div>
+    <div class="logo">Voxlo</div>
     <div class="tagline">${tagline || "How's the vibe today?"}</div>
     <div class="qr-container">
       <img src="${qrUrl}" alt="QR Code" width="200" height="200">
     </div>
     <div class="cta">Scan to check in & share the vibe</div>
     <div class="venue-name">${venue_name}</div>
-    <div class="branding">communitypulse.app</div>
+    <div class="branding">voxlo.app</div>
   </div>
 </body>
 </html>
