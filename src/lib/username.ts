@@ -1,31 +1,146 @@
 /**
  * Username generation utilities for creating unique anonymous usernames
  * B10 FIX: Ensures uniqueness by checking existing profiles
+ *
+ * Features:
+ * - PascalCase format (no spaces or special characters)
+ * - Built-in profanity filter
+ * - Witty, creative word combinations
  */
 
-// Fun word lists for generating usernames
-const MOODS = [
+// Witty adjectives - personality vibes
+const ADJECTIVES = [
+  // Classic vibes
   "Chill", "Spicy", "Sleepy", "Curious", "Salty", "Hyper", "Zen", "Chaotic",
   "Sunny", "Mellow", "Peppy", "Quirky", "Cozy", "Breezy", "Funky", "Jazzy",
   "Snappy", "Zesty", "Dreamy", "Sparkly", "Frosty", "Misty", "Wispy", "Lucky",
+  // Wittier additions
+  "Caffeinated", "Wandering", "Mysterious", "Sneaky", "Cosmic", "Turbo",
+  "Neon", "Pixel", "Fuzzy", "Grumpy", "Jolly", "Sassy", "Witty", "Clever",
+  "Silent", "Loud", "Swift", "Lazy", "Eager", "Bold", "Shy", "Wild",
+  "Urban", "Rustic", "Retro", "Vintage", "Stealth", "Nimble", "Bouncy",
 ];
 
-const ANIMALS = [
+// Fun nouns - creatures and things
+const NOUNS = [
+  // Animals
   "Coyote", "Otter", "Panda", "Falcon", "Capybara", "Llama", "Raccoon", "Fox",
   "Penguin", "Koala", "Dolphin", "Eagle", "Tiger", "Bear", "Wolf", "Owl",
   "Rabbit", "Deer", "Swan", "Crane", "Turtle", "Lynx", "Hawk", "Raven",
+  // Wittier additions
+  "Narwhal", "Platypus", "Axolotl", "Quokka", "Pangolin", "Lemur", "Sloth",
+  "Phoenix", "Dragon", "Unicorn", "Griffin", "Yeti", "Kraken", "Sphinx",
+  // Objects/concepts
+  "Wanderer", "Voyager", "Nomad", "Dreamer", "Thinker", "Seeker", "Drifter",
+  "Ninja", "Wizard", "Pirate", "Knight", "Rebel", "Scout", "Ranger",
+  "Byte", "Pixel", "Glitch", "Echo", "Spark", "Vortex", "Nebula",
+];
+
+// Built-in profanity list for immediate protection
+// This runs before the dynamic blocklist for fail-safe protection
+// Terms are checked with word boundary awareness to avoid false positives
+// (e.g., "sassy" won't match "ass", "class" won't match "ass")
+const PROFANITY_EXACT = [
+  // Short words that need exact matching to avoid false positives
+  "ass", "fag", "fuk", "fck",
+];
+
+const PROFANITY_CONTAINS = [
+  // Longer profanity that can be safely substring-matched
+  "fuck", "fucker", "fucking", "fucked", "fuking", "fack", // fack catches f@ck
+  "shit", "shitting", "shitty", "bullshit", "shiit", "siit", // siit catches $h1t
+  "asshole", "assholes",
+  "bitch", "bitches", "bitchy",
+  "dickhead", "dicks", "dick",
+  "cocks", "cock",
+  "pussy", "pussies",
+  "cunts", "cunt",
+  "bastard", "bastards",
+  "whore", "whores",
+  "slut", "sluts",
+  "nigger", "nigga",
+  "faggot", "fags",
+  "retard", "retarded",
+  "crappy", "crap",
+  "pissed", "piss",
+  "damn", "damned", "dammit",
+  "penis", "vagina", "boobs", "tits", "boob",
+  "porn", "porno",
+  "rapist", "rape",
+  "nazi", "hitler",
 ];
 
 /**
- * Generate a random fun username in format "Mood Animal NN"
+ * Check if text contains profanity (built-in fast check)
+ * Normalizes input and checks against built-in list
+ */
+export function containsProfanity(text: string): boolean {
+  // Normalize: lowercase first
+  let normalized = text.toLowerCase();
+
+  // Apply character substitutions (common leetspeak)
+  normalized = normalized
+    .replace(/0/g, "o")
+    .replace(/1/g, "i")
+    .replace(/!/g, "i")
+    .replace(/\|/g, "i")
+    .replace(/3/g, "e")
+    .replace(/4/g, "a")
+    .replace(/@/g, "a")
+    .replace(/5/g, "s")
+    .replace(/\$/g, "s")
+    .replace(/7/g, "t");
+
+  // Now strip everything except letters and spaces
+  const normalizedForSubstring = normalized.replace(/[^a-z]/g, "");
+
+  // Check substring-safe profanity (longer words)
+  for (const term of PROFANITY_CONTAINS) {
+    if (normalizedForSubstring.includes(term)) {
+      return true;
+    }
+  }
+
+  // For short words, check word boundaries to avoid false positives
+  // Split into words and check each individually
+  const words = normalized.replace(/[^a-z\s]/g, "").split(/\s+/).filter(Boolean);
+  for (const word of words) {
+    if (PROFANITY_EXACT.includes(word)) {
+      return true;
+    }
+  }
+
+  // Also check if the entire normalized string (no spaces) is exactly a short profanity
+  if (PROFANITY_EXACT.includes(normalizedForSubstring)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Sanitize text for use in usernames
+ * Removes profanity and returns cleaned words
+ */
+export function sanitizeForUsername(text: string): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+
+  return words.filter(word => {
+    const clean = word.replace(/[^a-zA-Z0-9]/g, "");
+    return clean.length > 0 && !containsProfanity(clean);
+  });
+}
+
+/**
+ * Generate a random fun username in PascalCase format (e.g., "ChillOtter42")
  * Does NOT guarantee uniqueness - use generateUniqueUsername for that
  */
 export function generateFunUsername(): string {
-  const mood = MOODS[Math.floor(Math.random() * MOODS.length)];
-  const animal = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+  const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
   const num = Math.floor(Math.random() * 90) + 10; // 10-99
 
-  return `${mood} ${animal} ${num}`;
+  return `${adj}${noun}${num}`;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -79,5 +194,5 @@ export async function generateUniqueUsername(
 /**
  * Export word lists for testing purposes
  */
-export const USERNAME_MOODS = MOODS;
-export const USERNAME_ANIMALS = ANIMALS;
+export const USERNAME_ADJECTIVES = ADJECTIVES;
+export const USERNAME_NOUNS = NOUNS;
