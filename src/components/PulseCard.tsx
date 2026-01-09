@@ -5,6 +5,8 @@ import type { Pulse } from "./types";
 import { formatPulseDateTime } from "@/lib/pulses";
 import { useExpiryCountdown } from "@/hooks/useExpiryCountdown";
 import PulseLikeButton from "@/components/PulseLikeButton";
+import PollVoting from "@/components/PollVoting";
+import PulseComments from "@/components/PulseComments";
 import ReportPulseButton from "@/components/ReportPulseButton";
 import StatusRing from "@/components/StatusRing";
 import { StatusIndicator } from "@/components/StatusRing";
@@ -148,7 +150,16 @@ export default function PulseCard({
         <div className="flex-1 min-w-0">
           <p className="text-sm text-white leading-snug mb-3">{pulse.message}</p>
 
-          <div className="flex items-center justify-between text-xs gap-3">
+          {/* Poll voting for This or That posts */}
+          {pulse.poll_options && pulse.poll_options.length >= 2 && (
+            <PollVoting
+              pulseId={pulse.id}
+              options={pulse.poll_options}
+              userIdentifier={userIdentifier}
+            />
+          )}
+
+          <div className="flex items-center justify-between text-xs gap-3 mt-3">
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-cyan-400 font-medium truncate">{pulse.author}</span>
               {pulse.is_bot && (
@@ -253,6 +264,12 @@ export default function PulseCard({
               </span>
             </div>
           </div>
+
+          {/* Comments Section */}
+          <PulseComments
+            pulseId={pulse.id}
+            userIdentifier={userIdentifier}
+          />
         </div>
       </div>
     </article>

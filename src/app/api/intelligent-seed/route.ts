@@ -104,6 +104,7 @@ export async function POST(request: NextRequest) {
           hidden: false,
           created_at: createdAt,
           expires_at: expiresAt,
+          poll_options: post.options || null,
         };
       });
 
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest) {
       const { data, error } = await supabase
         .from("pulses")
         .insert(records)
-        .select("id, message, tag, author");
+        .select("id, message, tag, author, poll_options");
 
       if (error) {
         console.error("[IntelligentSeed] Database error:", error);
@@ -168,8 +169,9 @@ export async function POST(request: NextRequest) {
         hidden: false,
         created_at: now.toISOString(),
         expires_at: expiresAt.toISOString(),
+        poll_options: result.post.options || null,
       })
-      .select("id, message, tag, author")
+      .select("id, message, tag, author, poll_options")
       .single();
 
     if (error) {

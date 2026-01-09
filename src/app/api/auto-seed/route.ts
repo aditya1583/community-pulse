@@ -378,13 +378,14 @@ export async function POST(req: NextRequest) {
             hidden: false,
             created_at: createdAt,
             expires_at: expiresAt,
+            poll_options: post.options || null,
           };
         });
 
         const { data, error } = await supabase
           .from("pulses")
           .insert(records)
-          .select("id, city, message, tag, mood, created_at");
+          .select("id, city, message, tag, mood, created_at, poll_options");
 
         if (error) {
           console.error("[Auto-Seed] Intelligent bot insert error:", error);
