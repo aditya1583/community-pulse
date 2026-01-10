@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { TicketmasterEvent } from "@/app/api/events/ticketmaster/route";
+import { RADIUS_CONFIG } from "@/lib/constants/radius";
 
 // ============================================================================
 // useEvents Hook
@@ -27,7 +28,7 @@ type UseEventsResult = {
 };
 
 type UseEventsOptions = {
-  /** Radius in miles (default: 25) */
+  /** Radius in miles (default: 10 from RADIUS_CONFIG) */
   radius?: number;
   /** City name as fallback when lat/lng unavailable */
   city?: string;
@@ -40,7 +41,7 @@ export function useEvents(
   lng: number | null,
   options: UseEventsOptions = {}
 ): UseEventsResult {
-  const { radius = 25, city, skip = false } = options;
+  const { radius = RADIUS_CONFIG.PRIMARY_RADIUS_MILES, city, skip = false } = options;
 
   const [events, setEvents] = useState<TicketmasterEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);

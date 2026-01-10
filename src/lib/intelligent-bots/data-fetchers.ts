@@ -5,6 +5,8 @@
  */
 
 import type { CityCoords, TrafficData, WeatherData, EventData, TrafficIncident } from "./types";
+import { RADIUS_CONFIG } from "@/lib/constants/radius";
+import { calculateDistanceMiles } from "@/lib/geo/distance";
 
 // Read API keys lazily to support dynamic env loading (e.g., dotenv)
 function getTomTomApiKey(): string | undefined {
@@ -63,8 +65,12 @@ export async function fetchTrafficData(coords: CityCoords): Promise<TrafficData>
 
 /**
  * Fetch traffic incidents from TomTom (separate endpoint)
+ * Uses 10-mile (16km) radius from RADIUS_CONFIG
  */
-export async function fetchTrafficIncidents(coords: CityCoords, radiusKm: number = 10): Promise<TrafficIncident[]> {
+export async function fetchTrafficIncidents(
+  coords: CityCoords,
+  radiusKm: number = RADIUS_CONFIG.PRIMARY_RADIUS_KM
+): Promise<TrafficIncident[]> {
   const TOMTOM_API_KEY = getTomTomApiKey();
   if (!TOMTOM_API_KEY) {
     return [];
@@ -139,7 +145,10 @@ export async function fetchWeatherData(coords: CityCoords): Promise<WeatherData>
 
 /**
  * Fetch upcoming events from Ticketmaster
- * Searches by lat/lng with 30-mile radius for better coverage in suburbs
+ * Searches by lat/lng with extended radius, then calculates distance for each event
+ *
+ * Returns events with distance information so bots can include distance callouts
+ * for out-of-radius events (e.g., "Bruno Mars in Austin, 15mi away")
  *
  * IMPORTANT: Includes sanity checking to filter out nonsensical event-venue pairings
  * (e.g., "VIP Backstage Experience" at a library is clearly wrong data)
@@ -168,10 +177,11 @@ export async function fetchEventData(
       sort: "date,asc",
     });
 
-    // Prefer lat/lng search with radius for suburbs like Leander
+    // Prefer lat/lng search with extended radius for suburbs like Leander
+    // We fetch from extended radius and include distance info for callouts
     if (coords) {
       params.set("latlong", `${coords.lat},${coords.lon}`);
-      params.set("radius", "30"); // 30 mile radius to include nearby events
+      params.set("radius", String(RADIUS_CONFIG.EXTENDED_RADIUS_MILES));
       params.set("unit", "miles");
     } else {
       params.set("city", cityName);
@@ -189,14 +199,35 @@ export async function fetchEventData(
     const events = data._embedded?.events || [];
 
     const mappedEvents = events.map((event: Record<string, unknown>) => {
-      const venue = (event._embedded as Record<string, unknown[]>)?.venues?.[0] as Record<string, string> | undefined;
+      const embedded = event._embedded as Record<string, unknown[]> | undefined;
+      const venue = embedded?.venues?.[0] as Record<string, unknown> | undefined;
+      const venueLocation = venue?.location as Record<string, string> | undefined;
       const dates = event.dates as Record<string, Record<string, string>>;
+
+      // Extract venue coordinates for distance calculation
+      const eventCoords = venueLocation?.latitude && venueLocation?.longitude
+        ? {
+            lat: parseFloat(venueLocation.latitude),
+            lon: parseFloat(venueLocation.longitude),
+          }
+        : undefined;
+
+      // Calculate distance from user's location
+      let distanceMiles: number | undefined;
+      if (coords && eventCoords) {
+        distanceMiles = calculateDistanceMiles(
+          { lat: coords.lat, lon: coords.lon },
+          eventCoords
+        );
+      }
 
       return {
         name: event.name as string,
-        venue: venue?.name || "Unknown venue",
+        venue: (venue?.name as string) || "Unknown venue",
         startTime: new Date(dates?.start?.dateTime || dates?.start?.localDate || ""),
         category: ((event.classifications as Record<string, Record<string, string>>[])?.[0]?.segment?.name) || "Event",
+        coords: eventCoords,
+        distanceMiles,
       };
     });
 

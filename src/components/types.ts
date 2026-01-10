@@ -91,6 +91,12 @@ export type Pulse = {
   is_bot?: boolean;
   /** Poll options for "This or That" style voting (e.g., ["🤠 Whataburger", "🍔 In-N-Out"]) */
   poll_options?: string[] | null;
+  /** Latitude where the pulse was created (for distance filtering) */
+  lat?: number | null;
+  /** Longitude where the pulse was created (for distance filtering) */
+  lon?: number | null;
+  /** Distance from user's location in miles (calculated client-side) */
+  distanceMiles?: number | null;
 };
 
 /**

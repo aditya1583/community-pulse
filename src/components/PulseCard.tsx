@@ -10,6 +10,8 @@ import PulseComments from "@/components/PulseComments";
 import ReportPulseButton from "@/components/ReportPulseButton";
 import StatusRing from "@/components/StatusRing";
 import { StatusIndicator } from "@/components/StatusRing";
+import DistanceBadge from "@/components/DistanceBadge";
+import { RADIUS_CONFIG } from "@/lib/constants/radius";
 
 type PulseCardProps = {
   pulse: Pulse;
@@ -145,6 +147,12 @@ export default function PulseCard({
           <span className="text-[10px] uppercase tracking-wide text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
             {pulse.tag}
           </span>
+          {/* Distance badge for out-of-radius content */}
+          {pulse.distanceMiles !== undefined &&
+            pulse.distanceMiles !== null &&
+            pulse.distanceMiles > RADIUS_CONFIG.PRIMARY_RADIUS_MILES && (
+              <DistanceBadge distanceMiles={pulse.distanceMiles} size="xs" />
+            )}
         </div>
 
         <div className="flex-1 min-w-0">

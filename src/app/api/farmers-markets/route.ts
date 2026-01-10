@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { RADIUS_CONFIG } from "@/lib/constants/radius";
 
 /**
  * Farmers Markets API Route
@@ -88,7 +89,7 @@ async function fetchFromOSM(
 
   try {
     // Query for marketplaces, farm shops, and places with "market" in name
-    const radiusMeters = 25000; // ~15 miles
+    const radiusMeters = RADIUS_CONFIG.PRIMARY_RADIUS_METERS;
     const query = `
       [out:json][timeout:15];
       (
@@ -220,7 +221,7 @@ async function fetchFromFoursquare(
     // Also include: 17070 (Flea Markets), 17068 (Food & Drink Markets)
     const params = new URLSearchParams({
       ll: `${lat},${lon}`,
-      radius: "25000", // ~15 miles in meters (expanded search)
+      radius: String(RADIUS_CONFIG.PRIMARY_RADIUS_METERS),
       categories: "17069,17070,17068", // Farmers Markets, Flea Markets, Food Markets
       limit: "15",
       fields: "fsq_id,name,location,distance,hours,website,tel",

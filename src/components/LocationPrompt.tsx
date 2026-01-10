@@ -55,7 +55,7 @@ export default function LocationPrompt({
           <div className="space-y-3 mb-6">
             <div className="flex items-center gap-3 text-sm">
               <span className="text-emerald-400 text-lg">📍</span>
-              <span className="text-slate-300">5-mile radius of local updates</span>
+              <span className="text-slate-300">10-mile radius of local updates</span>
             </div>
             <div className="flex items-center gap-3 text-sm">
               <span className="text-emerald-400 text-lg">⚡</span>

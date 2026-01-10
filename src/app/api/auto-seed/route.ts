@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { hasIntelligentBotConfig, generateColdStartPosts } from "@/lib/intelligent-bots";
+import { RADIUS_CONFIG } from "@/lib/constants/radius";
+import { formatDistance } from "@/lib/geo/distance";
 
 /**
  * Auto-Seed API - Generates contextual bot posts for empty cities
@@ -63,11 +65,20 @@ function getBotName(tag: string, city: string): string {
 }
 
 // Event-based post templates - THE PROMOTER personality (excited, hype!)
+// In-radius events (within 10 miles)
 const EVENT_TEMPLATES = [
   { mood: "🤩", template: (name: string, venue: string) => `OMG ${name} at ${venue}!! Who else is going?! This is gonna be GOOD 🔥` },
   { mood: "🎉", template: (name: string, venue: string) => `${name} tonight at ${venue}! Finally something fun happening around here! Anyone need a plus one?` },
   { mood: "🤩", template: (name: string, venue: string) => `Just found out about ${name} at ${venue} - why didn't anyone tell me sooner?! Who's in?` },
   { mood: "🎉", template: (name: string, venue: string) => `${name} at ${venue}!! Been waiting for this all week. See y'all there! 🙌` },
+];
+
+// Out-of-radius events (10-50 miles) - include distance callout
+const DISTANT_EVENT_TEMPLATES = [
+  { mood: "🤩", template: (name: string, venue: string, distance: string) => `${name} at ${venue} (${distance} away) - might be worth the drive! Anyone going? 🚗` },
+  { mood: "🎉", template: (name: string, venue: string, distance: string) => `Heads up: ${name} happening at ${venue}, about ${distance} from here. Road trip anyone?` },
+  { mood: "🤩", template: (name: string, venue: string, distance: string) => `${name} at ${venue} is ${distance} away but looks amazing! Who's down to make the trip?` },
+  { mood: "🎉", template: (name: string, venue: string, distance: string) => `If you don't mind the ${distance} drive, ${name} at ${venue} could be worth it! 🎶` },
 ];
 
 // Farmers market templates - ask for recommendations
@@ -161,6 +172,8 @@ type EventData = {
   venue: string;
   date?: string;
   category?: string | null;
+  /** Distance from user's location in miles */
+  distanceMiles?: number;
 };
 
 type MarketData = {
@@ -224,22 +237,50 @@ function generatePosts(data: AutoSeedRequest): Array<{ message: string; mood: st
     });
 
     const event = uniqueEvents[0]; // Pick first/soonest unique event
-    const template = getRandomItem(EVENT_TEMPLATES);
-    posts.push({
-      message: template.template(event.name, event.venue),
-      mood: template.mood,
-      tag: "Events",
-    });
+    const isDistant = event.distanceMiles !== undefined &&
+      event.distanceMiles > RADIUS_CONFIG.PRIMARY_RADIUS_MILES;
+
+    if (isDistant) {
+      // Use distance-aware template for out-of-radius events
+      const template = getRandomItem(DISTANT_EVENT_TEMPLATES);
+      const distanceStr = formatDistance(event.distanceMiles!);
+      posts.push({
+        message: template.template(event.name, event.venue, distanceStr),
+        mood: template.mood,
+        tag: "Events",
+      });
+    } else {
+      // Use regular template for in-radius events
+      const template = getRandomItem(EVENT_TEMPLATES);
+      posts.push({
+        message: template.template(event.name, event.venue),
+        mood: template.mood,
+        tag: "Events",
+      });
+    }
 
     // Add second event if available and different
     if (uniqueEvents.length > 1) {
       const event2 = uniqueEvents[1];
-      const template2 = getRandomItem(EVENT_TEMPLATES.filter(t => t !== template));
-      posts.push({
-        message: template2.template(event2.name, event2.venue),
-        mood: template2.mood,
-        tag: "Events",
-      });
+      const isDistant2 = event2.distanceMiles !== undefined &&
+        event2.distanceMiles > RADIUS_CONFIG.PRIMARY_RADIUS_MILES;
+
+      if (isDistant2) {
+        const template2 = getRandomItem(DISTANT_EVENT_TEMPLATES);
+        const distanceStr2 = formatDistance(event2.distanceMiles!);
+        posts.push({
+          message: template2.template(event2.name, event2.venue, distanceStr2),
+          mood: template2.mood,
+          tag: "Events",
+        });
+      } else {
+        const template2 = getRandomItem(EVENT_TEMPLATES);
+        posts.push({
+          message: template2.template(event2.name, event2.venue),
+          mood: template2.mood,
+          tag: "Events",
+        });
+      }
     }
   }
 
