@@ -13,6 +13,8 @@ import type {
   PostType,
 } from "./types";
 import { getRandomRoad, getRandomLandmark, getRandomSchool, getAltRoute } from "./city-configs";
+import { RADIUS_CONFIG } from "@/lib/constants/radius";
+import { formatDistance } from "@/lib/geo/distance";
 import {
   generateFunFact,
   generateEventFunFact,
@@ -139,56 +141,56 @@ const GENERAL_TEMPLATES = {
 
 const EVENT_TEMPLATES = {
   upcoming: [
-    "🎭 {event} at {venue} starting soon! Traffic near {road} might pick up.",
-    "🎸 Don't forget - {event} tonight at {venue}. Plan your route!",
-    "🎪 Heads up: {event} kicking off at {venue}. Parking's gonna be fun.",
-    "📍 {event} day! {venue} area will be busy. {altRoute} if you're passing through.",
+    "🎭 {event} at {venue} {eventDistanceCallout} starting soon! Traffic near {road} might pick up.",
+    "🎸 Don't forget - {event} tonight at {venue} {eventDistanceCallout}. Plan your route!",
+    "🎪 Heads up: {event} kicking off at {venue} {eventDistanceCallout}. Parking's gonna be fun.",
+    "📍 {event} day! {venue} {eventDistanceCallout} area will be busy. {altRoute} if you're passing through.",
   ],
   concert: [
-    "🎸 {event} tonight at {venue}! Doors open soon - get there early for good spots.",
-    "🎵 Live music alert: {event} at {venue}. {city}'s music scene stays undefeated.",
-    "🎤 {event} hitting the stage at {venue} tonight. Who's going?",
-    "🎶 {venue} is about to be loud! {event} starting soon.",
-    "🎸 Music lovers: {event} at {venue}. Support local live music!",
+    "🎸 {event} tonight at {venue} {eventDistanceCallout}! Doors open soon - get there early for good spots.",
+    "🎵 Live music alert: {event} at {venue} {eventDistanceCallout}. Worth the trip!",
+    "🎤 {event} hitting the stage at {venue} {eventDistanceCallout} tonight. Who's going?",
+    "🎶 {venue} {eventDistanceCallout} is about to be loud! {event} starting soon.",
+    "🎸 Music lovers: {event} at {venue} {eventDistanceCallout}. Support live music!",
   ],
   sports: [
-    "🏈 Game day! {event} at {venue}. Expect traffic on {road}.",
-    "⚽ {event} kicking off at {venue}! Let's go!",
-    "🏀 Hoops tonight - {event} at {venue}. Who's courtside?",
-    "🏒 Puck drops soon! {event} at {venue}. Let's get loud!",
-    "⚾ {event} at {venue} - perfect weather for a game!",
+    "🏈 Game day! {event} at {venue} {eventDistanceCallout}. Expect traffic on {road}.",
+    "⚽ {event} kicking off at {venue} {eventDistanceCallout}! Let's go!",
+    "🏀 Hoops tonight - {event} at {venue} {eventDistanceCallout}. Who's courtside?",
+    "🏒 Puck drops soon! {event} at {venue} {eventDistanceCallout}. Let's get loud!",
+    "⚾ {event} at {venue} {eventDistanceCallout} - perfect weather for a game!",
   ],
   festival: [
-    "🎪 {event} is happening at {venue}! Expect crowds all day.",
-    "🎉 Festival vibes: {event} at {venue}. Bring sunscreen and good energy!",
-    "🌟 {event} at {venue} - one of the best events of the year!",
-    "🎠 {event} in full swing at {venue}. Perfect day for it!",
+    "🎪 {event} is happening at {venue} {eventDistanceCallout}! Expect crowds all day.",
+    "🎉 Festival vibes: {event} at {venue} {eventDistanceCallout}. Bring sunscreen and good energy!",
+    "🌟 {event} at {venue} {eventDistanceCallout} - one of the best events of the year!",
+    "🎠 {event} in full swing at {venue} {eventDistanceCallout}. Perfect day for it!",
   ],
   community: [
-    "🏘️ Community event: {event} at {venue}. Great way to meet neighbors!",
-    "👥 {event} happening at {venue}. Love seeing the community come together.",
-    "🎈 Family-friendly: {event} at {venue}. Bring the kids!",
-    "🌳 {event} at {venue} - support local!",
+    "🏘️ Community event: {event} at {venue} {eventDistanceCallout}. Great way to meet neighbors!",
+    "👥 {event} happening at {venue} {eventDistanceCallout}. Love seeing the community come together.",
+    "🎈 Family-friendly: {event} at {venue} {eventDistanceCallout}. Bring the kids!",
+    "🌳 {event} at {venue} {eventDistanceCallout} - support local!",
   ],
   comedy: [
-    "😂 Laugh time: {event} at {venue} tonight. Get ready to LOL.",
-    "🎤 Comedy night! {event} at {venue}. Bring your sense of humor.",
-    "😆 {event} at {venue} - perfect way to end the week!",
+    "😂 Laugh time: {event} at {venue} {eventDistanceCallout} tonight. Get ready to LOL.",
+    "🎤 Comedy night! {event} at {venue} {eventDistanceCallout}. Bring your sense of humor.",
+    "😆 {event} at {venue} {eventDistanceCallout} - perfect way to end the week!",
   ],
   arts: [
-    "🎨 Art lovers: {event} at {venue}. Culture night in {city}!",
-    "🖼️ {event} at {venue} - expand your horizons tonight.",
-    "🎭 Theater alert: {event} at {venue}. Support local arts!",
+    "🎨 Art lovers: {event} at {venue} {eventDistanceCallout}. Culture night in {city}!",
+    "🖼️ {event} at {venue} {eventDistanceCallout} - expand your horizons tonight.",
+    "🎭 Theater alert: {event} at {venue} {eventDistanceCallout}. Support local arts!",
   ],
   food: [
-    "🍔 Foodies unite: {event} at {venue}. Bring your appetite!",
-    "🍕 {event} at {venue} - come hungry, leave happy.",
-    "🌮 Food event alert: {event} at {venue}. Diet starts Monday!",
+    "🍔 Foodies unite: {event} at {venue} {eventDistanceCallout}. Bring your appetite!",
+    "🍕 {event} at {venue} {eventDistanceCallout} - come hungry, leave happy.",
+    "🌮 Food event alert: {event} at {venue} {eventDistanceCallout}. Diet starts Monday!",
   ],
   general: [
-    "📅 Happening today: {event} at {venue}.",
-    "📍 {event} at {venue} - check it out if you're nearby!",
-    "🎟️ {event} at {venue}. Something for everyone!",
+    "📅 Happening today: {event} at {venue} {eventDistanceCallout}.",
+    "📍 {event} at {venue} {eventDistanceCallout} - check it out if you're nearby!",
+    "🎟️ {event} at {venue} {eventDistanceCallout}. Something for everyone!",
   ],
 };
 
@@ -463,6 +465,8 @@ interface TemplateVariables {
   traffic: string;
   event: string;
   description: string;
+  eventDistance: string;
+  eventDistanceCallout: string;
 }
 
 function buildVariables(ctx: SituationContext): TemplateVariables {
@@ -480,6 +484,15 @@ function buildVariables(ctx: SituationContext): TemplateVariables {
   const congestionPct = Math.round(traffic.congestionLevel * 100);
   const trafficDesc = congestionPct > 30 ? "heavy traffic" : congestionPct > 15 ? "moderate traffic" : "light traffic";
 
+  // Get actual event venue if available, otherwise fallback to random landmark
+  const eventVenue = events[0]?.venue || getRandomLandmark(city, "venues");
+
+  // Calculate event distance info for out-of-radius callouts
+  const eventDistance = events[0]?.distanceMiles;
+  const isOutOfRadius = eventDistance && eventDistance > RADIUS_CONFIG.PRIMARY_RADIUS_MILES;
+  const distanceStr = eventDistance ? formatDistance(eventDistance) : "";
+  const distanceCallout = isOutOfRadius ? `(${distanceStr} away)` : "";
+
   return {
     city: city.name,
     road: primaryRoad,
@@ -488,7 +501,7 @@ function buildVariables(ctx: SituationContext): TemplateVariables {
     landmark: getRandomLandmark(city, "shopping"),
     school: getRandomSchool(city, "high"),
     park: getRandomLandmark(city, "venues"),
-    venue: getRandomLandmark(city, "venues"),
+    venue: eventVenue,
     restaurant: getRandomLandmark(city, "restaurants"),
     bridge: `${primaryRoad} overpass`, // Generic bridge reference
     congestion: String(congestionPct),
@@ -501,6 +514,8 @@ function buildVariables(ctx: SituationContext): TemplateVariables {
     traffic: trafficDesc,
     event: events[0]?.name || "the event",
     description: traffic.incidents[0]?.description || "Delay reported",
+    eventDistance: distanceStr,
+    eventDistanceCallout: distanceCallout,
   };
 }
 
