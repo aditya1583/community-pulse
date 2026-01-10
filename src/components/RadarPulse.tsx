@@ -21,7 +21,7 @@ type RadarPulseProps = {
  * - Pure CSS animations for performance
  */
 export default function RadarPulse({
-  radiusMiles = 5,
+  radiusMiles = 10,
   isScanning = true,
   size = "sm",
 }: RadarPulseProps) {

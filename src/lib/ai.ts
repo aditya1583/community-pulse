@@ -51,7 +51,7 @@ export async function generateNewsSummary(
     )
     .join("\n\n");
 
-  const prompt = `You are summarizing local news for a city-focused community app called "Community Pulse".
+  const prompt = `You are summarizing local news for a city-focused community app called "Voxlo".
 
 City: ${city}
 

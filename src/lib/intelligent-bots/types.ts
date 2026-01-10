@@ -92,6 +92,10 @@ export interface EventData {
   endTime?: Date;
   category: string;
   expectedAttendance?: number;
+  /** Event venue coordinates for distance calculation */
+  coords?: { lat: number; lon: number };
+  /** Distance from user's location in miles */
+  distanceMiles?: number;
 }
 
 export interface TimeContext {

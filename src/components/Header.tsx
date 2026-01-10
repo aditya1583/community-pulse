@@ -18,7 +18,7 @@ type HeaderProps = {
  * The radar animation replaces the static "5-MILE RADIUS ACTIVE" text,
  * providing visual proof that the app is actively monitoring the area.
  */
-export default function Header({ cityName, isLive = true, radiusMiles = 5 }: HeaderProps) {
+export default function Header({ cityName, isLive = true, radiusMiles = 10 }: HeaderProps) {
   // Show full "City, ST" format to avoid Springfield trap
   // Only strip country if it's included (e.g., "Austin, TX, US" → "Austin, TX")
   const parts = cityName.split(",").map(p => p.trim());

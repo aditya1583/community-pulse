@@ -100,36 +100,250 @@ const RECOMMENDATION_TEMPLATES = [
 ];
 
 // ============================================================================
-// THIS OR THAT - Binary choice polls (one-tap engagement)
+// THIS OR THAT - Dynamic Context-Aware Polls
 // ============================================================================
 
-const THIS_OR_THAT_CHOICES = [
-  // Food battles
+type PollChoice = {
+  a: string;
+  b: string;
+  category: string;
+  // Optional context filters
+  seasons?: ("spring" | "summer" | "fall" | "winter")[];
+  weather?: ("hot" | "cold" | "rain" | "nice")[];
+  timeOfDay?: ("morning" | "afternoon" | "evening" | "night")[];
+  dayType?: ("weekday" | "weekend")[];
+};
+
+// Base static choices (always available)
+const BASE_CHOICES: PollChoice[] = [
+  // Food battles - always relevant
   { a: "🌮 Tacos", b: "🌯 Burritos", category: "food" },
   { a: "🍔 Burgers", b: "🌭 Hot Dogs", category: "food" },
   { a: "🍕 Pizza", b: "🍝 Pasta", category: "food" },
   { a: "☕ Coffee", b: "🍵 Tea", category: "food" },
   { a: "🍖 BBQ", b: "🍗 Fried Chicken", category: "food" },
-  { a: "🥞 Pancakes", b: "🧇 Waffles", category: "food" },
+  { a: "🥞 Pancakes", b: "🧇 Waffles", category: "food", timeOfDay: ["morning"] },
   { a: "🍦 Ice Cream", b: "🧁 Cupcakes", category: "food" },
   { a: "🥑 Guac", b: "🫘 Queso", category: "food" },
   { a: "🍟 Fries", b: "🧅 Onion Rings", category: "food" },
   { a: "🌶️ Spicy", b: "🧂 Mild", category: "food" },
-  // Local preferences
-  { a: "🏠 Cook at home", b: "🍽️ Eat out", category: "lifestyle" },
-  { a: "☀️ Morning person", b: "🌙 Night owl", category: "lifestyle" },
-  { a: "🏃 Gym", b: "🌳 Outdoor workout", category: "lifestyle" },
-  { a: "📚 Book", b: "📺 Netflix", category: "lifestyle" },
-  { a: "🎸 Live music", b: "🎬 Movies", category: "lifestyle" },
-  { a: "🐕 Dogs", b: "🐈 Cats", category: "lifestyle" },
-  { a: "🏖️ Beach trip", b: "⛰️ Mountain trip", category: "lifestyle" },
   // Texas-specific
   { a: "🤠 Whataburger", b: "🍔 In-N-Out", category: "texas" },
   { a: "🧊 Blue Bell", b: "🍨 Amy's Ice Cream", category: "texas" },
-  { a: "🌅 Sunrise hike", b: "🌇 Sunset patio", category: "texas" },
-  { a: "💨 AC blast", b: "🪟 Windows down", category: "texas" },
   { a: "🚗 Toll road", b: "🛣️ Frontage road", category: "texas" },
 ];
+
+// Seasonal choices
+const SEASONAL_CHOICES: PollChoice[] = [
+  // Summer (hot weather)
+  { a: "🏊 Pool day", b: "🎬 Movie theater AC", category: "summer", seasons: ["summer"], weather: ["hot"] },
+  { a: "💨 AC on blast", b: "🪟 Windows down", category: "summer", seasons: ["summer"], weather: ["hot"] },
+  { a: "🧊 Iced coffee", b: "☕ Hot coffee anyway", category: "summer", seasons: ["summer"], weather: ["hot"] },
+  { a: "🌅 Early morning workout", b: "🌙 Night owl gym", category: "summer", seasons: ["summer"], weather: ["hot"] },
+  { a: "🏖️ Lake day", b: "🛒 Mall walking", category: "summer", seasons: ["summer"], weather: ["hot"] },
+  { a: "🍹 Frozen marg", b: "🍺 Cold beer", category: "summer", seasons: ["summer"], weather: ["hot"] },
+
+  // Fall
+  { a: "🎃 Pumpkin spice everything", b: "🍎 Apple cider vibes", category: "fall", seasons: ["fall"] },
+  { a: "🏈 Watch the game", b: "🍂 Fall festival", category: "fall", seasons: ["fall"] },
+  { a: "🌾 Corn maze", b: "🎃 Pumpkin patch", category: "fall", seasons: ["fall"], dayType: ["weekend"] },
+  { a: "🧥 Hoodie weather", b: "👕 Still shorts season", category: "fall", seasons: ["fall"] },
+
+  // Winter
+  { a: "☕ Hot cocoa", b: "🍵 Hot cider", category: "winter", seasons: ["winter"], weather: ["cold"] },
+  { a: "🔥 Firepit hangout", b: "🛋️ Cozy couch", category: "winter", seasons: ["winter"], weather: ["cold"] },
+  { a: "🎄 Lights display", b: "🎬 Holiday movie marathon", category: "winter", seasons: ["winter"] },
+  { a: "🧣 Bundle up outside", b: "🏠 Hibernate inside", category: "winter", seasons: ["winter"], weather: ["cold"] },
+
+  // Spring
+  { a: "🌸 Bluebonnet photos", b: "🌷 Garden visit", category: "spring", seasons: ["spring"] },
+  { a: "🚴 Bike the trails", b: "🚶 Walk the park", category: "spring", seasons: ["spring"], weather: ["nice"] },
+  { a: "🧹 Spring cleaning", b: "🌳 Yard work", category: "spring", seasons: ["spring"], dayType: ["weekend"] },
+];
+
+// Weather-reactive choices
+const WEATHER_CHOICES: PollChoice[] = [
+  // Rainy day
+  { a: "☔ Cozy inside", b: "🌧️ Rain walk anyway", category: "rainy", weather: ["rain"] },
+  { a: "📚 Reading day", b: "🎮 Gaming session", category: "rainy", weather: ["rain"] },
+  { a: "🍲 Soup weather", b: "🧀 Grilled cheese vibes", category: "rainy", weather: ["rain"] },
+  { a: "😴 Nap time", b: "☕ Coffee and chill", category: "rainy", weather: ["rain"] },
+
+  // Perfect weather
+  { a: "🌳 Hike it out", b: "☕ Patio brunch", category: "nice_weather", weather: ["nice"] },
+  { a: "🚴 Bike ride", b: "🏃 Trail run", category: "nice_weather", weather: ["nice"] },
+  { a: "🧺 Picnic", b: "🍽️ Outdoor dining", category: "nice_weather", weather: ["nice"] },
+  { a: "🌅 Sunrise hike", b: "🌇 Sunset patio", category: "nice_weather", weather: ["nice"] },
+];
+
+// Time-of-day choices
+const TIME_CHOICES: PollChoice[] = [
+  // Morning
+  { a: "🥱 Snooze button", b: "🏃 Early bird workout", category: "morning", timeOfDay: ["morning"] },
+  { a: "🍳 Big breakfast", b: "☕ Just coffee", category: "morning", timeOfDay: ["morning"] },
+
+  // Evening/Night
+  { a: "🍷 Wine down", b: "🍺 Beer o'clock", category: "evening", timeOfDay: ["evening"] },
+  { a: "🎸 Live music night", b: "🎬 Movie night", category: "evening", timeOfDay: ["evening", "night"] },
+  { a: "🍽️ Dinner out", b: "🏠 Cook at home", category: "evening", timeOfDay: ["evening"] },
+
+  // Weekend specific
+  { a: "😴 Sleep in", b: "🌅 Early start", category: "weekend", dayType: ["weekend"] },
+  { a: "🥂 Brunch crew", b: "🏋️ Gym first", category: "weekend", dayType: ["weekend"], timeOfDay: ["morning"] },
+  { a: "📺 Binge watch", b: "🎯 Productive day", category: "weekend", dayType: ["weekend"] },
+  { a: "🚗 Day trip", b: "🏡 Staycation", category: "weekend", dayType: ["weekend"] },
+
+  // Friday specific
+  { a: "🍻 Happy hour", b: "🏠 Straight home", category: "friday", dayType: ["weekday"], timeOfDay: ["afternoon", "evening"] },
+];
+
+// Lifestyle choices (always available)
+const LIFESTYLE_CHOICES: PollChoice[] = [
+  { a: "🏠 Homebody", b: "🎉 Social butterfly", category: "lifestyle" },
+  { a: "☀️ Morning person", b: "🌙 Night owl", category: "lifestyle" },
+  { a: "🏃 Gym rat", b: "🌳 Outdoor workout", category: "lifestyle" },
+  { a: "📚 Book", b: "📺 Netflix", category: "lifestyle" },
+  { a: "🎸 Live music", b: "🎬 Movies", category: "lifestyle" },
+  { a: "🐕 Dog person", b: "🐈 Cat person", category: "lifestyle" },
+  { a: "🏖️ Beach trip", b: "⛰️ Mountain trip", category: "lifestyle" },
+  { a: "📱 Android", b: "🍎 iPhone", category: "lifestyle" },
+  { a: "🎧 Podcasts", b: "🎵 Music only", category: "lifestyle" },
+];
+
+// Event-driven choices (when events are happening nearby)
+type EventPollChoice = PollChoice & {
+  eventCategories?: string[]; // Matches EventData.category
+};
+
+const EVENT_CHOICES: EventPollChoice[] = [
+  // Concert/Music events
+  { a: "🎤 Front row", b: "🍺 Back with drinks", category: "concert", eventCategories: ["music", "concert", "concerts"] },
+  { a: "🎸 Opening act", b: "⭐ Headliner only", category: "concert", eventCategories: ["music", "concert", "concerts"] },
+  { a: "🎵 Standing", b: "💺 Seated", category: "concert", eventCategories: ["music", "concert", "concerts"] },
+  { a: "👕 Merch booth", b: "💰 Save the cash", category: "concert", eventCategories: ["music", "concert", "concerts"] },
+
+  // Sports events
+  { a: "🏟️ Live at the stadium", b: "📺 Watch at home", category: "sports", eventCategories: ["sports", "football", "basketball", "baseball", "soccer", "hockey"] },
+  { a: "🌭 Stadium food", b: "🍽️ Eat before", category: "sports", eventCategories: ["sports", "football", "basketball", "baseball", "soccer", "hockey"] },
+  { a: "🎉 Tailgate", b: "🏃 Straight to seats", category: "sports", eventCategories: ["sports", "football"] },
+  { a: "🧢 Jersey on", b: "👔 Casual fit", category: "sports", eventCategories: ["sports", "football", "basketball", "baseball", "soccer", "hockey"] },
+
+  // Festival/Fair events
+  { a: "🎡 Rides first", b: "🍗 Food first", category: "festival", eventCategories: ["festival", "fair", "carnival"] },
+  { a: "🌅 Day vibes", b: "🌙 Night scene", category: "festival", eventCategories: ["festival", "fair", "carnival", "music"] },
+  { a: "🎨 Art exhibits", b: "🎭 Live performances", category: "festival", eventCategories: ["festival", "arts", "cultural"] },
+
+  // Comedy/Theater
+  { a: "😂 Stand-up comedy", b: "🎭 Theater show", category: "entertainment", eventCategories: ["comedy", "theatre", "theater", "performing arts"] },
+  { a: "🍿 Snacks during", b: "🍽️ Dinner after", category: "entertainment", eventCategories: ["comedy", "theatre", "theater", "performing arts", "film"] },
+
+  // General event vibes
+  { a: "📅 Plan every detail", b: "🎲 Go with the flow", category: "event_general" },
+  { a: "📸 Pics or it didn't happen", b: "📵 In the moment", category: "event_general" },
+  { a: "🚗 Drive there", b: "🚕 Rideshare back", category: "event_general" },
+];
+
+/**
+ * Get current season based on month
+ */
+function getCurrentSeason(): "spring" | "summer" | "fall" | "winter" {
+  const month = new Date().getMonth();
+  if (month >= 2 && month <= 4) return "spring";
+  if (month >= 5 && month <= 7) return "summer";
+  if (month >= 8 && month <= 10) return "fall";
+  return "winter";
+}
+
+/**
+ * Get weather category from temperature and conditions
+ */
+function getWeatherCategory(temp: number, condition: string): "hot" | "cold" | "rain" | "nice" {
+  if (condition === "rain" || condition === "storm") return "rain";
+  if (temp > 85) return "hot";
+  if (temp < 50) return "cold";
+  return "nice";
+}
+
+/**
+ * Get time of day category
+ */
+function getTimeOfDay(hour: number): "morning" | "afternoon" | "evening" | "night" {
+  if (hour >= 5 && hour < 12) return "morning";
+  if (hour >= 12 && hour < 17) return "afternoon";
+  if (hour >= 17 && hour < 21) return "evening";
+  return "night";
+}
+
+/**
+ * Build contextual poll choices based on current conditions
+ */
+function getContextualChoices(ctx: SituationContext): PollChoice[] {
+  const { weather, time, events } = ctx;
+  const season = getCurrentSeason();
+  const weatherCat = getWeatherCategory(weather.temperature, weather.condition);
+  const timeOfDay = getTimeOfDay(time.hour);
+  const dayType = time.isWeekend ? "weekend" : "weekday";
+
+  // Start with base choices
+  let choices: PollChoice[] = [...BASE_CHOICES, ...LIFESTYLE_CHOICES];
+
+  // Add seasonal choices that match current season
+  const seasonalMatches = SEASONAL_CHOICES.filter(c =>
+    !c.seasons || c.seasons.includes(season)
+  ).filter(c =>
+    !c.weather || c.weather.includes(weatherCat)
+  ).filter(c =>
+    !c.dayType || c.dayType.includes(dayType)
+  );
+  choices = [...choices, ...seasonalMatches];
+
+  // Add weather-specific choices
+  const weatherMatches = WEATHER_CHOICES.filter(c =>
+    !c.weather || c.weather.includes(weatherCat)
+  );
+  choices = [...choices, ...weatherMatches];
+
+  // Add time-appropriate choices
+  const timeMatches = TIME_CHOICES.filter(c =>
+    !c.timeOfDay || c.timeOfDay.includes(timeOfDay)
+  ).filter(c =>
+    !c.dayType || c.dayType.includes(dayType)
+  );
+  choices = [...choices, ...timeMatches];
+
+  // Add event-driven choices if events are happening
+  if (events && events.length > 0) {
+    // Get all unique event categories (normalized to lowercase)
+    const eventCategories = new Set(
+      events.map(e => e.category?.toLowerCase()).filter(Boolean)
+    );
+
+    // Find event choices that match any of the current event categories
+    const eventMatches = EVENT_CHOICES.filter(c => {
+      // Always include general event choices
+      if (c.category === "event_general") return true;
+      // Include if any event category matches
+      if (c.eventCategories) {
+        return c.eventCategories.some(cat =>
+          eventCategories.has(cat.toLowerCase())
+        );
+      }
+      return false;
+    });
+
+    // Boost event choices by adding them to the pool (higher chance of selection)
+    choices = [...choices, ...eventMatches, ...eventMatches]; // Double weight
+  }
+
+  // Dedupe by creating unique key
+  const seen = new Set<string>();
+  return choices.filter(c => {
+    const key = `${c.a}|${c.b}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 const THIS_OR_THAT_TEMPLATES = [
   "⚔️ {a} vs {b} — Choose your fighter!",
@@ -465,31 +679,36 @@ export async function generateLocalSpotlightPost(
 /**
  * Generate a "This or That" binary choice poll
  * Super easy one-tap engagement - no typing required!
+ * Now uses context-aware choices based on season, weather, time, and day type.
  */
 export async function generateThisOrThatPost(
   ctx: SituationContext
 ): Promise<EngagementPost | null> {
-  const { city, time, weather } = ctx;
+  const { city } = ctx;
 
-  // Filter choices based on context
-  let choices = THIS_OR_THAT_CHOICES;
+  // Get contextually-appropriate choices based on current conditions
+  const choices = getContextualChoices(ctx);
 
-  // Food choices during meal times
-  if ((time.hour >= 7 && time.hour <= 10) || (time.hour >= 11 && time.hour <= 14) || (time.hour >= 17 && time.hour <= 21)) {
-    choices = choices.filter(c => c.category === "food" || c.category === "texas");
-  }
+  if (choices.length === 0) {
+    // Fallback to base choices if filtering removed everything
+    const fallback = [...BASE_CHOICES, ...LIFESTYLE_CHOICES];
+    const choice = fallback[Math.floor(Math.random() * fallback.length)];
+    const template = THIS_OR_THAT_TEMPLATES[Math.floor(Math.random() * THIS_OR_THAT_TEMPLATES.length)];
+    const message = template
+      .replace("{a}", choice.a)
+      .replace("{b}", choice.b)
+      .replace("{city}", city.name);
 
-  // Weekend - more lifestyle choices
-  if (time.isWeekend) {
-    choices = THIS_OR_THAT_CHOICES; // All choices available
-  }
-
-  // Hot weather - specific Texas choices
-  if (weather.temperature > 85) {
-    const texasChoices = choices.filter(c => c.category === "texas");
-    if (texasChoices.length > 0 && Math.random() < 0.5) {
-      choices = texasChoices;
-    }
+    return {
+      message,
+      tag: "General",
+      mood: "⚔️",
+      author: `${city.name} poll_master_bot 📊`,
+      is_bot: true,
+      hidden: false,
+      engagementType: "this_or_that",
+      options: [choice.a, choice.b],
+    };
   }
 
   const choice = choices[Math.floor(Math.random() * choices.length)];

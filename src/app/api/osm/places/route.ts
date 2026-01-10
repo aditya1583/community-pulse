@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { RADIUS_CONFIG } from "@/lib/constants/radius";
 
 /**
  * OpenStreetMap Overpass API Route
@@ -86,7 +87,7 @@ export async function GET(req: NextRequest) {
   const lat = searchParams.get("lat");
   const lon = searchParams.get("lon");
   const category = searchParams.get("category") || "all";
-  const radiusMeters = parseInt(searchParams.get("radius") || "3000"); // Default 3km
+  const radiusMeters = parseInt(searchParams.get("radius") || String(RADIUS_CONFIG.PRIMARY_RADIUS_METERS));
   const limit = parseInt(searchParams.get("limit") || "15");
 
   if (!lat || !lon) {

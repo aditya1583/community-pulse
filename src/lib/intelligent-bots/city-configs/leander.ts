@@ -64,8 +64,9 @@ export const LEANDER_CONFIG: CityConfig = {
       "Chick-fil-A",
       "Whataburger",
       "In-N-Out",
-      "Rudy's BBQ",
+      "Dahlia Cafe",      // Local Leander spot (replaced Rudy's BBQ - 11mi away)
       "Black Walnut Cafe",
+      "Pluckers Wing Bar",
     ],
   },
 

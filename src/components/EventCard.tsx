@@ -25,7 +25,7 @@ function generateICS(event: TicketmasterEvent): string {
 
   return `BEGIN:VCALENDAR
 VERSION:2.0
-PRODID:-//Community Pulse//Events//EN
+PRODID:-//Voxlo//Events//EN
 BEGIN:VEVENT
 UID:${event.id}@communitypulse
 DTSTART:${formatDate(eventDate)}

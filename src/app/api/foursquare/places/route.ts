@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { RADIUS_CONFIG } from "@/lib/constants/radius";
 
 /**
  * Foursquare Places API Route
@@ -73,7 +74,7 @@ export async function GET(req: NextRequest) {
   const lon = searchParams.get("lon");
   const query = searchParams.get("query") || "";
   const category = searchParams.get("category") || "";
-  const radius = searchParams.get("radius") || "5000"; // meters, default 5km
+  const radius = searchParams.get("radius") || String(RADIUS_CONFIG.PRIMARY_RADIUS_METERS);
   const limit = searchParams.get("limit") || "15";
 
   if (!lat || !lon) {

@@ -45,7 +45,7 @@ export default function LocationPrompt({
         {/* Main Card */}
         <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6 backdrop-blur-sm">
           <h1 className="text-2xl font-bold text-white text-center mb-2">
-            Community Pulse
+            Voxlo
           </h1>
           <p className="text-slate-400 text-center mb-6">
             Your hyperlocal neighborhood companion
@@ -55,7 +55,7 @@ export default function LocationPrompt({
           <div className="space-y-3 mb-6">
             <div className="flex items-center gap-3 text-sm">
               <span className="text-emerald-400 text-lg">📍</span>
-              <span className="text-slate-300">5-mile radius of local updates</span>
+              <span className="text-slate-300">10-mile radius of local updates</span>
             </div>
             <div className="flex items-center gap-3 text-sm">
               <span className="text-emerald-400 text-lg">⚡</span>

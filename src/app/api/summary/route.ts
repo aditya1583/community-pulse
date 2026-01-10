@@ -166,7 +166,7 @@ Return ONLY the summary text, nothing else.
         .join("\n");
 
       prompt = `
-You are summarizing short, real-time status updates for a city board called "Community Pulse".
+You are summarizing short, real-time status updates for a city board called "Voxlo".
 
 City: ${city}
 

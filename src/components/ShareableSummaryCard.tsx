@@ -119,11 +119,11 @@ export default function ShareableSummaryCard({
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Community Pulse logo/branding at top
+    // Voxlo logo/branding at top
     ctx.fillStyle = "#10b981"; // emerald-500
     ctx.font = "bold 24px system-ui, -apple-system, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("COMMUNITY PULSE", width / 2, cardY + 60);
+    ctx.fillText("VOXLO", width / 2, cardY + 60);
 
     // Date
     ctx.fillStyle = "#94a3b8"; // slate-400
@@ -228,7 +228,7 @@ export default function ShareableSummaryCard({
     ctx.textAlign = "center";
     ctx.fillStyle = "#475569"; // slate-600
     ctx.font = "16px system-ui, -apple-system, sans-serif";
-    ctx.fillText("Get your city's pulse at communitypulse.app", width / 2, cardY + cardHeight - 60);
+    ctx.fillText("Get your city's vibe at voxlo.app", width / 2, cardY + cardHeight - 60);
 
     // Radar icon in corner
     ctx.fillStyle = "#10b981";
@@ -268,7 +268,7 @@ export default function ShareableSummaryCard({
       // Try Web Share API first (mobile)
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({
-          title: `${cityName} - Community Pulse`,
+          title: `${cityName} - Voxlo`,
           text: `Check out today's vibe in ${cityName}: ${vibeHeadline}`,
           files: [file],
         });
