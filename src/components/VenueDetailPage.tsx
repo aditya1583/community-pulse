@@ -2,39 +2,18 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { createPortal } from "react-dom";
+import {
+  VENUE_VIBE_TYPES,
+  getVibeTypeInfo,
+  VenueVibeType,
+  VenueVibeAggregate,
+} from "./types";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
-
-// Vibe type to emoji mapping
-const VIBE_EMOJI: Record<string, string> = {
-  busy: "🔥",
-  live_music: "🎵",
-  great_vibes: "✨",
-  worth_it: "💯",
-  fast_service: "⚡",
-  moderate: "👍",
-  chill: "😎",
-  quiet: "🤫",
-  long_wait: "⏳",
-  skip_it: "👎",
-};
-
-// Vibe type to display name
-const VIBE_DISPLAY: Record<string, string> = {
-  busy: "Busy",
-  live_music: "Live Music",
-  great_vibes: "Great Vibes",
-  worth_it: "Worth It",
-  fast_service: "Fast Service",
-  moderate: "Moderate",
-  chill: "Chill",
-  quiet: "Quiet",
-  long_wait: "Long Wait",
-  skip_it: "Skip It",
-};
 
 type Venue = {
   id: string;
@@ -56,6 +35,14 @@ type VenueVibe = {
   venue_name: string;
 };
 
+// Group vibe types by category for the picker
+const VIBES_BY_CATEGORY = {
+  crowd: VENUE_VIBE_TYPES.filter((v) => v.category === "crowd"),
+  atmosphere: VENUE_VIBE_TYPES.filter((v) => v.category === "atmosphere"),
+  service: VENUE_VIBE_TYPES.filter((v) => v.category === "service"),
+  quality: VENUE_VIBE_TYPES.filter((v) => v.category === "quality"),
+};
+
 type Props = {
   venue: Venue;
   userId: string | null;
@@ -70,38 +57,40 @@ export default function VenueDetailPage({
   onSignInClick,
 }: Props) {
   const [vibes, setVibes] = useState<VenueVibe[]>([]);
+  const [aggregatedVibes, setAggregatedVibes] = useState<VenueVibeAggregate[]>([]);
+  const [totalVibeCount, setTotalVibeCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showVibeModal, setShowVibeModal] = useState(false);
   const [loggingVibe, setLoggingVibe] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [submittedVibe, setSubmittedVibe] = useState<VenueVibeType | null>(null);
 
-  // Calculate dominant vibe from recent vibes
-  const dominantVibe = vibes.length > 0
-    ? vibes.reduce((acc, v) => {
-        acc[v.vibe_type] = (acc[v.vibe_type] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>)
-    : null;
+  // Get the top vibe for hero display
+  const topVibe = aggregatedVibes[0];
+  const topVibeInfo = topVibe ? getVibeTypeInfo(topVibe.vibeType as VenueVibeType) : null;
 
-  const topVibe = dominantVibe
-    ? Object.entries(dominantVibe).sort((a, b) => b[1] - a[1])[0]?.[0]
-    : null;
-
-  // Fetch venue vibes
+  // Fetch venue vibes (both raw and aggregated)
   const fetchVenueData = useCallback(async () => {
     setLoading(true);
 
     try {
+      // Fetch aggregated vibes from API using venue_name (canonical identifier)
+      const res = await fetch(`/api/venue-vibe?venue_name=${encodeURIComponent(venue.name)}`);
+      const data = await res.json();
+      setAggregatedVibes(data.vibes || []);
+      setTotalVibeCount(data.totalCount || 0);
+
+      // Also fetch raw recent vibes for activity feed
       const now = new Date();
       const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString();
 
-      // Fetch recent vibes for this venue
       const { data: vibesData } = await supabase
         .from("venue_vibes")
         .select("id, vibe_type, created_at, venue_name")
         .eq("venue_name", venue.name)
         .gte("created_at", fourHoursAgo)
         .order("created_at", { ascending: false })
-        .limit(20);
+        .limit(10);
 
       setVibes(vibesData || []);
     } catch (err) {
@@ -116,7 +105,7 @@ export default function VenueDetailPage({
   }, [fetchVenueData]);
 
   // Handle log vibe
-  const handleLogVibe = async (vibeType: string) => {
+  const handleLogVibe = async (vibeType: VenueVibeType) => {
     if (!userId) {
       onSignInClick();
       return;
@@ -129,18 +118,26 @@ export default function VenueDetailPage({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          venue_name: venue.name,
-          venue_id: venue.id,
-          venue_lat: venue.lat,
-          venue_lon: venue.lon,
-          vibe_type: vibeType,
-          user_id: userId,
+          venueName: venue.name,
+          venueId: venue.id,
+          venueLat: venue.lat,
+          venueLon: venue.lon,
+          vibeType: vibeType,
+          userId: userId,
         }),
       });
 
       if (response.ok) {
         setShowVibeModal(false);
-        fetchVenueData(); // Refresh data
+        setSubmitSuccess(true);
+        setSubmittedVibe(vibeType);
+        await fetchVenueData(); // Refresh data
+
+        // Reset success state after animation
+        setTimeout(() => {
+          setSubmitSuccess(false);
+          setSubmittedVibe(null);
+        }, 3000);
       } else {
         const error = await response.json();
         console.error("Log vibe failed:", error);
@@ -150,6 +147,12 @@ export default function VenueDetailPage({
     } finally {
       setLoggingVibe(false);
     }
+  };
+
+  // Get vibe count for a specific type
+  const getVibeCount = (vibeType: string): number => {
+    const found = aggregatedVibes.find((v) => v.vibeType === vibeType);
+    return found?.count || 0;
   };
 
   // Format relative time
@@ -215,83 +218,169 @@ export default function VenueDetailPage({
       </header>
 
       <main className="px-4 py-4 space-y-4 pb-24">
-        {/* Current Vibe Card */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
-          <div className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-2">
-            Current Vibe
-          </div>
-          {loading ? (
-            <div className="text-slate-400 animate-pulse">Loading...</div>
-          ) : topVibe ? (
-            <div className="flex items-center gap-3">
-              <span className="text-4xl">{VIBE_EMOJI[topVibe] || "📍"}</span>
-              <div>
-                <div className="text-xl font-semibold text-emerald-400">
-                  {VIBE_DISPLAY[topVibe] || topVibe}
+        {/* Hero Vibe Section - The star of the show */}
+        <div className="bg-gradient-to-br from-slate-900/90 to-slate-800/50 border border-slate-700/50 rounded-2xl p-5 relative overflow-hidden">
+          {/* Subtle background glow when there's a vibe */}
+          {topVibeInfo && (
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-transparent pointer-events-none" />
+          )}
+
+          <div className="relative">
+            {loading ? (
+              <div className="flex items-center justify-center py-6">
+                <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : topVibeInfo ? (
+              <>
+                {/* Current vibe display */}
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-16 h-16 rounded-2xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center">
+                    <span className="text-4xl">{topVibeInfo.emoji}</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-2xl font-semibold text-white">
+                      {topVibeInfo.label}
+                    </div>
+                    <div className="text-sm text-slate-400 flex items-center gap-2">
+                      <span>{totalVibeCount} {totalVibeCount === 1 ? "person" : "people"} checked in</span>
+                      <span className="text-slate-600">in last 4h</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-sm text-slate-400">
-                  {vibes.length} vibe{vibes.length !== 1 ? "s" : ""} in last 4h
+
+                {/* Other active vibes */}
+                {aggregatedVibes.length > 1 && (
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {aggregatedVibes.slice(1, 4).map((vibe) => {
+                      const info = getVibeTypeInfo(vibe.vibeType as VenueVibeType);
+                      return (
+                        <span
+                          key={vibe.vibeType}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs bg-slate-800/80 text-slate-300 border border-slate-700/50 rounded-full"
+                        >
+                          <span>{info.emoji}</span>
+                          <span>{info.label}</span>
+                          <span className="text-slate-500">{vibe.count}</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            ) : (
+              /* Empty state - invitation to contribute */
+              <div className="text-center py-4">
+                <div className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-slate-800/50 border border-dashed border-slate-600 flex items-center justify-center">
+                  <span className="text-3xl opacity-50">?</span>
+                </div>
+                <p className="text-slate-400 mb-1">No vibes yet</p>
+                <p className="text-sm text-slate-500">Be the first to share what it's like here</p>
+              </div>
+            )}
+
+            {/* Success feedback overlay */}
+            {submitSuccess && submittedVibe && (
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-900/90 rounded-2xl animate-fade-in">
+                <div className="text-center">
+                  <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center animate-success-pop">
+                    <svg className="w-8 h-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <p className="text-lg font-medium text-white">
+                    {getVibeTypeInfo(submittedVibe).emoji} Vibe logged!
+                  </p>
+                  <p className="text-sm text-slate-400 mt-1">Thanks for sharing</p>
                 </div>
               </div>
-            </div>
-          ) : (
-            <div className="text-slate-400">
-              No recent vibes. Be the first to share!
-            </div>
-          )}
-        </div>
-
-        {/* Log Vibe Button */}
-        <button
-          onClick={() => setShowVibeModal(true)}
-          className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl font-medium bg-gradient-to-r from-emerald-500 to-cyan-500 text-white hover:from-emerald-600 hover:to-cyan-600 active:scale-[0.98] transition shadow-lg shadow-emerald-500/25"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-          </svg>
-          Share What&apos;s Happening
-        </button>
-
-        {/* Recent Activity */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
-          <div className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-3">
-            Recent Activity
+            )}
           </div>
-          {loading ? (
-            <div className="text-slate-400 animate-pulse">Loading...</div>
-          ) : vibes.length > 0 ? (
-            <div className="space-y-3">
-              {vibes.slice(0, 5).map((vibe) => (
-                <div
-                  key={vibe.id}
-                  className="flex items-center gap-3 text-sm"
-                >
-                  <span className="text-xl">{VIBE_EMOJI[vibe.vibe_type] || "📍"}</span>
-                  <span className="flex-1 text-slate-300">
-                    {VIBE_DISPLAY[vibe.vibe_type] || vibe.vibe_type}
-                  </span>
-                  <span className="text-slate-500 text-xs">
-                    {formatRelativeTime(vibe.created_at)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-slate-500 text-sm">
-              No activity yet. Be the first to share!
-            </div>
-          )}
         </div>
+
+        {/* Quick Vibe Actions - Most common vibes as one-tap buttons */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+              Quick Check-in
+            </span>
+            <button
+              onClick={() => setShowVibeModal(true)}
+              className="text-xs text-violet-400 hover:text-violet-300 transition"
+            >
+              See all vibes
+            </button>
+          </div>
+
+          <div className="grid grid-cols-4 gap-2">
+            {/* Show the 4 most relevant quick vibes */}
+            {[
+              VENUE_VIBE_TYPES.find(v => v.id === "busy"),
+              VENUE_VIBE_TYPES.find(v => v.id === "chill"),
+              VENUE_VIBE_TYPES.find(v => v.id === "great_vibes"),
+              VENUE_VIBE_TYPES.find(v => v.id === "worth_it"),
+            ].filter(Boolean).map((vibe) => {
+              const count = getVibeCount(vibe!.id);
+              const isActive = count > 0;
+
+              return (
+                <button
+                  key={vibe!.id}
+                  onClick={() => handleLogVibe(vibe!.id as VenueVibeType)}
+                  disabled={loggingVibe}
+                  className={`flex flex-col items-center gap-1 py-3 px-2 rounded-xl border transition-all active:scale-95 ${
+                    isActive
+                      ? "bg-violet-500/15 border-violet-500/30 hover:bg-violet-500/25"
+                      : "bg-slate-800/60 border-slate-700/50 hover:bg-slate-800 hover:border-slate-600"
+                  } disabled:opacity-50`}
+                >
+                  <span className="text-2xl">{vibe!.emoji}</span>
+                  <span className={`text-[10px] font-medium ${isActive ? "text-violet-300" : "text-slate-400"}`}>
+                    {vibe!.label}
+                  </span>
+                  {count > 0 && (
+                    <span className="text-[9px] text-violet-400/70">{count}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Recent Activity - Timeline style */}
+        {vibes.length > 0 && (
+          <div className="bg-slate-900/60 border border-slate-800/50 rounded-2xl p-4">
+            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
+              Recent Activity
+            </div>
+            <div className="space-y-2">
+              {vibes.slice(0, 5).map((vibe, index) => {
+                const info = getVibeTypeInfo(vibe.vibe_type as VenueVibeType);
+                return (
+                  <div
+                    key={vibe.id}
+                    className={`flex items-center gap-3 py-2 ${
+                      index !== vibes.slice(0, 5).length - 1 ? "border-b border-slate-800/50" : ""
+                    }`}
+                  >
+                    <span className="text-lg">{info.emoji}</span>
+                    <span className="flex-1 text-sm text-slate-300">{info.label}</span>
+                    <span className="text-xs text-slate-500">{formatRelativeTime(vibe.created_at)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Venue Info */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
-          <div className="text-xs font-mono text-slate-500 uppercase tracking-wider">
+        <div className="bg-slate-900/60 border border-slate-800/50 rounded-2xl p-4 space-y-3">
+          <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">
             Info
           </div>
 
           {venue.address && (
             <div className="flex items-start gap-3 text-sm">
-              <svg className="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-5 h-5 text-slate-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
@@ -301,10 +390,10 @@ export default function VenueDetailPage({
 
           {venue.phone && (
             <div className="flex items-center gap-3 text-sm">
-              <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-5 h-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
               </svg>
-              <a href={`tel:${venue.phone}`} className="text-emerald-400">
+              <a href={`tel:${venue.phone}`} className="text-emerald-400 hover:text-emerald-300 transition">
                 {venue.phone}
               </a>
             </div>
@@ -312,7 +401,7 @@ export default function VenueDetailPage({
 
           {venue.hours && (
             <div className="flex items-center gap-3 text-sm">
-              <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-5 h-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span className="text-slate-300">{venue.hours}</span>
@@ -322,7 +411,7 @@ export default function VenueDetailPage({
           {(venue.lat && venue.lon) || venue.address ? (
             <button
               onClick={openInMaps}
-              className="w-full mt-2 py-2.5 px-4 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 transition flex items-center justify-center gap-2"
+              className="w-full mt-2 py-2.5 px-4 rounded-xl border border-slate-700/50 text-slate-300 hover:bg-slate-800/50 hover:border-slate-600 transition flex items-center justify-center gap-2"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
@@ -333,61 +422,226 @@ export default function VenueDetailPage({
         </div>
       </main>
 
-      {/* Vibe Modal */}
+      {/* Vibe Modal - Full categorized picker */}
       {showVibeModal && (
-        <div
-          className="fixed inset-0 z-50 bg-black/70 flex items-end justify-center"
-          onClick={() => setShowVibeModal(false)}
-        >
-          <div
-            className="w-full max-w-lg bg-slate-900 rounded-t-3xl p-6 pb-8 animate-slide-up"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-12 h-1 bg-slate-700 rounded-full mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-4 text-center">
-              How&apos;s the vibe at {venue.name}?
-            </h3>
-
-            <div className="grid grid-cols-2 gap-3">
-              {Object.entries(VIBE_EMOJI).map(([type, emoji]) => (
-                <button
-                  key={type}
-                  onClick={() => handleLogVibe(type)}
-                  disabled={loggingVibe}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-emerald-500/50 transition active:scale-[0.98]"
-                >
-                  <span className="text-2xl">{emoji}</span>
-                  <span className="text-sm font-medium text-slate-200">
-                    {VIBE_DISPLAY[type]}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={() => setShowVibeModal(false)}
-              className="w-full mt-4 py-3 text-slate-400 hover:text-white transition"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+        <VibePickerModal
+          venueName={venue.name}
+          aggregatedVibes={aggregatedVibes}
+          onSelect={handleLogVibe}
+          onClose={() => setShowVibeModal(false)}
+          isSubmitting={loggingVibe}
+        />
       )}
 
-      {/* CSS for slide-up animation */}
+      {/* CSS for animations */}
       <style jsx>{`
         @keyframes slide-up {
-          from {
-            transform: translateY(100%);
-          }
-          to {
-            transform: translateY(0);
-          }
+          from { transform: translateY(100%); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
         }
         .animate-slide-up {
-          animation: slide-up 0.3s ease-out;
+          animation: slide-up 0.25s ease-out;
+        }
+        @keyframes fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.3s ease-out;
+        }
+        @keyframes success-pop {
+          0% { transform: scale(0.8); opacity: 0; }
+          50% { transform: scale(1.1); }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-success-pop {
+          animation: success-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
       `}</style>
     </div>
+  );
+}
+
+// ============================================================
+// Vibe Picker Modal - Categorized vibe selection
+// ============================================================
+function VibePickerModal({
+  venueName,
+  aggregatedVibes,
+  onSelect,
+  onClose,
+  isSubmitting,
+}: {
+  venueName: string;
+  aggregatedVibes: VenueVibeAggregate[];
+  onSelect: (vibeType: VenueVibeType) => void;
+  onClose: () => void;
+  isSubmitting: boolean;
+}) {
+  // Get counts for each vibe type
+  const getVibeCount = (vibeType: string) => {
+    const found = aggregatedVibes.find((v) => v.vibeType === vibeType);
+    return found?.count || 0;
+  };
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="w-full sm:max-w-md bg-slate-900 border border-slate-700/50 rounded-t-2xl sm:rounded-2xl p-4 sm:p-6 animate-slide-up max-h-[85vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Drag handle for mobile */}
+        <div className="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-4 sm:hidden" />
+
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h3 className="text-lg font-semibold text-white">
+              What's the vibe?
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[250px]">
+              at {venueName}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Vibe options by category */}
+        <div className="space-y-5">
+          {/* Crowd Level */}
+          <div>
+            <p className="text-xs text-slate-500 uppercase tracking-wider mb-2 font-medium">
+              Crowd Level
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {VIBES_BY_CATEGORY.crowd.map((vibe) => (
+                <VibeOptionButton
+                  key={vibe.id}
+                  vibe={vibe}
+                  count={getVibeCount(vibe.id)}
+                  onSelect={() => onSelect(vibe.id as VenueVibeType)}
+                  disabled={isSubmitting}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Atmosphere */}
+          <div>
+            <p className="text-xs text-slate-500 uppercase tracking-wider mb-2 font-medium">
+              Atmosphere
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {VIBES_BY_CATEGORY.atmosphere.map((vibe) => (
+                <VibeOptionButton
+                  key={vibe.id}
+                  vibe={vibe}
+                  count={getVibeCount(vibe.id)}
+                  onSelect={() => onSelect(vibe.id as VenueVibeType)}
+                  disabled={isSubmitting}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Service */}
+          <div>
+            <p className="text-xs text-slate-500 uppercase tracking-wider mb-2 font-medium">
+              Service
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {VIBES_BY_CATEGORY.service.map((vibe) => (
+                <VibeOptionButton
+                  key={vibe.id}
+                  vibe={vibe}
+                  count={getVibeCount(vibe.id)}
+                  onSelect={() => onSelect(vibe.id as VenueVibeType)}
+                  disabled={isSubmitting}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Quality */}
+          <div>
+            <p className="text-xs text-slate-500 uppercase tracking-wider mb-2 font-medium">
+              Worth It?
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {VIBES_BY_CATEGORY.quality.map((vibe) => (
+                <VibeOptionButton
+                  key={vibe.id}
+                  vibe={vibe}
+                  count={getVibeCount(vibe.id)}
+                  onSelect={() => onSelect(vibe.id as VenueVibeType)}
+                  disabled={isSubmitting}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer note */}
+        <p className="text-[10px] text-slate-500 text-center mt-5">
+          Vibes expire after 4 hours to stay fresh
+        </p>
+      </div>
+
+      <style jsx>{`
+        @keyframes slide-up {
+          from { transform: translateY(100%); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        .animate-slide-up {
+          animation: slide-up 0.25s ease-out;
+        }
+      `}</style>
+    </div>,
+    document.body
+  );
+}
+
+// Individual vibe option button
+function VibeOptionButton({
+  vibe,
+  count,
+  onSelect,
+  disabled,
+}: {
+  vibe: typeof VENUE_VIBE_TYPES[number];
+  count: number;
+  onSelect: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <button
+      onClick={onSelect}
+      disabled={disabled}
+      className={`group flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-xl transition-all duration-200 active:scale-95 ${
+        count > 0
+          ? "bg-violet-500/20 text-violet-200 border border-violet-500/30 hover:bg-violet-500/30 hover:shadow-[0_0_12px_rgba(139,92,246,0.2)]"
+          : "bg-slate-800 text-slate-300 border border-slate-700/50 hover:bg-slate-700/50 hover:border-slate-500 hover:text-white"
+      } disabled:opacity-50 disabled:cursor-not-allowed`}
+    >
+      <span className="group-hover:scale-110 transition-transform">{vibe.emoji}</span>
+      <span>{vibe.label}</span>
+      {count > 0 && (
+        <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-violet-500/30 text-violet-200 rounded-full">
+          {count}
+        </span>
+      )}
+    </button>
   );
 }

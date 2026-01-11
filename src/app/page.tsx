@@ -16,6 +16,8 @@ import {
   writeOnboardingCompleted,
   filterVisiblePulses,
   isPulseVisible,
+  hasShownFirstPulseModalThisSession,
+  markFirstPulseModalShown,
   type AuthStatus,
 } from "@/lib/pulses";
 import { moderateContent } from "@/lib/moderation";
@@ -156,8 +158,31 @@ export default function Home() {
   const [authorStats, setAuthorStats] = useState<Record<string, { level: number; rank: number | null }>>({});
 
   // Tab state for new Neon theme
-  const [activeTab, setActiveTab] = useState<TabId>("pulse");
+  // Persist tab state in sessionStorage so it survives navigation to venue pages
+  const [activeTab, setActiveTabState] = useState<TabId>("pulse");
   const [localSection, setLocalSection] = useState<LocalSection>("deals");
+
+  // Wrapper to persist tab changes
+  const setActiveTab = (tab: TabId) => {
+    setActiveTabState(tab);
+    try {
+      sessionStorage.setItem("cp-active-tab", tab);
+    } catch {
+      // Ignore storage errors
+    }
+  };
+
+  // Restore tab from sessionStorage on mount
+  useEffect(() => {
+    try {
+      const savedTab = sessionStorage.getItem("cp-active-tab");
+      if (savedTab && isTabId(savedTab)) {
+        setActiveTabState(savedTab);
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }, []);
   const [showPulseModal, setShowPulseModal] = useState(false);
 
   // Auth + anon profile
@@ -832,19 +857,25 @@ export default function Home() {
   }, [loadStreak]);
 
   // ========= FIRST-TIME USER ONBOARDING =========
+  // Use sessionStorage to track if modal has been shown (survives navigation within session)
   useEffect(() => {
+    // Check sessionStorage first - if already shown this session, don't show again
+    const alreadyShownInSession = hasShownFirstPulseModalThisSession(window.sessionStorage);
+
     const show = shouldShowFirstPulseOnboarding({
       authStatus,
       identityReady,
       pulseCountResolved,
       userPulseCount,
       onboardingCompleted,
-      hasShownThisSession: hasShownOnboarding,
+      hasShownThisSession: hasShownOnboarding || alreadyShownInSession,
     });
 
     if (show) {
       setShowFirstPulseModal(true);
       setHasShownOnboarding(true);
+      // Persist to sessionStorage so it survives navigation
+      markFirstPulseModalShown(window.sessionStorage);
     }
   }, [
     authStatus,
@@ -1156,10 +1187,22 @@ export default function Home() {
       }
 
       if (error) {
-        console.error("Error fetching pulses:", error.message);
+        console.error("[Pulses] Error fetching pulses:", error.message);
         setErrorMsg("Could not load pulses. Try again in a bit.");
         setPulses([]);
       } else if (data) {
+        console.log(`[Pulses] Fetched ${data.length} pulses from DB for "${city}"`);
+
+        // Debug: log expiry info for first few pulses
+        if (data.length > 0) {
+          const now = new Date();
+          data.slice(0, 3).forEach((p, i) => {
+            const expiresAt = p.expires_at ? new Date(p.expires_at) : null;
+            const isExpired = expiresAt ? expiresAt.getTime() < now.getTime() - 60 * 60 * 1000 : false;
+            console.log(`[Pulses] #${i + 1}: tag=${p.tag}, created=${p.created_at}, expires=${p.expires_at}, expired=${isExpired}`);
+          });
+        }
+
         const hasMore = data.length > PULSES_PAGE_SIZE;
         setHasMorePulses(hasMore);
 
@@ -1171,6 +1214,7 @@ export default function Home() {
         }));
         setPulses(mapped);
       } else {
+        console.log(`[Pulses] No data returned for "${city}" (data is null/undefined)`);
         // Explicit empty case
         setPulses([]);
       }
@@ -1246,9 +1290,8 @@ export default function Home() {
         return;
       }
 
-      // Mark that we've attempted for this city
+      // Mark that we're attempting (will be reset on failure)
       console.log("[Auto-Seed Client] All conditions met! Triggering seed for:", city);
-      setAutoSeedAttempted(city);
 
       try {
         console.log(`Auto-seeding content for ${city}...`);
@@ -1280,32 +1323,62 @@ export default function Home() {
 
         if (!res.ok) {
           console.error("[Auto-Seed Client] API Error:", data);
+          // Don't mark as attempted so we can retry
           return;
         }
 
-        if (data.created > 0) {
+        // Mark as attempted only after successful API call
+        setAutoSeedAttempted(city);
+
+        if (data.created === 0) {
+          // Server reported no new posts created (e.g., city already has recent pulses)
+          console.log(`[Auto-Seed Client] Skipped - ${data.message || "city may already have recent pulses"}`);
+        } else if (data.created > 0) {
           console.log(`[Auto-Seed Client] SUCCESS! Created ${data.created} seed posts for ${city}`);
           // Refetch pulses to show the new posts
-            const now = new Date();
-            const start = startOfRecentWindow(now, 7);
-            const end = startOfNextLocalDay(now);
+          const now = new Date();
+          const start = startOfRecentWindow(now, 7);
+          const end = startOfNextLocalDay(now);
 
-            const { data: newData } = await supabase
+          // Use same column selection as initial fetch (with poll_options fallback)
+          let refetchData: DBPulse[] | null = null;
+          const refetchWithPolls = await supabase
+            .from("pulses")
+            .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, poll_options")
+            .eq("city", city)
+            .gte("created_at", start.toISOString())
+            .lt("created_at", end.toISOString())
+            .order("created_at", { ascending: false })
+            .limit(PULSES_PAGE_SIZE);
+
+          if (refetchWithPolls.error?.message?.includes("poll_options")) {
+            console.warn("[Auto-Seed Refetch] poll_options missing, retrying without it");
+            const refetchWithoutPolls = await supabase
               .from("pulses")
-              .select("*")
+              .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot")
               .eq("city", city)
               .gte("created_at", start.toISOString())
               .lt("created_at", end.toISOString())
               .order("created_at", { ascending: false })
               .limit(PULSES_PAGE_SIZE);
-
-            if (newData) {
-              const mapped: Pulse[] = (newData as DBPulse[]).map((row) => ({
-                ...mapDBPulseToPulse(row),
-                author: row.author || "Anonymous",
-              }));
-              setPulses(mapped);
+            refetchData = (refetchWithoutPolls.data as DBPulse[]) ?? null;
+            if (refetchWithoutPolls.error) {
+              console.error("[Auto-Seed Refetch] Error:", refetchWithoutPolls.error.message);
             }
+          } else if (refetchWithPolls.error) {
+            console.error("[Auto-Seed Refetch] Error:", refetchWithPolls.error.message);
+          } else {
+            refetchData = (refetchWithPolls.data as DBPulse[]) ?? null;
+          }
+
+          if (refetchData) {
+            console.log(`[Auto-Seed Refetch] Got ${refetchData.length} pulses after seed`);
+            const mapped: Pulse[] = refetchData.map((row) => ({
+              ...mapDBPulseToPulse(row),
+              author: row.author || "Anonymous",
+            }));
+            setPulses(mapped);
+          }
         }
       } catch (err) {
         console.error("Auto-seed error:", err);
@@ -1364,14 +1437,34 @@ export default function Home() {
     const cursor = oldestPulse.createdAt;
 
     try {
-      const { data, error } = await supabase
+      // Use same column selection as initial fetch (with poll_options fallback)
+      let data: DBPulse[] | null = null;
+      let error: { message: string } | null = null;
+
+      const queryWithPolls = await supabase
         .from("pulses")
-        .select("*")
+        .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, poll_options")
         .eq("city", city)
         .gte("created_at", start.toISOString())
         .lt("created_at", cursor)
         .order("created_at", { ascending: false })
         .limit(PULSES_PAGE_SIZE + 1);
+
+      if (queryWithPolls.error?.message?.includes("poll_options")) {
+        const fallbackQuery = await supabase
+          .from("pulses")
+          .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot")
+          .eq("city", city)
+          .gte("created_at", start.toISOString())
+          .lt("created_at", cursor)
+          .order("created_at", { ascending: false })
+          .limit(PULSES_PAGE_SIZE + 1);
+        data = (fallbackQuery.data as DBPulse[]) ?? null;
+        error = fallbackQuery.error;
+      } else {
+        data = (queryWithPolls.data as DBPulse[]) ?? null;
+        error = queryWithPolls.error;
+      }
 
       if (error) {
         console.error("Error loading more pulses:", error.message);
@@ -1971,9 +2064,17 @@ export default function Home() {
   // This ensures expired pulses are hidden even if they weren't filtered server-side
   const visiblePulses = filterVisiblePulses(pulses);
 
-  const filteredPulses = visiblePulses
-    .filter((p) => isInRecentWindow(p.createdAt))
-    .filter((p) => tagFilter === "All" || p.tag === tagFilter);
+  // Debug: log filtering results
+  if (pulses.length > 0 && visiblePulses.length !== pulses.length) {
+    console.log(`[Pulses] filterVisiblePulses: ${pulses.length} → ${visiblePulses.length} (${pulses.length - visiblePulses.length} expired)`);
+  }
+
+  const afterRecentFilter = visiblePulses.filter((p) => isInRecentWindow(p.createdAt));
+  if (visiblePulses.length > 0 && afterRecentFilter.length !== visiblePulses.length) {
+    console.log(`[Pulses] isInRecentWindow filter: ${visiblePulses.length} → ${afterRecentFilter.length}`);
+  }
+
+  const filteredPulses = afterRecentFilter.filter((p) => tagFilter === "All" || p.tag === tagFilter);
 
   // Traffic-tagged pulses for traffic tab (also filter expired)
   const trafficPulses = visiblePulses.filter((p) => p.tag === "Traffic");

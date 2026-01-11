@@ -88,8 +88,6 @@ export default function LocalTab({
             state={state}
             lat={lat}
             lon={lon}
-            userId={userId}
-            onSignInClick={onSignInClick}
           />
         )}
 
