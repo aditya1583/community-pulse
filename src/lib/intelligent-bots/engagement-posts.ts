@@ -7,6 +7,15 @@
  * - Venue check-ins ("What's happening at [venue] tonight?")
  * - School pickup alerts
  *
+ * === ENGAGEMENT PHILOSOPHY ===
+ * People don't engage with information. They engage with:
+ * 1. IDENTITY - Content that makes them feel part of something
+ * 2. CONTROVERSY - Hot takes they can't resist responding to
+ * 3. NOSTALGIA - Memories that trigger emotional responses
+ * 4. INSIDER STATUS - Knowledge that makes them feel special
+ * 5. CHALLENGES - Direct calls to action they want to answer
+ * 6. SOCIAL PROOF - What everyone else is doing/thinking
+ *
  * All content is AI-generated to avoid repetitive/static questions.
  */
 
@@ -23,9 +32,16 @@ export type EngagementType =
   | "venue_checkin"
   | "school_alert"
   | "local_spotlight"
-  | "this_or_that"      // NEW: Binary choice polls
-  | "fomo_alert"        // NEW: Time-sensitive urgency posts
-  | "weekly_roundup";   // NEW: Weekly summary posts
+  | "this_or_that"           // Binary choice polls
+  | "fomo_alert"             // Time-sensitive urgency posts
+  | "weekly_roundup"         // Weekly summary posts
+  | "hot_take"               // Controversial local opinions
+  | "insider_tip"            // "Only locals know" content
+  | "nostalgia_trigger"      // "Remember when..." posts
+  | "neighbor_challenge"     // Call-to-action engagement
+  | "community_callout"      // Celebrate/call out local behavior
+  | "would_you_rather"       // Hypothetical local scenarios
+  | "confession_booth";      // Anonymous-style local confessions
 
 export interface EngagementPost extends Omit<GeneratedPost, "tag"> {
   tag: PostType | "General";
@@ -423,6 +439,206 @@ Drop your weekly wins below! 👇`,
 🎭 On deck: {upcomingEvents}
 
 How was your week, neighbors?`,
+];
+
+// ============================================================================
+// HOT TAKES - Controversial local opinions that demand responses
+// ============================================================================
+
+const HOT_TAKE_TEMPLATES = {
+  food: [
+    "🔥 Hot take: {restaurant} is overrated and I'm tired of pretending it's not. Fight me in the comments.",
+    "🌶️ Unpopular opinion: The best {food} in {city} isn't where you think it is. Drop your real answer.",
+    "💀 I said what I said: {restaurant}'s wait time is NOT worth it. Who agrees?",
+    "🤷 Sorry not sorry: {city} has better {food} than Austin. @ me.",
+    "⚔️ Controversial take: We need to stop recommending {restaurant} to newcomers. There, I said it.",
+    "🎤 Someone had to say it: The {food} scene in {city} peaked in 2019. Change my mind.",
+  ],
+  traffic: [
+    "🔥 Hot take: {road} isn't that bad. Y'all just can't drive.",
+    "🌶️ Unpopular opinion: Taking {altRoute} is actually SLOWER most of the time. Prove me wrong.",
+    "💀 I said what I said: If you're complaining about {city} traffic, you've never lived anywhere else.",
+    "🚗 Controversial: {road} drivers are the worst in the entire Austin metro. Fight me.",
+    "⚔️ Hot take: The problem with {road} isn't the road. It's the people who don't use turn signals.",
+  ],
+  local: [
+    "🔥 Unpopular opinion: {city} is getting too big too fast and nobody wants to admit it.",
+    "🌶️ Hot take: Half the people complaining about {city} growth moved here in the last 3 years.",
+    "💀 I said what I said: {landmark} is mid at best. We need new spots.",
+    "🤷 Controversial: {city} has better vibes than Cedar Park. Sorry Cedar Park.",
+    "⚔️ Hot take: The 'old {city}' everyone misses wasn't actually that great. We romanticize it.",
+    "🎤 Someone had to say it: We don't need another {businessType} in {city}. We need {need}.",
+  ],
+  services: [
+    "🔥 Hot take: {city} desperately needs a {need} and it's embarrassing we don't have one.",
+    "🌶️ Unpopular opinion: Every {business} recommendation thread suggests the same 3 places. Let's get creative.",
+    "💀 I said what I said: The service at most {city} restaurants has gone downhill. True or false?",
+  ],
+};
+
+// Business types and needs for hot takes
+const HOT_TAKE_VARIABLES = {
+  businessType: ["coffee shop", "Mexican restaurant", "storage facility", "car wash", "urgent care"],
+  need: ["a good deli", "more parks", "better public transit", "a real downtown", "late-night food options"],
+  food: ["tacos", "BBQ", "pizza", "burgers", "coffee", "brunch"],
+};
+
+// ============================================================================
+// INSIDER TIPS - "Only locals know" content that rewards engagement
+// ============================================================================
+
+const INSIDER_TIP_TEMPLATES = [
+  "🤫 Insider tip for {city} newbies: The secret to {road} traffic is leaving at {time}. You're welcome.",
+  "💡 Local hack: {restaurant}'s secret menu item is {secretItem}. Don't tell everyone.",
+  "🎯 Pro tip only {city} OGs know: {landmark} is 10x better on {day} mornings. Trust me.",
+  "🔓 Unlocking {city} knowledge: Skip the main entrance at {venue}. Go around back.",
+  "📍 {city} insider move: When {restaurant} is packed, {alternative} has the same vibe with no wait.",
+  "🗝️ Real ones know: The best parking for {landmark} is actually at {parkingSpot}. Free and close.",
+  "⭐ {city} life hack: {restaurant} does half-price {item} on {day}s. You didn't hear it from me.",
+  "🤐 Shhh... The locals' secret: {venue} has the best {feature} in town. Don't blow up my spot.",
+  "🎪 Newbie alert: When someone says 'meet at {landmark},' they mean the {specificSpot}. Now you know.",
+  "💎 Hidden gem status: {hiddenSpot} is {city}'s best kept secret. Reply if you've been there.",
+];
+
+const INSIDER_VARIABLES = {
+  secretItem: ["the off-menu breakfast taco", "their 'loaded' version", "asking for extra crispy", "the secret sauce"],
+  time: ["exactly 7:47am", "before 7:15am", "right at noon when everyone else is eating", "after 6:30pm"],
+  day: ["Tuesday", "Wednesday", "Thursday", "Sunday"],
+  specificSpot: ["the side with the benches", "near the big tree", "by the fountain", "the back corner"],
+  feature: ["sunset views", "people watching", "quiet corners", "dog-friendly patio"],
+  item: ["apps", "drinks", "tacos", "wings"],
+};
+
+// ============================================================================
+// NOSTALGIA TRIGGERS - "Remember when..." emotional engagement
+// ============================================================================
+
+const NOSTALGIA_TEMPLATES = [
+  "🕰️ Remember when {road} was just a two-lane road? {city} OGs, where you at?",
+  "📸 Throwback to when {landmark} was the ONLY thing to do in {city}. What year did you move here?",
+  "👴 Only real {city} natives remember when {memory}. If you know, you know.",
+  "🌅 Miss the days when you could get to {destination} in {oldTime} minutes. Now it's {newTime}. Pain.",
+  "🏡 Who else remembers when {area} was all just {oldFeature}? The growth is wild.",
+  "🎭 Pouring one out for {closedBusiness}. If you never got to go there, I'm sorry for your loss.",
+  "📍 Back in the day, {landmark} was THE spot. What's the new THE spot now?",
+  "🚗 Remember when there was no {road}? How did we even survive?",
+  "✨ {city} before {change} hits different. Miss those vibes sometimes.",
+  "🗓️ It's been {years} years since {event} and I still think about it. Anyone else?",
+];
+
+const NOSTALGIA_VARIABLES = {
+  memory: [
+    "there was no HEB Plus",
+    "we didn't have an In-N-Out",
+    "183A was free",
+    "you could get a house here for under $200k",
+    "this was considered 'way out there' from Austin",
+  ],
+  oldTime: ["15", "10", "8", "5"],
+  newTime: ["35", "25", "20", "45"],
+  oldFeature: ["farmland", "empty fields", "one traffic light", "dirt roads"],
+  closedBusiness: ["that taco place on Main", "the old movie theater", "the original farmers market spot"],
+  change: ["the population boom", "all the construction", "everyone discovered us", "the toll roads"],
+  years: ["5", "10", "3", "7"],
+};
+
+// ============================================================================
+// NEIGHBOR CHALLENGES - Call-to-action engagement
+// ============================================================================
+
+const CHALLENGE_TEMPLATES = [
+  "📣 {city} CHALLENGE: Drop your go-to order at {restaurant} without naming the restaurant. Let's see who guesses.",
+  "🎯 Challenge accepted? Name ONE thing {city} does better than Austin. Just one. Go.",
+  "🏆 {city} challenge: What's the most {superlative} thing you've seen happen here? Winner gets bragging rights.",
+  "⚡ Quick challenge: Describe {city} in exactly 3 words. No more, no less.",
+  "🎪 Community challenge: Reply with the {city} business you want EVERYONE to support right now.",
+  "🗣️ CHALLENGE: Tag a {city} neighbor in the comments who needs to see this. Let's connect!",
+  "🔥 {city} food challenge: What's one dish from a local spot that changed your life? Be specific.",
+  "📍 Neighborhood challenge: What street/area do you live near? Let's see how spread out we are.",
+  "🎤 Open mic challenge: What's your {city} hot take that you've been holding back? Safe space, let it out.",
+  "🤝 Kindness challenge: Share something nice that happened to you in {city} this week.",
+];
+
+const CHALLENGE_VARIABLES = {
+  superlative: ["chaotic", "wholesome", "Texas", "unexpected", "hilarious"],
+};
+
+// ============================================================================
+// COMMUNITY CALLOUTS - Celebrate or call out local behavior
+// ============================================================================
+
+const CALLOUT_TEMPLATES = {
+  positive: [
+    "🙌 Shoutout to whoever {positiveAction}. You made someone's day and probably don't even know it.",
+    "💜 {city} showing up today. Saw someone {positiveAction} and it restored my faith in humanity.",
+    "⭐ Big shoutout to {business} for {positiveAction}. This is why we support local.",
+    "🎉 Just witnessed peak {city} energy: {positiveAction}. This is why I live here.",
+    "👏 Can we give it up for {city} neighbors who {positiveAction}? Y'all are the real ones.",
+  ],
+  callout: [
+    "👀 To the person who {negativeAction} at {location} today... we all saw that. Do better.",
+    "🙄 PSA: If you're the type to {negativeAction}, just know... everyone judges you.",
+    "😤 {city} pet peeve alert: People who {negativeAction}. Can we collectively stop?",
+    "🚨 Friendly reminder that {negativeAction} is NOT a {city} vibe. Let's be better.",
+    "⚠️ Attention {city}: If you {negativeAction}, we need to have a conversation.",
+  ],
+};
+
+const CALLOUT_VARIABLES = {
+  positiveAction: [
+    "let someone merge on {road}",
+    "returned a lost wallet at {landmark}",
+    "paid for the car behind them at {restaurant}",
+    "helped a stranger with their groceries at HEB",
+    "cleaned up trash at {park} this morning",
+  ],
+  negativeAction: [
+    "parks in the fire lane at HEB",
+    "doesn't return shopping carts",
+    "speeds through school zones",
+    "leaves their dog's mess at the park",
+    "takes up two parking spots",
+  ],
+};
+
+// ============================================================================
+// WOULD YOU RATHER - Local hypothetical scenarios
+// ============================================================================
+
+const WOULD_YOU_RATHER_TEMPLATES = [
+  "🤔 {city} edition: Would you rather have {optionA} OR {optionB}? No cop-outs, you have to pick.",
+  "⚖️ Hard choice time: {optionA} vs {optionB}. Where does {city} stand?",
+  "🎲 {city} hypothetical: If you HAD to choose - {optionA} or {optionB}?",
+  "💭 Real talk: Would you rather {optionA} OR {optionB}? Explain your reasoning.",
+  "🤷 Impossible choice: {optionA}... or {optionB}? {city}, I need answers.",
+];
+
+const WOULD_YOU_RATHER_OPTIONS = [
+  { a: "free breakfast tacos for life at ONE place", b: "50% off everywhere forever" },
+  { a: "zero traffic forever but no new restaurants", b: "keep the traffic but get a Trader Joe's" },
+  { a: "perfect 75° weather every day", b: "keep our seasons but get a beach nearby" },
+  { a: "live next to HEB but hear the carts 24/7", b: "live 15 min away in perfect quiet" },
+  { a: "have {road} permanently fixed", b: "get a new highway that bypasses it entirely" },
+  { a: "keep {city} small but lose some amenities", b: "grow bigger but get everything Austin has" },
+  { a: "always find parking but walk 10 minutes", b: "circle for parking but always find a close spot eventually" },
+  { a: "your favorite restaurant is always empty", b: "it's always packed but the food is somehow better" },
+  { a: "never hit another red light on {road}", b: "every restaurant delivery is always free" },
+  { a: "get a direct train to downtown Austin", b: "keep cars but all highways are always clear" },
+];
+
+// ============================================================================
+// CONFESSION BOOTH - Anonymous-style local confessions
+// ============================================================================
+
+const CONFESSION_TEMPLATES = [
+  "🙈 {city} confession booth is OPEN: What's your guilty pleasure spot that you're embarrassed to admit you love?",
+  "🤫 Confess your sins, {city}: What local norm do you secretly hate but pretend to be okay with?",
+  "😬 Safe space confession: What popular {city} opinion do you secretly disagree with?",
+  "🙊 Confession time: What's something about living in {city} that you'd never say out loud?",
+  "💀 Dead honest: What {city} restaurant do people LOVE that you just don't get?",
+  "🎭 Anonymous confessions: Reply with your {city} unpopular opinion. No judgment zone.",
+  "🤐 Secret confession: What's your {city} guilty pleasure that you hope your neighbors don't judge?",
+  "😅 Confession booth: What {city} thing have you been pretending to understand but actually don't?",
 ];
 
 // ============================================================================
@@ -901,6 +1117,301 @@ export async function generateWeeklyRoundupPost(
 }
 
 // ============================================================================
+// NEW HIGH-ENGAGEMENT POST GENERATORS
+// ============================================================================
+
+/**
+ * Helper to get random city-specific variables for templates
+ */
+function getCityVariables(city: CityConfig): Record<string, string> {
+  const roads = city.roads.major;
+  const restaurants = city.landmarks.restaurants;
+  const venues = city.landmarks.venues;
+  const landmarks = city.landmarks.shopping;
+
+  return {
+    city: city.name,
+    road: roads[Math.floor(Math.random() * roads.length)],
+    altRoute: city.roads.highways[Math.floor(Math.random() * city.roads.highways.length)],
+    restaurant: restaurants[Math.floor(Math.random() * restaurants.length)],
+    venue: venues[Math.floor(Math.random() * venues.length)],
+    landmark: landmarks[Math.floor(Math.random() * landmarks.length)],
+    park: venues.find(v => v.toLowerCase().includes('park')) || venues[0],
+    alternative: restaurants[Math.floor(Math.random() * restaurants.length)],
+    business: restaurants[Math.floor(Math.random() * restaurants.length)],
+    location: landmarks[Math.floor(Math.random() * landmarks.length)],
+    hiddenSpot: venues[Math.floor(Math.random() * venues.length)],
+    parkingSpot: `the lot behind ${landmarks[0]}`,
+    area: `the ${roads[0]} corridor`,
+    destination: "downtown Austin",
+  };
+}
+
+/**
+ * Helper to pick random item from array
+ */
+function pickRandom<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+/**
+ * Fill template with variables, handling nested variable references
+ */
+function fillEngagementTemplate(template: string, vars: Record<string, string>): string {
+  let result = template;
+  // Do multiple passes to handle nested variables like {road} inside {positiveAction}
+  for (let i = 0; i < 3; i++) {
+    for (const [key, value] of Object.entries(vars)) {
+      result = result.replace(new RegExp(`\\{${key}\\}`, "g"), value);
+    }
+  }
+  return result;
+}
+
+/**
+ * Generate a Hot Take post
+ * Controversial local opinions that demand responses
+ */
+export async function generateHotTakePost(
+  ctx: SituationContext
+): Promise<EngagementPost | null> {
+  const { city, time, traffic } = ctx;
+  const vars = getCityVariables(city);
+
+  // Pick category based on context
+  let category: keyof typeof HOT_TAKE_TEMPLATES;
+  if (traffic.congestionLevel > 0.2 || time.isRushHour) {
+    category = Math.random() < 0.6 ? "traffic" : "food";
+  } else if (time.hour >= 11 && time.hour <= 14) {
+    category = "food";
+  } else if (time.hour >= 17 && time.hour <= 21) {
+    category = Math.random() < 0.5 ? "food" : "local";
+  } else {
+    category = pickRandom(["food", "traffic", "local", "services"] as const);
+  }
+
+  const templates = HOT_TAKE_TEMPLATES[category];
+  const template = pickRandom(templates);
+
+  // Add category-specific variables
+  const extendedVars = {
+    ...vars,
+    food: pickRandom(HOT_TAKE_VARIABLES.food),
+    businessType: pickRandom(HOT_TAKE_VARIABLES.businessType),
+    need: pickRandom(HOT_TAKE_VARIABLES.need),
+  };
+
+  const message = fillEngagementTemplate(template, extendedVars);
+
+  return {
+    message,
+    tag: "General",
+    mood: "🔥",
+    author: `${city.name} hot_take_bot 🌶️`,
+    is_bot: true,
+    hidden: false,
+    engagementType: "hot_take",
+  };
+}
+
+/**
+ * Generate an Insider Tip post
+ * "Only locals know" content that creates insider status
+ */
+export async function generateInsiderTipPost(
+  ctx: SituationContext
+): Promise<EngagementPost | null> {
+  const { city } = ctx;
+  const vars = getCityVariables(city);
+
+  const template = pickRandom(INSIDER_TIP_TEMPLATES);
+
+  const extendedVars = {
+    ...vars,
+    secretItem: pickRandom(INSIDER_VARIABLES.secretItem),
+    time: pickRandom(INSIDER_VARIABLES.time),
+    day: pickRandom(INSIDER_VARIABLES.day),
+    specificSpot: pickRandom(INSIDER_VARIABLES.specificSpot),
+    feature: pickRandom(INSIDER_VARIABLES.feature),
+    item: pickRandom(INSIDER_VARIABLES.item),
+  };
+
+  const message = fillEngagementTemplate(template, extendedVars);
+
+  return {
+    message,
+    tag: "General",
+    mood: "🤫",
+    author: `${city.name} local_insider_bot 💡`,
+    is_bot: true,
+    hidden: false,
+    engagementType: "insider_tip",
+  };
+}
+
+/**
+ * Generate a Nostalgia Trigger post
+ * "Remember when..." emotional engagement
+ */
+export async function generateNostalgiaTriggerPost(
+  ctx: SituationContext
+): Promise<EngagementPost | null> {
+  const { city } = ctx;
+  const vars = getCityVariables(city);
+
+  const template = pickRandom(NOSTALGIA_TEMPLATES);
+
+  const extendedVars = {
+    ...vars,
+    memory: pickRandom(NOSTALGIA_VARIABLES.memory),
+    oldTime: pickRandom(NOSTALGIA_VARIABLES.oldTime),
+    newTime: pickRandom(NOSTALGIA_VARIABLES.newTime),
+    oldFeature: pickRandom(NOSTALGIA_VARIABLES.oldFeature),
+    closedBusiness: pickRandom(NOSTALGIA_VARIABLES.closedBusiness),
+    change: pickRandom(NOSTALGIA_VARIABLES.change),
+    years: pickRandom(NOSTALGIA_VARIABLES.years),
+    event: "the last Old Settlers Festival",
+  };
+
+  const message = fillEngagementTemplate(template, extendedVars);
+
+  return {
+    message,
+    tag: "General",
+    mood: "🕰️",
+    author: `${city.name} memory_lane_bot 📸`,
+    is_bot: true,
+    hidden: false,
+    engagementType: "nostalgia_trigger",
+  };
+}
+
+/**
+ * Generate a Neighbor Challenge post
+ * Call-to-action engagement
+ */
+export async function generateNeighborChallengePost(
+  ctx: SituationContext
+): Promise<EngagementPost | null> {
+  const { city } = ctx;
+  const vars = getCityVariables(city);
+
+  const template = pickRandom(CHALLENGE_TEMPLATES);
+
+  const extendedVars = {
+    ...vars,
+    superlative: pickRandom(CHALLENGE_VARIABLES.superlative),
+  };
+
+  const message = fillEngagementTemplate(template, extendedVars);
+
+  return {
+    message,
+    tag: "General",
+    mood: "📣",
+    author: `${city.name} challenge_bot 🎯`,
+    is_bot: true,
+    hidden: false,
+    engagementType: "neighbor_challenge",
+  };
+}
+
+/**
+ * Generate a Community Callout post
+ * Celebrate or (gently) call out local behavior
+ */
+export async function generateCommunityCalloutPost(
+  ctx: SituationContext
+): Promise<EngagementPost | null> {
+  const { city } = ctx;
+  const vars = getCityVariables(city);
+
+  // 70% positive, 30% callout (keep it mostly positive)
+  const isPositive = Math.random() < 0.7;
+  const templates = isPositive ? CALLOUT_TEMPLATES.positive : CALLOUT_TEMPLATES.callout;
+  const template = pickRandom(templates);
+
+  const extendedVars = {
+    ...vars,
+    positiveAction: fillEngagementTemplate(pickRandom(CALLOUT_VARIABLES.positiveAction), vars),
+    negativeAction: pickRandom(CALLOUT_VARIABLES.negativeAction),
+  };
+
+  const message = fillEngagementTemplate(template, extendedVars);
+
+  return {
+    message,
+    tag: "General",
+    mood: isPositive ? "🙌" : "👀",
+    author: `${city.name} community_vibes_bot ${isPositive ? "💜" : "🧐"}`,
+    is_bot: true,
+    hidden: false,
+    engagementType: "community_callout",
+  };
+}
+
+/**
+ * Generate a Would You Rather post
+ * Local hypothetical scenarios
+ */
+export async function generateWouldYouRatherPost(
+  ctx: SituationContext
+): Promise<EngagementPost | null> {
+  const { city } = ctx;
+  const vars = getCityVariables(city);
+
+  const template = pickRandom(WOULD_YOU_RATHER_TEMPLATES);
+  const choice = pickRandom(WOULD_YOU_RATHER_OPTIONS);
+
+  // Fill in city-specific variables in the options
+  const optionA = fillEngagementTemplate(choice.a, vars);
+  const optionB = fillEngagementTemplate(choice.b, vars);
+
+  const extendedVars = {
+    ...vars,
+    optionA,
+    optionB,
+  };
+
+  const message = fillEngagementTemplate(template, extendedVars);
+
+  return {
+    message,
+    tag: "General",
+    mood: "🤔",
+    author: `${city.name} hypothetical_bot ⚖️`,
+    is_bot: true,
+    hidden: false,
+    engagementType: "would_you_rather",
+    options: [optionA, optionB],
+  };
+}
+
+/**
+ * Generate a Confession Booth post
+ * Anonymous-style local confessions prompt
+ */
+export async function generateConfessionBoothPost(
+  ctx: SituationContext
+): Promise<EngagementPost | null> {
+  const { city } = ctx;
+  const vars = getCityVariables(city);
+
+  const template = pickRandom(CONFESSION_TEMPLATES);
+  const message = fillEngagementTemplate(template, vars);
+
+  return {
+    message,
+    tag: "General",
+    mood: "🙈",
+    author: `${city.name} confession_booth_bot 🤫`,
+    is_bot: true,
+    hidden: false,
+    engagementType: "confession_booth",
+  };
+}
+
+// ============================================================================
 // HIGH-LEVEL ENGAGEMENT GENERATOR
 // ============================================================================
 
@@ -912,21 +1423,24 @@ export interface EngagementDecision {
 
 /**
  * Analyze situation and decide what type of engagement post to generate
+ *
+ * ENGAGEMENT PHILOSOPHY:
+ * The new high-engagement types (hot_take, insider_tip, nostalgia_trigger, etc.)
+ * are designed to create emotional responses and identity-based engagement.
+ * They should appear frequently to transform passive scrolling into active participation.
+ *
+ * Priority tiers:
+ * 1. TIME-SENSITIVE: school_alert, fomo_alert (must post when relevant)
+ * 2. HIGH-ENGAGEMENT: hot_take, confession_booth, neighbor_challenge (viral potential)
+ * 3. IDENTITY-BUILDERS: insider_tip, nostalgia_trigger, community_callout (community bonding)
+ * 4. INTERACTIVE: would_you_rather, this_or_that (easy engagement)
+ * 5. INFORMATIONAL: poll, recommendation, venue_checkin, local_spotlight (traditional)
  */
 export function analyzeForEngagement(ctx: SituationContext): EngagementDecision {
-  const { time, events, weather } = ctx;
+  const { time, events } = ctx;
   const hour = time.hour;
 
-  // Weekly roundup on weekends (high priority)
-  if ((time.dayOfWeek === 0 || time.dayOfWeek === 6) && hour >= 10 && hour <= 14) {
-    if (Math.random() < 0.4) { // 40% chance on weekend mornings
-      return {
-        shouldPost: true,
-        engagementType: "weekly_roundup",
-        reason: "Weekend - time for weekly roundup",
-      };
-    }
-  }
+  // ========== TIER 1: TIME-SENSITIVE (Always check first) ==========
 
   // School alert takes priority during school dismissal window
   if (time.isWeekday) {
@@ -942,18 +1456,113 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
   }
 
   // FOMO alerts - time-sensitive opportunities
-  if (time.isWeekday && hour >= 15 && hour <= 18) {
-    if (Math.random() < 0.35) { // 35% chance during happy hour window
+  if (hour >= 15 && hour <= 19) {
+    if (Math.random() < 0.3) {
       return {
         shouldPost: true,
         engagementType: "fomo_alert",
-        reason: "Happy hour / event window - FOMO time!",
+        reason: "Prime FOMO window - create urgency",
       };
     }
   }
 
-  // This or That - quick engagement polls (high frequency)
-  if (Math.random() < 0.3) { // 30% chance anytime
+  // Weekly roundup on weekends (specific window)
+  if ((time.dayOfWeek === 0 || time.dayOfWeek === 6) && hour >= 10 && hour <= 14) {
+    if (Math.random() < 0.35) {
+      return {
+        shouldPost: true,
+        engagementType: "weekly_roundup",
+        reason: "Weekend - time for weekly roundup",
+      };
+    }
+  }
+
+  // ========== TIER 2: HIGH-ENGAGEMENT (Viral potential) ==========
+
+  // Hot takes are gold - they demand responses
+  // Higher chance during "controversy hours" (evening when people are relaxed)
+  if (hour >= 18 && hour <= 22) {
+    if (Math.random() < 0.35) {
+      return {
+        shouldPost: true,
+        engagementType: "hot_take",
+        reason: "Evening hours - prime hot take time",
+      };
+    }
+  } else if (Math.random() < 0.2) {
+    return {
+      shouldPost: true,
+      engagementType: "hot_take",
+      reason: "Hot take for engagement spark",
+    };
+  }
+
+  // Confession booth - high engagement, people love sharing opinions anonymously
+  if (Math.random() < 0.18) {
+    return {
+      shouldPost: true,
+      engagementType: "confession_booth",
+      reason: "Confession booth - people love to vent",
+    };
+  }
+
+  // Neighbor challenges - direct call to action
+  if (Math.random() < 0.2) {
+    return {
+      shouldPost: true,
+      engagementType: "neighbor_challenge",
+      reason: "Challenge time - direct engagement CTA",
+    };
+  }
+
+  // ========== TIER 3: IDENTITY BUILDERS (Community bonding) ==========
+
+  // Insider tips - makes people feel like locals
+  if (Math.random() < 0.2) {
+    return {
+      shouldPost: true,
+      engagementType: "insider_tip",
+      reason: "Insider knowledge sharing - builds community identity",
+    };
+  }
+
+  // Nostalgia triggers - emotional engagement, especially good on weekends
+  if (time.isWeekend && Math.random() < 0.25) {
+    return {
+      shouldPost: true,
+      engagementType: "nostalgia_trigger",
+      reason: "Weekend nostalgia - emotional engagement",
+    };
+  } else if (Math.random() < 0.12) {
+    return {
+      shouldPost: true,
+      engagementType: "nostalgia_trigger",
+      reason: "Nostalgia trigger - remember when...",
+    };
+  }
+
+  // Community callouts - celebrate/call out behavior (mostly positive)
+  if (Math.random() < 0.15) {
+    return {
+      shouldPost: true,
+      engagementType: "community_callout",
+      reason: "Community callout - behavioral engagement",
+    };
+  }
+
+  // ========== TIER 4: INTERACTIVE (Easy engagement) ==========
+
+  // Would you rather - fun hypotheticals
+  if (Math.random() < 0.2) {
+    return {
+      shouldPost: true,
+      engagementType: "would_you_rather",
+      reason: "Would you rather - easy interactive engagement",
+    };
+  }
+
+  // This or That - super quick engagement
+  if (Math.random() < 0.25) {
     return {
       shouldPost: true,
       engagementType: "this_or_that",
@@ -961,53 +1570,45 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
     };
   }
 
+  // ========== TIER 5: INFORMATIONAL (Traditional) ==========
+
   // Venue check-in during evening hours or when events happening
   if ((hour >= 17 && hour <= 22) || events.length > 0) {
-    if (Math.random() < 0.3) { // 30% chance
+    if (Math.random() < 0.2) {
       return {
         shouldPost: true,
         engagementType: "venue_checkin",
-        reason: "Evening time - venue vibe check appropriate",
+        reason: "Evening time - venue vibe check",
       };
     }
   }
 
   // Polls during meal times
   if ((hour >= 7 && hour <= 10) || (hour >= 11 && hour <= 14) || (hour >= 17 && hour <= 20)) {
-    if (Math.random() < 0.25) { // 25% chance
+    if (Math.random() < 0.18) {
       return {
         shouldPost: true,
         engagementType: "poll",
-        reason: "Meal time - food poll engagement",
+        reason: "Meal time - food poll",
       };
     }
   }
 
-  // Weekend - higher chance for fun engagement
-  if (time.isWeekend && Math.random() < 0.35) {
-    const types: EngagementType[] = ["poll", "local_spotlight", "recommendation", "this_or_that"];
-    return {
-      shouldPost: true,
-      engagementType: types[Math.floor(Math.random() * types.length)],
-      reason: "Weekend vibes - engagement time",
-    };
-  }
-
-  // Recommendation asks - good anytime
-  if (Math.random() < 0.15) {
-    return {
-      shouldPost: true,
-      engagementType: "recommendation",
-      reason: "Community knowledge sharing moment",
-    };
-  }
-
-  // Local spotlight - occasional
+  // Local spotlight
   if (Math.random() < 0.1) {
     return {
       shouldPost: true,
       engagementType: "local_spotlight",
-      reason: "Time to highlight a local spot",
+      reason: "Local business spotlight",
+    };
+  }
+
+  // Recommendation asks
+  if (Math.random() < 0.12) {
+    return {
+      shouldPost: true,
+      engagementType: "recommendation",
+      reason: "Community recommendation ask",
     };
   }
 
@@ -1031,6 +1632,7 @@ export async function generateEngagementPost(
   if (!type) return null;
 
   switch (type) {
+    // Traditional engagement types
     case "poll":
       return generatePollPost(ctx);
     case "recommendation":
@@ -1047,6 +1649,23 @@ export async function generateEngagementPost(
       return generateFomoAlertPost(ctx);
     case "weekly_roundup":
       return generateWeeklyRoundupPost(ctx);
+
+    // NEW HIGH-ENGAGEMENT types
+    case "hot_take":
+      return generateHotTakePost(ctx);
+    case "insider_tip":
+      return generateInsiderTipPost(ctx);
+    case "nostalgia_trigger":
+      return generateNostalgiaTriggerPost(ctx);
+    case "neighbor_challenge":
+      return generateNeighborChallengePost(ctx);
+    case "community_callout":
+      return generateCommunityCalloutPost(ctx);
+    case "would_you_rather":
+      return generateWouldYouRatherPost(ctx);
+    case "confession_booth":
+      return generateConfessionBoothPost(ctx);
+
     default:
       return null;
   }
@@ -1054,6 +1673,11 @@ export async function generateEngagementPost(
 
 /**
  * Generate multiple varied engagement posts for seeding
+ *
+ * SEED PHILOSOPHY:
+ * When seeding a cold feed, we want to create immediate engagement hooks.
+ * The new high-engagement types should be prioritized to make the feed
+ * feel alive and worth participating in.
  */
 export async function generateEngagementSeedPosts(
   ctx: SituationContext,
@@ -1062,8 +1686,10 @@ export async function generateEngagementSeedPosts(
   const posts: EngagementPost[] = [];
   const usedTypes = new Set<EngagementType>();
 
-  // Prioritize based on context
+  // Build priority list - HIGH-ENGAGEMENT TYPES FIRST
   const priorities: EngagementType[] = [];
+
+  // ========== TIME-SENSITIVE (if applicable) ==========
 
   // Weekly roundup on weekends
   if (ctx.time.dayOfWeek === 0 || ctx.time.dayOfWeek === 6) {
@@ -1079,22 +1705,54 @@ export async function generateEngagementSeedPosts(
     }
   }
 
-  // FOMO alerts during happy hour window
-  if (ctx.time.isWeekday && ctx.time.hour >= 15 && ctx.time.hour <= 18) {
+  // FOMO alerts during afternoon/evening
+  if (ctx.time.hour >= 15 && ctx.time.hour <= 19) {
     priorities.push("fomo_alert");
   }
+
+  // ========== HIGH-ENGAGEMENT (Always include for viral potential) ==========
+
+  // Hot takes are engagement gold - always include one
+  priorities.push("hot_take");
+
+  // Confession booth creates safe space for opinions
+  priorities.push("confession_booth");
+
+  // Challenges drive direct participation
+  priorities.push("neighbor_challenge");
+
+  // ========== IDENTITY BUILDERS (Community bonding) ==========
+
+  // Insider tips make people feel special
+  priorities.push("insider_tip");
+
+  // Nostalgia - especially good on weekends or evenings
+  if (ctx.time.isWeekend || ctx.time.hour >= 18) {
+    priorities.push("nostalgia_trigger");
+  }
+
+  // Community callouts celebrate local behavior
+  priorities.push("community_callout");
+
+  // ========== INTERACTIVE (Easy engagement) ==========
+
+  // Would you rather - fun hypotheticals with poll options
+  priorities.push("would_you_rather");
+
+  // This or That - super quick one-tap engagement
+  priorities.push("this_or_that");
+
+  // ========== TRADITIONAL (Fill remaining slots) ==========
 
   // Evening venue check
   if (ctx.time.hour >= 17 && ctx.time.hour <= 22) {
     priorities.push("venue_checkin");
   }
 
-  // This or That is always good - high engagement, low friction
-  priorities.push("this_or_that");
-
-  // Always include poll and spotlight as options
+  // Always include traditional types as fallbacks
   priorities.push("poll", "local_spotlight", "recommendation");
 
+  // Generate posts from priority list
   for (const type of priorities) {
     if (posts.length >= count) break;
     if (usedTypes.has(type)) continue;

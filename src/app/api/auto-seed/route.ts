@@ -65,20 +65,20 @@ function getBotName(tag: string, city: string): string {
 }
 
 // Event-based post templates - THE PROMOTER personality (excited, hype!)
-// In-radius events (within 10 miles)
+// In-radius events (within 10 miles) - LOCAL EVENTS with date
 const EVENT_TEMPLATES = [
-  { mood: "🤩", template: (name: string, venue: string) => `OMG ${name} at ${venue}!! Who else is going?! This is gonna be GOOD 🔥` },
-  { mood: "🎉", template: (name: string, venue: string) => `${name} tonight at ${venue}! Finally something fun happening around here! Anyone need a plus one?` },
-  { mood: "🤩", template: (name: string, venue: string) => `Just found out about ${name} at ${venue} - why didn't anyone tell me sooner?! Who's in?` },
-  { mood: "🎉", template: (name: string, venue: string) => `${name} at ${venue}!! Been waiting for this all week. See y'all there! 🙌` },
+  { mood: "🤩", template: (name: string, venue: string, date: string) => `🎟️ ${name} on ${date} @ ${venue}! Who else is going?! This is gonna be GOOD 🔥` },
+  { mood: "🎉", template: (name: string, venue: string, date: string) => `📅 ${date}: ${name} at ${venue}! Finally something fun happening locally! Anyone need a plus one?` },
+  { mood: "🤩", template: (name: string, venue: string, date: string) => `Just found out about ${name} at ${venue} on ${date} - why didn't anyone tell me sooner?! Who's in?` },
+  { mood: "🎉", template: (name: string, venue: string, date: string) => `🎫 ${name} @ ${venue} - ${date}! Been waiting for this. See y'all there! 🙌` },
 ];
 
-// Out-of-radius events (10-50 miles) - include distance callout
+// Out-of-radius events (10-50 miles) - include date AND distance callout
 const DISTANT_EVENT_TEMPLATES = [
-  { mood: "🤩", template: (name: string, venue: string, distance: string) => `${name} at ${venue} (${distance} away) - might be worth the drive! Anyone going? 🚗` },
-  { mood: "🎉", template: (name: string, venue: string, distance: string) => `Heads up: ${name} happening at ${venue}, about ${distance} from here. Road trip anyone?` },
-  { mood: "🤩", template: (name: string, venue: string, distance: string) => `${name} at ${venue} is ${distance} away but looks amazing! Who's down to make the trip?` },
-  { mood: "🎉", template: (name: string, venue: string, distance: string) => `If you don't mind the ${distance} drive, ${name} at ${venue} could be worth it! 🎶` },
+  { mood: "🤩", template: (name: string, venue: string, date: string, distance: string) => `🎟️ ${name} on ${date} @ ${venue} (${distance} away) - might be worth the drive! Anyone going? 🚗` },
+  { mood: "🎉", template: (name: string, venue: string, date: string, distance: string) => `📅 ${date}: ${name} at ${venue} (${distance} away). Road trip anyone?` },
+  { mood: "🤩", template: (name: string, venue: string, date: string, distance: string) => `${name} at ${venue} on ${date} is ${distance} away but looks amazing! Who's down to make the trip?` },
+  { mood: "🎉", template: (name: string, venue: string, date: string, distance: string) => `🎫 ${date}: ${name} @ ${venue} - ${distance} drive but could be worth it! 🎶` },
 ];
 
 // Farmers market templates - ask for recommendations
@@ -222,10 +222,24 @@ function normalizeEventName(name: string): string {
   return name.toLowerCase().trim().replace(/\s+/g, " ").replace(/[^\w\s]/g, "");
 }
 
+/**
+ * Format event date for display
+ * e.g., "2026-01-10" → "Jan 10"
+ */
+function formatEventDate(dateStr?: string): string {
+  if (!dateStr) return "Soon";
+  try {
+    const date = new Date(dateStr + "T12:00:00"); // Avoid timezone issues
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  } catch {
+    return "Soon";
+  }
+}
+
 function generatePosts(data: AutoSeedRequest): Array<{ message: string; mood: string; tag: string }> {
   const posts: Array<{ message: string; mood: string; tag: string }> = [];
 
-  // 1. Event post (if events available) - deduplicate first
+  // 1. Event posts (if events available) - deduplicate and sort by distance
   if (data.events && data.events.length > 0) {
     // Deduplicate events by normalized name
     const seenNames = new Set<string>();
@@ -236,51 +250,71 @@ function generatePosts(data: AutoSeedRequest): Array<{ message: string; mood: st
       return true;
     });
 
-    const event = uniqueEvents[0]; // Pick first/soonest unique event
-    const isDistant = event.distanceMiles !== undefined &&
-      event.distanceMiles > RADIUS_CONFIG.PRIMARY_RADIUS_MILES;
+    // Sort by distance - LOCAL events first (closest to user)
+    uniqueEvents.sort((a, b) => {
+      const distA = a.distanceMiles ?? 999;
+      const distB = b.distanceMiles ?? 999;
+      return distA - distB;
+    });
 
-    if (isDistant) {
-      // Use distance-aware template for out-of-radius events
-      const template = getRandomItem(DISTANT_EVENT_TEMPLATES);
-      const distanceStr = formatDistance(event.distanceMiles!);
-      posts.push({
-        message: template.template(event.name, event.venue, distanceStr),
-        mood: template.mood,
-        tag: "Events",
-      });
-    } else {
-      // Use regular template for in-radius events
+    // Separate local vs distant events
+    const localEvents = uniqueEvents.filter(e =>
+      e.distanceMiles === undefined || e.distanceMiles <= RADIUS_CONFIG.PRIMARY_RADIUS_MILES
+    );
+    const distantEvents = uniqueEvents.filter(e =>
+      e.distanceMiles !== undefined && e.distanceMiles > RADIUS_CONFIG.PRIMARY_RADIUS_MILES
+    );
+
+    console.log(`[Auto-Seed] Events: ${localEvents.length} local, ${distantEvents.length} distant`);
+
+    // First: Post about LOCAL event (most important - hyperlocal!)
+    if (localEvents.length > 0) {
+      const event = localEvents[0];
       const template = getRandomItem(EVENT_TEMPLATES);
+      const dateStr = formatEventDate(event.date);
       posts.push({
-        message: template.template(event.name, event.venue),
+        message: template.template(event.name, event.venue, dateStr),
         mood: template.mood,
         tag: "Events",
       });
     }
 
-    // Add second event if available and different
-    if (uniqueEvents.length > 1) {
-      const event2 = uniqueEvents[1];
-      const isDistant2 = event2.distanceMiles !== undefined &&
-        event2.distanceMiles > RADIUS_CONFIG.PRIMARY_RADIUS_MILES;
+    // Second: Post about DISTANT event (if available) - with distance callout
+    if (distantEvents.length > 0) {
+      const event = distantEvents[0];
+      const template = getRandomItem(DISTANT_EVENT_TEMPLATES);
+      const dateStr = formatEventDate(event.date);
+      const distanceStr = formatDistance(event.distanceMiles!);
+      posts.push({
+        message: template.template(event.name, event.venue, dateStr, distanceStr),
+        mood: template.mood,
+        tag: "Events",
+      });
+    }
 
-      if (isDistant2) {
-        const template2 = getRandomItem(DISTANT_EVENT_TEMPLATES);
-        const distanceStr2 = formatDistance(event2.distanceMiles!);
-        posts.push({
-          message: template2.template(event2.name, event2.venue, distanceStr2),
-          mood: template2.mood,
-          tag: "Events",
-        });
-      } else {
-        const template2 = getRandomItem(EVENT_TEMPLATES);
-        posts.push({
-          message: template2.template(event2.name, event2.venue),
-          mood: template2.mood,
-          tag: "Events",
-        });
-      }
+    // Third: If we only have local events, add a second local one
+    if (distantEvents.length === 0 && localEvents.length > 1) {
+      const event2 = localEvents[1];
+      const template2 = getRandomItem(EVENT_TEMPLATES);
+      const dateStr2 = formatEventDate(event2.date);
+      posts.push({
+        message: template2.template(event2.name, event2.venue, dateStr2),
+        mood: template2.mood,
+        tag: "Events",
+      });
+    }
+
+    // Fourth: If we only have distant events, add a second distant one
+    if (localEvents.length === 0 && distantEvents.length > 1) {
+      const event2 = distantEvents[1];
+      const template2 = getRandomItem(DISTANT_EVENT_TEMPLATES);
+      const dateStr2 = formatEventDate(event2.date);
+      const distanceStr2 = formatDistance(event2.distanceMiles!);
+      posts.push({
+        message: template2.template(event2.name, event2.venue, dateStr2, distanceStr2),
+        mood: template2.mood,
+        tag: "Events",
+      });
     }
   }
 
@@ -607,6 +641,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Fetch events using lat/lng (most accurate method)
+  // Request 50mi radius to get both local AND distant events for variety
   let events: EventData[] = [];
   if (lat && lon) {
     try {
@@ -616,13 +651,18 @@ export async function GET(req: NextRequest) {
       if (eventsRes.ok) {
         const eventsData = await eventsRes.json();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        events = (eventsData.events || []).slice(0, 5).map((e: any) => ({
+        events = (eventsData.events || []).slice(0, 10).map((e: any) => ({
           name: e.name,
           venue: e.venue || "Local Venue",
           date: e.date,
           category: e.category,
+          distanceMiles: e.distanceMiles, // Include distance for sorting/display
         }));
-        console.log(`[Auto-Seed GET] Found ${events.length} events via lat/lng for ${city}`);
+
+        // Log local vs distant events for debugging
+        const localCount = events.filter(e => !e.distanceMiles || e.distanceMiles <= 10).length;
+        const distantCount = events.filter(e => e.distanceMiles && e.distanceMiles > 10).length;
+        console.log(`[Auto-Seed GET] Found ${events.length} events for ${city}: ${localCount} local, ${distantCount} distant`);
       }
     } catch (err) {
       console.log(`[Auto-Seed GET] Events fetch failed: ${err}`);

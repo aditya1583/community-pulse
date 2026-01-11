@@ -65,18 +65,34 @@ export {
 } from "./template-engine";
 export type { ExtendedPostType } from "./template-engine";
 
-// Engagement Posts - Polls, Recommendations, Venue Check-ins, This or That, FOMO, Weekly Roundup
+// Engagement Posts - Full suite of engagement-driving content
+// Traditional: Polls, Recommendations, Venue Check-ins
+// High-Engagement: Hot Takes, Confession Booth, Neighbor Challenges
+// Identity Builders: Insider Tips, Nostalgia Triggers, Community Callouts
+// Interactive: Would You Rather, This or That
 export {
   generateEngagementPost,
   generateEngagementSeedPosts,
+  // Traditional engagement
   generatePollPost,
   generateRecommendationPost,
   generateVenueCheckinPost,
   generateSchoolAlertPost,
   generateLocalSpotlightPost,
-  generateThisOrThatPost,      // NEW: Binary choice polls
-  generateFomoAlertPost,       // NEW: Time-sensitive alerts
-  generateWeeklyRoundupPost,   // NEW: Weekly summary
+  generateThisOrThatPost,
+  generateFomoAlertPost,
+  generateWeeklyRoundupPost,
+  // HIGH-ENGAGEMENT types (viral potential)
+  generateHotTakePost,
+  generateConfessionBoothPost,
+  generateNeighborChallengePost,
+  // IDENTITY BUILDERS (community bonding)
+  generateInsiderTipPost,
+  generateNostalgiaTriggerPost,
+  generateCommunityCalloutPost,
+  // INTERACTIVE (easy engagement)
+  generateWouldYouRatherPost,
+  // Analysis
   analyzeForEngagement,
   type EngagementPost,
   type EngagementType,
