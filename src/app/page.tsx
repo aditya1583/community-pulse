@@ -1124,7 +1124,11 @@ export default function Home() {
       // Explicitly select only needed fields for privacy
       // user_id is included for ownership check (is this my pulse?) - it's a UUID, not PII
       // is_bot is included to identify seeded content
-      const { data, error } = await supabase
+      // poll_options is for "This or That" polls (may not exist if migration not applied)
+      let data: DBPulse[] | null = null;
+      let error: { message: string } | null = null;
+
+      const queryWithPolls = await supabase
         .from("pulses")
         .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, poll_options")
         .eq("city", city)
@@ -1132,6 +1136,24 @@ export default function Home() {
         .lt("created_at", end.toISOString())
         .order("created_at", { ascending: false })
         .limit(PULSES_PAGE_SIZE + 1);
+
+      // Fallback: If poll_options column doesn't exist, retry without it
+      if (queryWithPolls.error?.message?.includes("poll_options")) {
+        console.warn("[Pulses] poll_options column missing, fetching without it");
+        const fallbackQuery = await supabase
+          .from("pulses")
+          .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot")
+          .eq("city", city)
+          .gte("created_at", start.toISOString())
+          .lt("created_at", end.toISOString())
+          .order("created_at", { ascending: false })
+          .limit(PULSES_PAGE_SIZE + 1);
+        data = (fallbackQuery.data as DBPulse[]) ?? null;
+        error = fallbackQuery.error;
+      } else {
+        data = (queryWithPolls.data as DBPulse[]) ?? null;
+        error = queryWithPolls.error;
+      }
 
       if (error) {
         console.error("Error fetching pulses:", error.message);
