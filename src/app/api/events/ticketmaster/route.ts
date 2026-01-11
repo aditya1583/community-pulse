@@ -158,10 +158,16 @@ export type TicketmasterEvent = {
   time: string | null; // e.g., "19:30" or null if TBD
   venue: string;
   venueAddress: string | null;
+  /** City where the venue is located */
+  venueCity: string | null;
   priceRange: string | null; // e.g., "$25 - $150" or null
   category: string | null;
   url: string;
   imageUrl: string | null;
+  /** Venue coordinates for distance calculation */
+  venueCoords: { lat: number; lng: number } | null;
+  /** Distance from user's location in miles */
+  distanceMiles: number | null;
 };
 
 // Response type with optional fallback info
@@ -268,6 +274,10 @@ type TicketmasterApiEvent = {
       address?: { line1?: string };
       city?: { name?: string };
       state?: { stateCode?: string };
+      location?: {
+        latitude?: string;
+        longitude?: string;
+      };
     }>;
   };
 };
@@ -324,13 +334,16 @@ function extractCategory(
 function extractVenueInfo(embedded?: TicketmasterApiEvent["_embedded"]): {
   venue: string;
   venueAddress: string | null;
+  venueCity: string | null;
+  venueCoords: { lat: number; lng: number } | null;
 } {
   if (!embedded?.venues || embedded.venues.length === 0) {
-    return { venue: "Venue TBD", venueAddress: null };
+    return { venue: "Venue TBD", venueAddress: null, venueCity: null, venueCoords: null };
   }
 
   const venueData = embedded.venues[0];
   const venue = venueData.name || "Venue TBD";
+  const venueCity = venueData.city?.name || null;
 
   let venueAddress: string | null = null;
   const addressParts: string[] = [];
@@ -343,7 +356,16 @@ function extractVenueInfo(embedded?: TicketmasterApiEvent["_embedded"]): {
     venueAddress = addressParts.join(", ");
   }
 
-  return { venue, venueAddress };
+  // Extract venue coordinates for distance calculation
+  let venueCoords: { lat: number; lng: number } | null = null;
+  if (venueData.location?.latitude && venueData.location?.longitude) {
+    venueCoords = {
+      lat: parseFloat(venueData.location.latitude),
+      lng: parseFloat(venueData.location.longitude),
+    };
+  }
+
+  return { venue, venueAddress, venueCity, venueCoords };
 }
 
 function selectBestImage(
@@ -361,8 +383,20 @@ function selectBestImage(
   return sorted[0]?.url ?? null;
 }
 
-function normalizeEvent(apiEvent: TicketmasterApiEvent): TicketmasterEvent {
-  const { venue, venueAddress } = extractVenueInfo(apiEvent._embedded);
+function normalizeEvent(
+  apiEvent: TicketmasterApiEvent,
+  userLat?: number,
+  userLng?: number
+): TicketmasterEvent {
+  const { venue, venueAddress, venueCity, venueCoords } = extractVenueInfo(apiEvent._embedded);
+
+  // Calculate distance from user's location if we have both coordinates
+  let distanceMiles: number | null = null;
+  if (userLat !== undefined && userLng !== undefined && venueCoords) {
+    distanceMiles = Math.round(
+      getDistanceMiles(userLat, userLng, venueCoords.lat, venueCoords.lng) * 10
+    ) / 10; // Round to 1 decimal place
+  }
 
   return {
     id: apiEvent.id,
@@ -371,10 +405,13 @@ function normalizeEvent(apiEvent: TicketmasterApiEvent): TicketmasterEvent {
     time: apiEvent.dates?.start?.localTime || null,
     venue,
     venueAddress,
+    venueCity,
     priceRange: formatPriceRange(apiEvent.priceRanges),
     category: extractCategory(apiEvent.classifications),
     url: apiEvent.url,
     imageUrl: selectBestImage(apiEvent.images),
+    venueCoords,
+    distanceMiles,
   };
 }
 
@@ -534,13 +571,32 @@ export async function GET(req: NextRequest) {
 
     console.log(`[Ticketmaster] Raw API returned ${apiEvents.length} events`);
 
-    // Normalize events to our format
+    // Normalize events to our format with distance calculation
     // Note: We already filter by startDateTime in the API request, so no client-side date filtering needed
     let events = apiEvents
       .filter((e) => e.dates?.start?.localDate) // Just ensure date exists
-      .map(normalizeEvent);
+      .map((e) => normalizeEvent(e, parsedLat, parsedLng));
 
-    console.log(`[Ticketmaster] Final events count: ${events.length}`);
+    // Sort by distance (closest first), then by date for events at same distance
+    events.sort((a, b) => {
+      // Events without distance go last
+      if (a.distanceMiles === null && b.distanceMiles === null) {
+        // Both have no distance - sort by date
+        return (a.date || "").localeCompare(b.date || "");
+      }
+      if (a.distanceMiles === null) return 1;
+      if (b.distanceMiles === null) return -1;
+
+      // Sort by distance (closest first)
+      if (a.distanceMiles !== b.distanceMiles) {
+        return a.distanceMiles - b.distanceMiles;
+      }
+
+      // Same distance - sort by date
+      return (a.date || "").localeCompare(b.date || "");
+    });
+
+    console.log(`[Ticketmaster] Final events count: ${events.length}, sorted by distance`);
 
     // --- METRO FALLBACK for small towns ---
     // If no events found, try nearest major metro
@@ -611,7 +667,20 @@ export async function GET(req: NextRequest) {
 
               events = metroApiEvents
                 .filter((e) => e.dates?.start?.localDate)
-                .map(normalizeEvent);
+                .map((e) => normalizeEvent(e, parsedLat, parsedLng));
+
+              // Sort metro fallback events by distance too
+              events.sort((a, b) => {
+                if (a.distanceMiles === null && b.distanceMiles === null) {
+                  return (a.date || "").localeCompare(b.date || "");
+                }
+                if (a.distanceMiles === null) return 1;
+                if (b.distanceMiles === null) return -1;
+                if (a.distanceMiles !== b.distanceMiles) {
+                  return a.distanceMiles - b.distanceMiles;
+                }
+                return (a.date || "").localeCompare(b.date || "");
+              });
 
               if (events.length > 0) {
                 fallbackInfo = {

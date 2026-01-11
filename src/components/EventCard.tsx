@@ -3,6 +3,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import type { TicketmasterEvent, EventsFallback } from "@/hooks/useEvents";
+import { RADIUS_CONFIG } from "@/lib/constants/radius";
 
 // Supabase client for fetching vibe counts
 const supabase = createClient(
@@ -185,7 +186,13 @@ function FeaturedEventCard({ event, vibeCount }: { event: TicketmasterEvent; vib
                 d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"
               />
             </svg>
-            <span className="truncate">{event.venue}</span>
+            <span className="truncate">
+              {event.venue}
+              {event.venueCity && `, ${event.venueCity}`}
+              {event.distanceMiles !== null && event.distanceMiles > RADIUS_CONFIG.PRIMARY_RADIUS_MILES && (
+                <span className="text-amber-400 font-medium"> ({event.distanceMiles} mi away)</span>
+              )}
+            </span>
           </p>
           {event.priceRange && (
             <p className="text-sm text-emerald-400">{event.priceRange}</p>
@@ -278,7 +285,13 @@ function SmallEventCard({ event }: { event: TicketmasterEvent }) {
           <h4 className="text-sm font-medium text-white truncate">
             {event.name}
           </h4>
-          <p className="text-xs text-slate-400 truncate">{event.venue}</p>
+          <p className="text-xs text-slate-400 truncate">
+            {event.venue}
+            {event.venueCity && `, ${event.venueCity}`}
+            {event.distanceMiles !== null && event.distanceMiles > RADIUS_CONFIG.PRIMARY_RADIUS_MILES && (
+              <span className="text-amber-400"> ({event.distanceMiles} mi)</span>
+            )}
+          </p>
         </div>
 
         {/* Arrow */}
