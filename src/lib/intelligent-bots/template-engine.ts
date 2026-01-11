@@ -548,7 +548,7 @@ function formatEventDate(startTime?: Date): string {
   }
 }
 
-function buildVariables(ctx: SituationContext): TemplateVariables {
+function buildVariables(ctx: SituationContext, eventIndex: number = 0): TemplateVariables {
   const { city, traffic, weather, events } = ctx;
 
   const primaryRoad = getRandomRoad(city, "major");
@@ -563,17 +563,20 @@ function buildVariables(ctx: SituationContext): TemplateVariables {
   const congestionPct = Math.round(traffic.congestionLevel * 100);
   const trafficDesc = congestionPct > 30 ? "heavy traffic" : congestionPct > 15 ? "moderate traffic" : "light traffic";
 
+  // Get the event at the specified index (for handling multiple event posts)
+  const event = events[eventIndex] || events[0];
+
   // Get actual event venue if available, otherwise fallback to random landmark
-  const eventVenue = events[0]?.venue || getRandomLandmark(city, "venues");
+  const eventVenue = event?.venue || getRandomLandmark(city, "venues");
 
   // Calculate event distance info for out-of-radius callouts
-  const eventDistance = events[0]?.distanceMiles;
+  const eventDistance = event?.distanceMiles;
   const isOutOfRadius = eventDistance && eventDistance > RADIUS_CONFIG.PRIMARY_RADIUS_MILES;
   const distanceStr = eventDistance ? formatDistance(eventDistance) : "";
   const distanceCallout = isOutOfRadius ? `(${distanceStr} away)` : "";
 
   // Format event date
-  const eventDate = formatEventDate(events[0]?.startTime);
+  const eventDate = formatEventDate(event?.startTime);
 
   return {
     city: city.name,
@@ -594,7 +597,7 @@ function buildVariables(ctx: SituationContext): TemplateVariables {
     condition: weather.condition,
     weather: weatherDesc,
     traffic: trafficDesc,
-    event: events[0]?.name || "the event",
+    event: event?.name || "the event",
     description: traffic.incidents[0]?.description || "Delay reported",
     eventDistance: distanceStr,
     eventDistanceCallout: distanceCallout,
@@ -722,14 +725,16 @@ export async function generateSeedPosts(
 
   // Categories to try, in priority order - avoid redundancy
   // Rule: Only ONE post per type (except Events can have 2 if different events)
-  const categoryOptions: Array<{ type: PostType; category: string }> = [
+  // Events are now sorted by distance, so events[0] is always the closest/most local
+  const categoryOptions: Array<{ type: PostType; category: string; eventIndex?: number }> = [
     // Traffic - only one
     { type: "Traffic", category: ctx.time.isRushHour ? `rushHour.${ctx.time.rushHourType}` : "general" },
     // Weather - only one, skip if conditions are unremarkable
     ...(getWeatherCategory(ctx) ? [{ type: "Weather" as PostType, category: getWeatherCategory(ctx) }] : []),
-    // Events: Up to 2 if different events available
-    ...(ctx.events.length > 0 ? [{ type: "Events" as PostType, category: getEventCategory(ctx.events[0]) }] : []),
-    ...(ctx.events.length > 1 ? [{ type: "Events" as PostType, category: getEventCategory(ctx.events[1]) }] : []),
+    // Events: LOCAL event first (events[0] is closest due to distance sorting)
+    ...(ctx.events.length > 0 ? [{ type: "Events" as PostType, category: getEventCategory(ctx.events[0]), eventIndex: 0 }] : []),
+    // Events: Second event (if different) - this will be farther away
+    ...(ctx.events.length > 1 ? [{ type: "Events" as PostType, category: getEventCategory(ctx.events[1]), eventIndex: 1 }] : []),
     // General - only if NOT already posting weather (to avoid redundancy)
     // Skip during normal hours when weather post already covers the vibe
     ...(
@@ -739,15 +744,29 @@ export async function generateSeedPosts(
     ...(ctx.time.isSchoolDismissal ? [{ type: "Traffic" as PostType, category: "schoolZone" }] : []),
   ];
 
+  // Track which event names we've posted about to prevent duplicates
+  const usedEventNames = new Set<string>();
+
   for (const option of categoryOptions) {
     if (posts.length >= count) break;
     if (usedCategories.has(`${option.type}-${option.category}`)) continue;
+
+    // For Events, check if we've already posted about this specific event
+    if (option.type === "Events" && option.eventIndex !== undefined) {
+      const eventName = ctx.events[option.eventIndex]?.name?.toLowerCase().trim();
+      if (eventName && usedEventNames.has(eventName)) {
+        console.log(`[TemplateEngine] Skipping duplicate event: ${eventName}`);
+        continue;
+      }
+      if (eventName) usedEventNames.add(eventName);
+    }
 
     const templates = getTemplates(option.type, option.category);
     if (templates.length === 0) continue;
 
     const template = selectTemplate(templates);
-    const variables = buildVariables(ctx);
+    // Pass eventIndex to buildVariables so each event post uses the correct event
+    const variables = buildVariables(ctx, option.eventIndex ?? 0);
     let message = fillTemplate(template, variables);
 
     // Inject fun facts into seed posts more frequently (~40% for variety)
