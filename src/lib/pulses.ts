@@ -33,6 +33,35 @@ export function writeOnboardingCompleted(
   }
 }
 
+// Session-level tracking keys (survive navigation within session, cleared on tab close)
+const FIRST_PULSE_MODAL_SHOWN_KEY = "cp-first-pulse-modal-shown";
+
+/**
+ * Check if the first pulse modal has been shown this session (survives navigation)
+ */
+export function hasShownFirstPulseModalThisSession(
+  storage: Pick<Storage, "getItem">
+): boolean {
+  try {
+    return storage.getItem(FIRST_PULSE_MODAL_SHOWN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Mark the first pulse modal as shown this session
+ */
+export function markFirstPulseModalShown(
+  storage: Pick<Storage, "setItem">
+): void {
+  try {
+    storage.setItem(FIRST_PULSE_MODAL_SHOWN_KEY, "1");
+  } catch {
+    // ignore storage errors
+  }
+}
+
 export function shouldShowFirstPulseOnboarding(args: {
   authStatus: AuthStatus;
   identityReady: boolean;

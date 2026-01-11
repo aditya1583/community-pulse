@@ -232,7 +232,18 @@ export async function fetchEventData(
     });
 
     // Filter out nonsensical event-venue pairings
-    return mappedEvents.filter((event: EventData) => isValidEventVenuePairing(event));
+    const validEvents = mappedEvents.filter((event: EventData) => isValidEventVenuePairing(event));
+
+    // Sort by distance - LOCAL events first (hyperlocal priority!)
+    validEvents.sort((a: EventData, b: EventData) => {
+      const distA = a.distanceMiles ?? 999;
+      const distB = b.distanceMiles ?? 999;
+      return distA - distB;
+    });
+
+    console.log(`[IntelligentBots] Events sorted by distance: ${validEvents.slice(0, 3).map((e: EventData) => `${e.name} (${e.distanceMiles?.toFixed(1) || '?'}mi)`).join(', ')}`);
+
+    return validEvents;
   } catch (error) {
     console.error("[IntelligentBots] Failed to fetch events:", error);
     return [];

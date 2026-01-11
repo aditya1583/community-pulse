@@ -19,27 +19,42 @@ const VALID_VIBE_TYPES = [
 type VibeType = typeof VALID_VIBE_TYPES[number];
 
 /**
- * GET /api/venue-vibe?venue_id=...
+ * GET /api/venue-vibe?venue_name=...
+ * GET /api/venue-vibe?venue_id=... (legacy, falls back to venue_name if no results)
  * Fetches aggregated vibes for a venue
+ *
+ * NOTE: venue_name is the canonical identifier since Foursquare/OSM IDs vary
+ * but venue names are consistent when users submit vibes.
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
+  const venueName = searchParams.get("venue_name");
   const venueId = searchParams.get("venue_id");
 
-  if (!venueId) {
+  if (!venueName && !venueId) {
     return NextResponse.json(
-      { error: "venue_id is required" },
+      { error: "venue_name or venue_id is required" },
       { status: 400 }
     );
   }
 
   try {
-    // Fetch non-expired vibes for this venue, aggregated by type
-    const { data, error } = await supabase
+    // Query by venue_name (canonical) since place IDs from Foursquare/OSM
+    // don't match what's stored when users submit vibes
+    let query = supabase
       .from("venue_vibes")
       .select("vibe_type, created_at")
-      .eq("venue_id", venueId)
       .gt("expires_at", new Date().toISOString());
+
+    if (venueName) {
+      // Primary: query by venue name (case-insensitive for robustness)
+      query = query.ilike("venue_name", venueName);
+    } else if (venueId) {
+      // Fallback: try venue_id first, then venue_name
+      query = query.eq("venue_id", venueId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       // Table might not exist yet

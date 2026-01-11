@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import VenueVibeCheck from "./VenueVibeCheck";
+import { VENUE_VIBE_TYPES, VenueVibeAggregate, getVibeTypeInfo, VenueVibeType } from "./types";
 
 type LocalPlace = {
   id: string;
@@ -29,10 +29,6 @@ type LocalDealsSectionProps = {
   state: string;
   lat?: number;
   lon?: number;
-  /** Current user ID for vibe logging */
-  userId?: string | null;
-  /** Callback to show sign-in modal */
-  onSignInClick?: () => void;
 };
 
 const DEAL_CATEGORIES = [
@@ -84,13 +80,14 @@ function getCategoryIcon(category: string): { emoji: string; gradient: string } 
   return CATEGORY_ICONS[category] || { emoji: "🏪", gradient: "from-slate-600 to-slate-700" };
 }
 
+// Store for venue vibes (simple cache to avoid repeated fetches)
+type VenueVibesCache = Record<string, { vibes: VenueVibeAggregate[]; fetchedAt: number }>;
+
 export default function LocalDealsSection({
   cityName,
   state,
   lat,
   lon,
-  userId,
-  onSignInClick,
 }: LocalDealsSectionProps) {
   const router = useRouter();
   const [places, setPlaces] = useState<LocalPlace[]>([]);
@@ -98,6 +95,7 @@ export default function LocalDealsSection({
   const [error, setError] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<CategoryId>("all");
   const [dataSource, setDataSource] = useState<DataSource>(null);
+  const [venueVibes, setVenueVibes] = useState<VenueVibesCache>({});
 
   const fetchPlaces = useCallback(async (category: CategoryId) => {
     if (!lat || !lon) {
@@ -109,6 +107,8 @@ export default function LocalDealsSection({
     setLoading(true);
     setError(null);
     setDataSource(null);
+    // Clear places array to prevent stale data from showing during re-fetch
+    setPlaces([]);
 
     const categoryConfig = DEAL_CATEGORIES.find(c => c.id === category);
 
@@ -184,12 +184,60 @@ export default function LocalDealsSection({
     }
   }, [lat, lon]);
 
+  // Fetch vibes for a venue (with caching)
+  // Uses venue name as the key since that's the canonical identifier for vibes
+  // Note: Using functional update pattern to avoid dependency on venueVibes
+  const fetchVenueVibes = useCallback(async (venueName: string) => {
+    // We need to check cache via ref or inside the setState callback
+    // For now, let's use a simpler approach that doesn't cause re-renders
+    try {
+      // Query by venue_name - this matches how vibes are stored and queried on detail pages
+      const res = await fetch(`/api/venue-vibe?venue_name=${encodeURIComponent(venueName)}`);
+      const data = await res.json();
+      const vibes = data.vibes || [];
+
+      setVenueVibes(prev => {
+        // Check cache inside the functional update to avoid stale closure issues
+        const cached = prev[venueName];
+        if (cached && Date.now() - cached.fetchedAt < 120000) {
+          // Already cached and fresh, don't update
+          return prev;
+        }
+        return {
+          ...prev,
+          [venueName]: { vibes, fetchedAt: Date.now() }
+        };
+      });
+
+      return vibes;
+    } catch (error) {
+      console.error("Error fetching venue vibes:", error);
+      return [];
+    }
+  }, []);
+
+  // Fetch vibes for all places when places change
+  useEffect(() => {
+    if (places.length > 0) {
+      // Fetch vibes for first 6 places (visible ones) using venue name
+      places.slice(0, 6).forEach(place => {
+        fetchVenueVibes(place.name);
+      });
+    }
+  }, [places, fetchVenueVibes]);
+
   useEffect(() => {
     fetchPlaces(activeCategory);
   }, [activeCategory, fetchPlaces]);
 
   const handleCategoryChange = (category: CategoryId) => {
     setActiveCategory(category);
+  };
+
+  // Get the top vibe for a venue (by name)
+  const getTopVibe = (venueName: string): VenueVibeAggregate | null => {
+    const cached = venueVibes[venueName];
+    return cached?.vibes?.[0] || null;
   };
 
   // Navigate to venue detail page
@@ -321,15 +369,15 @@ export default function LocalDealsSection({
       {/* Places Grid */}
       {!loading && !error && places.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {places.map((place) => (
-            <div
-              key={place.id}
-              className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3 hover:border-emerald-500/30 hover:bg-slate-800/80 transition group"
-            >
-              {/* Clickable area for venue detail page */}
+          {places.map((place, index) => {
+            const topVibe = getTopVibe(place.name);
+            const vibeInfo = topVibe ? getVibeTypeInfo(topVibe.vibeType as VenueVibeType) : null;
+
+            return (
               <button
+                key={`${place.id}-${place.name}-${index}`}
                 onClick={() => openVenueDetail(place)}
-                className="w-full text-left"
+                className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3 hover:border-emerald-500/30 hover:bg-slate-800/80 transition group text-left w-full"
               >
                 <div className="flex gap-3">
                   {/* Image or Icon */}
@@ -360,9 +408,21 @@ export default function LocalDealsSection({
 
                   {/* Details */}
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-white text-sm truncate pr-2">
-                      {place.name}
-                    </h4>
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="font-medium text-white text-sm truncate">
+                        {place.name}
+                      </h4>
+                      {/* Vibe badge - the key visual indicator */}
+                      {topVibe && vibeInfo && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-violet-500/20 text-violet-300 border border-violet-500/30 rounded-full shrink-0 group-hover:bg-violet-500/30 transition">
+                          <span>{vibeInfo.emoji}</span>
+                          <span className="hidden sm:inline">{vibeInfo.label}</span>
+                          {topVibe.count > 1 && (
+                            <span className="text-violet-400/60">+{topVibe.count - 1}</span>
+                          )}
+                        </span>
+                      )}
+                    </div>
 
                     <p className="text-xs text-slate-500 truncate mt-0.5">
                       {place.category}
@@ -388,31 +448,25 @@ export default function LocalDealsSection({
                           {place.address}
                         </p>
                       )}
-                      {place.distance !== null && (
-                        <span className="text-[10px] text-slate-400 shrink-0">
-                          {formatDistance(place.distance)}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {place.distance !== null && (
+                          <span className="text-[10px] text-slate-400">
+                            {formatDistance(place.distance)}
+                          </span>
+                        )}
+                        {/* Subtle prompt to share vibe */}
+                        {!vibeInfo && (
+                          <span className="text-[10px] text-emerald-500/70 group-hover:text-emerald-400 transition">
+                            share vibe
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
               </button>
-
-              {/* Vibe Check - separate from navigation */}
-              <div className="mt-2 pt-2 border-t border-slate-700/30">
-                <VenueVibeCheck
-                  venueId={place.id}
-                  venueName={place.name}
-                  venueLat={place.lat}
-                  venueLon={place.lon}
-                  city={cityName}
-                  compact={true}
-                  userId={userId}
-                  onSignInClick={onSignInClick}
-                />
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

@@ -141,56 +141,56 @@ const GENERAL_TEMPLATES = {
 
 const EVENT_TEMPLATES = {
   upcoming: [
-    "🎭 {event} at {venue} {eventDistanceCallout} starting soon! Traffic near {road} might pick up.",
-    "🎸 Don't forget - {event} tonight at {venue} {eventDistanceCallout}. Plan your route!",
-    "🎪 Heads up: {event} kicking off at {venue} {eventDistanceCallout}. Parking's gonna be fun.",
-    "📍 {event} day! {venue} {eventDistanceCallout} area will be busy. {altRoute} if you're passing through.",
+    "🎭 {eventDate}: {event} at {venue} {eventDistanceCallout}! Traffic near {road} might pick up.",
+    "🎸 Don't forget - {event} on {eventDate} at {venue} {eventDistanceCallout}. Plan your route!",
+    "🎪 {eventDate}: {event} kicking off at {venue} {eventDistanceCallout}. Parking's gonna be fun.",
+    "📍 {event} on {eventDate}! {venue} {eventDistanceCallout} area will be busy. {altRoute} if you're passing through.",
   ],
   concert: [
-    "🎸 {event} tonight at {venue} {eventDistanceCallout}! Doors open soon - get there early for good spots.",
-    "🎵 Live music alert: {event} at {venue} {eventDistanceCallout}. Worth the trip!",
-    "🎤 {event} hitting the stage at {venue} {eventDistanceCallout} tonight. Who's going?",
-    "🎶 {venue} {eventDistanceCallout} is about to be loud! {event} starting soon.",
-    "🎸 Music lovers: {event} at {venue} {eventDistanceCallout}. Support live music!",
+    "🎸 {eventDate}: {event} at {venue} {eventDistanceCallout}! Get there early for good spots.",
+    "🎵 Live music alert: {event} on {eventDate} at {venue} {eventDistanceCallout}. Worth the trip!",
+    "🎤 {event} hitting the stage at {venue} {eventDistanceCallout} on {eventDate}. Who's going?",
+    "🎶 {eventDate}: {venue} {eventDistanceCallout} is about to be loud! {event} time.",
+    "🎸 Music lovers: {event} at {venue} {eventDistanceCallout} - {eventDate}!",
   ],
   sports: [
-    "🏈 Game day! {event} at {venue} {eventDistanceCallout}. Expect traffic on {road}.",
-    "⚽ {event} kicking off at {venue} {eventDistanceCallout}! Let's go!",
-    "🏀 Hoops tonight - {event} at {venue} {eventDistanceCallout}. Who's courtside?",
-    "🏒 Puck drops soon! {event} at {venue} {eventDistanceCallout}. Let's get loud!",
-    "⚾ {event} at {venue} {eventDistanceCallout} - perfect weather for a game!",
+    "🏈 {eventDate}: Game day! {event} at {venue} {eventDistanceCallout}. Expect traffic on {road}.",
+    "⚽ {event} kicking off {eventDate} at {venue} {eventDistanceCallout}! Let's go!",
+    "🏀 {eventDate}: {event} at {venue} {eventDistanceCallout}. Who's courtside?",
+    "🏒 {eventDate}: {event} at {venue} {eventDistanceCallout}. Let's get loud!",
+    "⚾ {event} on {eventDate} at {venue} {eventDistanceCallout} - perfect weather for a game!",
   ],
   festival: [
-    "🎪 {event} is happening at {venue} {eventDistanceCallout}! Expect crowds all day.",
-    "🎉 Festival vibes: {event} at {venue} {eventDistanceCallout}. Bring sunscreen and good energy!",
-    "🌟 {event} at {venue} {eventDistanceCallout} - one of the best events of the year!",
-    "🎠 {event} in full swing at {venue} {eventDistanceCallout}. Perfect day for it!",
+    "🎪 {eventDate}: {event} at {venue} {eventDistanceCallout}! Expect crowds all day.",
+    "🎉 Festival vibes: {event} on {eventDate} at {venue} {eventDistanceCallout}. Bring sunscreen!",
+    "🌟 {event} at {venue} {eventDistanceCallout} - {eventDate}. One of the best events of the year!",
+    "🎠 {eventDate}: {event} at {venue} {eventDistanceCallout}. Perfect day for it!",
   ],
   community: [
-    "🏘️ Community event: {event} at {venue} {eventDistanceCallout}. Great way to meet neighbors!",
-    "👥 {event} happening at {venue} {eventDistanceCallout}. Love seeing the community come together.",
-    "🎈 Family-friendly: {event} at {venue} {eventDistanceCallout}. Bring the kids!",
-    "🌳 {event} at {venue} {eventDistanceCallout} - support local!",
+    "🏘️ {eventDate}: {event} at {venue} {eventDistanceCallout}. Great way to meet neighbors!",
+    "👥 {event} on {eventDate} at {venue} {eventDistanceCallout}. Community vibes!",
+    "🎈 {eventDate}: {event} at {venue} {eventDistanceCallout}. Bring the kids!",
+    "🌳 {event} on {eventDate} at {venue} {eventDistanceCallout} - support local!",
   ],
   comedy: [
-    "😂 Laugh time: {event} at {venue} {eventDistanceCallout} tonight. Get ready to LOL.",
-    "🎤 Comedy night! {event} at {venue} {eventDistanceCallout}. Bring your sense of humor.",
-    "😆 {event} at {venue} {eventDistanceCallout} - perfect way to end the week!",
+    "😂 {eventDate}: {event} at {venue} {eventDistanceCallout}. Get ready to LOL.",
+    "🎤 Comedy night! {event} on {eventDate} at {venue} {eventDistanceCallout}.",
+    "😆 {event} at {venue} {eventDistanceCallout} - {eventDate}. Perfect way to end the week!",
   ],
   arts: [
-    "🎨 Art lovers: {event} at {venue} {eventDistanceCallout}. Culture night in {city}!",
-    "🖼️ {event} at {venue} {eventDistanceCallout} - expand your horizons tonight.",
-    "🎭 Theater alert: {event} at {venue} {eventDistanceCallout}. Support local arts!",
+    "🎨 {eventDate}: {event} at {venue} {eventDistanceCallout}. Culture night in {city}!",
+    "🖼️ {event} on {eventDate} at {venue} {eventDistanceCallout} - expand your horizons.",
+    "🎭 Theater alert: {event} at {venue} {eventDistanceCallout} on {eventDate}!",
   ],
   food: [
-    "🍔 Foodies unite: {event} at {venue} {eventDistanceCallout}. Bring your appetite!",
-    "🍕 {event} at {venue} {eventDistanceCallout} - come hungry, leave happy.",
-    "🌮 Food event alert: {event} at {venue} {eventDistanceCallout}. Diet starts Monday!",
+    "🍔 {eventDate}: {event} at {venue} {eventDistanceCallout}. Bring your appetite!",
+    "🍕 {event} on {eventDate} at {venue} {eventDistanceCallout} - come hungry!",
+    "🌮 Food event: {event} at {venue} {eventDistanceCallout} - {eventDate}. Diet starts Monday!",
   ],
   general: [
-    "📅 Happening today: {event} at {venue} {eventDistanceCallout}.",
-    "📍 {event} at {venue} {eventDistanceCallout} - check it out if you're nearby!",
-    "🎟️ {event} at {venue} {eventDistanceCallout}. Something for everyone!",
+    "📅 {eventDate}: {event} at {venue} {eventDistanceCallout}.",
+    "📍 {event} on {eventDate} at {venue} {eventDistanceCallout} - check it out!",
+    "🎟️ {eventDate}: {event} at {venue} {eventDistanceCallout}. Something for everyone!",
   ],
 };
 
@@ -230,8 +230,21 @@ const MOOD_BY_CATEGORY: Record<string, string[]> = {
 // BOT NAME GENERATOR
 // ============================================================================
 
-// Extended post types to include engagement
-export type ExtendedPostType = PostType | "Engagement" | "SchoolTraffic" | "VenueCheck" | "Local";
+// Extended post types to include engagement and new high-engagement types
+export type ExtendedPostType =
+  | PostType
+  | "Engagement"
+  | "SchoolTraffic"
+  | "VenueCheck"
+  | "Local"
+  // NEW HIGH-ENGAGEMENT TYPES
+  | "HotTake"
+  | "InsiderTip"
+  | "Nostalgia"
+  | "Challenge"
+  | "Callout"
+  | "WouldYouRather"
+  | "Confession";
 
 interface BotPersona {
   name: string;
@@ -280,6 +293,57 @@ const BOT_PERSONAS: Record<ExtendedPostType, BotPersona[]> = {
     { name: "munching_bot", emoji: "🍔" },
     { name: "foodie_finder_bot", emoji: "🌮" },
     { name: "local_eats_bot", emoji: "😋" },
+  ],
+
+  // ========== NEW HIGH-ENGAGEMENT BOT PERSONAS ==========
+
+  // Hot Takes - controversial opinions that spark debate
+  HotTake: [
+    { name: "hot_take_bot", emoji: "🌶️" },
+    { name: "spicy_opinions_bot", emoji: "🔥" },
+    { name: "truth_bomb_bot", emoji: "💣" },
+  ],
+
+  // Insider Tips - makes locals feel special
+  InsiderTip: [
+    { name: "local_insider_bot", emoji: "💡" },
+    { name: "secret_keeper_bot", emoji: "🤫" },
+    { name: "pro_tip_bot", emoji: "🗝️" },
+  ],
+
+  // Nostalgia - remember when posts
+  Nostalgia: [
+    { name: "memory_lane_bot", emoji: "📸" },
+    { name: "throwback_bot", emoji: "🕰️" },
+    { name: "og_vibes_bot", emoji: "👴" },
+  ],
+
+  // Challenges - direct call to action
+  Challenge: [
+    { name: "challenge_bot", emoji: "🎯" },
+    { name: "game_on_bot", emoji: "🏆" },
+    { name: "dare_bot", emoji: "📣" },
+  ],
+
+  // Callouts - celebrate or call out behavior
+  Callout: [
+    { name: "community_watch_bot", emoji: "👀" },
+    { name: "shoutout_bot", emoji: "🙌" },
+    { name: "real_talk_bot", emoji: "💜" },
+  ],
+
+  // Would You Rather - hypotheticals
+  WouldYouRather: [
+    { name: "hypothetical_bot", emoji: "⚖️" },
+    { name: "dilemma_bot", emoji: "🤔" },
+    { name: "choice_bot", emoji: "🎲" },
+  ],
+
+  // Confession Booth - anonymous-style confessions
+  Confession: [
+    { name: "confession_booth_bot", emoji: "🤫" },
+    { name: "safe_space_bot", emoji: "🙈" },
+    { name: "no_judgment_bot", emoji: "🎭" },
   ],
 };
 
@@ -467,9 +531,24 @@ interface TemplateVariables {
   description: string;
   eventDistance: string;
   eventDistanceCallout: string;
+  eventDate: string;
+  venueCity: string;
 }
 
-function buildVariables(ctx: SituationContext): TemplateVariables {
+/**
+ * Format event date for display
+ * e.g., "2026-01-10T19:00:00" → "Jan 10"
+ */
+function formatEventDate(startTime?: Date): string {
+  if (!startTime) return "Soon";
+  try {
+    return startTime.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  } catch {
+    return "Soon";
+  }
+}
+
+function buildVariables(ctx: SituationContext, eventIndex: number = 0): TemplateVariables {
   const { city, traffic, weather, events } = ctx;
 
   const primaryRoad = getRandomRoad(city, "major");
@@ -484,14 +563,20 @@ function buildVariables(ctx: SituationContext): TemplateVariables {
   const congestionPct = Math.round(traffic.congestionLevel * 100);
   const trafficDesc = congestionPct > 30 ? "heavy traffic" : congestionPct > 15 ? "moderate traffic" : "light traffic";
 
+  // Get the event at the specified index (for handling multiple event posts)
+  const event = events[eventIndex] || events[0];
+
   // Get actual event venue if available, otherwise fallback to random landmark
-  const eventVenue = events[0]?.venue || getRandomLandmark(city, "venues");
+  const eventVenue = event?.venue || getRandomLandmark(city, "venues");
 
   // Calculate event distance info for out-of-radius callouts
-  const eventDistance = events[0]?.distanceMiles;
+  const eventDistance = event?.distanceMiles;
   const isOutOfRadius = eventDistance && eventDistance > RADIUS_CONFIG.PRIMARY_RADIUS_MILES;
   const distanceStr = eventDistance ? formatDistance(eventDistance) : "";
   const distanceCallout = isOutOfRadius ? `(${distanceStr} away)` : "";
+
+  // Format event date
+  const eventDate = formatEventDate(event?.startTime);
 
   return {
     city: city.name,
@@ -512,10 +597,12 @@ function buildVariables(ctx: SituationContext): TemplateVariables {
     condition: weather.condition,
     weather: weatherDesc,
     traffic: trafficDesc,
-    event: events[0]?.name || "the event",
+    event: event?.name || "the event",
     description: traffic.incidents[0]?.description || "Delay reported",
     eventDistance: distanceStr,
     eventDistanceCallout: distanceCallout,
+    eventDate,
+    venueCity: "", // Will be populated when we have venue city data
   };
 }
 
@@ -638,14 +725,16 @@ export async function generateSeedPosts(
 
   // Categories to try, in priority order - avoid redundancy
   // Rule: Only ONE post per type (except Events can have 2 if different events)
-  const categoryOptions: Array<{ type: PostType; category: string }> = [
+  // Events are now sorted by distance, so events[0] is always the closest/most local
+  const categoryOptions: Array<{ type: PostType; category: string; eventIndex?: number }> = [
     // Traffic - only one
     { type: "Traffic", category: ctx.time.isRushHour ? `rushHour.${ctx.time.rushHourType}` : "general" },
     // Weather - only one, skip if conditions are unremarkable
     ...(getWeatherCategory(ctx) ? [{ type: "Weather" as PostType, category: getWeatherCategory(ctx) }] : []),
-    // Events: Up to 2 if different events available
-    ...(ctx.events.length > 0 ? [{ type: "Events" as PostType, category: getEventCategory(ctx.events[0]) }] : []),
-    ...(ctx.events.length > 1 ? [{ type: "Events" as PostType, category: getEventCategory(ctx.events[1]) }] : []),
+    // Events: LOCAL event first (events[0] is closest due to distance sorting)
+    ...(ctx.events.length > 0 ? [{ type: "Events" as PostType, category: getEventCategory(ctx.events[0]), eventIndex: 0 }] : []),
+    // Events: Second event (if different) - this will be farther away
+    ...(ctx.events.length > 1 ? [{ type: "Events" as PostType, category: getEventCategory(ctx.events[1]), eventIndex: 1 }] : []),
     // General - only if NOT already posting weather (to avoid redundancy)
     // Skip during normal hours when weather post already covers the vibe
     ...(
@@ -655,15 +744,29 @@ export async function generateSeedPosts(
     ...(ctx.time.isSchoolDismissal ? [{ type: "Traffic" as PostType, category: "schoolZone" }] : []),
   ];
 
+  // Track which event names we've posted about to prevent duplicates
+  const usedEventNames = new Set<string>();
+
   for (const option of categoryOptions) {
     if (posts.length >= count) break;
     if (usedCategories.has(`${option.type}-${option.category}`)) continue;
+
+    // For Events, check if we've already posted about this specific event
+    if (option.type === "Events" && option.eventIndex !== undefined) {
+      const eventName = ctx.events[option.eventIndex]?.name?.toLowerCase().trim();
+      if (eventName && usedEventNames.has(eventName)) {
+        console.log(`[TemplateEngine] Skipping duplicate event: ${eventName}`);
+        continue;
+      }
+      if (eventName) usedEventNames.add(eventName);
+    }
 
     const templates = getTemplates(option.type, option.category);
     if (templates.length === 0) continue;
 
     const template = selectTemplate(templates);
-    const variables = buildVariables(ctx);
+    // Pass eventIndex to buildVariables so each event post uses the correct event
+    const variables = buildVariables(ctx, option.eventIndex ?? 0);
     let message = fillTemplate(template, variables);
 
     // Inject fun facts into seed posts more frequently (~40% for variety)
