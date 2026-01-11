@@ -1,3 +1,14 @@
+<!--
+  Community Pulse - UI Mockup
+
+  Purpose: Standalone interactive HTML mockup for visualizing the app UI
+           without requiring API keys or backend services.
+
+  Usage: Open directly in a browser to preview the UI design.
+
+  Note: This is a static mockup for design reference only - not connected
+        to the actual application architecture.
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -730,6 +741,52 @@
       text-transform: uppercase;
       letter-spacing: 0.1em;
     }
+
+    /* Traffic Hotspots */
+    .traffic-hotspots-title {
+      margin-bottom: 12px;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .traffic-hotspots-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .traffic-hotspot {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px;
+      border-radius: 8px;
+    }
+
+    .traffic-hotspot.moderate {
+      background: rgba(251, 191, 36, 0.1);
+    }
+
+    .traffic-hotspot.clear {
+      background: rgba(16, 185, 129, 0.1);
+    }
+
+    .traffic-hotspot-status.moderate {
+      color: var(--amber-400);
+    }
+
+    .traffic-hotspot-status.clear {
+      color: var(--emerald-400);
+    }
+
+    /* BOT Badge */
+    .bot-badge {
+      background: #374151;
+      color: #9ca3af;
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 6px;
+    }
   </style>
 </head>
 <body>
@@ -774,31 +831,31 @@
           </div>
           <span class="vibe-emoji">🔥</span>
         </div>
-        <button class="gas-price-btn">
-          <span>⛽</span>
+        <button class="gas-price-btn" aria-label="View gas prices - Regular at $2.89">
+          <span aria-hidden="true">⛽</span>
           <span class="gas-price">$2.89</span>
           <span class="gas-label">Regular</span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
         </button>
       </div>
 
       <!-- Quick Stats -->
       <div class="quick-stats">
-        <div class="stat-card stat-traffic" onclick="showTab('traffic')">
+        <button class="stat-card stat-traffic" onclick="showTab('traffic', event)" aria-label="View traffic conditions - currently light">
           <div class="stat-icon">🚗</div>
           <div class="stat-value">Light</div>
           <div class="stat-label">Traffic</div>
-        </div>
-        <div class="stat-card stat-events" onclick="showTab('events')">
+        </button>
+        <button class="stat-card stat-events" onclick="showTab('events', event)" aria-label="View 12 upcoming events">
           <div class="stat-icon">📅</div>
           <div class="stat-value">12</div>
           <div class="stat-label">Events</div>
-        </div>
-        <div class="stat-card stat-mood">
+        </button>
+        <button class="stat-card stat-mood" aria-label="Community mood is happy">
           <div class="stat-icon">😊</div>
           <div class="stat-value">Happy</div>
           <div class="stat-label">Mood</div>
-        </div>
+        </button>
       </div>
 
       <!-- Pulse Tab Content -->
@@ -874,7 +931,7 @@
               <div class="pulse-footer">
                 <div>
                   <span class="pulse-author">MusicLover512</span>
-                  <span style="background:#374151;color:#9ca3af;font-size:9px;padding:2px 6px;border-radius:4px;margin-left:6px;">BOT</span>
+                  <span class="bot-badge">BOT</span>
                 </div>
                 <div class="pulse-actions">
                   <span class="pulse-action">🔥 45</span>
@@ -957,19 +1014,19 @@
         </div>
 
         <div class="card">
-          <h4 style="margin-bottom:12px;font-size:14px;color:var(--text-secondary);">Traffic Hotspots</h4>
-          <div style="display:flex;flex-direction:column;gap:8px;">
-            <div style="display:flex;justify-content:space-between;padding:8px;background:rgba(251,191,36,0.1);border-radius:8px;">
+          <h4 class="traffic-hotspots-title">Traffic Hotspots</h4>
+          <div class="traffic-hotspots-list">
+            <div class="traffic-hotspot moderate">
               <span>I-35 @ Rundberg</span>
-              <span style="color:var(--amber-400)">Moderate</span>
+              <span class="traffic-hotspot-status moderate">Moderate</span>
             </div>
-            <div style="display:flex;justify-content:space-between;padding:8px;background:rgba(16,185,129,0.1);border-radius:8px;">
+            <div class="traffic-hotspot clear">
               <span>Mopac @ 360</span>
-              <span style="color:var(--emerald-400)">Clear</span>
+              <span class="traffic-hotspot-status clear">Clear</span>
             </div>
-            <div style="display:flex;justify-content:space-between;padding:8px;background:rgba(16,185,129,0.1);border-radius:8px;">
+            <div class="traffic-hotspot clear">
               <span>183 @ Burnet</span>
-              <span style="color:var(--emerald-400)">Clear</span>
+              <span class="traffic-hotspot-status clear">Clear</span>
             </div>
           </div>
         </div>
@@ -1016,16 +1073,16 @@
     </main>
 
     <!-- Bottom Navigation -->
-    <nav class="bottom-nav">
+    <nav class="bottom-nav" aria-label="Main navigation">
       <div class="nav-items">
-        <button class="nav-item active" onclick="showTab('pulse')">
+        <button class="nav-item active" onclick="showTab('pulse', event)" aria-current="page" aria-label="Pulse feed">
           <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
           </svg>
           <span class="nav-label">Pulse</span>
         </button>
 
-        <button class="nav-item" onclick="showTab('events')">
+        <button class="nav-item" onclick="showTab('events', event)" aria-label="Events">
           <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
           </svg>
@@ -1033,7 +1090,7 @@
         </button>
 
         <div class="fab-container">
-          <button class="fab">
+          <button class="fab" aria-label="Create new post">
             <svg class="fab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
@@ -1041,14 +1098,14 @@
           <span class="fab-label">Post</span>
         </div>
 
-        <button class="nav-item" onclick="showTab('traffic')">
+        <button class="nav-item" onclick="showTab('traffic', event)" aria-label="Traffic">
           <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
           </svg>
           <span class="nav-label">Traffic</span>
         </button>
 
-        <button class="nav-item" onclick="showTab('local')">
+        <button class="nav-item" onclick="showTab('local', event)" aria-label="Local deals and services">
           <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
             <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
@@ -1060,18 +1117,29 @@
   </div>
 
   <script>
-    function showTab(tabId) {
+    /**
+     * Switches between different tab views (Pulse, Events, Traffic, Local)
+     *
+     * @param {string} tabId - The ID of the tab to display (without '-content' suffix)
+     * @param {Event} event - The click event from the button
+     */
+    function showTab(tabId, event) {
       // Update tab content visibility
       document.querySelectorAll('.tab-content').forEach(content => {
         content.classList.remove('active');
       });
       document.getElementById(tabId + '-content').classList.add('active');
 
-      // Update nav item active state
+      // Update nav item active state and aria-current
       document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.remove('active');
+        item.removeAttribute('aria-current');
       });
-      event.currentTarget.classList.add('active');
+
+      if (event && event.currentTarget) {
+        event.currentTarget.classList.add('active');
+        event.currentTarget.setAttribute('aria-current', 'page');
+      }
 
       // Update screen label
       const labels = {
