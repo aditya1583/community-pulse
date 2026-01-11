@@ -1689,6 +1689,16 @@ export async function generateEngagementSeedPosts(
   // Build priority list - HIGH-ENGAGEMENT TYPES FIRST
   const priorities: EngagementType[] = [];
 
+  // ========== INTERACTIVE POLLS (Highest priority - easy one-tap engagement) ==========
+  // These generate voteable polls that users can interact with immediately
+  // Moved to top priority to ensure every city gets at least one poll
+
+  // This or That - super quick one-tap engagement with poll options
+  priorities.push("this_or_that");
+
+  // Would you rather - fun hypotheticals with poll options
+  priorities.push("would_you_rather");
+
   // ========== TIME-SENSITIVE (if applicable) ==========
 
   // Weekly roundup on weekends
@@ -1734,14 +1744,6 @@ export async function generateEngagementSeedPosts(
   // Community callouts celebrate local behavior
   priorities.push("community_callout");
 
-  // ========== INTERACTIVE (Easy engagement) ==========
-
-  // Would you rather - fun hypotheticals with poll options
-  priorities.push("would_you_rather");
-
-  // This or That - super quick one-tap engagement
-  priorities.push("this_or_that");
-
   // ========== TRADITIONAL (Fill remaining slots) ==========
 
   // Evening venue check
@@ -1749,7 +1751,7 @@ export async function generateEngagementSeedPosts(
     priorities.push("venue_checkin");
   }
 
-  // Always include traditional types as fallbacks
+  // Traditional poll and other types as fallbacks
   priorities.push("poll", "local_spotlight", "recommendation");
 
   // Generate posts from priority list

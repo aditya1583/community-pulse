@@ -1,8 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { hasIntelligentBotConfig, generateColdStartPosts } from "@/lib/intelligent-bots";
+import { hasIntelligentBotConfig, generateColdStartPosts, getCityConfig } from "@/lib/intelligent-bots";
 import { RADIUS_CONFIG } from "@/lib/constants/radius";
 import { formatDistance } from "@/lib/geo/distance";
+
+// City coordinates for distance-based filtering
+// Used when bot posts are created to enable distance sorting
+const CITY_COORDINATES: Record<string, { lat: number; lon: number }> = {
+  "leander": { lat: 30.5788, lon: -97.8531 },
+  "cedar park": { lat: 30.5052, lon: -97.8203 },
+  "austin": { lat: 30.2672, lon: -97.7431 },
+  "round rock": { lat: 30.5083, lon: -97.6789 },
+  "georgetown": { lat: 30.6333, lon: -97.6780 },
+  "pflugerville": { lat: 30.4394, lon: -97.6200 },
+  "kyle": { lat: 29.9894, lon: -97.8772 },
+  "san marcos": { lat: 29.8833, lon: -97.9414 },
+  "buda": { lat: 30.0852, lon: -97.8403 },
+  "hutto": { lat: 30.5427, lon: -97.5467 },
+  "taylor": { lat: 30.5708, lon: -97.4097 },
+  "lakeway": { lat: 30.3641, lon: -97.9797 },
+  "dripping springs": { lat: 30.1902, lon: -98.0867 },
+  "bee cave": { lat: 30.3085, lon: -97.9469 },
+  "manor": { lat: 30.3416, lon: -97.5567 },
+};
+
+function getCityCoordinates(cityName: string): { lat: number; lon: number } | null {
+  // First try the intelligent bot config
+  const cityConfig = getCityConfig(cityName);
+  if (cityConfig?.coords) {
+    return { lat: cityConfig.coords.lat, lon: cityConfig.coords.lon };
+  }
+
+  // Fallback to static coordinates lookup
+  const normalized = cityName.toLowerCase().split(",")[0].trim();
+  return CITY_COORDINATES[normalized] ?? null;
+}
 
 /**
  * Auto-Seed API - Generates contextual bot posts for empty cities
@@ -441,6 +473,9 @@ export async function POST(req: NextRequest) {
         const now = Date.now();
         let cumulativeOffset = 0;
 
+        // Get city coordinates for distance-based filtering
+        const cityCoords = getCityCoordinates(body.city);
+
         const records = result.posts.map((post, index) => {
           // First post is "now", subsequent posts are staggered backwards in time
           // Each post is 3-7 minutes apart (varies per post) to feel organic
@@ -466,6 +501,8 @@ export async function POST(req: NextRequest) {
             created_at: createdAt,
             expires_at: expiresAt,
             poll_options: post.options || null,
+            lat: cityCoords?.lat ?? null,
+            lon: cityCoords?.lon ?? null,
           };
         });
 
@@ -540,6 +577,9 @@ export async function POST(req: NextRequest) {
     const now = Date.now();
     let cumulativeOffset = 0;
 
+    // Get city coordinates for distance-based filtering
+    const cityCoords = getCityCoordinates(body.city);
+
     const records = posts.map((post, index) => {
       // Stagger posts backwards in time with natural variation
       // Each post is 4-12 minutes apart (wider variance for non-intelligent seeds)
@@ -564,6 +604,8 @@ export async function POST(req: NextRequest) {
         hidden: false, // Explicitly set to ensure RLS allows reading
         created_at: createdAt,
         expires_at: expiresAt,
+        lat: cityCoords?.lat ?? null,
+        lon: cityCoords?.lon ?? null,
       };
     });
 

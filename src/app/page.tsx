@@ -44,6 +44,8 @@ import { useGamification } from "@/hooks/useGamification";
 import XPProgressBadge from "@/components/XPProgressBadge";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import LocationPrompt from "@/components/LocationPrompt";
+import { calculateDistanceMiles } from "@/lib/geo/distance";
+import { RADIUS_CONFIG } from "@/lib/constants/radius";
 
 // Real-time Live Updates
 type DBPulse = {
@@ -60,6 +62,8 @@ type DBPulse = {
   is_bot?: boolean;
   hidden?: boolean;
   poll_options?: string[] | null;
+  lat?: number | null;
+  lon?: number | null;
 };
 
 // Pagination constants
@@ -79,6 +83,8 @@ function mapDBPulseToPulse(row: DBPulse): Pulse {
     expiresAt: row.expires_at ?? null,
     is_bot: row.is_bot ?? false,
     poll_options: row.poll_options ?? null,
+    lat: row.lat ?? null,
+    lon: row.lon ?? null,
   };
 }
 
@@ -1159,9 +1165,10 @@ export default function Home() {
       let data: DBPulse[] | null = null;
       let error: { message: string } | null = null;
 
+      // Include lat/lon for distance-based filtering
       const queryWithPolls = await supabase
         .from("pulses")
-        .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, poll_options")
+        .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, poll_options, lat, lon")
         .eq("city", city)
         .gte("created_at", start.toISOString())
         .lt("created_at", end.toISOString())
@@ -1173,7 +1180,7 @@ export default function Home() {
         console.warn("[Pulses] poll_options column missing, fetching without it");
         const fallbackQuery = await supabase
           .from("pulses")
-          .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot")
+          .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, lat, lon")
           .eq("city", city)
           .gte("created_at", start.toISOString())
           .lt("created_at", end.toISOString())
@@ -1340,11 +1347,11 @@ export default function Home() {
           const start = startOfRecentWindow(now, 7);
           const end = startOfNextLocalDay(now);
 
-          // Use same column selection as initial fetch (with poll_options fallback)
+          // Use same column selection as initial fetch (with poll_options and lat/lon)
           let refetchData: DBPulse[] | null = null;
           const refetchWithPolls = await supabase
             .from("pulses")
-            .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, poll_options")
+            .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, poll_options, lat, lon")
             .eq("city", city)
             .gte("created_at", start.toISOString())
             .lt("created_at", end.toISOString())
@@ -1355,7 +1362,7 @@ export default function Home() {
             console.warn("[Auto-Seed Refetch] poll_options missing, retrying without it");
             const refetchWithoutPolls = await supabase
               .from("pulses")
-              .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot")
+              .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, lat, lon")
               .eq("city", city)
               .gte("created_at", start.toISOString())
               .lt("created_at", end.toISOString())
@@ -1437,13 +1444,13 @@ export default function Home() {
     const cursor = oldestPulse.createdAt;
 
     try {
-      // Use same column selection as initial fetch (with poll_options fallback)
+      // Use same column selection as initial fetch (with poll_options and lat/lon)
       let data: DBPulse[] | null = null;
       let error: { message: string } | null = null;
 
       const queryWithPolls = await supabase
         .from("pulses")
-        .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, poll_options")
+        .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, poll_options, lat, lon")
         .eq("city", city)
         .gte("created_at", start.toISOString())
         .lt("created_at", cursor)
@@ -1453,7 +1460,7 @@ export default function Home() {
       if (queryWithPolls.error?.message?.includes("poll_options")) {
         const fallbackQuery = await supabase
           .from("pulses")
-          .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot")
+          .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, lat, lon")
           .eq("city", city)
           .gte("created_at", start.toISOString())
           .lt("created_at", cursor)
@@ -2059,9 +2066,12 @@ export default function Home() {
     }
   }
 
-  // ========= FILTER PULSES =========
-  // Client-side expiry filtering as a safety net
-  // This ensures expired pulses are hidden even if they weren't filtered server-side
+  // ========= FILTER AND SORT PULSES BY DISTANCE =========
+  // 1. Filter expired pulses (client-side safety net)
+  // 2. Calculate distance from user's location
+  // 3. Sort by distance: in-radius (< 10mi) first, then out-of-radius
+  // 4. Apply tag filter
+
   const visiblePulses = filterVisiblePulses(pulses);
 
   // Debug: log filtering results
@@ -2074,7 +2084,70 @@ export default function Home() {
     console.log(`[Pulses] isInRecentWindow filter: ${visiblePulses.length} → ${afterRecentFilter.length}`);
   }
 
-  const filteredPulses = afterRecentFilter.filter((p) => tagFilter === "All" || p.tag === tagFilter);
+  // Calculate distance for each pulse and sort by proximity
+  const pulsesWithDistance = useMemo(() => {
+    // Use geolocation if available, otherwise use selected city coordinates
+    const userLat = geolocation.lat ?? selectedCity?.lat ?? null;
+    const userLon = geolocation.lon ?? selectedCity?.lon ?? null;
+
+    if (!userLat || !userLon) {
+      // No location available - return pulses with null distance, sorted by time
+      return afterRecentFilter.map((p) => ({ ...p, distanceMiles: null }));
+    }
+
+    // Calculate distance for each pulse
+    const withDistance = afterRecentFilter.map((pulse) => {
+      // Use pulse's stored coordinates if available
+      const pulseLat = pulse.lat ?? null;
+      const pulseLon = pulse.lon ?? null;
+
+      let distanceMiles: number | null = null;
+
+      if (pulseLat !== null && pulseLon !== null) {
+        distanceMiles = calculateDistanceMiles(
+          { lat: userLat, lon: userLon },
+          { lat: pulseLat, lon: pulseLon }
+        );
+      }
+
+      return { ...pulse, distanceMiles };
+    });
+
+    // Sort: in-radius first (by distance), then out-of-radius (by distance)
+    // Within each group, maintain time-based order for same-distance pulses
+    return withDistance.sort((a, b) => {
+      const distA = a.distanceMiles;
+      const distB = b.distanceMiles;
+      const radiusMiles = RADIUS_CONFIG.PRIMARY_RADIUS_MILES;
+
+      // Handle null distances - push to end
+      if (distA === null && distB === null) return 0;
+      if (distA === null) return 1;
+      if (distB === null) return -1;
+
+      // Categorize: in-radius vs out-of-radius
+      const aInRadius = distA <= radiusMiles;
+      const bInRadius = distB <= radiusMiles;
+
+      // In-radius pulses come first
+      if (aInRadius && !bInRadius) return -1;
+      if (!aInRadius && bInRadius) return 1;
+
+      // Within same category, sort by distance (closest first)
+      return distA - distB;
+    });
+  }, [afterRecentFilter, geolocation.lat, geolocation.lon, selectedCity?.lat, selectedCity?.lon]);
+
+  // Apply tag filter
+  const filteredPulses = pulsesWithDistance.filter((p) => tagFilter === "All" || p.tag === tagFilter);
+
+  // Count in-radius vs out-of-radius for potential UI separation
+  const inRadiusPulses = filteredPulses.filter(
+    (p) => p.distanceMiles !== null && p.distanceMiles <= RADIUS_CONFIG.PRIMARY_RADIUS_MILES
+  );
+  const outOfRadiusPulses = filteredPulses.filter(
+    (p) => p.distanceMiles === null || p.distanceMiles > RADIUS_CONFIG.PRIMARY_RADIUS_MILES
+  );
 
   // Traffic-tagged pulses for traffic tab (also filter expired)
   const trafficPulses = visiblePulses.filter((p) => p.tag === "Traffic");
@@ -3046,7 +3119,38 @@ export default function Home() {
                           </div>
                         ) : (
                           <>
-                            {filteredPulses.map((pulse) => (
+                            {/* In-radius pulses (within 10 miles) */}
+                            {inRadiusPulses.map((pulse) => (
+                              <PulseCard
+                                key={pulse.id}
+                                pulse={pulse}
+                                isOwnPulse={sessionUser?.id === pulse.user_id}
+                                isFavorite={favoritePulseIds.includes(pulse.id)}
+                                onToggleFavorite={handleToggleFavorite}
+                                onDelete={handleDeletePulse}
+                                reporterId={sessionUser?.id}
+                                userIdentifier={sessionUser ? displayName : undefined}
+                                authorRank={pulse.user_id ? authorStats[pulse.user_id]?.rank : null}
+                                authorLevel={pulse.user_id ? authorStats[pulse.user_id]?.level : undefined}
+                              />
+                            ))}
+
+                            {/* Visual separator for out-of-radius content */}
+                            {outOfRadiusPulses.length > 0 && inRadiusPulses.length > 0 && (
+                              <div className="relative my-6">
+                                <div className="absolute inset-0 flex items-center">
+                                  <div className="w-full border-t border-dashed border-amber-500/30" />
+                                </div>
+                                <div className="relative flex justify-center">
+                                  <span className="bg-slate-950 px-4 py-1 text-xs text-amber-400/80 font-medium rounded-full border border-amber-500/30">
+                                    Beyond 10-mile radius
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Out-of-radius pulses (beyond 10 miles) */}
+                            {outOfRadiusPulses.map((pulse) => (
                               <PulseCard
                                 key={pulse.id}
                                 pulse={pulse}
