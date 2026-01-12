@@ -64,6 +64,7 @@ export default function VenueDetailPage({
   const [loggingVibe, setLoggingVibe] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submittedVibe, setSubmittedVibe] = useState<VenueVibeType | null>(null);
+  const [vibeError, setVibeError] = useState<string | null>(null);
 
   // Get the top vibe for hero display
   const topVibe = aggregatedVibes[0];
@@ -112,6 +113,7 @@ export default function VenueDetailPage({
     }
 
     setLoggingVibe(true);
+    setVibeError(null); // Clear previous errors
 
     try {
       const response = await fetch("/api/venue-vibe", {
@@ -131,6 +133,7 @@ export default function VenueDetailPage({
         setShowVibeModal(false);
         setSubmitSuccess(true);
         setSubmittedVibe(vibeType);
+        setVibeError(null);
         await fetchVenueData(); // Refresh data
 
         // Reset success state after animation
@@ -139,11 +142,19 @@ export default function VenueDetailPage({
           setSubmittedVibe(null);
         }, 3000);
       } else {
-        const error = await response.json();
-        console.error("Log vibe failed:", error);
+        const errorData = await response.json();
+        const errorMessage = errorData.error || "Failed to log vibe. Please try again.";
+        setVibeError(errorMessage);
+        console.error("Log vibe failed:", errorMessage);
+
+        // Auto-clear error after 5 seconds
+        setTimeout(() => setVibeError(null), 5000);
       }
     } catch (err) {
+      const errorMessage = "Network error. Please try again.";
+      setVibeError(errorMessage);
       console.error("Log vibe error:", err);
+      setTimeout(() => setVibeError(null), 5000);
     } finally {
       setLoggingVibe(false);
     }
@@ -302,6 +313,20 @@ export default function VenueDetailPage({
             )}
           </div>
         </div>
+
+        {/* Error Toast */}
+        {vibeError && (
+          <div className="bg-red-500/15 border border-red-500/30 rounded-xl p-3 flex items-center gap-3">
+            <span className="text-red-400 text-sm">⚠️</span>
+            <span className="text-red-300 text-sm flex-1">{vibeError}</span>
+            <button
+              onClick={() => setVibeError(null)}
+              className="text-red-400 hover:text-red-300 text-lg"
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         {/* Quick Vibe Actions - Most common vibes as one-tap buttons */}
         <div className="space-y-3">

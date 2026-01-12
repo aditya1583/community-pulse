@@ -60,9 +60,9 @@ export const RATE_LIMITS = {
     windowSeconds: 86400, // 24 hours
     keyPrefix: "report",
   },
-  // Venue vibe logging: 5 per hour
+  // Venue vibe logging: 10 per hour (generous for active users)
   VENUE_VIBE: {
-    limit: 5,
+    limit: 10,
     windowSeconds: 3600,
     keyPrefix: "vibe",
   },
