@@ -6,6 +6,7 @@ import GasPricesCard from "./GasPricesCard";
 import FarmersMarketsSection from "./FarmersMarketsSection";
 import LocalDealsSection from "./LocalDealsSection";
 import SentimentHeatmap from "./SentimentHeatmap";
+import TabPulseInput from "./TabPulseInput";
 
 type LocalTabProps = {
   cityName: string;
@@ -20,6 +21,19 @@ type LocalTabProps = {
   userId?: string | null;
   /** Callback to show sign-in modal */
   onSignInClick?: () => void;
+  // Pulse input props
+  isSignedIn?: boolean;
+  identityReady?: boolean;
+  displayName?: string;
+  pulseLoading?: boolean;
+  pulseMood?: string;
+  pulseMessage?: string;
+  moodValidationError?: string | null;
+  messageValidationError?: string | null;
+  showValidationErrors?: boolean;
+  onMoodChange?: (mood: string) => void;
+  onMessageChange?: (message: string) => void;
+  onSubmit?: () => void;
 };
 
 const SECTIONS: { id: LocalSection; label: string; emoji: string }[] = [
@@ -47,6 +61,18 @@ export default function LocalTab({
   onSectionChange,
   userId,
   onSignInClick,
+  isSignedIn = false,
+  identityReady = false,
+  displayName = "",
+  pulseLoading = false,
+  pulseMood = "",
+  pulseMessage = "",
+  moodValidationError = null,
+  messageValidationError = null,
+  showValidationErrors = false,
+  onMoodChange,
+  onMessageChange,
+  onSubmit,
 }: LocalTabProps) {
   // Support both controlled and uncontrolled modes
   const [internalSection, setInternalSection] = useState<LocalSection>("deals");
@@ -79,6 +105,26 @@ export default function LocalTab({
           );
         })}
       </div>
+
+      {/* Drop a Local Pulse - only show if handlers are provided */}
+      {onMoodChange && onMessageChange && onSubmit && onSignInClick && (
+        <TabPulseInput
+          category="General"
+          mood={pulseMood}
+          message={pulseMessage}
+          displayName={displayName}
+          isSignedIn={isSignedIn}
+          identityReady={identityReady}
+          loading={pulseLoading}
+          moodValidationError={moodValidationError}
+          messageValidationError={messageValidationError}
+          showValidationErrors={showValidationErrors}
+          onMoodChange={onMoodChange}
+          onMessageChange={onMessageChange}
+          onSubmit={onSubmit}
+          onSignInClick={onSignInClick}
+        />
+      )}
 
       {/* Section Content */}
       <div className="min-h-[300px]">

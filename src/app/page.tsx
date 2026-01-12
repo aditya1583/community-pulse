@@ -157,6 +157,18 @@ export default function Home() {
   const [mood, setMood] = useState("");
   const [tag, setTag] = useState("");
   const [message, setMessage] = useState("");
+
+  // Tab-specific pulse input state (Traffic, Events, Local tabs each have their own input)
+  const [trafficMood, setTrafficMood] = useState("");
+  const [trafficMessage, setTrafficMessage] = useState("");
+  const [eventsMood, setEventsMood] = useState("");
+  const [eventsMessage, setEventsMessage] = useState("");
+  const [localMood, setLocalMood] = useState("");
+  const [localMessage, setLocalMessage] = useState("");
+  // Tab-specific validation (reuse existing error state but with separate show flags)
+  const [tabMoodValidationError, setTabMoodValidationError] = useState<string | null>(null);
+  const [tabMessageValidationError, setTabMessageValidationError] = useState<string | null>(null);
+  const [showTabValidationErrors, setShowTabValidationErrors] = useState(false);
   const [pulses, setPulses] = useState<Pulse[]>([]);
   // Track whether initial pulse fetch has completed (prevents "No pulses" flash)
   const [initialPulsesFetched, setInitialPulsesFetched] = useState(false);
@@ -2343,6 +2355,210 @@ export default function Home() {
   const displayName = profile?.anon_name || username || "...";
   const currentStreak = streakInfo?.currentStreak ?? 0;
 
+  // ========= TAB-SPECIFIC PULSE HANDLERS =========
+  // These handle posting from the in-tab inputs (Traffic, Events, Local)
+  type TabCategory = "Traffic" | "Events" | "General";
+
+  const handleTabPulseSubmit = async (
+    tabCategory: TabCategory,
+    tabMood: string,
+    tabMessage: string,
+    setTabMood: (m: string) => void,
+    setTabMessage: (m: string) => void
+  ) => {
+    const trimmed = tabMessage.trim();
+
+    if (!sessionUser) {
+      setErrorMsg("Sign in to post.");
+      setShowAuthModal(true);
+      return;
+    }
+
+    if (!identityReady) {
+      setErrorMsg("Please wait...");
+      return;
+    }
+
+    let hasErrors = false;
+
+    // Mood is mandatory
+    if (!tabMood) {
+      setTabMoodValidationError("Please select a vibe");
+      hasErrors = true;
+    } else {
+      setTabMoodValidationError(null);
+    }
+
+    // Message is required
+    if (!trimmed) {
+      setTabMessageValidationError("Please enter a message");
+      hasErrors = true;
+    } else {
+      const moderationResult = moderateContent(trimmed);
+      if (!moderationResult.allowed) {
+        setTabMessageValidationError(
+          moderationResult.reason || "Pulse contains disallowed language."
+        );
+        hasErrors = true;
+      } else {
+        setTabMessageValidationError(null);
+      }
+    }
+
+    if (hasErrors) {
+      setShowTabValidationErrors(true);
+      return;
+    }
+
+    setErrorMsg(null);
+    setShowTabValidationErrors(false);
+
+    const wasFirstPulse =
+      pulseCountResolved && userPulseCount === 0 && !onboardingCompleted;
+
+    const authorName = profile?.anon_name || username || "Anonymous";
+
+    try {
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
+      if (sessionError || !accessToken) {
+        setErrorMsg("Sign in to post.");
+        setShowAuthModal(true);
+        return;
+      }
+
+      setLoading(true);
+
+      const res = await fetch("/api/pulses", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          city,
+          mood: tabMood,
+          tag: tabCategory,
+          message: trimmed,
+          author: authorName,
+        }),
+      });
+
+      type CreatePulseResponse = { pulse?: unknown; error?: string; code?: string };
+      let data: CreatePulseResponse | null = null;
+      try {
+        data = await res.json();
+      } catch {
+        // ignore JSON parse error
+      }
+
+      if (!res.ok || !data?.pulse) {
+        const message =
+          data?.error || "Could not post your pulse. Please try again.";
+
+        if (data?.code === "MODERATION_FAILED") {
+          setTabMessageValidationError(message);
+          setShowTabValidationErrors(true);
+          setLoading(false);
+          return;
+        }
+
+        if (res.status === 401) {
+          setErrorMsg("Sign in to post.");
+          setShowAuthModal(true);
+          setLoading(false);
+          return;
+        }
+
+        setErrorMsg(message);
+        setLoading(false);
+        return;
+      }
+
+      // Optimistically insert the created pulse
+      const raw = data.pulse as Record<string, unknown>;
+      const createdAt =
+        typeof raw.created_at === "string"
+          ? raw.created_at
+          : typeof raw.createdAt === "string"
+            ? raw.createdAt
+            : new Date().toISOString();
+
+      const createdPulse: Pulse = {
+        id: Number(raw.id),
+        city: typeof raw.city === "string" ? raw.city : city,
+        neighborhood:
+          typeof raw.neighborhood === "string" ? raw.neighborhood : null,
+        mood: typeof raw.mood === "string" ? raw.mood : tabMood,
+        tag: typeof raw.tag === "string" ? raw.tag : tabCategory,
+        message: typeof raw.message === "string" ? raw.message : trimmed,
+        author: typeof raw.author === "string" ? raw.author : authorName,
+        createdAt,
+        user_id: typeof raw.user_id === "string" ? raw.user_id : sessionUser.id,
+      };
+
+      if (createdPulse.id) {
+        setPulses((prev) => {
+          const exists = prev.some((p) => String(p.id) === String(createdPulse.id));
+          if (exists) return prev;
+          return [createdPulse, ...prev].sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+        });
+      }
+
+      // Reset the tab-specific form
+      setTabMood("");
+      setTabMessage("");
+      setTabMoodValidationError(null);
+      setTabMessageValidationError(null);
+      setShowTabValidationErrors(false);
+
+      setLoading(false);
+
+      setPulseCountResolved(true);
+      setUserPulseCount((prev) => prev + 1);
+
+      if (wasFirstPulse) {
+        writeOnboardingCompleted(window.localStorage, sessionUser.id);
+        setOnboardingCompleted(true);
+        setShowFirstPulseModal(false);
+        setHasShownOnboarding(true);
+      }
+
+      if (sessionUser) {
+        await loadStreak();
+
+        if (wasFirstPulse) {
+          setShowFirstPulseBadgeToast(true);
+          setTimeout(() => {
+            setShowFirstPulseBadgeToast(false);
+          }, 5000);
+        }
+      }
+    } catch (err) {
+      console.error("Unexpected error creating tab pulse:", err);
+      setErrorMsg("Could not post your pulse. Please try again.");
+      setLoading(false);
+    }
+  };
+
+  // Specific handlers for each tab
+  const handleTrafficPulseSubmit = () => {
+    handleTabPulseSubmit("Traffic", trafficMood, trafficMessage, setTrafficMood, setTrafficMessage);
+  };
+
+  const handleEventsPulseSubmit = () => {
+    handleTabPulseSubmit("Events", eventsMood, eventsMessage, setEventsMood, setEventsMessage);
+  };
+
+  const handleLocalPulseSubmit = () => {
+    handleTabPulseSubmit("General", localMood, localMessage, setLocalMood, setLocalMessage);
+  };
+
   const recentPulseCount2h = useMemo(() => {
     const cutoff = Date.now() - 2 * 60 * 60 * 1000;
     return pulses.reduce((count, pulse) => {
@@ -2990,6 +3206,25 @@ export default function Home() {
                       error={ticketmasterError}
                       hasLocation={!!(selectedCity?.lat && selectedCity?.lon)}
                       fallback={ticketmasterFallback}
+                      isSignedIn={!!sessionUser}
+                      identityReady={identityReady}
+                      displayName={displayName}
+                      pulseLoading={loading}
+                      pulseMood={eventsMood}
+                      pulseMessage={eventsMessage}
+                      moodValidationError={tabMoodValidationError}
+                      messageValidationError={tabMessageValidationError}
+                      showValidationErrors={showTabValidationErrors}
+                      onMoodChange={(m) => {
+                        setEventsMood(m);
+                        setTabMoodValidationError(null);
+                      }}
+                      onMessageChange={(m) => {
+                        setEventsMessage(m);
+                        setTabMessageValidationError(null);
+                      }}
+                      onSubmit={handleEventsPulseSubmit}
+                      onSignInClick={() => setShowAuthModal(true)}
                     />
                   );
                 case "traffic":
@@ -3000,6 +3235,25 @@ export default function Home() {
                       trafficError={trafficError}
                       trafficPulses={trafficPulses}
                       cityName={city}
+                      isSignedIn={!!sessionUser}
+                      identityReady={identityReady}
+                      displayName={displayName}
+                      pulseLoading={loading}
+                      pulseMood={trafficMood}
+                      pulseMessage={trafficMessage}
+                      moodValidationError={tabMoodValidationError}
+                      messageValidationError={tabMessageValidationError}
+                      showValidationErrors={showTabValidationErrors}
+                      onMoodChange={(m) => {
+                        setTrafficMood(m);
+                        setTabMoodValidationError(null);
+                      }}
+                      onMessageChange={(m) => {
+                        setTrafficMessage(m);
+                        setTabMessageValidationError(null);
+                      }}
+                      onSubmit={handleTrafficPulseSubmit}
+                      onSignInClick={() => setShowAuthModal(true)}
                     />
                   );
                 case "local":
@@ -3013,6 +3267,24 @@ export default function Home() {
                       onSectionChange={setLocalSection}
                       userId={sessionUser?.id ?? null}
                       onSignInClick={() => setShowAuthModal(true)}
+                      isSignedIn={!!sessionUser}
+                      identityReady={identityReady}
+                      displayName={displayName}
+                      pulseLoading={loading}
+                      pulseMood={localMood}
+                      pulseMessage={localMessage}
+                      moodValidationError={tabMoodValidationError}
+                      messageValidationError={tabMessageValidationError}
+                      showValidationErrors={showTabValidationErrors}
+                      onMoodChange={(m) => {
+                        setLocalMood(m);
+                        setTabMoodValidationError(null);
+                      }}
+                      onMessageChange={(m) => {
+                        setLocalMessage(m);
+                        setTabMessageValidationError(null);
+                      }}
+                      onSubmit={handleLocalPulseSubmit}
                     />
                   );
                 case "status":

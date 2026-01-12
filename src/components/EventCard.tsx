@@ -4,6 +4,7 @@ import React, { useState, useCallback, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import type { TicketmasterEvent, EventsFallback } from "@/hooks/useEvents";
 import { RADIUS_CONFIG } from "@/lib/constants/radius";
+import TabPulseInput from "./TabPulseInput";
 
 // Supabase client for fetching vibe counts
 const supabase = createClient(
@@ -61,6 +62,20 @@ type EventCardProps = {
   error: string | null;
   hasLocation: boolean;
   fallback?: EventsFallback | null;
+  // Pulse input props
+  isSignedIn?: boolean;
+  identityReady?: boolean;
+  displayName?: string;
+  pulseLoading?: boolean;
+  pulseMood?: string;
+  pulseMessage?: string;
+  moodValidationError?: string | null;
+  messageValidationError?: string | null;
+  showValidationErrors?: boolean;
+  onMoodChange?: (mood: string) => void;
+  onMessageChange?: (message: string) => void;
+  onSubmit?: () => void;
+  onSignInClick?: () => void;
 };
 
 /**
@@ -325,6 +340,19 @@ export default function EventCard({
   error,
   hasLocation,
   fallback,
+  isSignedIn = false,
+  identityReady = false,
+  displayName = "",
+  pulseLoading = false,
+  pulseMood = "",
+  pulseMessage = "",
+  moodValidationError = null,
+  messageValidationError = null,
+  showValidationErrors = false,
+  onMoodChange,
+  onMessageChange,
+  onSubmit,
+  onSignInClick,
 }: EventCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [venueVibeCount, setVenueVibeCount] = useState<number>(0);
@@ -480,6 +508,26 @@ export default function EventCard({
 
       {/* Featured Event - with proprietary vibe context */}
       <FeaturedEventCard event={featuredEvent} vibeCount={venueVibeCount} />
+
+      {/* Drop an Events Pulse - only show if handlers are provided */}
+      {onMoodChange && onMessageChange && onSubmit && onSignInClick && (
+        <TabPulseInput
+          category="Events"
+          mood={pulseMood}
+          message={pulseMessage}
+          displayName={displayName}
+          isSignedIn={isSignedIn}
+          identityReady={identityReady}
+          loading={pulseLoading}
+          moodValidationError={moodValidationError}
+          messageValidationError={messageValidationError}
+          showValidationErrors={showValidationErrors}
+          onMoodChange={onMoodChange}
+          onMessageChange={onMessageChange}
+          onSubmit={onSubmit}
+          onSignInClick={onSignInClick}
+        />
+      )}
 
       {/* Accordion for more events */}
       {remainingEvents.length > 0 && (

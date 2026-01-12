@@ -2,6 +2,7 @@
 
 import React, { useMemo } from "react";
 import type { TrafficLevel, Pulse } from "./types";
+import TabPulseInput from "./TabPulseInput";
 
 type TrafficContentProps = {
   trafficLevel: TrafficLevel | null;
@@ -9,6 +10,20 @@ type TrafficContentProps = {
   trafficError: string | null;
   trafficPulses: Pulse[];
   cityName: string;
+  // Pulse input props
+  isSignedIn: boolean;
+  identityReady: boolean;
+  displayName: string;
+  pulseLoading: boolean;
+  pulseMood: string;
+  pulseMessage: string;
+  moodValidationError: string | null;
+  messageValidationError: string | null;
+  showValidationErrors: boolean;
+  onMoodChange: (mood: string) => void;
+  onMessageChange: (message: string) => void;
+  onSubmit: () => void;
+  onSignInClick: () => void;
 };
 
 // Traffic mood sentiment analysis
@@ -54,6 +69,19 @@ export default function TrafficContent({
   trafficError,
   trafficPulses,
   cityName,
+  isSignedIn,
+  identityReady,
+  displayName,
+  pulseLoading,
+  pulseMood,
+  pulseMessage,
+  moodValidationError,
+  messageValidationError,
+  showValidationErrors,
+  onMoodChange,
+  onMessageChange,
+  onSubmit,
+  onSignInClick,
 }: TrafficContentProps) {
   // Calculate traffic intelligence from user pulses
   const intelligence = useMemo((): TrafficIntelligence => {
@@ -192,6 +220,24 @@ export default function TrafficContent({
           </>
         )}
       </div>
+
+      {/* Drop a Traffic Pulse */}
+      <TabPulseInput
+        category="Traffic"
+        mood={pulseMood}
+        message={pulseMessage}
+        displayName={displayName}
+        isSignedIn={isSignedIn}
+        identityReady={identityReady}
+        loading={pulseLoading}
+        moodValidationError={moodValidationError}
+        messageValidationError={messageValidationError}
+        showValidationErrors={showValidationErrors}
+        onMoodChange={onMoodChange}
+        onMessageChange={onMessageChange}
+        onSubmit={onSubmit}
+        onSignInClick={onSignInClick}
+      />
 
       {/* Traffic intelligence cards */}
       <div className="grid grid-cols-2 gap-3">
