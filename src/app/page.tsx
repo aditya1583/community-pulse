@@ -142,45 +142,12 @@ function isTabId(value: unknown): value is TabId {
   return typeof value === "string" && TAB_ID_SET.has(value as TabId);
 }
 
-// Helper to restore city from localStorage immediately (prevents race condition)
-function getInitialCity(): { city: string; selectedCity: GeocodedCity | null; lastValidCity: GeocodedCity } {
-  if (typeof window === "undefined") {
-    return { city: DEFAULT_CITY.displayName, selectedCity: DEFAULT_CITY, lastValidCity: DEFAULT_CITY };
-  }
-  try {
-    const savedCity = localStorage.getItem("cp-city");
-    if (savedCity) {
-      const parsed = JSON.parse(savedCity) as StoredCity;
-      if (parsed && parsed.displayName) {
-        const restoredCity: GeocodedCity = {
-          id: parsed.id || `${parsed.displayName}-${parsed.lat ?? "unknown"}-${parsed.lon ?? "unknown"}`,
-          name: parsed.name || parsed.displayName.split(",")[0]?.trim() || parsed.displayName,
-          state: parsed.state,
-          country: parsed.country,
-          lat: parsed.lat ?? DEFAULT_CITY.lat,
-          lon: parsed.lon ?? DEFAULT_CITY.lon,
-          displayName: parsed.displayName,
-        };
-        return {
-          city: restoredCity.displayName,
-          selectedCity: parsed.lat && parsed.lon ? restoredCity : null,
-          lastValidCity: restoredCity
-        };
-      }
-    }
-  } catch {
-    // Ignore errors
-  }
-  return { city: DEFAULT_CITY.displayName, selectedCity: DEFAULT_CITY, lastValidCity: DEFAULT_CITY };
-}
-
 export default function Home() {
-  // Core state - initialize from localStorage to prevent race condition
-  // Use lazy initializer to read localStorage once on mount
-  const [cityState] = useState(getInitialCity);
-  const [city, setCity] = useState(cityState.city);
-  const [selectedCity, setSelectedCity] = useState<GeocodedCity | null>(cityState.selectedCity);
-  const [lastValidCity, setLastValidCity] = useState<GeocodedCity>(cityState.lastValidCity);
+  // Core state - initialize with defaults to avoid SSR hydration mismatch
+  // localStorage restoration happens in useEffect after hydration
+  const [city, setCity] = useState(DEFAULT_CITY.displayName);
+  const [selectedCity, setSelectedCity] = useState<GeocodedCity | null>(DEFAULT_CITY);
+  const [lastValidCity, setLastValidCity] = useState<GeocodedCity>(DEFAULT_CITY);
   const [tagFilter, setTagFilter] = useState("All");
   const [username, setUsername] = useState<string>("");
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -256,15 +223,10 @@ export default function Home() {
 
   // Geolocation - true hyperlocal experience
   const geolocation = useGeolocation();
-  // Initialize from sessionStorage to prevent race condition with geolocation
-  const [useManualLocation, setUseManualLocation] = useState(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      return sessionStorage.getItem("cp-use-manual-location") === "true";
-    } catch {
-      return false;
-    }
-  });
+  // Initialize with false to avoid hydration mismatch - restored in useEffect
+  const [useManualLocation, setUseManualLocation] = useState(false);
+  // Track if we've restored state from storage (prevents geolocation race)
+  const [storageRestored, setStorageRestored] = useState(false);
 
   // USER STREAK
   const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
@@ -1038,13 +1000,12 @@ export default function Home() {
     fetchEvents();
   }, [city]);
 
-  // ========= LOCAL STORAGE: CITY =========
-  // Also restore manual location flag from sessionStorage to prevent geolocation override
+  // ========= STORAGE RESTORATION (runs once after hydration) =========
+  // Restores city and manual location flag to prevent geolocation override
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // CRITICAL: Restore manual location flag FIRST, before any city restoration
-    // This prevents geolocation from overwriting the user's city selection
+    // 1. Restore manual location flag FIRST
     try {
       const savedManualFlag = sessionStorage.getItem("cp-use-manual-location");
       if (savedManualFlag === "true") {
@@ -1054,44 +1015,46 @@ export default function Home() {
       // Ignore storage errors
     }
 
+    // 2. Restore city from localStorage
     const savedCity = localStorage.getItem("cp-city");
-    if (!savedCity) return;
+    if (savedCity) {
+      try {
+        const parsed = JSON.parse(savedCity) as StoredCity;
+        if (parsed && parsed.displayName) {
+          const restoredCity: GeocodedCity = {
+            id:
+              parsed.id ||
+              `${parsed.displayName}-${parsed.lat ?? "unknown"}-${
+                parsed.lon ?? "unknown"
+              }`,
+            name:
+              parsed.name ||
+              parsed.displayName.split(",")[0]?.trim() ||
+              parsed.displayName,
+            state: parsed.state,
+            country: parsed.country,
+            lat: parsed.lat ?? DEFAULT_CITY.lat,
+            lon: parsed.lon ?? DEFAULT_CITY.lon,
+            displayName: parsed.displayName,
+          };
 
-    try {
-      const parsed = JSON.parse(savedCity) as StoredCity;
-      if (parsed && parsed.displayName) {
-        const restoredCity: GeocodedCity = {
-          id:
-            parsed.id ||
-            `${parsed.displayName}-${parsed.lat ?? "unknown"}-${
-              parsed.lon ?? "unknown"
-            }`,
-          name:
-            parsed.name ||
-            parsed.displayName.split(",")[0]?.trim() ||
-            parsed.displayName,
-          state: parsed.state,
-          country: parsed.country,
-          lat: parsed.lat ?? DEFAULT_CITY.lat,
-          lon: parsed.lon ?? DEFAULT_CITY.lon,
-          displayName: parsed.displayName,
-        };
-
-        setCity(restoredCity.displayName);
-        setCityInput(restoredCity.displayName);
-        if (parsed.lat && parsed.lon) {
-          setSelectedCity(restoredCity);
-          setLastValidCity(restoredCity);
+          setCity(restoredCity.displayName);
+          setCityInput(restoredCity.displayName);
+          if (parsed.lat && parsed.lon) {
+            setSelectedCity(restoredCity);
+            setLastValidCity(restoredCity);
+          }
         }
-        return;
+      } catch {
+        // Fallback to treating as plain string
+        setCity(savedCity);
+        setCityInput(savedCity);
+        setSelectedCity(null);
       }
-    } catch {
-      // Fallback to treating the saved value as a plain string
     }
 
-    setCity(savedCity);
-    setCityInput(savedCity);
-    setSelectedCity(null);
+    // 3. Mark storage as restored - allows geolocation to proceed if not manual
+    setStorageRestored(true);
   }, [setCityInput, setLastValidCity, setSelectedCity, setCity]);
 
   useEffect(() => {
@@ -1112,6 +1075,8 @@ export default function Home() {
   // ========= GEOLOCATION → CITY SYNC =========
   // When geolocation succeeds and we're not in manual mode, update city state
   useEffect(() => {
+    // Skip until storage has been restored (prevents race condition)
+    if (!storageRestored) return;
     // Skip if user chose manual mode
     if (useManualLocation) return;
     // Skip if geolocation doesn't have data yet
@@ -1136,6 +1101,7 @@ export default function Home() {
     setSelectedCity(geoCity);
     setLastValidCity(geoCity);
   }, [
+    storageRestored,
     useManualLocation,
     geolocation.lat,
     geolocation.lon,
