@@ -377,32 +377,6 @@ export default function VenueDetailPage({
           </div>
         </div>
 
-        {/* Recent Activity - Timeline style */}
-        {vibes.length > 0 && (
-          <div className="bg-slate-900/60 border border-slate-800/50 rounded-2xl p-4">
-            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
-              Recent Activity
-            </div>
-            <div className="space-y-2">
-              {vibes.slice(0, 5).map((vibe, index) => {
-                const info = getVibeTypeInfo(vibe.vibe_type as VenueVibeType);
-                return (
-                  <div
-                    key={vibe.id}
-                    className={`flex items-center gap-3 py-2 ${
-                      index !== vibes.slice(0, 5).length - 1 ? "border-b border-slate-800/50" : ""
-                    }`}
-                  >
-                    <span className="text-lg">{info.emoji}</span>
-                    <span className="flex-1 text-sm text-slate-300">{info.label}</span>
-                    <span className="text-xs text-slate-500">{formatRelativeTime(vibe.created_at)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Venue Info */}
         <div className="bg-slate-900/60 border border-slate-800/50 rounded-2xl p-4 space-y-3">
           <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">
