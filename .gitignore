@@ -44,3 +44,6 @@ nul
 # Local Claude settings
 .claude/settings.local.json
 
+
+# Claude temp files
+tmpclaude-*
