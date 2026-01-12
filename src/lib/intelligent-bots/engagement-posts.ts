@@ -140,7 +140,16 @@ const RECOMMENDATION_TEMPLATES = [
 ];
 
 // ============================================================================
-// THIS OR THAT - Dynamic Context-Aware Polls
+// THIS OR THAT - TRULY CONTEXTUAL Polls
+// ============================================================================
+//
+// PHILOSOPHY: Generic food polls are BORING. Users scroll past "Tacos vs Burritos"
+// because it's not relevant to their moment. CONTEXTUAL polls engage because they
+// reflect the user's current reality - the weather outside, the time of day,
+// what's happening in town, and the traffic they're sitting in.
+//
+// These polls should feel like a friend asking "given what's happening RIGHT NOW,
+// what would you do?" - not a generic survey.
 // ============================================================================
 
 type PollChoice = {
@@ -154,23 +163,221 @@ type PollChoice = {
   dayType?: ("weekday" | "weekend")[];
 };
 
-// Base static choices (always available)
+// ============================================================================
+// CONTEXTUAL POLL TEMPLATES - These use {variables} filled at generation time
+// ============================================================================
+
+type ContextualPollTemplate = {
+  template: string;           // Message template with {variables}
+  optionA: string;            // First poll option
+  optionB: string;            // Second poll option
+  // Context requirements - poll only shows when ALL conditions match
+  conditions: {
+    minTemp?: number;         // Minimum temperature
+    maxTemp?: number;         // Maximum temperature
+    weatherConditions?: string[];  // rain, clear, cloudy, storm
+    timeOfDay?: ("morning" | "afternoon" | "evening" | "night")[];
+    dayType?: ("weekday" | "weekend")[];
+    requiresEvents?: boolean; // Only show if events are happening
+    requiresTraffic?: boolean; // Only show if traffic is notable
+  };
+};
+
+// WEATHER-BASED CONTEXTUAL POLLS
+const WEATHER_CONTEXTUAL_POLLS: ContextualPollTemplate[] = [
+  // HOT weather (>85F)
+  {
+    template: "🥵 {temp}°F outside. Perfect day for:",
+    optionA: "🏊 Pool time",
+    optionB: "❄️ AC & Netflix",
+    conditions: { minTemp: 85 }
+  },
+  {
+    template: "🌡️ It's {temp}°F in {city}. How are you beating the heat?",
+    optionA: "🧊 Iced drinks patio",
+    optionB: "🏠 Staying inside",
+    conditions: { minTemp: 85 }
+  },
+  {
+    template: "☀️ {temp}°F and sunny. Your move:",
+    optionA: "🏖️ Lake day",
+    optionB: "🎬 Movie theater AC",
+    conditions: { minTemp: 90 }
+  },
+  {
+    template: "🔥 Triple digits coming! {temp}°F right now. You're choosing:",
+    optionA: "🍹 Frozen margs",
+    optionB: "🍦 Ice cream run",
+    conditions: { minTemp: 95 }
+  },
+  // COLD weather (<50F)
+  {
+    template: "🥶 {temp}°F in {city}. Perfect weather for:",
+    optionA: "☕ Hot coffee run",
+    optionB: "🛋️ Cozy at home",
+    conditions: { maxTemp: 50 }
+  },
+  {
+    template: "❄️ Brr! {temp}°F out there. You're reaching for:",
+    optionA: "🧥 Jacket + outside",
+    optionB: "🔥 Blanket + couch",
+    conditions: { maxTemp: 45 }
+  },
+  {
+    template: "🌡️ {temp}°F - finally hoodie weather! You're:",
+    optionA: "🚶 Walking the trails",
+    optionB: "☕ Cafe hopping",
+    conditions: { minTemp: 45, maxTemp: 60 }
+  },
+  // RAINY weather
+  {
+    template: "☔ Rainy day in {city}. Your vibe:",
+    optionA: "🍲 Soup & stay in",
+    optionB: "☕ Cozy cafe",
+    conditions: { weatherConditions: ["rain", "storm"] }
+  },
+  {
+    template: "🌧️ Rain moving through {city}. Perfect excuse for:",
+    optionA: "📚 Reading day",
+    optionB: "🎮 Gaming session",
+    conditions: { weatherConditions: ["rain", "storm"] }
+  },
+  {
+    template: "⛈️ Stormy in {city}! You're choosing:",
+    optionA: "😴 Nap time",
+    optionB: "🍿 Movie marathon",
+    conditions: { weatherConditions: ["storm"] }
+  },
+  // PERFECT weather (65-80F, clear)
+  {
+    template: "✨ {temp}°F and gorgeous in {city}! You're:",
+    optionA: "🚴 Outside exploring",
+    optionB: "🍽️ Patio dining",
+    conditions: { minTemp: 65, maxTemp: 80, weatherConditions: ["clear"] }
+  },
+  {
+    template: "🌤️ Perfect {temp}°F weather! {city}, what's the move:",
+    optionA: "🥾 Hike or trail",
+    optionB: "🧺 Picnic in the park",
+    conditions: { minTemp: 68, maxTemp: 78, weatherConditions: ["clear"] }
+  },
+];
+
+// TIME-BASED CONTEXTUAL POLLS
+const TIME_CONTEXTUAL_POLLS: ContextualPollTemplate[] = [
+  // Saturday morning
+  {
+    template: "Saturday morning in {city}! You're:",
+    optionA: "🛏️ Sleeping in",
+    optionB: "🥬 Farmers market run",
+    conditions: { dayType: ["weekend"], timeOfDay: ["morning"] }
+  },
+  {
+    template: "Weekend morning vibes. {city}, what's calling you:",
+    optionA: "🥞 Big breakfast out",
+    optionB: "☕ Slow coffee at home",
+    conditions: { dayType: ["weekend"], timeOfDay: ["morning"] }
+  },
+  // Friday night
+  {
+    template: "Friday night in {city}! Your plans:",
+    optionA: "🍻 Going out",
+    optionB: "🛋️ Staying in",
+    conditions: { dayType: ["weekday"], timeOfDay: ["evening", "night"] }
+  },
+  {
+    template: "TGIF {city}! Tonight you're:",
+    optionA: "🍕 Dinner & drinks",
+    optionB: "🎬 Couch & takeout",
+    conditions: { dayType: ["weekday"], timeOfDay: ["evening"] }
+  },
+  // Sunday
+  {
+    template: "Lazy Sunday in {city}. You're choosing:",
+    optionA: "🥂 Brunch spot",
+    optionB: "🥞 Homemade pancakes",
+    conditions: { dayType: ["weekend"], timeOfDay: ["morning", "afternoon"] }
+  },
+  {
+    template: "Sunday vibes. {city}, how are you spending it:",
+    optionA: "📺 Binge watching",
+    optionB: "🛠️ Getting stuff done",
+    conditions: { dayType: ["weekend"], timeOfDay: ["afternoon"] }
+  },
+  // Weekday morning
+  {
+    template: "Monday morning in {city}. Your fuel:",
+    optionA: "☕ Coffee, obviously",
+    optionB: "🏃 Morning workout",
+    conditions: { dayType: ["weekday"], timeOfDay: ["morning"] }
+  },
+  // Weekday evening
+  {
+    template: "After work in {city}. You're:",
+    optionA: "🏋️ Hitting the gym",
+    optionB: "🏠 Straight home",
+    conditions: { dayType: ["weekday"], timeOfDay: ["evening"] }
+  },
+  {
+    template: "Hump day evening. {city}, what's the vibe:",
+    optionA: "🍻 Midweek drinks",
+    optionB: "📺 Early night",
+    conditions: { dayType: ["weekday"], timeOfDay: ["evening"] }
+  },
+];
+
+// EVENT-BASED CONTEXTUAL POLLS (when events are happening)
+const EVENT_CONTEXTUAL_POLLS: ContextualPollTemplate[] = [
+  {
+    template: "🎉 {eventName} tonight in {city}! You're:",
+    optionA: "🎟️ Going!",
+    optionB: "😴 Skipping this one",
+    conditions: { requiresEvents: true }
+  },
+  {
+    template: "🎸 {eventName} at {venue}! How are you watching:",
+    optionA: "🏟️ Live at the venue",
+    optionB: "📺 From home",
+    conditions: { requiresEvents: true }
+  },
+  {
+    template: "🏒 Game day! {eventName}. Your move:",
+    optionA: "👥 Bringing the crew",
+    optionB: "🍺 Solo at a bar",
+    conditions: { requiresEvents: true }
+  },
+];
+
+// TRAFFIC-BASED CONTEXTUAL POLLS
+const TRAFFIC_CONTEXTUAL_POLLS: ContextualPollTemplate[] = [
+  {
+    template: "🚗 Traffic on {road} is rough. You're:",
+    optionA: "😤 Sitting through it",
+    optionB: "🗺️ Taking the long way",
+    conditions: { requiresTraffic: true }
+  },
+  {
+    template: "⏰ Rush hour in {city}. Your strategy:",
+    optionA: "🏃 Leave early",
+    optionB: "⏳ Wait it out",
+    conditions: { requiresTraffic: true, timeOfDay: ["afternoon", "evening"] }
+  },
+  {
+    template: "🛣️ {road} backed up again. Worth it to:",
+    optionA: "🚗 Toll road it",
+    optionB: "🛤️ Frontage road",
+    conditions: { requiresTraffic: true }
+  },
+];
+
+// Fallback base choices - only used when no contextual poll matches
 const BASE_CHOICES: PollChoice[] = [
-  // Food battles - always relevant
-  { a: "🌮 Tacos", b: "🌯 Burritos", category: "food" },
-  { a: "🍔 Burgers", b: "🌭 Hot Dogs", category: "food" },
-  { a: "🍕 Pizza", b: "🍝 Pasta", category: "food" },
-  { a: "☕ Coffee", b: "🍵 Tea", category: "food" },
-  { a: "🍖 BBQ", b: "🍗 Fried Chicken", category: "food" },
-  { a: "🥞 Pancakes", b: "🧇 Waffles", category: "food", timeOfDay: ["morning"] },
-  { a: "🍦 Ice Cream", b: "🧁 Cupcakes", category: "food" },
-  { a: "🥑 Guac", b: "🫘 Queso", category: "food" },
-  { a: "🍟 Fries", b: "🧅 Onion Rings", category: "food" },
-  { a: "🌶️ Spicy", b: "🧂 Mild", category: "food" },
-  // Texas-specific
-  { a: "🤠 Whataburger", b: "🍔 In-N-Out", category: "texas" },
-  { a: "🧊 Blue Bell", b: "🍨 Amy's Ice Cream", category: "texas" },
-  { a: "🚗 Toll road", b: "🛣️ Frontage road", category: "texas" },
+  // These are kept minimal as fallbacks only
+  { a: "☕ Coffee", b: "🍵 Tea", category: "beverage" },
+  { a: "🌅 Early bird", b: "🌙 Night owl", category: "lifestyle" },
+  { a: "📚 Book", b: "📺 Stream", category: "lifestyle" },
+  { a: "🏠 Homebody", b: "🎉 Social butterfly", category: "lifestyle" },
+  { a: "🐕 Dogs", b: "🐈 Cats", category: "lifestyle" },
 ];
 
 // Seasonal choices
@@ -1048,20 +1255,97 @@ export async function generateLocalSpotlightPost(
 // ============================================================================
 
 /**
- * Generate a "This or That" binary choice poll
- * Super easy one-tap engagement - no typing required!
- * Now uses context-aware choices based on season, weather, time, and day type.
+ * Generate a CONTEXTUAL "This or That" binary choice poll
+ *
+ * PHILOSOPHY: Generic food polls are BORING and get ignored.
+ * Users engage with polls that reflect their CURRENT REALITY:
+ * - The weather outside right now
+ * - Events happening today
+ * - The time of day and day of week
+ * - Traffic conditions
+ *
+ * This function prioritizes contextual templates over generic ones.
  */
 export async function generateThisOrThatPost(
   ctx: SituationContext
 ): Promise<EngagementPost | null> {
-  const { city } = ctx;
+  const { city, weather, time, events, traffic } = ctx;
+  const timeOfDay = getTimeOfDay(time.hour);
+  const dayType = time.isWeekend ? "weekend" : "weekday";
 
-  // Get contextually-appropriate choices based on current conditions
+  // Build variables for template filling
+  const vars: Record<string, string> = {
+    city: city.name,
+    temp: String(Math.round(weather.temperature)),
+    road: city.roads.major[Math.floor(Math.random() * city.roads.major.length)],
+  };
+
+  // Add event variables if events exist
+  if (events && events.length > 0) {
+    vars.eventName = events[0].name;
+    vars.venue = events[0].venue;
+  }
+
+  // Collect all matching contextual templates
+  const matchingTemplates: ContextualPollTemplate[] = [];
+
+  // Check WEATHER templates (highest priority - most immediately relevant)
+  for (const poll of WEATHER_CONTEXTUAL_POLLS) {
+    if (matchesConditions(poll.conditions, ctx, timeOfDay, dayType)) {
+      matchingTemplates.push(poll);
+    }
+  }
+
+  // Check TIME templates
+  for (const poll of TIME_CONTEXTUAL_POLLS) {
+    if (matchesConditions(poll.conditions, ctx, timeOfDay, dayType)) {
+      matchingTemplates.push(poll);
+    }
+  }
+
+  // Check EVENT templates (only if events exist)
+  if (events && events.length > 0) {
+    for (const poll of EVENT_CONTEXTUAL_POLLS) {
+      if (matchesConditions(poll.conditions, ctx, timeOfDay, dayType)) {
+        matchingTemplates.push(poll);
+      }
+    }
+  }
+
+  // Check TRAFFIC templates (only if traffic is notable)
+  if (traffic && traffic.congestionLevel > 0.3) {
+    for (const poll of TRAFFIC_CONTEXTUAL_POLLS) {
+      if (matchesConditions(poll.conditions, ctx, timeOfDay, dayType)) {
+        matchingTemplates.push(poll);
+      }
+    }
+  }
+
+  // If we have contextual matches, use one of them
+  if (matchingTemplates.length > 0) {
+    const selected = matchingTemplates[Math.floor(Math.random() * matchingTemplates.length)];
+
+    // Fill in the template
+    let message = selected.template;
+    for (const [key, value] of Object.entries(vars)) {
+      message = message.replace(new RegExp(`\\{${key}\\}`, "g"), value);
+    }
+
+    return {
+      message,
+      tag: "General",
+      mood: "📊",
+      author: `${city.name} poll_master_bot 📊`,
+      is_bot: true,
+      hidden: false,
+      engagementType: "this_or_that",
+      options: [selected.optionA, selected.optionB],
+    };
+  }
+
+  // FALLBACK: Use the old system with base choices (should rarely happen)
   const choices = getContextualChoices(ctx);
-
   if (choices.length === 0) {
-    // Fallback to base choices if filtering removed everything
     const fallback = [...BASE_CHOICES, ...LIFESTYLE_CHOICES];
     const choice = fallback[Math.floor(Math.random() * fallback.length)];
     const template = THIS_OR_THAT_TEMPLATES[Math.floor(Math.random() * THIS_OR_THAT_TEMPLATES.length)];
@@ -1100,6 +1384,59 @@ export async function generateThisOrThatPost(
     engagementType: "this_or_that",
     options: [choice.a, choice.b],
   };
+}
+
+/**
+ * Check if a contextual poll template's conditions match the current context
+ */
+function matchesConditions(
+  conditions: ContextualPollTemplate["conditions"],
+  ctx: SituationContext,
+  timeOfDay: "morning" | "afternoon" | "evening" | "night",
+  dayType: "weekday" | "weekend"
+): boolean {
+  const { weather, events, traffic } = ctx;
+
+  // Check temperature conditions
+  if (conditions.minTemp !== undefined && weather.temperature < conditions.minTemp) {
+    return false;
+  }
+  if (conditions.maxTemp !== undefined && weather.temperature > conditions.maxTemp) {
+    return false;
+  }
+
+  // Check weather conditions
+  if (conditions.weatherConditions && conditions.weatherConditions.length > 0) {
+    if (!conditions.weatherConditions.includes(weather.condition)) {
+      return false;
+    }
+  }
+
+  // Check time of day
+  if (conditions.timeOfDay && conditions.timeOfDay.length > 0) {
+    if (!conditions.timeOfDay.includes(timeOfDay)) {
+      return false;
+    }
+  }
+
+  // Check day type
+  if (conditions.dayType && conditions.dayType.length > 0) {
+    if (!conditions.dayType.includes(dayType)) {
+      return false;
+    }
+  }
+
+  // Check if events are required
+  if (conditions.requiresEvents && (!events || events.length === 0)) {
+    return false;
+  }
+
+  // Check if traffic is required
+  if (conditions.requiresTraffic && (!traffic || traffic.congestionLevel <= 0.3)) {
+    return false;
+  }
+
+  return true;
 }
 
 /**

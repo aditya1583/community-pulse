@@ -190,12 +190,19 @@ export default function Home() {
     }
   };
 
-  // Restore tab from sessionStorage on mount
+  // Restore tab and local section from sessionStorage on mount
   useEffect(() => {
     try {
       const savedTab = sessionStorage.getItem("cp-active-tab");
       if (savedTab && isTabId(savedTab)) {
         setActiveTabState(savedTab);
+      }
+      // Also restore local section if navigating to local tab
+      const savedLocalSection = sessionStorage.getItem("cp-local-section");
+      if (savedLocalSection && ["deals", "gas", "markets", "heatmap"].includes(savedLocalSection)) {
+        setLocalSection(savedLocalSection as LocalSection);
+        // Clear it after reading so it doesn't persist unexpectedly
+        sessionStorage.removeItem("cp-local-section");
       }
     } catch {
       // Ignore storage errors
