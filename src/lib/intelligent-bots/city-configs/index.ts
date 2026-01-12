@@ -1,15 +1,20 @@
 /**
  * City Configuration Index
  *
- * Exports all city configs and provides lookup utilities
+ * Exports all city configs and provides lookup utilities.
+ *
+ * UNIVERSAL SUPPORT: The system now works for ANY city, not just pre-configured ones.
+ * - Pre-configured cities (Leander, Austin, Cedar Park) get hyperlocal content
+ * - All other cities get dynamic configs with contextual content (weather, events, time-based)
  */
 
 import type { CityConfig, CityCoords } from "../types";
 import { LEANDER_CONFIG } from "./leander";
 import { CEDAR_PARK_CONFIG } from "./cedar-park";
 import { AUSTIN_CONFIG } from "./austin";
+import { generateDynamicCityConfig, canGenerateDynamicConfig } from "./dynamic";
 
-// All configured cities
+// All pre-configured cities with hyperlocal data
 export const CITY_CONFIGS: Record<string, CityConfig> = {
   leander: LEANDER_CONFIG,
   "cedar park": CEDAR_PARK_CONFIG,
@@ -18,10 +23,54 @@ export const CITY_CONFIGS: Record<string, CityConfig> = {
 
 /**
  * Get city config by name (case-insensitive)
+ * Returns null if city is not pre-configured
  */
 export function getCityConfig(cityName: string): CityConfig | null {
   const normalized = cityName.toLowerCase().trim();
   return CITY_CONFIGS[normalized] || null;
+}
+
+/**
+ * Get or generate a city config for ANY city
+ *
+ * This is the UNIVERSAL config retrieval function that enables the intelligent
+ * bots system to work for any city, not just pre-configured ones.
+ *
+ * Priority:
+ * 1. Pre-configured city by name (hyperlocal content)
+ * 2. Pre-configured city by proximity (within 50km)
+ * 3. Dynamically generated config (contextual content)
+ *
+ * @param cityName - City name (e.g., "Overland Park" or "Overland Park, KS")
+ * @param coords - City coordinates for dynamic config generation
+ * @returns CityConfig - either pre-configured or dynamically generated
+ */
+export function getOrCreateCityConfig(
+  cityName: string,
+  coords: CityCoords
+): CityConfig {
+  // Try pre-configured city first
+  const preconfigured = getCityConfig(cityName);
+  if (preconfigured) {
+    return preconfigured;
+  }
+
+  // Try finding nearby pre-configured city
+  const nearby = getCityConfigByCoords(coords);
+  if (nearby) {
+    return nearby;
+  }
+
+  // Generate dynamic config for this city
+  return generateDynamicCityConfig(cityName, coords);
+}
+
+/**
+ * Check if we can provide intelligent bot content for a city
+ * Now always returns true since we can generate dynamic configs
+ */
+export function canProvideIntelligentContent(coords: CityCoords): boolean {
+  return canGenerateDynamicConfig(coords);
 }
 
 /**

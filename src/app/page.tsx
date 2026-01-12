@@ -1394,6 +1394,11 @@ export default function Home() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             city,
+            // CRITICAL: Pass coordinates for universal intelligent bot support
+            // This enables contextual polls, farmers markets, and weather-based
+            // content for ANY city, not just pre-configured Texas cities
+            lat: selectedCity?.lat,
+            lon: selectedCity?.lon,
             events: ticketmasterEvents.slice(0, 3).map((e) => ({
               name: e.name,
               venue: e.venue,

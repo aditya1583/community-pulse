@@ -226,6 +226,8 @@ type AutoSeedRequest = {
   farmersMarkets?: MarketData[];
   weather?: WeatherData | null;
   force?: boolean; // Bypass cooldown for testing
+  lat?: number; // Coordinates for universal intelligent bot support
+  lon?: number;
 };
 
 function getRandomItem<T>(arr: T[]): T {
@@ -435,11 +437,18 @@ export async function POST(req: NextRequest) {
 
     console.log(`[Auto-Seed] Starting for city: ${body.city}`);
 
-    // Check if this city has intelligent bot configuration
-    // If so, use the hyperlocal system with real road names
+    // UNIVERSAL INTELLIGENT BOTS: Try intelligent system for ALL cities when coords are provided
+    // This enables contextual polls, farmers markets, and weather-based content for any location
     const cityName = body.city.split(",")[0].trim();
-    if (hasIntelligentBotConfig(cityName)) {
-      console.log(`[Auto-Seed] City "${cityName}" has intelligent bot config - using hyperlocal system`);
+    const hasCoords = body.lat !== undefined && body.lon !== undefined;
+    const hasPreconfiguredCity = hasIntelligentBotConfig(cityName);
+
+    // Use intelligent bots when:
+    // 1. City has pre-configured hyperlocal data (Leander, Austin, Cedar Park), OR
+    // 2. We have coordinates (can generate dynamic config for any city)
+    if (hasPreconfiguredCity || hasCoords) {
+      const mode = hasPreconfiguredCity ? "hyperlocal" : "universal";
+      console.log(`[Auto-Seed] Using intelligent bot system (${mode}) for "${cityName}"`);
 
       // Check for recent posts first
       const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
@@ -460,9 +469,14 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // Use intelligent bot system (force=true since we already checked DB for recent posts)
-      // Generate 4 varied posts (Traffic, Weather, Events x2) - no redundancy
-      const result = await generateColdStartPosts(cityName, { count: 4, force: true });
+      // Use intelligent bot system with coords for universal support
+      // Generate 4 varied posts (Traffic, Weather, Events, Engagement)
+      const coords = hasCoords ? { lat: body.lat!, lon: body.lon! } : undefined;
+      const result = await generateColdStartPosts(cityName, {
+        count: 4,
+        force: true,
+        coords,
+      });
 
       if (!result.success || result.posts.length === 0) {
         console.log(`[Auto-Seed] Intelligent bots returned no posts: ${result.reason}`);
@@ -473,8 +487,10 @@ export async function POST(req: NextRequest) {
         const now = Date.now();
         let cumulativeOffset = 0;
 
-        // Get city coordinates for distance-based filtering
-        const cityCoords = getCityCoordinates(body.city);
+        // Use provided coords or fall back to city lookup
+        const cityCoords = hasCoords
+          ? { lat: body.lat!, lon: body.lon! }
+          : getCityCoordinates(body.city);
 
         const records = result.posts.map((post, index) => {
           // First post is "now", subsequent posts are staggered backwards in time
@@ -519,12 +535,13 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        console.log(`[Auto-Seed] SUCCESS! Created ${data.length} intelligent bot pulses for ${body.city}`);
+        console.log(`[Auto-Seed] SUCCESS! Created ${data.length} intelligent bot pulses for ${body.city} (${mode})`);
         return NextResponse.json({
           success: true,
           created: data.length,
           pulses: data,
           mode: "intelligent",
+          intelligentMode: mode,
           situationSummary: result.situationSummary,
         });
       }
@@ -740,12 +757,20 @@ export async function GET(req: NextRequest) {
     console.log(`[Auto-Seed GET] Could not fetch weather: ${err}`);
   }
 
-  // Forward to POST handler with events and weather
+  // Forward to POST handler with events, weather, AND coordinates
+  // Including lat/lon enables universal intelligent bot support for any city
   const response = await POST(
     new NextRequest(req.url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ city, events, weather, force }),
+      body: JSON.stringify({
+        city,
+        events,
+        weather,
+        force,
+        lat: lat ?? undefined,
+        lon: lon ?? undefined,
+      }),
     })
   );
 

@@ -32,6 +32,8 @@ export type {
 export {
   getCityConfig,
   getCityConfigByCoords,
+  getOrCreateCityConfig,
+  canProvideIntelligentContent,
   hasIntelligentBotConfig,
   getRandomRoad,
   getRandomLandmark,
@@ -129,7 +131,7 @@ export {
 // HIGH-LEVEL API
 // ============================================================================
 
-import { getCityConfig, getCityConfigByCoords } from "./city-configs";
+import { getCityConfig, getCityConfigByCoords, getOrCreateCityConfig } from "./city-configs";
 import { fetchTrafficData, fetchWeatherData, fetchEventData, fetchFarmersMarkets } from "./data-fetchers";
 import { buildSituationContext, analyzeForPost, getSituationSummary } from "./situation-analyzer";
 import { generatePost, generateSeedPosts } from "./template-engine";
@@ -153,6 +155,8 @@ export interface IntelligentPostResult {
 /**
  * Generate an intelligent post for a city if conditions warrant
  *
+ * UNIVERSAL: Now works for ANY city with coordinates, not just pre-configured ones.
+ *
  * This is the main entry point for the intelligent bot system.
  * It fetches real data, analyzes the situation, checks cooldowns,
  * and generates a post only if appropriate.
@@ -161,15 +165,20 @@ export async function generateIntelligentPost(
   cityName: string,
   options: { force?: boolean; coords?: CityCoords; includeEngagement?: boolean } = {}
 ): Promise<IntelligentPostResult> {
-  // Get city config
-  const config = getCityConfig(cityName) ||
+  // UNIVERSAL CONFIG: Get pre-configured OR generate dynamic config
+  let config = getCityConfig(cityName) ||
     (options.coords ? getCityConfigByCoords(options.coords) : null);
+
+  // If no pre-configured match but we have coords, generate dynamic config
+  if (!config && options.coords) {
+    config = getOrCreateCityConfig(cityName, options.coords);
+  }
 
   if (!config) {
     return {
       success: false,
       posted: false,
-      reason: `No configuration for city: ${cityName}`,
+      reason: `No configuration for city: ${cityName}. Provide coords for universal support.`,
     };
   }
 
@@ -258,7 +267,14 @@ export async function generateIntelligentPost(
 /**
  * Generate seed posts for a city with no content (cold-start)
  *
- * Creates varied posts based on real conditions.
+ * UNIVERSAL: Now works for ANY city with coordinates, not just pre-configured ones.
+ *
+ * Creates varied posts based on real conditions:
+ * - Weather-based contextual polls (works for any location via Open-Meteo)
+ * - Event-based posts (works for any location via Ticketmaster)
+ * - Farmers market posts (works for any location via USDA/OSM)
+ * - Time-based engagement posts (rush hour, weekends)
+ *
  * Includes both informational and engagement posts.
  * Bypasses regular cooldown but respects cold-start limits.
  */
@@ -286,26 +302,37 @@ export async function generateColdStartPosts(
     }
   }
 
-  // Get city config
-  const config = getCityConfig(cityName) ||
-    (options.coords ? getCityConfigByCoords(options.coords) : null);
-
-  if (!config) {
-    // No config - fall back to generic posts
-    return {
-      success: false,
-      posts: [],
-      reason: `No configuration for city: ${cityName}. Use generic auto-seed instead.`,
-    };
+  // UNIVERSAL CONFIG: Get pre-configured OR generate dynamic config
+  // This is the key change that enables the system to work for ANY city
+  if (!options.coords) {
+    // Without coords, we can't generate dynamic config for unknown cities
+    const preconfigured = getCityConfig(cityName);
+    if (!preconfigured) {
+      return {
+        success: false,
+        posts: [],
+        reason: `No coordinates provided for city: ${cityName}. Coords required for universal support.`,
+      };
+    }
   }
 
-  // Fetch real-time data (pass coords for better event coverage in suburbs)
+  // Get or create config - this will use pre-configured if available,
+  // or generate a dynamic config for any other city
+  const config = options.coords
+    ? getOrCreateCityConfig(cityName, options.coords)
+    : getCityConfig(cityName)!; // Safe because we checked above
+
+  console.log(`[IntelligentBots] Using config for ${config.name}, ${config.state} (coords: ${config.coords.lat}, ${config.coords.lon})`);
+
+  // Fetch real-time data (pass coords for accurate location-based results)
   const [traffic, weather, events, farmersMarkets] = await Promise.all([
     fetchTrafficData(config.coords),
     fetchWeatherData(config.coords),
     fetchEventData(config.name, config.state, config.coords),
     fetchFarmersMarkets(config.name, config.state, config.coords),
   ]);
+
+  console.log(`[IntelligentBots] Data fetched - Weather: ${weather.temperature}°F ${weather.condition}, Events: ${events.length}, Markets: ${farmersMarkets.length}`);
 
   // Build context
   const ctx = buildSituationContext(config, traffic, weather, events, farmersMarkets);
