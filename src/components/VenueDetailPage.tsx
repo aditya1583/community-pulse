@@ -169,16 +169,22 @@ export default function VenueDetailPage({
     return date.toLocaleDateString();
   };
 
-  // Open in maps
+  // Open in maps - use venue name + address for better UX (shows business name, not coordinates)
   const openInMaps = () => {
-    if (venue.lat && venue.lon) {
+    // Build a search query with venue name and address for best results
+    const searchParts: string[] = [];
+    if (venue.name) searchParts.push(venue.name);
+    if (venue.address) searchParts.push(venue.address);
+
+    if (searchParts.length > 0) {
       window.open(
-        `https://www.google.com/maps/search/?api=1&query=${venue.lat},${venue.lon}`,
+        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(searchParts.join(' '))}`,
         "_blank"
       );
-    } else if (venue.address) {
+    } else if (venue.lat && venue.lon) {
+      // Fallback to coordinates only if no name/address available
       window.open(
-        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venue.address)}`,
+        `https://www.google.com/maps/search/?api=1&query=${venue.lat},${venue.lon}`,
         "_blank"
       );
     }

@@ -106,7 +106,11 @@ export default function GasPricesCard({ state, cityName, lat, lon }: GasPricesCa
   };
 
   const openDirections = (station: GasStation) => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${station.lat},${station.lon}`;
+    // Use station name + address for better UX (shows business name, not coordinates)
+    const destination = station.address
+      ? `${station.name} ${station.address}`
+      : `${station.lat},${station.lon}`;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`;
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
