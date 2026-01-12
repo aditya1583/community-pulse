@@ -142,15 +142,45 @@ function isTabId(value: unknown): value is TabId {
   return typeof value === "string" && TAB_ID_SET.has(value as TabId);
 }
 
+// Helper to restore city from localStorage immediately (prevents race condition)
+function getInitialCity(): { city: string; selectedCity: GeocodedCity | null; lastValidCity: GeocodedCity } {
+  if (typeof window === "undefined") {
+    return { city: DEFAULT_CITY.displayName, selectedCity: DEFAULT_CITY, lastValidCity: DEFAULT_CITY };
+  }
+  try {
+    const savedCity = localStorage.getItem("cp-city");
+    if (savedCity) {
+      const parsed = JSON.parse(savedCity) as StoredCity;
+      if (parsed && parsed.displayName) {
+        const restoredCity: GeocodedCity = {
+          id: parsed.id || `${parsed.displayName}-${parsed.lat ?? "unknown"}-${parsed.lon ?? "unknown"}`,
+          name: parsed.name || parsed.displayName.split(",")[0]?.trim() || parsed.displayName,
+          state: parsed.state,
+          country: parsed.country,
+          lat: parsed.lat ?? DEFAULT_CITY.lat,
+          lon: parsed.lon ?? DEFAULT_CITY.lon,
+          displayName: parsed.displayName,
+        };
+        return {
+          city: restoredCity.displayName,
+          selectedCity: parsed.lat && parsed.lon ? restoredCity : null,
+          lastValidCity: restoredCity
+        };
+      }
+    }
+  } catch {
+    // Ignore errors
+  }
+  return { city: DEFAULT_CITY.displayName, selectedCity: DEFAULT_CITY, lastValidCity: DEFAULT_CITY };
+}
+
 export default function Home() {
-  // Core state
-  const [city, setCity] = useState(DEFAULT_CITY.displayName);
-  const [selectedCity, setSelectedCity] = useState<GeocodedCity | null>(
-    DEFAULT_CITY
-  );
-  const [lastValidCity, setLastValidCity] = useState<GeocodedCity>(
-    DEFAULT_CITY
-  );
+  // Core state - initialize from localStorage to prevent race condition
+  // Use lazy initializer to read localStorage once on mount
+  const [cityState] = useState(getInitialCity);
+  const [city, setCity] = useState(cityState.city);
+  const [selectedCity, setSelectedCity] = useState<GeocodedCity | null>(cityState.selectedCity);
+  const [lastValidCity, setLastValidCity] = useState<GeocodedCity>(cityState.lastValidCity);
   const [tagFilter, setTagFilter] = useState("All");
   const [username, setUsername] = useState<string>("");
   const [validationError, setValidationError] = useState<string | null>(null);
