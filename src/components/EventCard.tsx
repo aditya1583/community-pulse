@@ -62,6 +62,8 @@ type EventCardProps = {
   error: string | null;
   hasLocation: boolean;
   fallback?: EventsFallback | null;
+  /** City name for hyperlocal pulse prompts */
+  cityName?: string;
   // Pulse input props
   isSignedIn?: boolean;
   identityReady?: boolean;
@@ -340,6 +342,7 @@ export default function EventCard({
   error,
   hasLocation,
   fallback,
+  cityName = "Austin",
   isSignedIn = false,
   identityReady = false,
   displayName = "",
@@ -513,6 +516,7 @@ export default function EventCard({
       {onMoodChange && onMessageChange && onSubmit && onSignInClick && (
         <TabPulseInput
           category="Events"
+          cityName={cityName}
           mood={pulseMood}
           message={pulseMessage}
           displayName={displayName}

@@ -110,6 +110,7 @@ export default function LocalTab({
       {onMoodChange && onMessageChange && onSubmit && onSignInClick && (
         <TabPulseInput
           category="General"
+          cityName={cityName}
           mood={pulseMood}
           message={pulseMessage}
           displayName={displayName}

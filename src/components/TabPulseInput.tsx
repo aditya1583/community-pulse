@@ -2,55 +2,15 @@
 
 import React, { forwardRef, useState, useEffect } from "react";
 import { CATEGORY_MOODS, type PulseCategory } from "./types";
+import { getStableHyperlocalPlaceholder } from "@/lib/hyperlocal-prompts";
 
 const MAX_MESSAGE_LENGTH = 240;
-
-/**
- * Category-specific placeholder examples
- * These are designed to inspire contextual, specific content
- */
-const CATEGORY_PLACEHOLDERS: Record<PulseCategory, string[]> = {
-  Traffic: [
-    "Ronald Reagan traffic around 5:00 is crazy right now",
-    "I-35 backed up near downtown - accident on shoulder",
-    "Mopac is clear, smooth sailing today",
-    "Construction on 183 causing major delays",
-    "360 loop moving slow - give yourself extra time",
-  ],
-  Events: [
-    "The concert at Moody Center was amazing!",
-    "Long lines at the stadium - arrive early",
-    "This festival has great food trucks",
-    "Parking is $40 near the arena tonight",
-    "The opening act is fire - don't skip it",
-  ],
-  General: [
-    "Torchy's on 183 has a 20 min wait right now",
-    "Found a great parking spot downtown",
-    "The new coffee shop on South Congress is worth it",
-    "Farmers market is packed but vibes are good",
-    "Line at Franklin's is only an hour today",
-  ],
-  Weather: [
-    "It's way hotter than the forecast said",
-    "Perfect patio weather downtown",
-    "Flooding on low water crossings - be careful",
-    "The sunset tonight is incredible",
-  ],
-};
-
-/**
- * Get a stable placeholder that only changes every few minutes
- */
-function getStablePlaceholder(category: PulseCategory): string {
-  const placeholders = CATEGORY_PLACEHOLDERS[category];
-  const index = Math.floor(Date.now() / (3 * 60 * 1000)) % placeholders.length;
-  return placeholders[index];
-}
 
 type TabPulseInputProps = {
   /** The category this input is pre-set to (Traffic, Events, General) */
   category: PulseCategory;
+  /** The user's selected city name for hyperlocal prompts */
+  cityName?: string;
   /** Current mood selection */
   mood: string;
   /** Current message text */
@@ -92,6 +52,7 @@ const TabPulseInput = forwardRef<HTMLTextAreaElement, TabPulseInputProps>(
   function TabPulseInput(
     {
       category,
+      cityName = "Austin", // Default to Austin for backward compatibility
       mood,
       message,
       displayName,
@@ -108,15 +69,16 @@ const TabPulseInput = forwardRef<HTMLTextAreaElement, TabPulseInputProps>(
     },
     ref
   ) {
-    // Time-based placeholder (refreshes when category changes)
+    // Time-based placeholder (refreshes when category or city changes)
+    // Uses hyperlocal prompts specific to the user's selected city
     const [placeholder, setPlaceholder] = useState(() =>
-      getStablePlaceholder(category)
+      getStableHyperlocalPlaceholder(cityName, category)
     );
 
-    // Update placeholder when category changes
+    // Update placeholder when category or city changes
     useEffect(() => {
-      setPlaceholder(getStablePlaceholder(category));
-    }, [category]);
+      setPlaceholder(getStableHyperlocalPlaceholder(cityName, category));
+    }, [category, cityName]);
 
     // Get moods for current category
     const categoryMoods = CATEGORY_MOODS[category];

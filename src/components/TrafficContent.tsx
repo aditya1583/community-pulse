@@ -224,6 +224,7 @@ export default function TrafficContent({
       {/* Drop a Traffic Pulse */}
       <TabPulseInput
         category="Traffic"
+        cityName={cityName}
         mood={pulseMood}
         message={pulseMessage}
         displayName={displayName}

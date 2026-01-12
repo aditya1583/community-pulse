@@ -3206,6 +3206,7 @@ export default function Home() {
                       error={ticketmasterError}
                       hasLocation={!!(selectedCity?.lat && selectedCity?.lon)}
                       fallback={ticketmasterFallback}
+                      cityName={city}
                       isSignedIn={!!sessionUser}
                       identityReady={identityReady}
                       displayName={displayName}
