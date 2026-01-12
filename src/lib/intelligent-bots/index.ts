@@ -102,6 +102,7 @@ export {
   type EngagementPost,
   type EngagementType,
   type EngagementDecision,
+  type PostActionData,
 } from "./engagement-posts";
 
 // AI-Powered Fun Facts

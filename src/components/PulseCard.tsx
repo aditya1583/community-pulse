@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import type { Pulse } from "./types";
 import { formatPulseDateTime } from "@/lib/pulses";
 import { useExpiryCountdown } from "@/hooks/useExpiryCountdown";
@@ -12,6 +12,103 @@ import StatusRing from "@/components/StatusRing";
 import { StatusIndicator } from "@/components/StatusRing";
 import DistanceBadge from "@/components/DistanceBadge";
 import { RADIUS_CONFIG } from "@/lib/constants/radius";
+
+// ============================================================================
+// ACTIONABLE CONTENT DETECTION
+// ============================================================================
+
+/**
+ * Parsed action data from message content
+ * Used to render action buttons for farmers market and other actionable posts
+ */
+interface ParsedActionData {
+  type: "farmers_market" | "venue" | null;
+  venueName: string | null;
+  address: string | null;
+  directionsUrl: string | null;
+}
+
+/**
+ * Detect and parse actionable content from pulse message
+ *
+ * Farmers market posts have recognizable patterns:
+ * - Address line starting with location pin emoji
+ * - Directions CTA (e.g., "Tap for directions", "Get directions")
+ *
+ * This allows us to make bot posts actionable without database changes.
+ */
+function parseActionableContent(message: string, author: string): ParsedActionData {
+  // Only check bot posts that are likely market-related
+  const isMarketBot = author.toLowerCase().includes("market_scout");
+  // Market emojis: corn, tomato, leafy green, carrot, honey pot
+  const marketEmojis = ["🌽", "🍅", "🥬", "🥕", "🍯"];
+  const hasMarketEmoji = marketEmojis.some(emoji => message.includes(emoji));
+  const hasAddressLine = message.includes("📍"); // Pin emoji
+
+  if (!isMarketBot && !hasMarketEmoji && !hasAddressLine) {
+    return { type: null, venueName: null, address: null, directionsUrl: null };
+  }
+
+  // Try to extract venue name (first line, usually has the market name)
+  const lines = message.split("\n").filter(line => line.trim());
+  let venueName: string | null = null;
+  let address: string | null = null;
+
+  // First line usually contains the market name
+  if (lines.length > 0) {
+    // Remove emojis and extract the name part
+    const firstLine = lines[0]
+      .replace(/[\u{1F300}-\u{1F9FF}]/gu, "") // Remove emojis
+      .replace(/^[^a-zA-Z]*/, "") // Remove leading non-letters
+      .replace(/is (OPEN|open|Open).*$/i, "") // Remove status text
+      .replace(/!.*$/, "") // Remove exclamation and after
+      .trim();
+
+    if (firstLine.length > 2) {
+      venueName = firstLine;
+    }
+  }
+
+  // Find address line (starts with pin emoji)
+  for (const line of lines) {
+    if (line.includes("📍")) {
+      // Extract address after the pin emoji
+      address = line
+        .replace(/📍/g, "")
+        .replace(/\([^)]*mi\)/g, "") // Remove distance like "(1.8 mi)"
+        .trim();
+      break;
+    }
+  }
+
+  // Check if there's a directions CTA
+  const hasDirectionsCTA =
+    message.toLowerCase().includes("directions") ||
+    message.toLowerCase().includes("tap for") ||
+    message.toLowerCase().includes("markets tab");
+
+  if ((venueName || address) && hasDirectionsCTA) {
+    // Build Google Maps directions URL
+    const searchQuery = address
+      ? encodeURIComponent(address)
+      : venueName
+        ? encodeURIComponent(venueName)
+        : null;
+
+    const directionsUrl = searchQuery
+      ? `https://www.google.com/maps/dir/?api=1&destination=${searchQuery}`
+      : null;
+
+    return {
+      type: "farmers_market",
+      venueName,
+      address,
+      directionsUrl,
+    };
+  }
+
+  return { type: null, venueName: null, address: null, directionsUrl: null };
+}
 
 type PulseCardProps = {
   pulse: Pulse;
@@ -26,6 +123,51 @@ type PulseCardProps = {
   /** Optional: author's level */
   authorLevel?: number;
 };
+
+/**
+ * Action buttons for actionable posts (farmers markets, venues)
+ * Renders directions and website buttons when action data is present
+ */
+function ActionButtons({ actionData }: { actionData: ParsedActionData }) {
+  if (!actionData.type || !actionData.directionsUrl) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-slate-700/50">
+      {/* Get Directions button */}
+      <a
+        href={actionData.directionsUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 transition-colors"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z" />
+        </svg>
+        Get Directions
+      </a>
+
+      {/* View on Google Maps button */}
+      {actionData.address && (
+        <a
+          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(actionData.address)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-700/50 hover:bg-slate-700 text-slate-300 border border-slate-600/50 transition-colors"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+          </svg>
+          View on Map
+        </a>
+      )}
+    </div>
+  );
+}
 
 /**
  * Clock icon SVG component
@@ -113,6 +255,12 @@ export default function PulseCard({
   const { remainingText, opacity, isExpiringSoon, isFading, isExpired } =
     useExpiryCountdown(pulse.expiresAt);
 
+  // Parse actionable content from message (memoized to avoid re-parsing)
+  const actionData = useMemo(
+    () => parseActionableContent(pulse.message, pulse.author),
+    [pulse.message, pulse.author]
+  );
+
   // Don't render if fully expired (client-side safety)
   if (isExpired) {
     return null;
@@ -156,7 +304,11 @@ export default function PulseCard({
         </div>
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm text-white leading-snug mb-3">{pulse.message}</p>
+          {/* Message content - preserve line breaks for multi-line posts */}
+          <p className="text-sm text-white leading-snug mb-3 whitespace-pre-line">{pulse.message}</p>
+
+          {/* Action buttons for actionable content (farmers markets, venues) */}
+          {actionData.type && <ActionButtons actionData={actionData} />}
 
           {/* Poll voting for This or That posts */}
           {pulse.poll_options && pulse.poll_options.length >= 2 && (

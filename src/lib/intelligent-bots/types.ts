@@ -105,6 +105,9 @@ export interface FarmersMarketData {
   products: string[];     // e.g., ["Fresh Produce", "Local Honey"]
   isOpenToday: boolean;
   distance?: number;      // Miles from user
+  lat?: number;           // Latitude for directions
+  lon?: number;           // Longitude for directions
+  website?: string | null; // Market website
 }
 
 export interface TimeContext {

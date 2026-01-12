@@ -21,6 +21,8 @@ export type FarmersMarketData = {
   website: string | null;
   facebook: string | null;
   source: "usda" | "foursquare" | "osm";
+  lat: number | null;
+  lon: number | null;
 };
 
 export type FarmersMarketsResponse = {
@@ -192,6 +194,8 @@ async function fetchFromOSM(
           website: tags.website || tags["contact:website"] || null,
           facebook: tags["contact:facebook"] || null,
           source: "osm" as const,
+          lat: elLat,
+          lon: elLon,
         };
       })
       .filter(Boolean);
@@ -281,6 +285,8 @@ async function fetchFromFoursquare(
         website: place.website || null,
         facebook: null,
         source: "foursquare" as const,
+        lat: place.geocodes?.main?.latitude ?? null,
+        lon: place.geocodes?.main?.longitude ?? null,
       };
     });
   } catch (error) {
@@ -383,6 +389,8 @@ export async function GET(req: NextRequest) {
                   website: details.Website || null,
                   facebook: details.Facebook || null,
                   source: "usda",
+                  lat: null, // USDA API doesn't provide coordinates
+                  lon: null,
                 });
               } catch {
                 // If details fetch fails, use basic info
@@ -397,6 +405,8 @@ export async function GET(req: NextRequest) {
                   website: null,
                   facebook: null,
                   source: "usda",
+                  lat: null,
+                  lon: null,
                 });
               }
             }

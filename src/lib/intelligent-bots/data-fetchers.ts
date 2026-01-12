@@ -446,6 +446,9 @@ export async function fetchFarmersMarkets(
       products: string[];
       isOpenToday?: boolean;
       distance?: number;
+      lat?: number | null;
+      lon?: number | null;
+      website?: string | null;
     }) => ({
       name: market.name,
       address: market.address,
@@ -453,6 +456,9 @@ export async function fetchFarmersMarkets(
       products: market.products || [],
       isOpenToday: market.isOpenToday ?? false,
       distance: market.distance,
+      lat: market.lat ?? undefined,
+      lon: market.lon ?? undefined,
+      website: market.website ?? undefined,
     }));
   } catch (error) {
     console.error("[IntelligentBots] Failed to fetch farmers markets:", error);

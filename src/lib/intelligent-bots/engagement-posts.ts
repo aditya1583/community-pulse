@@ -44,10 +44,33 @@ export type EngagementType =
   | "confession_booth"       // Anonymous-style local confessions
   | "farmers_market";        // Hyperlocal farmers market content
 
+/**
+ * Action metadata for actionable posts (e.g., farmers market posts with directions)
+ * Enables PulseCard to render interactive elements
+ */
+export interface PostActionData {
+  /** Type of action - navigation to tab or external link */
+  type: "navigate_tab" | "directions" | "website";
+  /** Target for navigation (e.g., "local/markets") or URL for external */
+  target: string;
+  /** Display label for the action button */
+  label: string;
+  /** Optional venue/market data for rich rendering */
+  venue?: {
+    name: string;
+    address: string;
+    lat?: number;
+    lon?: number;
+    website?: string;
+  };
+}
+
 export interface EngagementPost extends Omit<GeneratedPost, "tag"> {
   tag: PostType | "General";
   engagementType: EngagementType;
   options?: string[];  // For polls
+  /** Action metadata for actionable posts */
+  action?: PostActionData;
 }
 
 // ============================================================================
@@ -643,42 +666,133 @@ const CONFESSION_TEMPLATES = [
 ];
 
 // ============================================================================
-// FARMERS MARKET - Hyperlocal market engagement
+// FARMERS MARKET - Hyperlocal market engagement with ACTIONABLE content
 // ============================================================================
 
+/**
+ * ACTIONABLE FARMERS MARKET TEMPLATES
+ *
+ * These templates produce RICH, ACTIONABLE content that tells users:
+ * - WHERE: Full address with distance
+ * - WHEN: Opening hours and current status
+ * - HOW: Clear CTA for directions
+ *
+ * The templates use {markers} for dynamic content:
+ * - {marketName}: Market name
+ * - {address}: Full street address
+ * - {schedule}: Operating hours (e.g., "Sa-Su 10am-6pm")
+ * - {distance}: Distance in miles (e.g., "1.8 mi")
+ * - {products}: Top products (e.g., "fresh produce, local honey")
+ * - {openStatus}: "OPEN NOW" or "Opens Saturday" etc.
+ * - {city}: City name
+ */
 const FARMERS_MARKET_TEMPLATES = {
-  // When market is open today - FOMO/urgency
+  // When market is OPEN TODAY - FOMO/urgency with full actionable details
   openToday: [
-    "🥬 {marketName} is open TODAY! Fresh produce, local honey, and more. Who's heading out?",
-    "🍅 Saturday market run! {marketName} is open right now. What's your go-to vendor?",
-    "🌽 {marketName} alert! It's market day. Get there early for the best tomatoes 🍅",
-    "🥕 Farmers market morning! {marketName} has the goods. Anyone need anything while I'm there?",
-    "🍯 {marketName} is open! Local honey season is here. Who has the best booth?",
-    "🌿 Market day at {marketName}! Fresh herbs, local eggs, live music. Perfect Saturday vibes.",
+    `🥬 {marketName} is OPEN NOW!
+📍 {address}{distanceText}
+🕐 {schedule}
+Fresh produce, local vendors & more!
+→ Tap for directions`,
+
+    `🍅 MARKET DAY! {marketName} is open right now
+📍 {address}{distanceText}
+🕐 {schedule}
+Get there before the good stuff sells out!
+→ See on Markets tab`,
+
+    `🌽 {marketName} is OPEN for business!
+📍 {address}{distanceText}
+🕐 {schedule}
+{products} and more fresh from the farm
+→ Get directions`,
+
+    `🥕 Fresh produce alert! {marketName}
+📍 {address}{distanceText}
+🕐 Open now - {schedule}
+Who's making a market run today?
+→ Tap for directions`,
+
+    `🍯 Local market is LIVE! {marketName}
+📍 {address}{distanceText}
+🕐 {schedule}
+Support local farmers & grab something fresh!
+→ View on Markets tab`,
   ],
-  // When market is coming up this week
+
+  // When market is COMING UP this week - build anticipation with details
   upcoming: [
-    "🥬 {marketName} every {schedule}! What's the must-try vendor there?",
-    "🍅 Pro tip: {marketName} on {schedule} has amazing local produce. Get there early!",
-    "🌽 {marketName} is the spot for {products}. Anyone been recently?",
-    "🥕 Looking for fresh produce? {marketName} ({schedule}) is where it's at. Favorite finds?",
-    "🍯 {marketName} supporters - what should I try first? New to the area!",
+    `📅 This weekend: {marketName}
+📍 {address}{distanceText}
+🕐 {schedule}
+{products} - who's planning to go?
+→ Check the Markets tab for more`,
+
+    `🥬 Mark your calendar: {marketName}
+📍 {address}{distanceText}
+🕐 {schedule}
+Fresh local produce awaits!
+→ Get directions for the weekend`,
+
+    `🍅 Weekend plans? {marketName} has you covered
+📍 {address}{distanceText}
+🕐 {schedule}
+What's your go-to find there?
+→ See on Markets tab`,
+
+    `🌽 Coming up: {marketName}
+📍 {address}{distanceText}
+🕐 {schedule}
+Pro tip: Get there early for the best selection!
+→ Tap for directions`,
   ],
-  // General market discovery/recommendations
+
+  // Discovery/engagement posts - still include key details
   discovery: [
-    "🥬 Farmers market question: {marketName} vs other local markets - which is your favorite?",
-    "🍅 Just discovered {marketName}! {products} looked amazing. Hidden gems I should know about?",
-    "🌽 Best farmers market in {city}? I've heard good things about {marketName}...",
-    "🥕 {city} farmers market fans - {marketName} or somewhere else? Need recommendations!",
-    "🍯 Market haul time! Heading to {marketName} this week. What can't I miss?",
+    `Looking for fresh local produce? 🍅
+{marketName} in {city} has you covered:
+📍 {address}{distanceText}
+🕐 {schedule}
+→ Get directions`,
+
+    `🥬 Local gem: {marketName}
+📍 {address}{distanceText}
+🕐 {schedule}
+Anyone been? What's the best booth?
+→ See on Markets tab`,
+
+    `🧑‍🌾 Know your local markets?
+{marketName} - {schedule}
+📍 {address}{distanceText}
+What other markets should I check out?
+→ View all in Markets tab`,
+
+    `Fresh finds at {marketName} 🥕
+📍 {address}{distanceText}
+🕐 {schedule}
+{products} and more!
+→ Tap for directions`,
   ],
-  // Tips and insider knowledge
+
+  // Tips with actionable details
   tips: [
-    "🥬 Insider tip: {marketName} - arrive by {tipTime} for the best selection. Trust me.",
-    "🍅 {marketName} hack: The booth near {tipLocation} has the best {products}. You're welcome.",
-    "🌽 Pro move at {marketName}: Bring cash, chat with vendors, and go early. Life-changing produce.",
-    "🥕 {marketName} secret: Their {products} sell out by noon. Early bird gets the goods!",
-    "🍯 Real talk: {marketName} isn't just shopping, it's a whole vibe. Bring your coffee and enjoy.",
+    `🤫 Insider tip: {marketName}
+📍 {address}{distanceText}
+🕐 {schedule}
+Arrive early for the best {products}!
+→ Get directions`,
+
+    `🥬 Pro tip for {marketName}:
+📍 {address}{distanceText}
+🕐 {schedule}
+Bring cash & reusable bags. Trust me.
+→ See on Markets tab`,
+
+    `💡 {marketName} hack:
+📍 {address}{distanceText}
+🕐 {schedule}
+The vendors near the entrance have the freshest {products}
+→ Tap for directions`,
   ],
 };
 
@@ -1456,6 +1570,12 @@ export async function generateConfessionBoothPost(
  * Generate a Farmers Market post
  * Uses REAL farmers market data from the user's area (hyperlocal - 10mi radius)
  *
+ * NOW PRODUCES ACTIONABLE CONTENT:
+ * - Full address with distance
+ * - Opening hours
+ * - Clear CTA for directions
+ * - Action metadata for PulseCard interactivity
+ *
  * Post types:
  * - openToday: Market is open NOW - create urgency/FOMO
  * - upcoming: Market is coming up this week - build anticipation
@@ -1474,7 +1594,6 @@ export async function generateFarmersMarketPost(
 
   // Pick the closest/first market (they should be sorted by distance)
   const market = farmersMarkets[0];
-  const vars = getCityVariables(city);
 
   // Determine which template category to use based on context
   let templateCategory: keyof typeof FARMERS_MARKET_TEMPLATES;
@@ -1493,21 +1612,48 @@ export async function generateFarmersMarketPost(
   const templates = FARMERS_MARKET_TEMPLATES[templateCategory];
   const template = pickRandom(templates);
 
-  // Build market-specific variables
+  // Build RICH market-specific variables for actionable content
   const productsStr = market.products.length > 0
     ? market.products.slice(0, 3).join(", ").toLowerCase()
     : "fresh produce";
 
-  const extendedVars = {
-    ...vars,
+  // Format distance text (e.g., " (1.8 mi)" or empty if no distance)
+  const distanceText = market.distance
+    ? ` (${market.distance.toFixed(1)} mi)`
+    : "";
+
+  // Clean up address - remove city name if it's redundant
+  const address = market.address || city.name;
+
+  const extendedVars: Record<string, string> = {
     marketName: market.name,
-    schedule: market.schedule,
+    address: address,
+    distanceText: distanceText,
+    schedule: market.schedule || "Hours vary",
     products: productsStr,
-    tipTime: "9am",
-    tipLocation: "the entrance",
+    city: city.name,
   };
 
   const message = fillEngagementTemplate(template, extendedVars);
+
+  // Build Google Maps directions URL
+  const directionsUrl = market.lat && market.lon
+    ? `https://www.google.com/maps/dir/?api=1&destination=${market.lat},${market.lon}`
+    : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(market.name + " " + market.address)}`;
+
+  // Action metadata for PulseCard to make this post interactive
+  const action: PostActionData = {
+    type: "directions",
+    target: directionsUrl,
+    label: "Get Directions",
+    venue: {
+      name: market.name,
+      address: market.address,
+      lat: market.lat,
+      lon: market.lon,
+      website: market.website ?? undefined,
+    },
+  };
 
   return {
     message,
@@ -1517,6 +1663,7 @@ export async function generateFarmersMarketPost(
     is_bot: true,
     hidden: false,
     engagementType: "farmers_market",
+    action,
   };
 }
 
