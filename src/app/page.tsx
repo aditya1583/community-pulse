@@ -1001,8 +1001,21 @@ export default function Home() {
   }, [city]);
 
   // ========= LOCAL STORAGE: CITY =========
+  // Also restore manual location flag from sessionStorage to prevent geolocation override
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    // CRITICAL: Restore manual location flag FIRST, before any city restoration
+    // This prevents geolocation from overwriting the user's city selection
+    try {
+      const savedManualFlag = sessionStorage.getItem("cp-use-manual-location");
+      if (savedManualFlag === "true") {
+        setUseManualLocation(true);
+      }
+    } catch {
+      // Ignore storage errors
+    }
+
     const savedCity = localStorage.getItem("cp-city");
     if (!savedCity) return;
 
@@ -1104,6 +1117,12 @@ export default function Home() {
     setShowCitySuggestions(false);
     // Mark as manual selection to prevent geolocation from overwriting
     setUseManualLocation(true);
+    // Persist manual location flag so it survives page navigation
+    try {
+      sessionStorage.setItem("cp-use-manual-location", "true");
+    } catch {
+      // Ignore storage errors
+    }
   }
 
   // Handler for city input changes
@@ -1152,6 +1171,12 @@ export default function Home() {
         setShowCitySuggestions(false);
         // Mark as manual selection to prevent geolocation from overwriting
         setUseManualLocation(true);
+        // Persist manual location flag so it survives page navigation
+        try {
+          sessionStorage.setItem("cp-use-manual-location", "true");
+        } catch {
+          // Ignore storage errors
+        }
       }
       return;
     }
@@ -2625,7 +2650,14 @@ export default function Home() {
           const success = await geolocation.requestLocation();
           return success;
         }}
-        onUseManual={() => setUseManualLocation(true)}
+        onUseManual={() => {
+          setUseManualLocation(true);
+          try {
+            sessionStorage.setItem("cp-use-manual-location", "true");
+          } catch {
+            // Ignore storage errors
+          }
+        }}
         loading={geolocation.loading}
         error={geolocation.error}
       />
