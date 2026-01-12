@@ -227,6 +227,8 @@ export default function Home() {
   const [useManualLocation, setUseManualLocation] = useState(false);
   // Track if we've restored state from storage (prevents geolocation race)
   const [storageRestored, setStorageRestored] = useState(false);
+  // Ref to ensure storage restoration only happens once (survives re-renders and StrictMode)
+  const storageRestorationAttempted = useRef(false);
 
   // USER STREAK
   const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
@@ -1002,14 +1004,24 @@ export default function Home() {
 
   // ========= STORAGE RESTORATION (runs once after hydration) =========
   // Restores city and manual location flag to prevent geolocation override
+  // Uses a ref to ensure this only runs ONCE even with StrictMode double-invocation
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // 1. Restore manual location flag FIRST
+    // CRITICAL: Skip if already attempted (prevents StrictMode/re-render issues)
+    if (storageRestorationAttempted.current) {
+      // Even if skipped, ensure storageRestored is true
+      if (!storageRestored) setStorageRestored(true);
+      return;
+    }
+    storageRestorationAttempted.current = true;
+
+    // 1. Restore manual location flag FIRST (BEFORE anything else can run)
     try {
       const savedManualFlag = sessionStorage.getItem("cp-use-manual-location");
       if (savedManualFlag === "true") {
         setUseManualLocation(true);
+        console.log("[Storage Restore] Manual location flag restored: true");
       }
     } catch {
       // Ignore storage errors
@@ -1038,6 +1050,7 @@ export default function Home() {
             displayName: parsed.displayName,
           };
 
+          console.log("[Storage Restore] City restored:", restoredCity.displayName);
           setCity(restoredCity.displayName);
           setCityInput(restoredCity.displayName);
           if (parsed.lat && parsed.lon) {
@@ -1047,6 +1060,7 @@ export default function Home() {
         }
       } catch {
         // Fallback to treating as plain string
+        console.log("[Storage Restore] City restored (plain):", savedCity);
         setCity(savedCity);
         setCityInput(savedCity);
         setSelectedCity(null);
@@ -1055,7 +1069,8 @@ export default function Home() {
 
     // 3. Mark storage as restored - allows geolocation to proceed if not manual
     setStorageRestored(true);
-  }, [setCityInput, setLastValidCity, setSelectedCity, setCity]);
+    console.log("[Storage Restore] Complete");
+  }, [setCityInput, setLastValidCity, setSelectedCity, setCity, storageRestored]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1076,13 +1091,36 @@ export default function Home() {
   // When geolocation succeeds and we're not in manual mode, update city state
   useEffect(() => {
     // Skip until storage has been restored (prevents race condition)
-    if (!storageRestored) return;
-    // Skip if user chose manual mode
-    if (useManualLocation) return;
+    if (!storageRestored) {
+      console.log("[Geo Sync] Skipping - storage not yet restored");
+      return;
+    }
+    // Skip if user chose manual mode (check state first, then storage as fallback)
+    if (useManualLocation) {
+      console.log("[Geo Sync] Skipping - manual location mode active (state)");
+      return;
+    }
+    // CRITICAL FALLBACK: Check sessionStorage directly in case state hasn't synced yet
+    // This prevents race conditions where geolocation sync runs before state updates
+    try {
+      const storedManualFlag = sessionStorage.getItem("cp-use-manual-location");
+      if (storedManualFlag === "true") {
+        console.log("[Geo Sync] Skipping - manual location mode active (storage fallback)");
+        return;
+      }
+    } catch {
+      // Ignore storage errors
+    }
     // Skip if geolocation doesn't have data yet
-    if (!geolocation.lat || !geolocation.lon || !geolocation.displayName) return;
+    if (!geolocation.lat || !geolocation.lon || !geolocation.displayName) {
+      console.log("[Geo Sync] Skipping - no geolocation data");
+      return;
+    }
     // Skip if still loading
-    if (geolocation.loading) return;
+    if (geolocation.loading) {
+      console.log("[Geo Sync] Skipping - geolocation still loading");
+      return;
+    }
 
     // Build a GeocodedCity from geolocation
     const geoCity: GeocodedCity = {
@@ -1093,6 +1131,8 @@ export default function Home() {
       lon: geolocation.lon,
       displayName: geolocation.displayName,
     };
+
+    console.log("[Geo Sync] Updating city to geolocation:", geoCity.displayName);
 
     // Update city state with geolocation data
     // Use applySuggestionSelection to set input without triggering autocomplete search
