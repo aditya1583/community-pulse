@@ -226,7 +226,15 @@ export default function Home() {
 
   // Geolocation - true hyperlocal experience
   const geolocation = useGeolocation();
-  const [useManualLocation, setUseManualLocation] = useState(false);
+  // Initialize from sessionStorage to prevent race condition with geolocation
+  const [useManualLocation, setUseManualLocation] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return sessionStorage.getItem("cp-use-manual-location") === "true";
+    } catch {
+      return false;
+    }
+  });
 
   // USER STREAK
   const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
