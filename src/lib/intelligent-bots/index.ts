@@ -19,6 +19,7 @@ export type {
   TrafficData,
   WeatherData,
   EventData,
+  FarmersMarketData,
   TimeContext,
   SituationContext,
   PostDecision,
@@ -47,6 +48,7 @@ export {
   fetchTrafficIncidents,
   fetchWeatherData,
   fetchEventData,
+  fetchFarmersMarkets,
 } from "./data-fetchers";
 
 // Situation Analyzer
@@ -70,6 +72,7 @@ export type { ExtendedPostType } from "./template-engine";
 // High-Engagement: Hot Takes, Confession Booth, Neighbor Challenges
 // Identity Builders: Insider Tips, Nostalgia Triggers, Community Callouts
 // Interactive: Would You Rather, This or That
+// Hyperlocal: Farmers Markets
 export {
   generateEngagementPost,
   generateEngagementSeedPosts,
@@ -92,6 +95,8 @@ export {
   generateCommunityCalloutPost,
   // INTERACTIVE (easy engagement)
   generateWouldYouRatherPost,
+  // HYPERLOCAL (real data)
+  generateFarmersMarketPost,
   // Analysis
   analyzeForEngagement,
   type EngagementPost,
@@ -124,7 +129,7 @@ export {
 // ============================================================================
 
 import { getCityConfig, getCityConfigByCoords } from "./city-configs";
-import { fetchTrafficData, fetchWeatherData, fetchEventData } from "./data-fetchers";
+import { fetchTrafficData, fetchWeatherData, fetchEventData, fetchFarmersMarkets } from "./data-fetchers";
 import { buildSituationContext, analyzeForPost, getSituationSummary } from "./situation-analyzer";
 import { generatePost, generateSeedPosts } from "./template-engine";
 import { checkCooldown, recordPost, checkColdStartAllowed, recordColdStart } from "./cooldown";
@@ -168,14 +173,15 @@ export async function generateIntelligentPost(
   }
 
   // Fetch real-time data in parallel (pass coords for better event coverage)
-  const [traffic, weather, events] = await Promise.all([
+  const [traffic, weather, events, farmersMarkets] = await Promise.all([
     fetchTrafficData(config.coords),
     fetchWeatherData(config.coords),
     fetchEventData(config.name, config.state, config.coords),
+    fetchFarmersMarkets(config.name, config.state, config.coords),
   ]);
 
   // Build situation context
-  const ctx = buildSituationContext(config, traffic, weather, events);
+  const ctx = buildSituationContext(config, traffic, weather, events, farmersMarkets);
   const situationSummary = getSituationSummary(ctx);
 
   // Check for engagement post opportunity first (if enabled)
@@ -293,14 +299,15 @@ export async function generateColdStartPosts(
   }
 
   // Fetch real-time data (pass coords for better event coverage in suburbs)
-  const [traffic, weather, events] = await Promise.all([
+  const [traffic, weather, events, farmersMarkets] = await Promise.all([
     fetchTrafficData(config.coords),
     fetchWeatherData(config.coords),
     fetchEventData(config.name, config.state, config.coords),
+    fetchFarmersMarkets(config.name, config.state, config.coords),
   ]);
 
   // Build context
-  const ctx = buildSituationContext(config, traffic, weather, events);
+  const ctx = buildSituationContext(config, traffic, weather, events, farmersMarkets);
   const situationSummary = getSituationSummary(ctx);
 
   // Generate varied posts (now with AI-powered fun facts!)

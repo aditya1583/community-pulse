@@ -10,6 +10,7 @@ import type {
   TrafficData,
   WeatherData,
   EventData,
+  FarmersMarketData,
   TimeContext,
   SituationContext,
   PostDecision,
@@ -23,7 +24,8 @@ export function buildSituationContext(
   city: CityConfig,
   traffic: TrafficData,
   weather: WeatherData,
-  events: EventData[]
+  events: EventData[],
+  farmersMarkets: FarmersMarketData[] = []
 ): SituationContext {
   const now = new Date();
 
@@ -33,6 +35,7 @@ export function buildSituationContext(
     traffic,
     weather,
     events,
+    farmersMarkets,
     time: buildTimeContext(now, city),
   };
 }

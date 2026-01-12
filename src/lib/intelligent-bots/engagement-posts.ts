@@ -41,7 +41,8 @@ export type EngagementType =
   | "neighbor_challenge"     // Call-to-action engagement
   | "community_callout"      // Celebrate/call out local behavior
   | "would_you_rather"       // Hypothetical local scenarios
-  | "confession_booth";      // Anonymous-style local confessions
+  | "confession_booth"       // Anonymous-style local confessions
+  | "farmers_market";        // Hyperlocal farmers market content
 
 export interface EngagementPost extends Omit<GeneratedPost, "tag"> {
   tag: PostType | "General";
@@ -640,6 +641,46 @@ const CONFESSION_TEMPLATES = [
   "🤐 Secret confession: What's your {city} guilty pleasure that you hope your neighbors don't judge?",
   "😅 Confession booth: What {city} thing have you been pretending to understand but actually don't?",
 ];
+
+// ============================================================================
+// FARMERS MARKET - Hyperlocal market engagement
+// ============================================================================
+
+const FARMERS_MARKET_TEMPLATES = {
+  // When market is open today - FOMO/urgency
+  openToday: [
+    "🥬 {marketName} is open TODAY! Fresh produce, local honey, and more. Who's heading out?",
+    "🍅 Saturday market run! {marketName} is open right now. What's your go-to vendor?",
+    "🌽 {marketName} alert! It's market day. Get there early for the best tomatoes 🍅",
+    "🥕 Farmers market morning! {marketName} has the goods. Anyone need anything while I'm there?",
+    "🍯 {marketName} is open! Local honey season is here. Who has the best booth?",
+    "🌿 Market day at {marketName}! Fresh herbs, local eggs, live music. Perfect Saturday vibes.",
+  ],
+  // When market is coming up this week
+  upcoming: [
+    "🥬 {marketName} every {schedule}! What's the must-try vendor there?",
+    "🍅 Pro tip: {marketName} on {schedule} has amazing local produce. Get there early!",
+    "🌽 {marketName} is the spot for {products}. Anyone been recently?",
+    "🥕 Looking for fresh produce? {marketName} ({schedule}) is where it's at. Favorite finds?",
+    "🍯 {marketName} supporters - what should I try first? New to the area!",
+  ],
+  // General market discovery/recommendations
+  discovery: [
+    "🥬 Farmers market question: {marketName} vs other local markets - which is your favorite?",
+    "🍅 Just discovered {marketName}! {products} looked amazing. Hidden gems I should know about?",
+    "🌽 Best farmers market in {city}? I've heard good things about {marketName}...",
+    "🥕 {city} farmers market fans - {marketName} or somewhere else? Need recommendations!",
+    "🍯 Market haul time! Heading to {marketName} this week. What can't I miss?",
+  ],
+  // Tips and insider knowledge
+  tips: [
+    "🥬 Insider tip: {marketName} - arrive by {tipTime} for the best selection. Trust me.",
+    "🍅 {marketName} hack: The booth near {tipLocation} has the best {products}. You're welcome.",
+    "🌽 Pro move at {marketName}: Bring cash, chat with vendors, and go early. Life-changing produce.",
+    "🥕 {marketName} secret: Their {products} sell out by noon. Early bird gets the goods!",
+    "🍯 Real talk: {marketName} isn't just shopping, it's a whole vibe. Bring your coffee and enjoy.",
+  ],
+};
 
 // ============================================================================
 // AI-DRIVEN GENERATION FUNCTIONS
@@ -1411,6 +1452,74 @@ export async function generateConfessionBoothPost(
   };
 }
 
+/**
+ * Generate a Farmers Market post
+ * Uses REAL farmers market data from the user's area (hyperlocal - 10mi radius)
+ *
+ * Post types:
+ * - openToday: Market is open NOW - create urgency/FOMO
+ * - upcoming: Market is coming up this week - build anticipation
+ * - discovery: Ask for recommendations - engagement driver
+ * - tips: Share insider knowledge - builds community trust
+ */
+export async function generateFarmersMarketPost(
+  ctx: SituationContext
+): Promise<EngagementPost | null> {
+  const { city, farmersMarkets, time } = ctx;
+
+  // Need at least one farmers market to generate a post
+  if (!farmersMarkets || farmersMarkets.length === 0) {
+    return null;
+  }
+
+  // Pick the closest/first market (they should be sorted by distance)
+  const market = farmersMarkets[0];
+  const vars = getCityVariables(city);
+
+  // Determine which template category to use based on context
+  let templateCategory: keyof typeof FARMERS_MARKET_TEMPLATES;
+
+  if (market.isOpenToday) {
+    // Market is open today - use FOMO/urgency templates
+    templateCategory = "openToday";
+  } else if (time.isWeekend) {
+    // Weekend but market not open today - discovery or tips
+    templateCategory = Math.random() < 0.5 ? "discovery" : "tips";
+  } else {
+    // Weekday - upcoming or discovery
+    templateCategory = Math.random() < 0.6 ? "upcoming" : "discovery";
+  }
+
+  const templates = FARMERS_MARKET_TEMPLATES[templateCategory];
+  const template = pickRandom(templates);
+
+  // Build market-specific variables
+  const productsStr = market.products.length > 0
+    ? market.products.slice(0, 3).join(", ").toLowerCase()
+    : "fresh produce";
+
+  const extendedVars = {
+    ...vars,
+    marketName: market.name,
+    schedule: market.schedule,
+    products: productsStr,
+    tipTime: "9am",
+    tipLocation: "the entrance",
+  };
+
+  const message = fillEngagementTemplate(template, extendedVars);
+
+  return {
+    message,
+    tag: "General",
+    mood: "🥬",
+    author: `${city.name} market_scout_bot 🥕`,
+    is_bot: true,
+    hidden: false,
+    engagementType: "farmers_market",
+  };
+}
+
 // ============================================================================
 // HIGH-LEVEL ENGAGEMENT GENERATOR
 // ============================================================================
@@ -1513,6 +1622,40 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
       engagementType: "neighbor_challenge",
       reason: "Challenge time - direct engagement CTA",
     };
+  }
+
+  // ========== HYPERLOCAL DATA (Real market/venue data) ==========
+
+  // Farmers market posts when we have market data - especially on weekends
+  if (ctx.farmersMarkets && ctx.farmersMarkets.length > 0) {
+    const hasOpenMarket = ctx.farmersMarkets.some(m => m.isOpenToday);
+
+    // High priority if market is open today
+    if (hasOpenMarket && Math.random() < 0.6) {
+      return {
+        shouldPost: true,
+        engagementType: "farmers_market",
+        reason: "Farmers market open today - hyperlocal engagement",
+      };
+    }
+
+    // Weekend morning is prime farmers market time
+    if (time.isWeekend && hour >= 7 && hour <= 12 && Math.random() < 0.4) {
+      return {
+        shouldPost: true,
+        engagementType: "farmers_market",
+        reason: "Weekend morning - farmers market time",
+      };
+    }
+
+    // Otherwise still consider with lower probability
+    if (Math.random() < 0.15) {
+      return {
+        shouldPost: true,
+        engagementType: "farmers_market",
+        reason: "Farmers market discovery post",
+      };
+    }
   }
 
   // ========== TIER 3: IDENTITY BUILDERS (Community bonding) ==========
@@ -1666,6 +1809,10 @@ export async function generateEngagementPost(
     case "confession_booth":
       return generateConfessionBoothPost(ctx);
 
+    // HYPERLOCAL CONTENT types
+    case "farmers_market":
+      return generateFarmersMarketPost(ctx);
+
     default:
       return null;
   }
@@ -1718,6 +1865,22 @@ export async function generateEngagementSeedPosts(
   // FOMO alerts during afternoon/evening
   if (ctx.time.hour >= 15 && ctx.time.hour <= 19) {
     priorities.push("fomo_alert");
+  }
+
+  // ========== HYPERLOCAL CONTENT (Real data, high relevance) ==========
+
+  // Farmers market posts - especially valuable on weekends or when markets have data
+  // These use REAL market names from the user's area
+  if (ctx.farmersMarkets && ctx.farmersMarkets.length > 0) {
+    // High priority if market is open today
+    const hasOpenMarket = ctx.farmersMarkets.some(m => m.isOpenToday);
+    if (hasOpenMarket || ctx.time.isWeekend) {
+      // Insert at beginning for weekend/open market priority
+      priorities.unshift("farmers_market");
+    } else {
+      // Still include, just lower priority
+      priorities.push("farmers_market");
+    }
   }
 
   // ========== HIGH-ENGAGEMENT (Always include for viral potential) ==========

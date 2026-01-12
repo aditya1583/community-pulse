@@ -1095,6 +1095,8 @@ export default function Home() {
     setSelectedCity(chosenCity);
     setLastValidCity(chosenCity);
     setShowCitySuggestions(false);
+    // Mark as manual selection to prevent geolocation from overwriting
+    setUseManualLocation(true);
   }
 
   // Handler for city input changes
@@ -1141,6 +1143,8 @@ export default function Home() {
         setCity(manualCity);
         setSelectedCity(null);
         setShowCitySuggestions(false);
+        // Mark as manual selection to prevent geolocation from overwriting
+        setUseManualLocation(true);
       }
       return;
     }

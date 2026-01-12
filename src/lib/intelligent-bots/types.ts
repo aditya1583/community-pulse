@@ -98,6 +98,15 @@ export interface EventData {
   distanceMiles?: number;
 }
 
+export interface FarmersMarketData {
+  name: string;
+  address: string;
+  schedule: string;       // e.g., "Saturdays 9am-1pm"
+  products: string[];     // e.g., ["Fresh Produce", "Local Honey"]
+  isOpenToday: boolean;
+  distance?: number;      // Miles from user
+}
+
 export interface TimeContext {
   hour: number;
   dayOfWeek: number;        // 0 = Sunday
@@ -116,6 +125,7 @@ export interface SituationContext {
   traffic: TrafficData;
   weather: WeatherData;
   events: EventData[];
+  farmersMarkets: FarmersMarketData[];
   time: TimeContext;
 }
 

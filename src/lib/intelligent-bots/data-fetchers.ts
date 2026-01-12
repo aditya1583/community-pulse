@@ -4,7 +4,7 @@
  * Fetches traffic, weather, and event data to inform bot posts
  */
 
-import type { CityCoords, TrafficData, WeatherData, EventData, TrafficIncident } from "./types";
+import type { CityCoords, TrafficData, WeatherData, EventData, TrafficIncident, FarmersMarketData } from "./types";
 import { RADIUS_CONFIG } from "@/lib/constants/radius";
 import { calculateDistanceMiles } from "@/lib/geo/distance";
 
@@ -406,4 +406,56 @@ function mapWeatherCode(code: number): WeatherData["condition"] {
   if (code <= 79) return "snow";
   if (code <= 99) return "storm";
   return "clear";
+}
+
+/**
+ * Fetch farmers markets near a location
+ * Uses the app's existing farmers-markets API endpoint
+ */
+export async function fetchFarmersMarkets(
+  cityName: string,
+  state: string = "TX",
+  coords?: CityCoords
+): Promise<FarmersMarketData[]> {
+  try {
+    // Build API URL - use internal API route
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    let url = `${baseUrl}/api/farmers-markets?city=${encodeURIComponent(cityName)}`;
+    if (state) url += `&state=${encodeURIComponent(state)}`;
+    if (coords) url += `&lat=${coords.lat}&lon=${coords.lon}`;
+
+    const response = await fetch(url, { next: { revalidate: 3600 } }); // 1 hour cache
+
+    if (!response.ok) {
+      console.error(`[IntelligentBots] Farmers markets API error: ${response.status}`);
+      return [];
+    }
+
+    const data = await response.json();
+
+    if (!data.markets || !Array.isArray(data.markets)) {
+      return [];
+    }
+
+    // Map to our internal format
+    return data.markets.slice(0, 5).map((market: {
+      id: string;
+      name: string;
+      address: string;
+      schedule: string;
+      products: string[];
+      isOpenToday?: boolean;
+      distance?: number;
+    }) => ({
+      name: market.name,
+      address: market.address,
+      schedule: market.schedule,
+      products: market.products || [],
+      isOpenToday: market.isOpenToday ?? false,
+      distance: market.distance,
+    }));
+  } catch (error) {
+    console.error("[IntelligentBots] Failed to fetch farmers markets:", error);
+    return [];
+  }
 }
