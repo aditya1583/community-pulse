@@ -1287,52 +1287,91 @@ export default function Home() {
     }
   }, [city]);
 
-  // ========= AUTO-SEED EMPTY CITIES =========
-  // When a city has no pulses, automatically generate contextual bot posts
+  // ========= AUTO-SEED AND REFRESH STALE CITIES =========
+  // When a city has no pulses OR content is stale, automatically generate fresh bot posts
+  // This keeps the app feeling alive with continuous content generation
   const [autoSeedAttempted, setAutoSeedAttempted] = useState<string | null>(null);
+  const [staleRefreshAttempted, setStaleRefreshAttempted] = useState<string | null>(null);
+
+  // Constants for stale content detection
+  const STALE_PULSE_THRESHOLD = 3; // Trigger refresh if fewer than this many pulses
+  const STALE_AGE_HOURS = 2; // Trigger refresh if newest pulse is older than this
 
   useEffect(() => {
     const triggerAutoSeed = async () => {
+      // Determine if this is a cold start (empty) or stale content situation
+      const isEmpty = pulses.length === 0;
+      const isStale = !isEmpty && (
+        pulses.length < STALE_PULSE_THRESHOLD ||
+        (pulses.length > 0 && isContentStale(pulses))
+      );
+
+      // Check if content is stale (oldest non-expired pulse is too old)
+      function isContentStale(pulsesToCheck: Pulse[]): boolean {
+        if (pulsesToCheck.length === 0) return false;
+
+        // Find the newest pulse
+        const newestPulse = pulsesToCheck.reduce((newest, p) => {
+          const pTime = new Date(p.createdAt).getTime();
+          const newestTime = new Date(newest.createdAt).getTime();
+          return pTime > newestTime ? p : newest;
+        }, pulsesToCheck[0]);
+
+        const newestAge = Date.now() - new Date(newestPulse.createdAt).getTime();
+        const staleAgeMs = STALE_AGE_HOURS * 60 * 60 * 1000;
+
+        return newestAge > staleAgeMs;
+      }
+
       // Debug logging
-      console.log("[Auto-Seed Client] Checking conditions:", {
+      console.log("[Content Refresh] Checking conditions:", {
         city,
         initialPulsesFetched,
         pulsesCount: pulses.length,
+        isEmpty,
+        isStale,
         autoSeedAttempted,
+        staleRefreshAttempted,
         loading,
         ticketmasterLoading,
       });
 
-      // Only auto-seed if:
-      // 1. Initial fetch is complete
+      // Skip if no action needed
+      if (!isEmpty && !isStale) {
+        console.log("[Content Refresh] Skipping - city has fresh content");
+        return;
+      }
+
+      // 1. Initial fetch must be complete
       if (!initialPulsesFetched) {
-        console.log("[Auto-Seed Client] Skipping - initial fetch not complete");
+        console.log("[Content Refresh] Skipping - initial fetch not complete");
         return;
       }
-      // 2. No pulses exist
-      if (pulses.length > 0) {
-        console.log("[Auto-Seed Client] Skipping - city has pulses:", pulses.length);
+
+      // 2. Check if we've already attempted for this city
+      if (isEmpty && autoSeedAttempted === city) {
+        console.log("[Content Refresh] Skipping - already attempted empty seed for this city");
         return;
       }
-      // 3. We haven't already tried for this city
-      if (autoSeedAttempted === city) {
-        console.log("[Auto-Seed Client] Skipping - already attempted for this city");
+      if (isStale && staleRefreshAttempted === city) {
+        console.log("[Content Refresh] Skipping - already attempted stale refresh for this city");
         return;
       }
-      // 4. Not currently loading
+
+      // 3. Not currently loading
       if (loading) {
-        console.log("[Auto-Seed Client] Skipping - still loading pulses");
+        console.log("[Content Refresh] Skipping - still loading pulses");
         return;
       }
 
       // Wait for events AND weather to finish loading
       // This prevents using stale data from a previous city
       if (ticketmasterLoading) {
-        console.log("[Auto-Seed Client] Skipping - waiting for events to load");
+        console.log("[Content Refresh] Skipping - waiting for events to load");
         return;
       }
       if (weatherLoading) {
-        console.log("[Auto-Seed Client] Skipping - waiting for weather to load");
+        console.log("[Content Refresh] Skipping - waiting for weather to load");
         return;
       }
 
@@ -1342,63 +1381,79 @@ export default function Home() {
       const weatherMatchesCity = weather?.cityName?.toLowerCase().includes(cityNamePart);
 
       if (weather && !weatherMatchesCity) {
-        console.log("[Auto-Seed Client] Skipping - weather data is stale (from different city)", {
+        console.log("[Content Refresh] Skipping - weather data is stale (from different city)", {
           weatherCity: weather.cityName,
           currentCity: city,
         });
         return;
       }
 
-      // Mark that we're attempting (will be reset on failure)
-      console.log("[Auto-Seed Client] All conditions met! Triggering seed for:", city);
+      const refreshType = isEmpty ? "cold-start" : "stale-refresh";
+      console.log(`[Content Refresh] Triggering ${refreshType} for:`, city);
 
       try {
-        console.log(`Auto-seeding content for ${city}...`);
+        console.log(`[Content Refresh] ${refreshType} for ${city}...`);
 
-        const res = await fetch("/api/auto-seed", {
+        // For stale refresh, use the cron refresh endpoint; for cold-start, use auto-seed
+        const endpoint = isEmpty ? "/api/auto-seed" : "/api/cron/refresh-content";
+        const requestBody = isEmpty
+          ? {
+              city,
+              // CRITICAL: Pass coordinates for universal intelligent bot support
+              // This enables contextual polls, farmers markets, and weather-based
+              // content for ANY city, not just pre-configured Texas cities
+              lat: selectedCity?.lat,
+              lon: selectedCity?.lon,
+              events: ticketmasterEvents.slice(0, 3).map((e) => ({
+                name: e.name,
+                venue: e.venue,
+                date: e.date,
+                category: e.category,
+              })),
+              // Only include weather if it matches the current city
+              weather: weather && weatherMatchesCity
+                ? {
+                    description: weather.description,
+                    temp: weather.temp,
+                    icon: weather.icon,
+                  }
+                : null,
+            }
+          : {
+              city,
+              force: false, // Let server decide if refresh is needed
+            };
+
+        const res = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            city,
-            // CRITICAL: Pass coordinates for universal intelligent bot support
-            // This enables contextual polls, farmers markets, and weather-based
-            // content for ANY city, not just pre-configured Texas cities
-            lat: selectedCity?.lat,
-            lon: selectedCity?.lon,
-            events: ticketmasterEvents.slice(0, 3).map((e) => ({
-              name: e.name,
-              venue: e.venue,
-              date: e.date,
-              category: e.category,
-            })),
-            // Only include weather if it matches the current city
-            weather: weather && weatherMatchesCity
-              ? {
-                  description: weather.description,
-                  temp: weather.temp,
-                  icon: weather.icon,
-                }
-              : null,
-          }),
+          body: JSON.stringify(requestBody),
         });
 
         const data = await res.json();
-        console.log("[Auto-Seed Client] API Response:", res.status, data);
+        console.log(`[Content Refresh] ${refreshType} API Response:`, res.status, data);
 
         if (!res.ok) {
-          console.error("[Auto-Seed Client] API Error:", data);
+          console.error(`[Content Refresh] ${refreshType} API Error:`, data);
           // Don't mark as attempted so we can retry
           return;
         }
 
         // Mark as attempted only after successful API call
-        setAutoSeedAttempted(city);
+        if (isEmpty) {
+          setAutoSeedAttempted(city);
+        } else {
+          setStaleRefreshAttempted(city);
+        }
 
-        if (data.created === 0) {
+        // Handle postsCreated (from refresh endpoint) or created (from auto-seed)
+        const postsCreated = data.postsCreated ?? data.created ?? 0;
+
+        if (postsCreated === 0) {
           // Server reported no new posts created (e.g., city already has recent pulses)
-          console.log(`[Auto-Seed Client] Skipped - ${data.message || "city may already have recent pulses"}`);
-        } else if (data.created > 0) {
-          console.log(`[Auto-Seed Client] SUCCESS! Created ${data.created} seed posts for ${city}`);
+          console.log(`[Content Refresh] Skipped - ${data.message || "city may already have recent pulses"}`);
+        } else if (postsCreated > 0) {
+          console.log(`[Content Refresh] SUCCESS! Created ${postsCreated} posts for ${city} (${refreshType})`);
           // Refetch pulses to show the new posts
           const now = new Date();
           const start = startOfRecentWindow(now, 7);
@@ -1416,7 +1471,7 @@ export default function Home() {
             .limit(PULSES_PAGE_SIZE);
 
           if (refetchWithPolls.error?.message?.includes("poll_options")) {
-            console.warn("[Auto-Seed Refetch] poll_options missing, retrying without it");
+            console.warn("[Content Refresh] poll_options missing, retrying without it");
             const refetchWithoutPolls = await supabase
               .from("pulses")
               .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, lat, lon")
@@ -1427,16 +1482,16 @@ export default function Home() {
               .limit(PULSES_PAGE_SIZE);
             refetchData = (refetchWithoutPolls.data as DBPulse[]) ?? null;
             if (refetchWithoutPolls.error) {
-              console.error("[Auto-Seed Refetch] Error:", refetchWithoutPolls.error.message);
+              console.error("[Content Refresh] Refetch Error:", refetchWithoutPolls.error.message);
             }
           } else if (refetchWithPolls.error) {
-            console.error("[Auto-Seed Refetch] Error:", refetchWithPolls.error.message);
+            console.error("[Content Refresh] Refetch Error:", refetchWithPolls.error.message);
           } else {
             refetchData = (refetchWithPolls.data as DBPulse[]) ?? null;
           }
 
           if (refetchData) {
-            console.log(`[Auto-Seed Refetch] Got ${refetchData.length} pulses after seed`);
+            console.log(`[Content Refresh] Got ${refetchData.length} pulses after ${refreshType}`);
             const mapped: Pulse[] = refetchData.map((row) => ({
               ...mapDBPulseToPulse(row),
               author: row.author || "Anonymous",
@@ -1445,12 +1500,15 @@ export default function Home() {
           }
         }
       } catch (err) {
-        console.error("Auto-seed error:", err);
+        console.error("[Content Refresh] Error:", err);
       }
     };
 
     triggerAutoSeed();
-  }, [city, initialPulsesFetched, pulses.length, ticketmasterEvents, ticketmasterLoading, weather, weatherLoading, autoSeedAttempted, loading]);
+    // Note: We intentionally use pulses.length instead of pulses to avoid infinite loops
+    // The stale check inside uses pulses directly but only runs when conditions are met
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [city, initialPulsesFetched, pulses.length, ticketmasterEvents, ticketmasterLoading, weather, weatherLoading, autoSeedAttempted, staleRefreshAttempted, loading, selectedCity?.lat, selectedCity?.lon]);
 
   // ========= FETCH AUTHOR STATS =========
   // Batch fetch level and rank for all unique authors when pulses change
