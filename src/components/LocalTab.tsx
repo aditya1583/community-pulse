@@ -135,6 +135,8 @@ export default function LocalTab({
             state={state}
             lat={lat}
             lon={lon}
+            isSignedIn={isSignedIn}
+            onSignInClick={onSignInClick}
           />
         )}
 

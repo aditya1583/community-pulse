@@ -29,6 +29,10 @@ type LocalDealsSectionProps = {
   state: string;
   lat?: number;
   lon?: number;
+  /** Whether user is signed in */
+  isSignedIn?: boolean;
+  /** Callback to show sign-in modal */
+  onSignInClick?: () => void;
 };
 
 const DEAL_CATEGORIES = [
@@ -88,6 +92,8 @@ export default function LocalDealsSection({
   state,
   lat,
   lon,
+  isSignedIn = false,
+  onSignInClick,
 }: LocalDealsSectionProps) {
   const router = useRouter();
   const [places, setPlaces] = useState<LocalPlace[]>([]);
@@ -240,8 +246,17 @@ export default function LocalDealsSection({
     return cached?.vibes?.[0] || null;
   };
 
-  // Navigate to venue detail page
+  // Navigate to venue detail page (requires sign-in to share vibes)
   const openVenueDetail = (place: LocalPlace) => {
+    // Check if user is signed in first
+    if (!isSignedIn) {
+      // Prompt to sign in instead of navigating
+      if (onSignInClick) {
+        onSignInClick();
+      }
+      return;
+    }
+
     // Create URL-friendly slug from venue name
     const slug = place.name
       .toLowerCase()
