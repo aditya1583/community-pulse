@@ -321,6 +321,7 @@ export default function Home() {
 
   // Gas Prices (for quick view in Current Vibe section)
   const [gasPrice, setGasPrice] = useState<number | null>(null);
+  const [nearestStation, setNearestStation] = useState<{ name: string; distanceMiles: number } | null>(null);
 
   // City Autocomplete
   const {
@@ -695,6 +696,47 @@ export default function Home() {
       cancelled = true;
     };
   }, [selectedCity?.state]);
+
+  // ========= NEAREST GAS STATION (for Current Vibe card) =========
+  useEffect(() => {
+    const lat = selectedCity?.lat;
+    const lon = selectedCity?.lon;
+
+    if (!lat || !lon) {
+      setNearestStation(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchNearestStation = async () => {
+      try {
+        const res = await fetch(`/api/gas-stations?lat=${lat}&lon=${lon}&limit=1`);
+        const data = await res.json();
+
+        if (cancelled) return;
+
+        if (data.stations && data.stations.length > 0) {
+          const station = data.stations[0];
+          setNearestStation({
+            name: station.name,
+            distanceMiles: station.distanceMiles,
+          });
+        } else {
+          setNearestStation(null);
+        }
+      } catch {
+        // Silently fail - station name is supplementary info
+        if (!cancelled) setNearestStation(null);
+      }
+    };
+
+    fetchNearestStation();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCity?.lat, selectedCity?.lon]);
 
   // ========= LOAD SESSION + PROFILE =========
   useEffect(() => {
@@ -2808,10 +2850,17 @@ export default function Home() {
 
   // Show loading overlay while geolocation is resolving after user granted permission
   // This prevents users from interacting with Austin content while waiting for location
+  // EXPANDED: Also show loading when permission is granted but we haven't received data yet
+  // This closes the race condition gap between permission check and location arrival
   const showLocationLoading =
     !useManualLocation &&
-    geolocation.loading &&
-    !geolocation.lat;
+    !geolocation.lat &&
+    !geolocation.error &&
+    (
+      geolocation.loading ||
+      // Permission granted but still waiting for location data (gap between permission check and requestLocationInternal)
+      (geolocation.permissionStatus === "granted" && !geolocation.displayName)
+    );
 
   // If we need location prompt, show it instead of main app
   if (showLocationPrompt) {
@@ -3373,6 +3422,7 @@ export default function Home() {
             cityMood={cityMood}
             cityMoodLoading={cityMoodLoading}
             gasPrice={gasPrice}
+            gasStationName={nearestStation?.name}
             onGasPriceClick={() => {
               setLocalSection("gas");
               setActiveTab("local");
@@ -3441,6 +3491,9 @@ export default function Home() {
                       hasLocation={!!(selectedCity?.lat && selectedCity?.lon)}
                       fallback={ticketmasterFallback}
                       cityName={city}
+                      state={selectedCity?.state}
+                      lat={selectedCity?.lat}
+                      lon={selectedCity?.lon}
                       isSignedIn={!!sessionUser}
                       identityReady={identityReady}
                       displayName={displayName}

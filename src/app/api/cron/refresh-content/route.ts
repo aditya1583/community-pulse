@@ -1,21 +1,23 @@
 /**
- * Content Refresh Cron Job
+ * Content Refresh Cron Job - PERMANENT SEEDING
  *
  * Runs every 30 minutes via Vercel cron to generate fresh content for active cities.
  * This solves the "dead app" problem where bot pulses expire and no new content
  * is generated, leaving feeds empty.
  *
- * Strategy:
+ * PERMANENT SEEDING STRATEGY:
  * 1. Get list of cities with recent activity (pulses in last 7 days)
- * 2. For each city, check if content is getting stale (< 3 active pulses)
- * 3. Generate 2-3 time-appropriate posts per city
- * 4. Vary content by time of day (morning traffic, lunch spots, evening events)
+ * 2. Generate 2 new posts per city EVERY cron run (no stale threshold)
+ * 3. Vary content by time of day (morning traffic, lunch spots, evening events)
+ * 4. This keeps feeds consistently fresh with regular new content
  *
  * Expiration times (match intelligent-seed):
  * - Weather: 3 hours (conditions change constantly)
  * - Traffic: 2 hours (conditions shift throughout day)
  * - Events: 12 hours
  * - General: 24 hours
+ *
+ * Rate limiting: 2 posts per city per 30-minute cron run = max 4 posts/hour/city
  *
  * Security: Protected by Vercel's CRON_SECRET header validation
  */
@@ -42,14 +44,14 @@ function getExpirationHours(tag: string): number {
   return 24;
 }
 
-// Minimum active pulses before we consider a city "stale"
-const STALE_THRESHOLD = 3;
+// PERMANENT SEEDING: Always generate posts, regardless of existing count
+// This keeps feeds fresh and active with regular new content
 
 // Maximum cities to process per cron run (prevent timeout)
 const MAX_CITIES_PER_RUN = 10;
 
-// Maximum posts to generate per city
-const MAX_POSTS_PER_CITY = 3;
+// Posts to generate per city per cron run (2-3 keeps it fresh without spam)
+const POSTS_PER_CITY_PER_RUN = 2;
 
 /**
  * Time-of-day content categories
@@ -193,39 +195,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Step 2: Filter to cities that need refresh (stale content)
-    // Also check current active pulse count (not expired)
-    const staleCities: ActiveCity[] = [];
+    // Step 2: PERMANENT SEEDING - Process ALL active cities
+    // No stale threshold check - always generate fresh content for every city
+    // This ensures feeds stay active and engaging
+    const activeCities: ActiveCity[] = Array.from(cityMap.values());
 
-    for (const [cityName, cityInfo] of cityMap) {
-      // Count currently active (non-expired) pulses
-      const { count, error: countError } = await supabase
-        .from("pulses")
-        .select("*", { count: "exact", head: true })
-        .eq("city", cityName)
-        .or(`expires_at.is.null,expires_at.gt.${now}`);
+    console.log(`[Cron Refresh] PERMANENT SEEDING: Processing ${activeCities.length} active cities`);
 
-      if (countError) {
-        console.warn(`[Cron Refresh] Error counting pulses for ${cityName}:`, countError);
-        continue;
-      }
-
-      const activePulseCount = count || 0;
-
-      if (activePulseCount < STALE_THRESHOLD) {
-        staleCities.push({
-          ...cityInfo,
-          activePulseCount,
-        });
-      }
-    }
-
-    console.log(`[Cron Refresh] Found ${staleCities.length} stale cities (< ${STALE_THRESHOLD} active pulses)`);
-
-    if (staleCities.length === 0) {
+    if (activeCities.length === 0) {
       return NextResponse.json({
         success: true,
-        message: "No cities need content refresh",
+        message: "No active cities found",
         citiesChecked: cityMap.size,
         citiesRefreshed: 0,
         postsCreated: 0,
@@ -234,9 +214,9 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Step 3: Generate fresh content for stale cities
+    // Step 3: Generate fresh content for ALL active cities
     // Limit to MAX_CITIES_PER_RUN to prevent timeout
-    const citiesToRefresh = staleCities.slice(0, MAX_CITIES_PER_RUN);
+    const citiesToRefresh = activeCities.slice(0, MAX_CITIES_PER_RUN);
     const results: Array<{ city: string; postsCreated: number; error?: string }> = [];
     let totalPostsCreated = 0;
 
@@ -244,18 +224,10 @@ export async function GET(request: NextRequest) {
       const citySlug = cityInfo.city.split(",")[0].trim().replace(/\s+/g, "");
       const cityName = cityInfo.city.split(",")[0].trim();
 
-      console.log(`[Cron Refresh] Processing ${cityInfo.city} (${cityInfo.activePulseCount} active pulses)`);
+      console.log(`[Cron Refresh] Processing ${cityInfo.city} (permanent seeding: ${POSTS_PER_CITY_PER_RUN} posts)`);
 
-      // Determine how many posts to create (fill up to threshold)
-      const postsNeeded = Math.min(
-        MAX_POSTS_PER_CITY,
-        STALE_THRESHOLD - cityInfo.activePulseCount
-      );
-
-      if (postsNeeded <= 0) {
-        results.push({ city: cityInfo.city, postsCreated: 0 });
-        continue;
-      }
+      // PERMANENT SEEDING: Always create POSTS_PER_CITY_PER_RUN posts
+      const postsNeeded = POSTS_PER_CITY_PER_RUN;
 
       // Try intelligent bot system first (if city has config or coords)
       const hasConfig = hasIntelligentBotConfig(cityName);
@@ -269,7 +241,7 @@ export async function GET(request: NextRequest) {
           // Generate posts one at a time to respect cooldown
           let postsCreatedForCity = 0;
 
-          for (let i = 0; i < postsNeeded && postsCreatedForCity < MAX_POSTS_PER_CITY; i++) {
+          for (let i = 0; i < postsNeeded && postsCreatedForCity < POSTS_PER_CITY_PER_RUN; i++) {
             const result = await generateIntelligentPost(cityName, {
               force: true, // Bypass cooldown for cron job
               coords,
@@ -429,16 +401,8 @@ export async function POST(request: NextRequest) {
 
     const activePulseCount = count || 0;
 
-    // Skip if city has enough content (unless forced)
-    if (!force && activePulseCount >= STALE_THRESHOLD) {
-      return NextResponse.json({
-        success: true,
-        message: "City has sufficient content",
-        city: targetCity,
-        activePulseCount,
-        postsCreated: 0,
-      });
-    }
+    // PERMANENT SEEDING: Always generate posts, no stale threshold check
+    // The 'force' parameter is kept for compatibility but no longer affects behavior
 
     // Get city coordinates from recent pulses
     const { data: coordsData } = await supabase
@@ -451,8 +415,8 @@ export async function POST(request: NextRequest) {
     const cityLat = coordsData?.[0]?.lat || null;
     const cityLon = coordsData?.[0]?.lon || null;
 
-    // Generate posts
-    const postsNeeded = force ? MAX_POSTS_PER_CITY : Math.min(MAX_POSTS_PER_CITY, STALE_THRESHOLD - activePulseCount);
+    // PERMANENT SEEDING: Always generate POSTS_PER_CITY_PER_RUN posts
+    const postsNeeded = POSTS_PER_CITY_PER_RUN;
     const citySlug = targetCity.split(",")[0].trim().replace(/\s+/g, "");
     const cityName = targetCity.split(",")[0].trim();
 

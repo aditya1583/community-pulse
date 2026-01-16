@@ -82,7 +82,7 @@ export type { ExtendedPostType } from "./template-engine";
 // High-Engagement: Hot Takes, Confession Booth, Neighbor Challenges
 // Identity Builders: Insider Tips, Nostalgia Triggers, Community Callouts
 // Interactive: Would You Rather, This or That
-// Hyperlocal: Farmers Markets
+// Hyperlocal: Farmers Markets, Landmark Food
 export {
   generateEngagementPost,
   generateEngagementSeedPosts,
@@ -107,6 +107,7 @@ export {
   generateWouldYouRatherPost,
   // HYPERLOCAL (real data)
   generateFarmersMarketPost,
+  generateLandmarkFoodPost,
   // CIVIC (50 XP predictions)
   generateCivicAlertPost,
   // Analysis

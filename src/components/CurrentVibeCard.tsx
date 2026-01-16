@@ -13,6 +13,7 @@ type CurrentVibeCardProps = {
   cityMoodLoading?: boolean;
   // Gas price quick view
   gasPrice?: number | null;
+  gasStationName?: string | null;
   onGasPriceClick?: () => void;
 };
 
@@ -33,9 +34,12 @@ export default function CurrentVibeCard({
   onDropPulse,
   cityMood,
   cityMoodLoading = false,
-  gasPrice,
+  // gasPrice is intentionally unused - we show station name only, not misleading price associations
+  gasPrice: _unusedGasPrice,
+  gasStationName,
   onGasPriceClick,
 }: CurrentVibeCardProps) {
+  void _unusedGasPrice; // Suppress unused variable warning - prop kept for API compatibility
   const formatTempF = (temp: number) => `${Math.round(temp)}\u00B0F`;
 
   // Get weather condition text with appropriate emoji
@@ -318,15 +322,15 @@ export default function CurrentVibeCard({
         </div>
       </div>
 
-      {/* Gas Price Quick View */}
-      {gasPrice && gasPrice > 0 && (
+      {/* Gas Station Quick View - Shows nearest station (price is regional average, not station-specific) */}
+      {gasStationName && (
         <button
           onClick={onGasPriceClick}
           className="mt-3 flex items-center gap-2 px-3 py-1.5 bg-slate-700/40 hover:bg-slate-700/60 border border-slate-600/30 rounded-lg transition-colors group"
         >
-          <span className="text-base">⛽</span>
-          <span className="text-sm font-medium text-amber-400">${gasPrice.toFixed(2)}</span>
-          <span className="text-xs text-slate-500">Regular</span>
+          <span className="text-base">{"\u26FD"}</span>
+          <span className="text-sm font-medium text-slate-200">{gasStationName}</span>
+          <span className="text-xs text-slate-500">nearby</span>
           <svg className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-400 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>

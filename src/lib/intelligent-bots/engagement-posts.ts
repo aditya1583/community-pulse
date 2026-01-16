@@ -44,7 +44,8 @@ export type EngagementType =
   | "confession_booth"       // Anonymous-style local confessions
   | "farmers_market"         // Hyperlocal farmers market content
   | "prediction"             // XP-staked predictions about local outcomes
-  | "civic_alert";           // Civic meeting alerts and predictions (50 XP)
+  | "civic_alert"            // Civic meeting alerts and predictions (50 XP)
+  | "landmark_food";         // Food/coffee spots anchored to local landmarks
 
 /**
  * Action metadata for actionable posts (e.g., farmers market posts with directions)
@@ -1198,6 +1199,124 @@ The vendors near the entrance have the freshest {products}
 };
 
 // ============================================================================
+// LANDMARK-ANCHORED FOOD/COFFEE POSTS
+// ============================================================================
+//
+// PHILOSOPHY: Generic "best tacos in town?" posts get ignored. Hyperlocal posts
+// that reference SPECIFIC landmarks people drive by every day create instant
+// recognition and engagement. "Coffee spot near HEB" hits different because
+// everyone knows exactly where HEB is.
+//
+// LANDMARK TIERS:
+// - Tier 1: HEB, HEB Plus (universal - everyone shops there)
+// - Tier 2: Lowe's, Target, Walmart, Costco, Home Depot (major retail anchors)
+// - Tier 3: Parks, Cap Metro Rail Station (community gathering spots)
+//
+// TIME WINDOWS:
+// - Morning (6-11am): Coffee, breakfast spots
+// - Lunch (11am-2pm): Quick lunch, takeout
+// - Afternoon (2-5pm): Coffee/snack runs, afternoon pick-me-up
+// - Evening (5-9pm): Dinner spots, restaurants
+// - Late night (9pm+): Late-night food options
+// ============================================================================
+
+/**
+ * Landmark tiers - organized by recognition level
+ * These should come from city config but have fallbacks
+ */
+const LANDMARK_TIERS = {
+  tier1: ["HEB Plus", "HEB"],
+  tier2: ["Lowe's", "Target", "Walmart", "Costco", "Home Depot"],
+  tier3: ["Robin Bledsoe Park", "Devine Lake Park", "Cap Metro Rail Station"],
+};
+
+/**
+ * Time-aware templates for landmark-anchored food posts
+ * Each template category is designed for its time window
+ */
+const LANDMARK_FOOD_TEMPLATES = {
+  // MORNING (6-11am) - Coffee and breakfast focus
+  morning: [
+    "☕ Coffee run near {landmark} - where do you go?",
+    "🌅 What's your go-to coffee spot near {landmark}?",
+    "🥞 Need a quick breakfast near {landmark}. Suggestions?",
+    "☕ Coffee craving hitting hard - what's good near {landmark}?",
+    "🍳 Best breakfast tacos near {landmark}? Asking for myself.",
+    "☕ That coffee place by {landmark} - anyone tried it?",
+    "🌮 Morning taco run near {landmark}. Where am I going?",
+    "☕ Early morning coffee spot near {landmark}? Need it strong.",
+    "🥐 Grabbing breakfast near {landmark} - what's the move?",
+    "☕ {landmark} area coffee lovers - drop your spot below!",
+  ],
+
+  // LUNCH (11am-2pm) - Quick lunch, takeout focus
+  lunch: [
+    "🍔 Best lunch spot near {landmark}? Need a quick bite.",
+    "🌮 That taco place by {landmark} - anyone tried it?",
+    "🥗 Quick lunch near {landmark} - what's the move?",
+    "🍕 Grabbing lunch near {landmark}. Where should I go?",
+    "🥡 Takeout near {landmark} - what's your go-to?",
+    "🍔 Need a solid lunch near {landmark}. Suggestions?",
+    "🌯 Best quick bite near {landmark}? Running on empty here.",
+    "🍜 Lunch spot near {landmark} that won't break the bank?",
+    "🥪 Sandwich shop near {landmark}? Or is there something better?",
+    "🍔 {landmark} lunch crew - where are you eating today?",
+  ],
+
+  // AFTERNOON (2-5pm) - Coffee/snack runs
+  afternoon: [
+    "☕ Afternoon coffee run near {landmark} - where do you go?",
+    "🍩 Snack spot near {landmark}? Need that 3pm pick-me-up.",
+    "☕ Best afternoon coffee near {landmark}? Hitting a wall here.",
+    "🧁 Sweet treat near {landmark}? Need a sugar hit.",
+    "☕ That new coffee place near {landmark} - worth stopping?",
+    "🍪 Quick snack near {landmark} - what's good?",
+    "☕ Afternoon slump fix near {landmark}? Coffee or snack?",
+    "🥤 Smoothie or drink spot near {landmark}?",
+    "☕ {landmark} area - best late afternoon coffee?",
+    "🍨 Ice cream near {landmark}? It's definitely that kind of day.",
+  ],
+
+  // EVENING (5-9pm) - Dinner spots, restaurants
+  evening: [
+    "🍽️ Dinner spot near {landmark}? Family-friendly preferred.",
+    "🍕 Pizza near {landmark} - what's the best option?",
+    "🌮 Taco Tuesday near {landmark}? Where's everyone going?",
+    "🍔 Burger spot near {landmark}? Craving something greasy.",
+    "🍝 Italian near {landmark}? Date night ideas welcome.",
+    "🥡 Good takeout near {landmark} for tonight?",
+    "🍗 Best wings near {landmark}? Asking the real questions.",
+    "🍽️ Restaurant near {landmark} that doesn't have a huge wait?",
+    "🌯 Tex-Mex near {landmark}? Need my fix.",
+    "🍔 {landmark} dinner crew - where are we eating?",
+  ],
+
+  // LATE NIGHT (9pm+) - Late-night food options
+  lateNight: [
+    "🌙 Late-night food near {landmark}? What's still open?",
+    "🍕 Pizza near {landmark} that's open late?",
+    "🌮 Late-night tacos near {landmark}? Asking for a friend.",
+    "🍔 What's open late near {landmark}? Need food ASAP.",
+    "🌙 Midnight snack run near {landmark} - options?",
+    "🍟 Fast food near {landmark} that's still serving?",
+    "🌯 Late-night drive-thru near {landmark}?",
+    "🌙 {landmark} area night owls - where do you eat after 10pm?",
+  ],
+
+  // DISCOVERY - General "that new place" templates (anytime)
+  discovery: [
+    "🆕 That new place by {landmark} - anyone tried it?",
+    "👀 What's the deal with that restaurant near {landmark}?",
+    "🤔 Keep seeing that spot by {landmark}. Worth trying?",
+    "📍 New food spot near {landmark}? What am I missing?",
+    "💭 Been meaning to try that place near {landmark}. Any reviews?",
+    "🔍 Hidden gem near {landmark}? Looking to explore.",
+    "🗣️ What opened near {landmark} recently? Need to try it.",
+    "✨ Best kept secret near {landmark}? Drop your spot.",
+  ],
+};
+
+// ============================================================================
 // AI-DRIVEN GENERATION FUNCTIONS
 // ============================================================================
 
@@ -2113,9 +2232,11 @@ export async function generateConfessionBoothPost(
  * - CIVIC: Phase 3 - school board, city council decisions
  */
 export async function generatePredictionPost(
-  ctx: SituationContext
+  ctx: SituationContext,
+  options: { skipEventPredictions?: boolean } = {}
 ): Promise<EngagementPost | null> {
   const { city, weather, time, events, traffic } = ctx;
+  const { skipEventPredictions = false } = options;
   const timeOfDay = getTimeOfDay(time.hour);
   const dayType = time.isWeekday ? "weekday" : "weekend";
 
@@ -2183,8 +2304,10 @@ export async function generatePredictionPost(
     }
   }
 
-  // Check EVENT predictions (only if events exist)
-  if (events && events.length > 0) {
+  // Check EVENT predictions (only if events exist AND not skipping due to seed dedup)
+  // Skip in seed mode because regular seed posts already create Events posts
+  // This prevents duplicate "Texas Stars vs Ontario Reign" type posts
+  if (!skipEventPredictions && events && events.length > 0) {
     for (const template of EVENT_PREDICTIONS) {
       if (matchesPredictionConditions(template)) {
         matchingTemplates.push(template);
@@ -2469,6 +2592,129 @@ export async function generateFarmersMarketPost(
   };
 }
 
+/**
+ * Generate a Landmark-Anchored Food/Coffee Post
+ *
+ * PHILOSOPHY: Generic food polls get ignored. Posts that reference specific
+ * landmarks everyone knows create instant recognition and engagement.
+ * "Coffee near HEB" resonates because everyone drives by HEB.
+ *
+ * TIME-AWARE:
+ * - Morning (6-11am): Coffee and breakfast spots
+ * - Lunch (11am-2pm): Quick lunch options
+ * - Afternoon (2-5pm): Coffee/snack runs
+ * - Evening (5-9pm): Dinner spots
+ * - Late night (9pm+): Late-night food options
+ *
+ * LANDMARK PRIORITY:
+ * 1. Tier 1: HEB/HEB Plus (highest recognition)
+ * 2. Tier 2: Major retail (Target, Lowe's, etc.)
+ * 3. Tier 3: Parks, transit stations
+ */
+export async function generateLandmarkFoodPost(
+  ctx: SituationContext
+): Promise<EngagementPost | null> {
+  const { city, time } = ctx;
+  const hour = time.hour;
+
+  // Determine time category for template selection
+  type TimeCategory = keyof typeof LANDMARK_FOOD_TEMPLATES;
+  let timeCategory: TimeCategory;
+
+  if (hour >= 6 && hour < 11) {
+    timeCategory = "morning";
+  } else if (hour >= 11 && hour < 14) {
+    timeCategory = "lunch";
+  } else if (hour >= 14 && hour < 17) {
+    timeCategory = "afternoon";
+  } else if (hour >= 17 && hour < 21) {
+    timeCategory = "evening";
+  } else if (hour >= 21 || hour < 6) {
+    timeCategory = "lateNight";
+  } else {
+    timeCategory = "discovery"; // Fallback
+  }
+
+  // 15% chance to use discovery templates instead (keeps it varied)
+  if (Math.random() < 0.15) {
+    timeCategory = "discovery";
+  }
+
+  // Get landmarks from city config, with fallbacks
+  const cityLandmarks = city.landmarks.shopping || [];
+  const cityVenues = city.landmarks.venues || [];
+
+  // Build landmark pool with tier weighting
+  // Tier 1 landmarks (HEB) should appear more often
+  const landmarkPool: string[] = [];
+
+  // Add Tier 1 (highest weight - add 3x)
+  const tier1Matches = cityLandmarks.filter(l =>
+    LANDMARK_TIERS.tier1.some(t => l.toLowerCase().includes(t.toLowerCase()))
+  );
+  if (tier1Matches.length > 0) {
+    landmarkPool.push(...tier1Matches, ...tier1Matches, ...tier1Matches);
+  }
+
+  // Add Tier 2 (medium weight - add 2x)
+  const tier2Matches = cityLandmarks.filter(l =>
+    LANDMARK_TIERS.tier2.some(t => l.toLowerCase().includes(t.toLowerCase()))
+  );
+  if (tier2Matches.length > 0) {
+    landmarkPool.push(...tier2Matches, ...tier2Matches);
+  }
+
+  // Add Tier 3 from venues (parks, transit - add 1x)
+  const tier3Matches = cityVenues.filter(l =>
+    LANDMARK_TIERS.tier3.some(t => l.toLowerCase().includes(t.toLowerCase())) ||
+    l.toLowerCase().includes("park") ||
+    l.toLowerCase().includes("station")
+  );
+  if (tier3Matches.length > 0) {
+    landmarkPool.push(...tier3Matches);
+  }
+
+  // If no matches, use all shopping landmarks as fallback
+  if (landmarkPool.length === 0) {
+    landmarkPool.push(...cityLandmarks);
+  }
+
+  // Still empty? Use hardcoded fallback
+  if (landmarkPool.length === 0) {
+    landmarkPool.push("HEB", "Target", "the shopping center");
+  }
+
+  // Pick a random landmark
+  const landmark = landmarkPool[Math.floor(Math.random() * landmarkPool.length)];
+
+  // Pick a template from the time category
+  const templates = LANDMARK_FOOD_TEMPLATES[timeCategory];
+  const template = templates[Math.floor(Math.random() * templates.length)];
+
+  // Fill in the template
+  const message = template.replace(/{landmark}/g, landmark);
+
+  // Determine mood emoji based on time category
+  const moodEmojis: Record<TimeCategory, string> = {
+    morning: "☕",
+    lunch: "🍔",
+    afternoon: "☕",
+    evening: "🍽️",
+    lateNight: "🌙",
+    discovery: "🔍",
+  };
+
+  return {
+    message,
+    tag: "General",
+    mood: moodEmojis[timeCategory],
+    author: `${city.name} local_foodie_bot 🍴`,
+    is_bot: true,
+    hidden: false,
+    engagementType: "landmark_food",
+  };
+}
+
 // ============================================================================
 // HIGH-LEVEL ENGAGEMENT GENERATOR
 // ============================================================================
@@ -2613,11 +2859,12 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
   // ========== HYPERLOCAL DATA (Real market/venue data) ==========
 
   // Farmers market posts when we have market data - especially on weekends
+  // Increased probability: farmers markets are high-engagement hyperlocal content
   if (ctx.farmersMarkets && ctx.farmersMarkets.length > 0) {
     const hasOpenMarket = ctx.farmersMarkets.some(m => m.isOpenToday);
 
-    // High priority if market is open today
-    if (hasOpenMarket && Math.random() < 0.6) {
+    // Very high priority if market is open today (80% chance)
+    if (hasOpenMarket && Math.random() < 0.8) {
       return {
         shouldPost: true,
         engagementType: "farmers_market",
@@ -2625,8 +2872,8 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
       };
     }
 
-    // Weekend morning is prime farmers market time
-    if (time.isWeekend && hour >= 7 && hour <= 12 && Math.random() < 0.4) {
+    // Weekend morning is prime farmers market time (70% chance)
+    if (time.isWeekend && hour >= 7 && hour <= 12 && Math.random() < 0.7) {
       return {
         shouldPost: true,
         engagementType: "farmers_market",
@@ -2634,14 +2881,43 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
       };
     }
 
-    // Otherwise still consider with lower probability
-    if (Math.random() < 0.15) {
+    // Otherwise still consider with moderate probability (30% chance)
+    if (Math.random() < 0.3) {
       return {
         shouldPost: true,
         engagementType: "farmers_market",
         reason: "Farmers market discovery post",
       };
     }
+  }
+
+  // Landmark-anchored food posts - time-aware and hyperlocal
+  // Higher chance during meal times when food is on people's minds
+  const isMealTime = (hour >= 7 && hour <= 10) || (hour >= 11 && hour <= 14) || (hour >= 17 && hour <= 21);
+  if (isMealTime && Math.random() < 0.25) {
+    return {
+      shouldPost: true,
+      engagementType: "landmark_food",
+      reason: "Meal time - landmark-anchored food recommendation",
+    };
+  }
+
+  // Coffee/snack time windows
+  if ((hour >= 14 && hour <= 16) && Math.random() < 0.2) {
+    return {
+      shouldPost: true,
+      engagementType: "landmark_food",
+      reason: "Afternoon slump - coffee/snack near landmark",
+    };
+  }
+
+  // Late night food options
+  if ((hour >= 21 || hour < 2) && Math.random() < 0.15) {
+    return {
+      shouldPost: true,
+      engagementType: "landmark_food",
+      reason: "Late night - food options near landmarks",
+    };
   }
 
   // ========== TIER 3: IDENTITY BUILDERS (Community bonding) ==========
@@ -2753,10 +3029,12 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
  */
 export async function generateEngagementPost(
   ctx: SituationContext,
-  engagementType?: EngagementType
+  engagementType?: EngagementType,
+  options: { isSeedMode?: boolean } = {}
 ): Promise<EngagementPost | null> {
   // If no type specified, analyze and decide
   const type = engagementType || analyzeForEngagement(ctx).engagementType;
+  const { isSeedMode = false } = options;
 
   if (!type) return null;
 
@@ -2798,10 +3076,13 @@ export async function generateEngagementPost(
     // HYPERLOCAL CONTENT types
     case "farmers_market":
       return generateFarmersMarketPost(ctx);
+    case "landmark_food":
+      return generateLandmarkFoodPost(ctx);
 
     // XP-STAKED PREDICTIONS
+    // In seed mode, skip event predictions to avoid duplicating regular Event posts
     case "prediction":
-      return generatePredictionPost(ctx);
+      return generatePredictionPost(ctx, { skipEventPredictions: isSeedMode });
 
     // CIVIC ALERTS (50 XP predictions)
     case "civic_alert":
@@ -2866,19 +3147,28 @@ export async function generateEngagementSeedPosts(
   }
 
   // ========== HYPERLOCAL CONTENT (Real data, high relevance) ==========
+  // FORCE-INCLUDED: Both landmark_food and farmers_market are ALWAYS in top positions
+  // This ensures every cold-start gets hyperlocal content attempts
+  // (generators will return null if no data, which is handled by the loop)
 
-  // Farmers market posts - especially valuable on weekends or when markets have data
-  // These use REAL market names from the user's area
-  if (ctx.farmersMarkets && ctx.farmersMarkets.length > 0) {
-    // High priority if market is open today
-    const hasOpenMarket = ctx.farmersMarkets.some(m => m.isOpenToday);
-    if (hasOpenMarket || ctx.time.isWeekend) {
-      // Insert at beginning for weekend/open market priority
-      priorities.unshift("farmers_market");
-    } else {
-      // Still include, just lower priority
-      priorities.push("farmers_market");
-    }
+  // Landmark-anchored food/coffee posts - FORCE INCLUDE IN TOP 3
+  // These use local landmarks (HEB, Target, parks) that everyone recognizes
+  // ALWAYS inserted at position 1 (after first prediction) to guarantee inclusion
+  priorities.splice(1, 0, "landmark_food");
+
+  // Farmers market posts - FORCE INCLUDE to guarantee attempt
+  // These use REAL market names from the user's area when available
+  // The generator will return null if no market data exists
+  const hasMarketData = ctx.farmersMarkets && ctx.farmersMarkets.length > 0;
+  const hasOpenMarket = hasMarketData && ctx.farmersMarkets.some(m => m.isOpenToday);
+
+  if (hasOpenMarket || ctx.time.isWeekend) {
+    // High priority: Insert at position 2 for weekend/open market (after landmark_food)
+    priorities.splice(2, 0, "farmers_market");
+  } else {
+    // Still force include, just after the top-priority items
+    // Insert at position 3 (after prediction, landmark_food, and any weekend-specific items)
+    priorities.splice(3, 0, "farmers_market");
   }
 
   // ========== HIGH-ENGAGEMENT (Always include for viral potential) ==========
@@ -2922,11 +3212,13 @@ export async function generateEngagementSeedPosts(
   priorities.push("poll", "local_spotlight", "recommendation");
 
   // Generate posts from priority list
+  // Pass isSeedMode: true to prevent duplicate event posts
+  // (regular seed posts already create Events posts from template-engine)
   for (const type of priorities) {
     if (posts.length >= count) break;
     if (usedTypes.has(type)) continue;
 
-    const post = await generateEngagementPost(ctx, type);
+    const post = await generateEngagementPost(ctx, type, { isSeedMode: true });
     if (post) {
       posts.push(post);
       usedTypes.add(type);
