@@ -3661,8 +3661,10 @@ export default function Home() {
                           </div>
                         ) : (
                           <>
-                            {/* In-radius pulses (within 10 miles) */}
-                            {inRadiusPulses.map((pulse) => (
+                            {/* In-radius pulses (within 10 miles) - exclude happeningNow to avoid duplication */}
+                            {inRadiusPulses
+                              .filter((pulse) => !happeningNowPulse || pulse.id !== happeningNowPulse.id)
+                              .map((pulse) => (
                               <PulseCard
                                 key={pulse.id}
                                 pulse={pulse}

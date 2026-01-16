@@ -276,27 +276,27 @@ export default function PulseCard({
     return null;
   }
 
-  // Color-coded borders by category + expiry status
+  // Color-coded LEFT STRIPE by category - highly visible
   // Traffic = amber, Events = purple, Weather = blue, General = teal
-  const getCategoryColors = () => {
+  const getCategoryStyle = () => {
     const tag = pulse.tag.toLowerCase();
-    if (tag === "traffic") return { border: "border-amber-500/30", hover: "hover:border-amber-500/50", glow: "shadow-amber-500/10" };
-    if (tag === "events") return { border: "border-purple-500/30", hover: "hover:border-purple-500/50", glow: "shadow-purple-500/10" };
-    if (tag === "weather") return { border: "border-sky-500/30", hover: "hover:border-sky-500/50", glow: "shadow-sky-500/10" };
-    return { border: "border-teal-500/30", hover: "hover:border-teal-500/50", glow: "shadow-teal-500/10" }; // General
+    if (tag === "traffic") return { leftBorder: "border-l-amber-500", bg: "bg-amber-500/5" };
+    if (tag === "events") return { leftBorder: "border-l-purple-500", bg: "bg-purple-500/5" };
+    if (tag === "weather") return { leftBorder: "border-l-sky-400", bg: "bg-sky-500/5" };
+    return { leftBorder: "border-l-teal-500", bg: "bg-teal-500/5" }; // General
   };
 
   const getBorderClass = () => {
-    // Expiry states override category colors
+    const style = getCategoryStyle();
+    // Expiry states add visual fade
     if (isFading) {
-      return "border-amber-500/20 hover:border-amber-500/30";
+      return `border-l-4 ${style.leftBorder} border-slate-700/50 opacity-60`;
     }
     if (isExpiringSoon) {
-      return "border-orange-500/20 hover:border-orange-500/30";
+      return `border-l-4 ${style.leftBorder} border-slate-700/50 opacity-80`;
     }
-    // Category-based colors
-    const colors = getCategoryColors();
-    return `${colors.border} ${colors.hover} shadow-sm ${colors.glow}`;
+    // Category-based left stripe + subtle background tint
+    return `border-l-4 ${style.leftBorder} border-slate-700/50 ${style.bg}`;
   };
 
   return (
