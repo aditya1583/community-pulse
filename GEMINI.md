@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This is a **Community Pulse** web application, a real-time dashboard that provides a "vibe" of a city based on user-submitted "pulses". The application is built with a modern web stack and includes features like real-time updates, weather information, traffic conditions, city mood analysis, news feeds, and AI-powered summaries.
+This is a **Community Pulse** web application, a real-time dashboard that provides a "vibe" of a city based on user-submitted "pulses". The application is built with a modern web stack and includes features like real-time updates, weather information, traffic conditions, city mood analysis, news feeds, and AI-powered summaries. The App is completely focused to exactly 10 miles from where the user lives in it will not go beyond the 10 miles. IF for any reason an update is given it will display an event, occurance, traffic, general with a distance mentioned. BUT IN NO CASE WILL THE APP GO BEYOND THE 10 MILE RADIUS UNLESS IT IS AN ABSOLUTE MUST YOU CAN MENTION IT BUT WITH DISTANCE and DATES. THE OBJECTIVE OF THE APP IS TO STAY HYPERLOCAL and BUILD TRUST FOR USERS IN THAT 10 MILE RADIUS.
 
 **Key Technologies:**
 

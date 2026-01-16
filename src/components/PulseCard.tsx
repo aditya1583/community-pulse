@@ -6,6 +6,7 @@ import { formatPulseDateTime } from "@/lib/pulses";
 import { useExpiryCountdown } from "@/hooks/useExpiryCountdown";
 import PulseLikeButton from "@/components/PulseLikeButton";
 import PollVoting from "@/components/PollVoting";
+import PredictionCard, { type PredictionData } from "@/components/PredictionCard";
 import PulseComments from "@/components/PulseComments";
 import ReportPulseButton from "@/components/ReportPulseButton";
 import StatusRing from "@/components/StatusRing";
@@ -275,15 +276,27 @@ export default function PulseCard({
     return null;
   }
 
-  // Determine card border color based on expiry status
+  // Color-coded borders by category + expiry status
+  // Traffic = amber, Events = purple, Weather = blue, General = teal
+  const getCategoryColors = () => {
+    const tag = pulse.tag.toLowerCase();
+    if (tag === "traffic") return { border: "border-amber-500/30", hover: "hover:border-amber-500/50", glow: "shadow-amber-500/10" };
+    if (tag === "events") return { border: "border-purple-500/30", hover: "hover:border-purple-500/50", glow: "shadow-purple-500/10" };
+    if (tag === "weather") return { border: "border-sky-500/30", hover: "hover:border-sky-500/50", glow: "shadow-sky-500/10" };
+    return { border: "border-teal-500/30", hover: "hover:border-teal-500/50", glow: "shadow-teal-500/10" }; // General
+  };
+
   const getBorderClass = () => {
+    // Expiry states override category colors
     if (isFading) {
       return "border-amber-500/20 hover:border-amber-500/30";
     }
     if (isExpiringSoon) {
       return "border-orange-500/20 hover:border-orange-500/30";
     }
-    return "border-slate-700/50 hover:border-emerald-500/30";
+    // Category-based colors
+    const colors = getCategoryColors();
+    return `${colors.border} ${colors.hover} shadow-sm ${colors.glow}`;
   };
 
   return (
@@ -301,7 +314,12 @@ export default function PulseCard({
           >
             <span className="text-2xl">{pulse.mood}</span>
           </StatusRing>
-          <span className="text-[10px] uppercase tracking-wide text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+          <span className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full ${
+            pulse.tag.toLowerCase() === "traffic" ? "text-amber-300 bg-amber-500/10 border border-amber-500/30" :
+            pulse.tag.toLowerCase() === "events" ? "text-purple-300 bg-purple-500/10 border border-purple-500/30" :
+            pulse.tag.toLowerCase() === "weather" ? "text-sky-300 bg-sky-500/10 border border-sky-500/30" :
+            "text-teal-300 bg-teal-500/10 border border-teal-500/30"
+          }`}>
             {pulse.tag}
           </span>
           {/* Distance badge for out-of-radius content */}
@@ -313,14 +331,66 @@ export default function PulseCard({
         </div>
 
         <div className="flex-1 min-w-0">
+          {/* Trending/New badges */}
+          {(() => {
+            const isNew = new Date().getTime() - new Date(pulse.createdAt).getTime() < 30 * 60 * 1000; // 30 min
+            const hasPoll = pulse.poll_options && pulse.poll_options.length >= 2;
+            const isPrediction = pulse.is_prediction;
+
+            if (isPrediction) {
+              return (
+                <div className="flex items-center gap-1.5 mb-2">
+                  <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 border border-amber-500/30">
+                    Predict
+                  </span>
+                </div>
+              );
+            }
+            if (hasPoll) {
+              return (
+                <div className="flex items-center gap-1.5 mb-2">
+                  <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-gradient-to-r from-pink-500/20 to-purple-500/20 text-pink-300 border border-pink-500/30">
+                    Vote
+                  </span>
+                </div>
+              );
+            }
+            if (isNew) {
+              return (
+                <div className="flex items-center gap-1.5 mb-2">
+                  <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    New
+                  </span>
+                </div>
+              );
+            }
+            return null;
+          })()}
           {/* Message content - preserve line breaks for multi-line posts */}
           <p className="text-sm text-white leading-snug mb-3 whitespace-pre-line">{pulse.message}</p>
 
           {/* Action buttons for actionable content (farmers markets, venues) */}
           {actionData.type && <ActionButtons actionData={actionData} />}
 
-          {/* Poll voting for This or That posts */}
-          {pulse.poll_options && pulse.poll_options.length >= 2 && (
+          {/* Prediction card for XP-staked predictions */}
+          {pulse.is_prediction && pulse.poll_options && pulse.poll_options.length >= 2 && pulse.prediction_resolves_at && (
+            <PredictionCard
+              pulseId={pulse.id}
+              options={pulse.poll_options}
+              predictionData={{
+                isPrediction: true,
+                resolvesAt: pulse.prediction_resolves_at,
+                resolvedAt: pulse.prediction_resolved_at ?? null,
+                winningOption: pulse.prediction_winning_option ?? null,
+                xpReward: pulse.prediction_xp_reward ?? 25,
+                category: pulse.prediction_category ?? "local",
+              }}
+              userIdentifier={userIdentifier}
+            />
+          )}
+
+          {/* Poll voting for regular This or That posts (not predictions) */}
+          {!pulse.is_prediction && pulse.poll_options && pulse.poll_options.length >= 2 && (
             <PollVoting
               pulseId={pulse.id}
               options={pulse.poll_options}

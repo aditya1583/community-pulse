@@ -23,7 +23,7 @@
     },
     {
       "path": "/api/cron/refresh-content",
-      "schedule": "0 */3 * * *"
+      "schedule": "*/30 * * * *"
     }
   ]
 }

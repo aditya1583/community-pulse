@@ -38,6 +38,37 @@ export default function CurrentVibeCard({
 }: CurrentVibeCardProps) {
   const formatTempF = (temp: number) => `${Math.round(temp)}\u00B0F`;
 
+  // Get weather condition text with appropriate emoji
+  const getWeatherDisplay = (): { emoji: string; text: string } | null => {
+    if (weatherLoading || !weather) return null;
+
+    const desc = weather.description?.toLowerCase() || "";
+    const temp = weather.temp;
+
+    // Map weather conditions to emoji and short description
+    if (desc.includes("rain") || desc.includes("drizzle") || desc.includes("shower")) {
+      return { emoji: "\uD83C\uDF27\uFE0F", text: `${formatTempF(temp)} Rain` };
+    }
+    if (desc.includes("thunder") || desc.includes("storm")) {
+      return { emoji: "\u26C8\uFE0F", text: `${formatTempF(temp)} Storms` };
+    }
+    if (desc.includes("snow")) {
+      return { emoji: "\uD83C\uDF28\uFE0F", text: `${formatTempF(temp)} Snow` };
+    }
+    if (desc.includes("fog") || desc.includes("mist")) {
+      return { emoji: "\uD83C\uDF2B\uFE0F", text: `${formatTempF(temp)} Foggy` };
+    }
+    if (desc.includes("cloud") || desc.includes("overcast")) {
+      return { emoji: "\u2601\uFE0F", text: `${formatTempF(temp)} Cloudy` };
+    }
+    if (desc.includes("clear") || desc.includes("sun")) {
+      return { emoji: "\u2600\uFE0F", text: `${formatTempF(temp)} Clear` };
+    }
+
+    // Default: show temp with generic emoji
+    return { emoji: "\uD83C\uDF21\uFE0F", text: formatTempF(temp) };
+  };
+
   // Get the vibe emoji based on emotion or intensity
   const getVibeEmoji = (): string => {
     if (cityMoodLoading) return "...";
@@ -245,14 +276,25 @@ export default function CurrentVibeCard({
   };
 
   const isLoading = weatherLoading || cityMoodLoading;
+  const weatherDisplay = getWeatherDisplay();
 
   return (
     <div className={`bento-card elevation-2 p-4 transition-all duration-500 ${getBorderGlow()}`}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <p className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-1">
-            Current Vibe
-          </p>
+          {/* Header row with title and weather badge */}
+          <div className="flex items-center gap-2 mb-1">
+            <p className="text-xs text-slate-400 uppercase tracking-wider font-medium">
+              Current Vibe
+            </p>
+            {/* Weather Badge - prominently displayed */}
+            {weatherDisplay && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-700/50 rounded-full text-xs">
+                <span>{weatherDisplay.emoji}</span>
+                <span className="text-slate-300 font-medium">{weatherDisplay.text}</span>
+              </span>
+            )}
+          </div>
 
           {isLoading ? (
             <>

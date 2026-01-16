@@ -86,7 +86,7 @@ const CITY_PROMPTS: Record<string, CityPrompts> = {
       "Bagdad Rd moving slow near HEB Plus",
     ],
     Events: [
-      "Old Settlers Park is packed for the event today",
+      "Robin Bledsoe Park is packed for the event today",
       "Long line at Robin Bledsoe Park pavilion",
       "Great turnout at Devine Lake Park",
       "Cap Metro Rail station has parking available",
@@ -100,7 +100,7 @@ const CITY_PROMPTS: Record<string, CityPrompts> = {
     ],
     Weather: [
       "Way hotter than forecast out here in Leander",
-      "Perfect evening for Old Settlers Park",
+      "Perfect evening for Robin Bledsoe Park",
       "Watch the low water crossings after yesterday's rain",
       "Beautiful Hill Country sunset tonight",
     ],

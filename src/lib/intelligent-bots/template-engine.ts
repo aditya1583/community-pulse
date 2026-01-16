@@ -106,11 +106,11 @@ const WEATHER_TEMPLATES = {
     "🌞 Peak UV hours coming up. Shade is your friend at {venue} today.",
   ],
   perfectWeather: [
-    "🌤️ Perfect {temp}°F today in {city}. No excuses to stay inside!",
-    "☀️ Heads up: Perfect conditions today. If you've been putting off outdoor errands, today's the day!",
-    "🌈 {city}'s having a great weather day - {temp}°F and {condition}. Get out there!",
-    "✨ Weather check: {temp}°F and beautiful. {park} calling your name?",
-    "🌤️ This is the weather we live here for! {temp}°F and {condition}.",
+    "🌤️ Beautiful {temp}°F and clear skies in {city}. No excuses to stay inside!",
+    "☀️ Gorgeous day ahead - {temp}°F and sunny. Great time for outdoor errands!",
+    "🌈 {city}'s having a great weather day - {temp}°F with clear skies. Get out there!",
+    "✨ Weather check: {temp}°F and sunny. {park} calling your name?",
+    "🌤️ This is the weather we live here for! {temp}°F and clear.",
   ],
   snow: [
     "❄️ Snow falling in {city}! Wild for Texas. {highway} could get dicey.",
@@ -125,6 +125,12 @@ const GENERAL_TEMPLATES = {
     "🌅 Good morning {city}! {weather} and {traffic} - rare combo. Enjoy it!",
     "☕ Rise and shine! Gorgeous day ahead - {temp}°F and sunny.",
     "🌤️ {city}'s having a good hair day. {temp}°F, light traffic, no complaints!",
+  ],
+  afternoon: [
+    "📍 {city} afternoon check-in. How's your day going?",
+    "☕ Midday vibes in {city}. Anyone else need more coffee?",
+    "🏙️ {city} afternoon energy. What's everyone up to?",
+    "📍 Quick afternoon pulse check - how's {city} treating you today?",
   ],
   weekend: [
     "🎉 Happy weekend, {city}! Great day for {park} - {temp}°F and {condition}.",
@@ -158,13 +164,13 @@ const EVENT_TEMPLATES = {
     "⚽ {event} kicking off {eventDate} at {venue} {eventDistanceCallout}! Let's go!",
     "🏀 {eventDate}: {event} at {venue} {eventDistanceCallout}. Who's courtside?",
     "🏒 {eventDate}: {event} at {venue} {eventDistanceCallout}. Let's get loud!",
-    "⚾ {event} on {eventDate} at {venue} {eventDistanceCallout} - perfect weather for a game!",
+    "🎟️ {event} on {eventDate} at {venue} {eventDistanceCallout}. Anyone else going?",
   ],
   festival: [
     "🎪 {eventDate}: {event} at {venue} {eventDistanceCallout}! Expect crowds all day.",
-    "🎉 Festival vibes: {event} on {eventDate} at {venue} {eventDistanceCallout}. Bring sunscreen!",
+    "🎉 Festival vibes: {event} on {eventDate} at {venue} {eventDistanceCallout}. Mark your calendar!",
     "🌟 {event} at {venue} {eventDistanceCallout} - {eventDate}. One of the best events of the year!",
-    "🎠 {eventDate}: {event} at {venue} {eventDistanceCallout}. Perfect day for it!",
+    "🎠 {eventDate}: {event} at {venue} {eventDistanceCallout}. Who's checking it out?",
   ],
   community: [
     "🏘️ {eventDate}: {event} at {venue} {eventDistanceCallout}. Great way to meet neighbors!",
@@ -213,6 +219,7 @@ const MOOD_BY_CATEGORY: Record<string, string[]> = {
   perfectWeather: ["🌤️", "☀️", "😊", "✨"],
   snow: ["❄️", "😱", "🌨️", "⚠️"],
   goodMorning: ["☀️", "😊", "🌅", "☕"],
+  afternoon: ["📍", "🌤️", "☕", "🏙️"],
   weekend: ["🎉", "😎", "🌳", "🍕"],
   lateNight: ["🌙", "😌", "✨", "🦉"],
   upcoming: ["🎭", "🎸", "🎉", "😊"],
@@ -912,32 +919,45 @@ function getGeneralCategory(ctx: SituationContext): string {
   if (ctx.time.isWeekend) return "weekend";
   if (ctx.time.hour >= 6 && ctx.time.hour <= 11) return "goodMorning";
   if (ctx.time.hour >= 20 || ctx.time.hour < 6) return "lateNight";
-  return "weekend"; // Fallback
+  // Midday on weekdays (12-7pm) - use afternoon category
+  return "afternoon";
 }
 
 function getWeatherCategory(ctx: SituationContext): string {
   const { weather } = ctx;
 
+  // PRIORITY ORDER: Adverse conditions always come first to ensure accurate reporting
+  // Never report "perfect" weather when conditions are actually problematic
+
+  // 1. Active precipitation/adverse conditions - HIGHEST priority
   if (["rain", "storm", "snow", "fog"].includes(weather.condition)) {
     return weather.condition;
   }
 
+  // 2. Extreme temperatures
   if (weather.temperature > 100) return "heat";
   if (weather.temperature < 32) return "cold";
+
+  // 3. High UV warning
   if (weather.uvIndex >= 8) return "uvAlert";
 
-  // Hot but not extreme
+  // 4. Hot but not extreme
   if (weather.temperature > 85) return "heat";
 
-  // Perfect weather (60-85°F with clear/partly cloudy)
+  // 5. Cold but not freezing (32-50F)
+  if (weather.temperature < 50) return "cold";
+
+  // 6. Perfect weather - ONLY for clear skies at comfortable temps (60-85F)
+  // IMPORTANT: "cloudy" is NOT perfect weather - only "clear" qualifies
   if (
     weather.temperature >= 60 &&
     weather.temperature <= 85 &&
-    (weather.condition === "clear" || weather.condition === "cloudy")
+    weather.condition === "clear"
   ) {
     return "perfectWeather";
   }
 
-  // Skip weather posts for unremarkable conditions
+  // 7. Skip weather posts for unremarkable conditions (cloudy but not extreme)
+  // This prevents posting misleading "perfect conditions" for average days
   return "";
 }

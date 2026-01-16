@@ -23,11 +23,25 @@ export const CITY_CONFIGS: Record<string, CityConfig> = {
 
 /**
  * Get city config by name (case-insensitive)
+ * Handles formats like "Leander", "Leander, TX", "Leander, TX, US"
  * Returns null if city is not pre-configured
  */
 export function getCityConfig(cityName: string): CityConfig | null {
   const normalized = cityName.toLowerCase().trim();
-  return CITY_CONFIGS[normalized] || null;
+
+  // Try exact match first
+  if (CITY_CONFIGS[normalized]) {
+    return CITY_CONFIGS[normalized];
+  }
+
+  // Try matching just the city name (strip state/country suffix)
+  // "Leander, TX" -> "leander", "Cedar Park, TX, US" -> "cedar park"
+  const cityOnly = normalized.split(",")[0].trim();
+  if (CITY_CONFIGS[cityOnly]) {
+    return CITY_CONFIGS[cityOnly];
+  }
+
+  return null;
 }
 
 /**

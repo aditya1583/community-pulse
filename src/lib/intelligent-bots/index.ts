@@ -26,6 +26,14 @@ export type {
   PostType,
   GeneratedPost,
   CooldownState,
+  // Civic types
+  CivicTopic,
+  CivicMeeting,
+  CivicDecision,
+  CivicStakes,
+  CivicEntityType,
+  CivicMeetingType,
+  CivicDecisionOutcome,
 } from "./types";
 
 // City Configs
@@ -99,6 +107,8 @@ export {
   generateWouldYouRatherPost,
   // HYPERLOCAL (real data)
   generateFarmersMarketPost,
+  // CIVIC (50 XP predictions)
+  generateCivicAlertPost,
   // Analysis
   analyzeForEngagement,
   type EngagementPost,
@@ -106,6 +116,22 @@ export {
   type EngagementDecision,
   type PostActionData,
 } from "./engagement-posts";
+
+// Civic Templates - Morning Brew style civic content
+// Use these when you have real civic meeting data from /api/civic/meetings
+export {
+  generatePreMeetingAlert,
+  generatePostMeetingSummary,
+  generateCivicPrediction,
+  generateMeetingStartingAlert,
+  generateDecisionFlashAlert,
+  shouldGeneratePreMeetingAlert,
+  isHighStakesTopic,
+  getPredictionWorthyTopics,
+  formatEntityName,
+  CIVIC_PREDICTION_XP,
+  CIVIC_BOT_PERSONAS,
+} from "./civic-templates";
 
 // AI-Powered Fun Facts
 export {
@@ -287,7 +313,7 @@ export async function generateColdStartPosts(
   reason: string;
   situationSummary?: string;
 }> {
-  const count = options.count || 3;
+  const count = options.count || 7; // Cold-start: 7 posts (4 regular + 3 engagement)
   const includeEngagement = options.includeEngagement !== false;
 
   // Check cold-start is allowed (unless forced)

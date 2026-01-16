@@ -13,23 +13,23 @@ export const LEANDER_CONFIG: CityConfig = {
   timezone: "America/Chicago",
 
   roads: {
+    // STRICT 10-MILE RADIUS: Only roads actually in/through Leander
     major: [
-      "Ronald Reagan Blvd",
-      "Crystal Falls Pkwy",
-      "Bagdad Rd",
-      "San Gabriel Pkwy",
-      "Old FM 2243",
-      "Hero Way",
-      "Lakeline Blvd",
-      "Parmer Ln",
-      "RM 620",
+      "Ronald Reagan Blvd",   // Main N-S artery through Leander
+      "Crystal Falls Pkwy",   // East-west through north Leander
+      "Bagdad Rd",            // Historic road through central Leander
+      "San Gabriel Pkwy",     // Northern Leander connector
+      "Old FM 2243",          // East-west through Leander
+      "Hero Way",             // Central Leander near HEB
+      "Mel Mathis Blvd",      // School zone area
+      "Sonny Dr",             // Near Gateway at Leander
+      // REMOVED: Lakeline Blvd (12.7mi - Austin), Parmer Ln (11mi - Austin), RM 620 (Cedar Park/Austin)
     ],
     highways: [
-      "US-183",
-      "183A Toll",
-      "TX-29",
-      "US-183A",
-      "RM 2243",
+      "US-183",       // Runs through Leander
+      "183A Toll",    // Toll road parallel to 183
+      "TX-29",        // East-west highway north of Leander
+      "RM 2243",      // Connects to Liberty Hill
     ],
     schoolZones: [
       "Horizon Park Dr",
@@ -52,19 +52,22 @@ export const LEANDER_CONFIG: CityConfig = {
       "Costco",
     ],
     venues: [
-      "Old Settlers Park",
-      "Robin Bledsoe Park",
-      "Devine Lake Park",
-      "Cap Metro Rail Station",
-      "Leander Public Library",
-      "Pat Bryson Municipal Hall",
+      // VERIFIED LOCAL PARKS (within 10mi of Leander city center)
+      "Robin Bledsoe Park",        // 2300 Bagdad Rd, Leander - 2mi
+      "Devine Lake Park",          // 800 Crystal Falls Pkwy, Leander - 3mi
+      "Cap Metro Rail Station",    // 800 N US-183, Leander - 1mi
+      "Leander Public Library",    // 1011 S Bagdad Rd, Leander - 2mi
+      "Pat Bryson Municipal Hall", // 201 N Brushy St, Leander - 1mi
+      "Mason Creek Park",          // Off Crystal Falls Pkwy - 3mi
+      "Benbrook Ranch Park",       // 2900 Mel Mathis Blvd, Leander - 4mi
+      // NOTE: Old Settlers Park is in Round Rock (~15mi away) - NOT included
     ],
     restaurants: [
       "Torchy's Tacos",
       "Chick-fil-A",
       "Whataburger",
       "In-N-Out",
-      "Dahlia Cafe",      // Local Leander spot (replaced Rudy's BBQ - 11mi away)
+      "Dahlia Cafe",      // Local Leander spot
       "Black Walnut Cafe",
       "Pluckers Wing Bar",
     ],
@@ -104,8 +107,8 @@ export const LEANDER_CONFIG: CityConfig = {
     "Crystal Falls Pkwy": "Bagdad Rd",
     "Bagdad Rd": "San Gabriel Pkwy",
     "Hero Way": "Crystal Falls Pkwy",
-    "Parmer Ln": "RM 620",
-    "Lakeline Blvd": "183A Toll",
+    "Old FM 2243": "Crystal Falls Pkwy",
+    "Mel Mathis Blvd": "Hero Way",
   },
 
   funFacts: {
@@ -124,11 +127,11 @@ export const LEANDER_CONFIG: CityConfig = {
       "The Hill Country creates its own microclimate with sudden temperature swings",
     ],
     events: [
-      "Old Settlers Park hosts the Old Settlers Music Festival since 1987",
       "The Cap Metro Rail Red Line opened in 2010, connecting Leander to downtown Austin",
       "Leander's July 4th celebration is one of the largest in Williamson County",
       "Divine Nine Park was the city's first dedicated disc golf course",
       "The Leander Public Library opened in 1983 with just 3,000 books",
+      "Robin Bledsoe Park hosts community events and has excellent sports fields",
     ],
     local: [
       "Leander was named after railroad official Leander 'Catfish' Brown in 1882",

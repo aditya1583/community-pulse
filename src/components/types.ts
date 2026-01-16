@@ -97,6 +97,20 @@ export type Pulse = {
   lon?: number | null;
   /** Distance from user's location in miles (calculated client-side) */
   distanceMiles?: number | null;
+
+  // ========== PREDICTION FIELDS ==========
+  /** True if this pulse is a prediction with XP stakes */
+  is_prediction?: boolean;
+  /** ISO timestamp when the prediction deadline passes */
+  prediction_resolves_at?: string | null;
+  /** ISO timestamp when the prediction was resolved (null if pending) */
+  prediction_resolved_at?: string | null;
+  /** Index of the winning option after resolution (null if pending) */
+  prediction_winning_option?: number | null;
+  /** XP reward for correct predictors (default 25) */
+  prediction_xp_reward?: number;
+  /** Category: weather, traffic, events, civic, local */
+  prediction_category?: string | null;
 };
 
 /**

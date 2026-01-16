@@ -151,6 +151,40 @@ export interface GeneratedPost {
   hidden: false;
   /** Poll options for "This or That" posts (e.g., ["🍖 BBQ", "🍗 Fried Chicken"]) */
   options?: string[];
+  /** Prediction metadata - transforms a poll into a prediction with stakes */
+  prediction?: PredictionMetadata;
+}
+
+/**
+ * Prediction categories for bot-generated predictions
+ */
+export type PredictionCategory = 'weather' | 'traffic' | 'events' | 'civic' | 'local';
+
+/**
+ * Data source for prediction auto-resolution
+ * - manual: Admin resolves manually
+ * - openweather: Auto-resolve via OpenWeather API
+ * - civic_api: Resolve after civic meeting outcomes
+ * - traffic_api: Resolve via TomTom traffic data
+ * - community: Community votes on outcome after deadline passes
+ */
+export type PredictionDataSource = 'manual' | 'openweather' | 'civic_api' | 'traffic_api' | 'community';
+
+/**
+ * Metadata for prediction posts
+ * Predictions are polls with stakes - correct voters earn XP
+ */
+export interface PredictionMetadata {
+  /** When the prediction deadline passes */
+  resolvesAt: Date;
+  /** XP reward for correct predictors (default 25) */
+  xpReward: number;
+  /** Category for analytics and generation */
+  category: PredictionCategory;
+  /** Data source for auto-resolution */
+  dataSource: PredictionDataSource;
+  /** Optional: Key for auto-resolution (e.g., weather condition code) */
+  resolutionKey?: string;
 }
 
 export interface CooldownState {
@@ -158,4 +192,151 @@ export interface CooldownState {
   lastPostType: PostType | null;
   postsToday: number;
   postsByType: Record<PostType, number>;
+}
+
+// ============================================================================
+// CHALLENGE TYPES
+// ============================================================================
+
+/**
+ * Challenge types for GPS-verified check-ins
+ */
+export type ChallengeType = "checkin" | "photo" | "trail";
+
+/**
+ * Metadata for challenge posts
+ * Challenges are GPS-verified check-ins that reward XP for visiting locations
+ */
+export interface ChallengeMetadata {
+  /** Target location coordinates */
+  targetLat: number;
+  targetLng: number;
+  /** Verification radius in meters (default 150m) */
+  radiusMeters: number;
+  /** Human-readable location name */
+  locationName: string;
+  /** Optional street address */
+  locationAddress?: string;
+  /** XP reward for completion (10-200) */
+  xpReward: number;
+  /** Maximum claims allowed (null = unlimited) */
+  maxClaims?: number | null;
+  /** When the challenge expires */
+  expiresAt: Date;
+  /** Type of challenge */
+  challengeType: ChallengeType;
+  /** For trail challenges: the trail this belongs to */
+  trailId?: string;
+  /** For trail challenges: order in sequence (1, 2, 3...) */
+  trailOrder?: number;
+  /** City this challenge belongs to */
+  city: string;
+}
+
+/**
+ * Trail metadata for multi-stop challenges
+ */
+export interface TrailMetadata {
+  /** Unique trail identifier */
+  id: string;
+  /** Trail title (e.g., "Taco Trail") */
+  title: string;
+  /** Trail description */
+  description: string;
+  /** Number of stops required to complete */
+  requiredStops: number;
+  /** Bonus XP for completing the entire trail */
+  completionBonusXp: number;
+  /** City this trail belongs to */
+  city: string;
+  /** When the trail expires */
+  expiresAt?: Date;
+}
+
+// ============================================================================
+// CIVIC TL;DR TYPES
+// ============================================================================
+
+/**
+ * Stakes level for civic topics - determines formatting and urgency
+ */
+export type CivicStakes = 'high' | 'medium' | 'low';
+
+/**
+ * Topic on a civic meeting agenda
+ */
+export interface CivicTopic {
+  /** Topic title (e.g., "Faubion Elementary Consolidation Vote") */
+  title: string;
+  /** Brief summary in plain English */
+  summary: string;
+  /** Stakes level - high gets special formatting */
+  stakes: CivicStakes;
+}
+
+/**
+ * Entity types for civic meetings
+ */
+export type CivicEntityType = 'school_district' | 'city_council' | 'committee' | 'county' | 'utility';
+
+/**
+ * Meeting types
+ */
+export type CivicMeetingType = 'board' | 'council' | 'special' | 'workshop' | 'hearing' | 'budget';
+
+/**
+ * Civic meeting - manually entered meeting data
+ */
+export interface CivicMeeting {
+  /** Unique meeting ID */
+  id: string;
+  /** City this meeting affects */
+  city: string;
+  /** Entity holding the meeting (e.g., "LISD", "City of Leander") */
+  entity: string;
+  /** Type of entity */
+  entityType: CivicEntityType;
+  /** Type of meeting */
+  meetingType: CivicMeetingType;
+  /** Optional custom title (overrides auto-generated) */
+  title?: string;
+  /** When the meeting occurs */
+  meetingDate: Date;
+  /** Topics on the agenda */
+  topics: CivicTopic[];
+  /** Livestream URL if available */
+  livestreamUrl?: string;
+  /** Agenda PDF/document URL */
+  agendaUrl?: string;
+  /** Physical location */
+  location?: string;
+}
+
+/**
+ * Decision outcomes for post-meeting summaries
+ */
+export type CivicDecisionOutcome = 'approved' | 'denied' | 'tabled' | 'amended' | 'withdrawn' | 'no_action';
+
+/**
+ * Decision made on a civic topic
+ */
+export interface CivicDecision {
+  /** Link to the meeting */
+  meetingId: string;
+  /** Topic this decision addresses */
+  topicTitle: string;
+  /** What happened */
+  decision: CivicDecisionOutcome;
+  /** Votes in favor */
+  voteFor?: number;
+  /** Votes against */
+  voteAgainst?: number;
+  /** Abstentions */
+  voteAbstain?: number;
+  /** Plain-English summary of the decision */
+  summary?: string;
+  /** Notable moment for "the drama" sections */
+  notableMoment?: string;
+  /** Impact summary for high-stakes decisions */
+  impactSummary?: string;
 }

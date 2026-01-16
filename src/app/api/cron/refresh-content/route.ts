@@ -1,7 +1,7 @@
 /**
  * Content Refresh Cron Job
  *
- * Runs every 3 hours via Vercel cron to generate fresh content for active cities.
+ * Runs every 30 minutes via Vercel cron to generate fresh content for active cities.
  * This solves the "dead app" problem where bot pulses expire and no new content
  * is generated, leaving feeds empty.
  *
@@ -10,6 +10,12 @@
  * 2. For each city, check if content is getting stale (< 3 active pulses)
  * 3. Generate 2-3 time-appropriate posts per city
  * 4. Vary content by time of day (morning traffic, lunch spots, evening events)
+ *
+ * Expiration times (match intelligent-seed):
+ * - Weather: 3 hours (conditions change constantly)
+ * - Traffic: 2 hours (conditions shift throughout day)
+ * - Events: 12 hours
+ * - General: 24 hours
  *
  * Security: Protected by Vercel's CRON_SECRET header validation
  */
@@ -23,6 +29,18 @@ import {
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+/**
+ * Get expiration time in hours based on post type.
+ * Time-sensitive content (weather, traffic) expires faster to avoid stale data.
+ */
+function getExpirationHours(tag: string): number {
+  const tagLower = tag.toLowerCase();
+  if (tagLower === "weather") return 3;
+  if (tagLower === "traffic") return 2;
+  if (tagLower === "events") return 12;
+  return 24;
+}
 
 // Minimum active pulses before we consider a city "stale"
 const STALE_THRESHOLD = 3;
@@ -259,8 +277,9 @@ export async function GET(request: NextRequest) {
             });
 
             if (result.posted && result.post) {
-              // Insert the generated post
-              const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+              // Insert the generated post with smart expiration based on content type
+              const expirationHours = getExpirationHours(result.post.tag);
+              const expiresAt = new Date(Date.now() + expirationHours * 60 * 60 * 1000).toISOString();
 
               const { error: insertError } = await supabase
                 .from("pulses")
@@ -304,7 +323,8 @@ export async function GET(request: NextRequest) {
         .slice(0, postsNeeded)
         .map((template, index) => {
           const createdAt = new Date(Date.now() - index * 5 * 60 * 1000).toISOString();
-          const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+          const expirationHours = getExpirationHours(template.tag);
+          const expiresAt = new Date(Date.now() + expirationHours * 60 * 60 * 1000).toISOString();
 
           return {
             city: cityInfo.city,
@@ -452,7 +472,8 @@ export async function POST(request: NextRequest) {
         });
 
         if (result.posted && result.post) {
-          const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+          const expirationHours = getExpirationHours(result.post.tag);
+          const expiresAt = new Date(Date.now() + expirationHours * 60 * 60 * 1000).toISOString();
 
           const { error } = await supabase
             .from("pulses")
@@ -488,20 +509,23 @@ export async function POST(request: NextRequest) {
 
     // Fallback to time-based templates
     const templates = TIME_TEMPLATES[timeCategory];
-    const postsToCreate = templates.slice(0, postsNeeded).map((template, index) => ({
-      city: targetCity,
-      message: template.message,
-      tag: template.tag,
-      mood: template.mood,
-      author: getBotName(template.tag, citySlug),
-      user_id: null,
-      is_bot: true,
-      hidden: false,
-      created_at: new Date(Date.now() - index * 5 * 60 * 1000).toISOString(),
-      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      lat: cityLat,
-      lon: cityLon,
-    }));
+    const postsToCreate = templates.slice(0, postsNeeded).map((template, index) => {
+      const expirationHours = getExpirationHours(template.tag);
+      return {
+        city: targetCity,
+        message: template.message,
+        tag: template.tag,
+        mood: template.mood,
+        author: getBotName(template.tag, citySlug),
+        user_id: null,
+        is_bot: true,
+        hidden: false,
+        created_at: new Date(Date.now() - index * 5 * 60 * 1000).toISOString(),
+        expires_at: new Date(Date.now() + expirationHours * 60 * 60 * 1000).toISOString(),
+        lat: cityLat,
+        lon: cityLon,
+      };
+    });
 
     const { data: inserted, error } = await supabase
       .from("pulses")

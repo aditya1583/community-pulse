@@ -121,29 +121,38 @@ const MARKET_TEMPLATES = [
 ];
 
 // Weather-based templates - THE HELPER personality (warnings, tips, helpful advice)
+// IMPORTANT: Templates MUST reflect actual weather conditions. "Perfect" is for clear/sunny ONLY.
 const WEATHER_TEMPLATES: Record<string, { mood: string; templates: string[] }> = {
   clear: {
     mood: "☀️",
     templates: [
       "PSA: Beautiful weather today! Great day to get outside. Don't forget sunscreen if you're out long! ☀️",
-      "Heads up: Perfect conditions today. If you've been putting off outdoor errands, today's the day!",
+      "Heads up: Clear skies and nice conditions today. If you've been putting off outdoor errands, today's the day!",
       "Tip: Clear skies all day. Great time to check those outdoor tasks off your list!",
     ],
   },
   clouds: {
-    mood: "😊",
+    mood: "☁️",
     templates: [
-      "FYI: Overcast but no rain expected. Good day for outdoor activities without the harsh sun!",
-      "Weather update: Cloudy but dry. Perfect if you don't like it too sunny. Enjoy!",
-      "Tip: Great weather for a walk - not too hot, not too cold. Take advantage! 🙂",
+      "FYI: Overcast today - good for outdoor activities without the harsh sun. Layer up!",
+      "Weather update: Cloudy skies but no rain expected. Good day for errands.",
+      "Tip: Gray skies today but staying dry. Not bad for getting things done! ☁️",
+    ],
+  },
+  clouds_cold: {
+    mood: "🥶",
+    templates: [
+      "☁️ Overcast and chilly today - grab a jacket if you're heading out!",
+      "Weather check: Cloudy and cold. Hot coffee sounds perfect right now. ☕",
+      "FYI: Gray skies and cool temps today. Stay warm out there! 🧥",
     ],
   },
   rain: {
-    mood: "🏠",
+    mood: "🌧️",
     templates: [
-      "⚠️ Rain alert! If you're driving, remember to slow down. Some streets flood around here!",
-      "Heads up: Getting wet out there! Don't forget your umbrella if you're heading out.",
-      "FYI: Rainy day - perfect excuse to support a local coffee shop. Stay dry everyone!",
+      "🌧️ Rain alert! If you're driving, remember to slow down. Some streets flood around here!",
+      "Heads up: Getting wet out there! Don't forget your umbrella if you're heading out. ☔",
+      "FYI: Rainy day - perfect excuse to support a local coffee shop. Stay dry everyone! 🌧️",
     ],
   },
   cold: {
@@ -151,7 +160,7 @@ const WEATHER_TEMPLATES: Record<string, { mood: string; templates: string[] }> =
     templates: [
       "Brrr! ❄️ Bundle up if you're heading out! Don't forget to check on elderly neighbors too.",
       "Cold weather alert: Make sure pets aren't left outside too long! Stay warm everyone.",
-      "FYI: Chilly one today. Hot drinks at local cafes are calling! Any favorites to recommend?",
+      "FYI: Chilly one today. Hot drinks at local cafes are calling! Any favorites to recommend? ☕",
     ],
   },
   hot: {
@@ -238,10 +247,29 @@ function getWeatherCategory(weather: WeatherData): keyof typeof WEATHER_TEMPLATE
   const desc = weather.description.toLowerCase();
   const temp = weather.temp;
 
-  if (temp < 45) return "cold";
+  // PRIORITY ORDER: Precipitation > Extreme temps > Condition-based
+  // This ensures we never say "perfect" when it's actually raining or freezing
+
+  // 1. Precipitation takes highest priority - ALWAYS mention if raining
+  if (desc.includes("rain") || desc.includes("drizzle") || desc.includes("shower") || desc.includes("thunder")) {
+    return "rain";
+  }
+
+  // 2. Extreme temperatures
+  if (temp < 40) return "cold";  // Lowered from 45 to 40 for "cold"
   if (temp > 85) return "hot";
-  if (desc.includes("rain") || desc.includes("drizzle") || desc.includes("shower")) return "rain";
-  if (desc.includes("clear") || desc.includes("sun")) return "clear";
+
+  // 3. Cool + cloudy combo (40-55F with clouds)
+  if (temp < 55 && (desc.includes("cloud") || desc.includes("overcast"))) {
+    return "clouds_cold";
+  }
+
+  // 4. Clear/sunny conditions
+  if (desc.includes("clear") || desc.includes("sun")) {
+    return "clear";
+  }
+
+  // 5. Default to cloudy for overcast conditions
   return "clouds";
 }
 

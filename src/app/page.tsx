@@ -1258,12 +1258,15 @@ export default function Home() {
       let error: { message: string } | null = null;
 
       // Include lat/lon for distance-based filtering
+      // Filter out expired posts at DB level for efficiency (1hr grace period)
+      const expiryGracePeriod = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
       const queryWithPolls = await supabase
         .from("pulses")
         .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, poll_options, lat, lon")
         .eq("city", city)
         .gte("created_at", start.toISOString())
         .lt("created_at", end.toISOString())
+        .or(`expires_at.is.null,expires_at.gt.${expiryGracePeriod}`)
         .order("created_at", { ascending: false })
         .limit(PULSES_PAGE_SIZE + 1);
 
@@ -1276,6 +1279,7 @@ export default function Home() {
           .eq("city", city)
           .gte("created_at", start.toISOString())
           .lt("created_at", end.toISOString())
+          .or(`expires_at.is.null,expires_at.gt.${expiryGracePeriod}`)
           .order("created_at", { ascending: false })
           .limit(PULSES_PAGE_SIZE + 1);
         data = (fallbackQuery.data as DBPulse[]) ?? null;
@@ -1324,6 +1328,15 @@ export default function Home() {
 
     if (city) {
       fetchPulses();
+
+      // Auto-refresh every 2 minutes to catch new bot posts and remove expired ones
+      // This ensures users don't need to manually refresh to see new content
+      const refreshInterval = setInterval(() => {
+        console.log("[Pulses] Auto-refreshing feed...");
+        fetchPulses();
+      }, 2 * 60 * 1000); // 2 minutes
+
+      return () => clearInterval(refreshInterval);
     }
   }, [city]);
 
@@ -1495,9 +1508,10 @@ export default function Home() {
         } else if (postsCreated > 0) {
           console.log(`[Content Refresh] SUCCESS! Created ${postsCreated} posts for ${city} (${refreshType})`);
           // Refetch pulses to show the new posts
-          const now = new Date();
-          const start = startOfRecentWindow(now, 7);
-          const end = startOfNextLocalDay(now);
+          const refetchNow = new Date();
+          const start = startOfRecentWindow(refetchNow, 7);
+          const end = startOfNextLocalDay(refetchNow);
+          const refetchExpiryGrace = new Date(refetchNow.getTime() - 60 * 60 * 1000).toISOString();
 
           // Use same column selection as initial fetch (with poll_options and lat/lon)
           let refetchData: DBPulse[] | null = null;
@@ -1507,6 +1521,7 @@ export default function Home() {
             .eq("city", city)
             .gte("created_at", start.toISOString())
             .lt("created_at", end.toISOString())
+            .or(`expires_at.is.null,expires_at.gt.${refetchExpiryGrace}`)
             .order("created_at", { ascending: false })
             .limit(PULSES_PAGE_SIZE);
 
@@ -1518,6 +1533,7 @@ export default function Home() {
               .eq("city", city)
               .gte("created_at", start.toISOString())
               .lt("created_at", end.toISOString())
+              .or(`expires_at.is.null,expires_at.gt.${refetchExpiryGrace}`)
               .order("created_at", { ascending: false })
               .limit(PULSES_PAGE_SIZE);
             refetchData = (refetchWithoutPolls.data as DBPulse[]) ?? null;
@@ -1594,6 +1610,7 @@ export default function Home() {
 
     const now = new Date();
     const start = startOfRecentWindow(now, 7);
+    const loadMoreExpiryGrace = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
 
     const oldestPulse = pulses[pulses.length - 1];
     const cursor = oldestPulse.createdAt;
@@ -1609,6 +1626,7 @@ export default function Home() {
         .eq("city", city)
         .gte("created_at", start.toISOString())
         .lt("created_at", cursor)
+        .or(`expires_at.is.null,expires_at.gt.${loadMoreExpiryGrace}`)
         .order("created_at", { ascending: false })
         .limit(PULSES_PAGE_SIZE + 1);
 
@@ -1619,6 +1637,7 @@ export default function Home() {
           .eq("city", city)
           .gte("created_at", start.toISOString())
           .lt("created_at", cursor)
+          .or(`expires_at.is.null,expires_at.gt.${loadMoreExpiryGrace}`)
           .order("created_at", { ascending: false })
           .limit(PULSES_PAGE_SIZE + 1);
         data = (fallbackQuery.data as DBPulse[]) ?? null;
@@ -2307,6 +2326,44 @@ export default function Home() {
   // Traffic-tagged pulses for traffic tab (also filter expired)
   const trafficPulses = visiblePulses.filter((p) => p.tag === "Traffic");
 
+  // "Happening Now" - Find the most critical active pulse for pinning
+  // Priority: Traffic alerts < 1hr old, then Events happening today, then Weather alerts
+  const happeningNowPulse = useMemo(() => {
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+
+    // Only consider in-radius pulses for "Happening Now"
+    const candidates = inRadiusPulses
+      .filter((p) => {
+        const created = new Date(p.createdAt);
+        // Must be recent (within 2 hours)
+        if (created < new Date(now.getTime() - 2 * 60 * 60 * 1000)) return false;
+        // Must be high-priority category
+        return p.tag === "Traffic" || p.tag === "Events" || p.tag === "Weather";
+      })
+      .map((p) => {
+        const created = new Date(p.createdAt);
+        let priority = 0;
+
+        // Traffic gets highest priority if very recent
+        if (p.tag === "Traffic" && created > oneHourAgo) priority = 100;
+        else if (p.tag === "Traffic") priority = 50;
+        // Events get medium-high priority
+        else if (p.tag === "Events") priority = 40;
+        // Weather alerts
+        else if (p.tag === "Weather") priority = 30;
+
+        // Boost for polls/predictions (interactive)
+        if (p.poll_options && p.poll_options.length >= 2) priority += 10;
+        if (p.is_prediction) priority += 15;
+
+        return { pulse: p, priority };
+      })
+      .sort((a, b) => b.priority - a.priority);
+
+    return candidates.length > 0 ? candidates[0].pulse : null;
+  }, [inRadiusPulses]);
+
   // ========= ADD PULSE =========
   const handleAddPulse = async () => {
     const trimmed = message.trim();
@@ -2749,6 +2806,13 @@ export default function Home() {
     geolocation.permissionStatus === "prompt" &&
     !geolocation.lat;
 
+  // Show loading overlay while geolocation is resolving after user granted permission
+  // This prevents users from interacting with Austin content while waiting for location
+  const showLocationLoading =
+    !useManualLocation &&
+    geolocation.loading &&
+    !geolocation.lat;
+
   // If we need location prompt, show it instead of main app
   if (showLocationPrompt) {
     return (
@@ -2768,6 +2832,26 @@ export default function Home() {
         loading={geolocation.loading}
         error={geolocation.error}
       />
+    );
+  }
+
+  // Show loading screen while determining location
+  if (showLocationLoading) {
+    return (
+      <div className="min-h-screen neon-grid-bg text-slate-50 flex flex-col items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-pulse">
+            <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/20 flex items-center justify-center">
+              <svg className="w-8 h-8 text-emerald-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            </div>
+          </div>
+          <h2 className="text-xl font-semibold text-emerald-400">Finding your location...</h2>
+          <p className="text-slate-400 text-sm">Getting hyperlocal content for your area</p>
+        </div>
+      </div>
     );
   }
 
@@ -3506,6 +3590,41 @@ export default function Home() {
                       </div>
 
                       {/* Pulses list */}
+                      {/* "Happening Now" Banner - Pin critical active event/alert */}
+                      {happeningNowPulse && tagFilter === "All" && (
+                        <div className="mb-4 relative">
+                          <div className={`rounded-xl p-3 border-2 ${
+                            happeningNowPulse.tag === "Traffic"
+                              ? "bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/50"
+                              : happeningNowPulse.tag === "Events"
+                              ? "bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/50"
+                              : "bg-gradient-to-r from-sky-500/10 to-blue-500/10 border-sky-500/50"
+                          }`}>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full animate-pulse ${
+                                happeningNowPulse.tag === "Traffic"
+                                  ? "bg-amber-500/30 text-amber-200"
+                                  : happeningNowPulse.tag === "Events"
+                                  ? "bg-purple-500/30 text-purple-200"
+                                  : "bg-sky-500/30 text-sky-200"
+                              }`}>
+                                <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                                Happening Now
+                              </span>
+                              <span className="text-[10px] text-slate-400 uppercase tracking-wide">
+                                {happeningNowPulse.tag}
+                              </span>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <span className="text-xl flex-shrink-0">{happeningNowPulse.mood}</span>
+                              <p className="text-sm text-white leading-snug line-clamp-2">
+                                {happeningNowPulse.message.split('\n')[0]}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {/* FIXED: Show loading state until initial fetch completes to prevent
                           the "No pulses yet" flash that was causing user confusion */}
                       <section className="space-y-3 pb-12">

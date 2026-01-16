@@ -19,7 +19,7 @@
  * All content is AI-generated to avoid repetitive/static questions.
  */
 
-import type { CityConfig, SituationContext, PostType, GeneratedPost } from "./types";
+import type { CityConfig, SituationContext, PostType, GeneratedPost, PredictionMetadata, PredictionCategory, PredictionDataSource } from "./types";
 import { ExtendedPostType } from "./template-engine";
 
 // ============================================================================
@@ -42,7 +42,9 @@ export type EngagementType =
   | "community_callout"      // Celebrate/call out local behavior
   | "would_you_rather"       // Hypothetical local scenarios
   | "confession_booth"       // Anonymous-style local confessions
-  | "farmers_market";        // Hyperlocal farmers market content
+  | "farmers_market"         // Hyperlocal farmers market content
+  | "prediction"             // XP-staked predictions about local outcomes
+  | "civic_alert";           // Civic meeting alerts and predictions (50 XP)
 
 /**
  * Action metadata for actionable posts (e.g., farmers market posts with directions)
@@ -71,6 +73,8 @@ export interface EngagementPost extends Omit<GeneratedPost, "tag"> {
   options?: string[];  // For polls
   /** Action metadata for actionable posts */
   action?: PostActionData;
+  /** Prediction metadata for prediction posts - transforms poll into XP-staked prediction */
+  prediction?: PredictionMetadata;
 }
 
 // ============================================================================
@@ -870,6 +874,196 @@ const CONFESSION_TEMPLATES = [
   "🎭 Anonymous confessions: Reply with your {city} unpopular opinion. No judgment zone.",
   "🤐 Secret confession: What's your {city} guilty pleasure that you hope your neighbors don't judge?",
   "😅 Confession booth: What {city} thing have you been pretending to understand but actually don't?",
+];
+
+// ============================================================================
+// PREDICTIONS - XP-Staked Community Predictions
+// ============================================================================
+//
+// PHILOSOPHY: Polls are passive. Predictions create stakes.
+// When users put their XP on the line, they become emotionally invested.
+// Correct predictors earn bonus XP, creating a "local oracle" status.
+//
+// Predictions are contextual: weather predictions when storms are coming,
+// traffic predictions before big events, civic predictions before votes.
+// ============================================================================
+
+/**
+ * Prediction template structure
+ * Each prediction has a question, two options, and resolution metadata
+ */
+interface PredictionTemplate {
+  question: string;           // Template with {variables}
+  optionA: string;            // YES/positive option
+  optionB: string;            // NO/negative option
+  category: PredictionCategory;
+  dataSource: PredictionDataSource;
+  /** Hours until resolution (from now) */
+  resolvesInHours: number;
+  /** XP reward for correct prediction */
+  xpReward: number;
+  /** Conditions when this prediction should be generated */
+  conditions?: {
+    minTemp?: number;
+    maxTemp?: number;
+    weatherConditions?: string[];
+    timeOfDay?: ("morning" | "afternoon" | "evening" | "night")[];
+    dayType?: ("weekday" | "weekend")[];
+    requiresEvents?: boolean;
+    requiresTraffic?: boolean;
+  };
+}
+
+// WEATHER PREDICTIONS - Auto-resolvable via OpenWeather API
+const WEATHER_PREDICTIONS: PredictionTemplate[] = [
+  // Rain predictions
+  {
+    question: "🔮 Prediction Time: Will it rain in {city} this weekend?",
+    optionA: "🌧️ YES - Get the umbrella ready",
+    optionB: "☀️ NO - We're staying dry",
+    category: "weather",
+    dataSource: "openweather",
+    resolvesInHours: 72,
+    xpReward: 25,
+    conditions: { dayType: ["weekday"] }
+  },
+  {
+    question: "🔮 Weather Oracle: Will {city} hit {temp}°F again tomorrow?",
+    optionA: "🌡️ YES - Same heat tomorrow",
+    optionB: "❄️ NO - Cooling down",
+    category: "weather",
+    dataSource: "openweather",
+    resolvesInHours: 24,
+    xpReward: 20,
+    conditions: { minTemp: 85 }
+  },
+  {
+    question: "🔮 Prediction: Will we see freezing temps in {city} this week?",
+    optionA: "🥶 YES - Break out the jackets",
+    optionB: "🌤️ NO - Texas winter is a myth",
+    category: "weather",
+    dataSource: "openweather",
+    resolvesInHours: 168,
+    xpReward: 30,
+    conditions: { maxTemp: 50 }
+  },
+  {
+    question: "🔮 Storm Watch: Will {city} get thunderstorms tonight?",
+    optionA: "⛈️ YES - Storms are coming",
+    optionB: "🌙 NO - Peaceful night ahead",
+    category: "weather",
+    dataSource: "openweather",
+    resolvesInHours: 12,
+    xpReward: 25,
+    conditions: { weatherConditions: ["cloudy", "rain"] }
+  },
+];
+
+// TRAFFIC PREDICTIONS - Require manual resolution or traffic API
+const TRAFFIC_PREDICTIONS: PredictionTemplate[] = [
+  {
+    question: "🔮 Traffic Oracle: Will {road} be backed up during tomorrow's rush hour?",
+    optionA: "🚗 YES - It's gonna be rough",
+    optionB: "🏎️ NO - Smooth sailing",
+    category: "traffic",
+    dataSource: "traffic_api",
+    resolvesInHours: 24,
+    xpReward: 20,
+    conditions: { dayType: ["weekday"] }
+  },
+  {
+    question: "🔮 Friday Prediction: Will {road} be a parking lot at 5 PM?",
+    optionA: "😤 YES - Total gridlock",
+    optionB: "🙌 NO - Everyone left early",
+    category: "traffic",
+    dataSource: "traffic_api",
+    resolvesInHours: 8,
+    xpReward: 25,
+    conditions: { dayType: ["weekday"], timeOfDay: ["morning", "afternoon"] }
+  },
+];
+
+// EVENT PREDICTIONS - Manual resolution
+const EVENT_PREDICTIONS: PredictionTemplate[] = [
+  {
+    question: "🔮 Event Prediction: Will {eventName} sell out?",
+    optionA: "🎟️ YES - It's gonna be packed",
+    optionB: "🪑 NO - Plenty of space",
+    category: "events",
+    dataSource: "manual",
+    resolvesInHours: 48,
+    xpReward: 25,
+    conditions: { requiresEvents: true }
+  },
+  {
+    question: "🔮 Traffic Prediction: Will {eventName} cause major traffic in {city}?",
+    optionA: "🚗 YES - Avoid the area",
+    optionB: "🛣️ NO - It'll be fine",
+    category: "events",
+    dataSource: "manual",
+    resolvesInHours: 24,
+    xpReward: 20,
+    conditions: { requiresEvents: true }
+  },
+];
+
+// LOCAL PREDICTIONS - Community-resolved (voters decide what happened)
+// These are subjective predictions where the community votes on the outcome
+// after the deadline passes. This creates engagement AND resolves the prediction.
+const LOCAL_PREDICTIONS: PredictionTemplate[] = [
+  {
+    question: "🔮 Weekend Prediction: Will {park} be crowded this Saturday?",
+    optionA: "👨‍👩‍👧‍👦 YES - Pack early",
+    optionB: "🧘 NO - Plenty of space",
+    category: "local",
+    dataSource: "community",  // Community votes on outcome after deadline
+    resolvesInHours: 72,
+    xpReward: 20,
+    conditions: { dayType: ["weekday"] }
+  },
+  {
+    question: "🔮 Restaurant Bet: Will {restaurant} have a wait on Friday night?",
+    optionA: "⏰ YES - Expect a line",
+    optionB: "🪑 NO - Walk right in",
+    category: "local",
+    dataSource: "community",  // Community votes on outcome after deadline
+    resolvesInHours: 48,
+    xpReward: 15,
+    conditions: { dayType: ["weekday"], timeOfDay: ["morning", "afternoon"] }
+  },
+  {
+    question: "🔮 Weekend Vibe: Will downtown {city} be busy this Saturday night?",
+    optionA: "🎉 YES - Party mode",
+    optionB: "😴 NO - Ghost town",
+    category: "local",
+    dataSource: "community",
+    resolvesInHours: 72,
+    xpReward: 20,
+    conditions: { dayType: ["weekday"] }
+  },
+];
+
+// CIVIC PREDICTIONS (Phase 3 prep) - For school board, city council decisions
+// TODO: Integrate with civic-templates.ts for full civic prediction support
+const _CIVIC_PREDICTIONS: PredictionTemplate[] = [
+  {
+    question: "🔮 Civic Prediction: Will the {city} bond proposal pass?",
+    optionA: "✅ YES - Community says yes",
+    optionB: "❌ NO - Voters reject it",
+    category: "civic",
+    dataSource: "civic_api",
+    resolvesInHours: 168,
+    xpReward: 50,
+  },
+  {
+    question: "🔮 School Board: Will LISD approve the new policy?",
+    optionA: "✅ YES - It passes",
+    optionB: "❌ NO - Back to the drawing board",
+    category: "civic",
+    dataSource: "civic_api",
+    resolvesInHours: 48,
+    xpReward: 35,
+  },
 ];
 
 // ============================================================================
@@ -1762,7 +1956,7 @@ export async function generateNostalgiaTriggerPost(
     closedBusiness: pickRandom(NOSTALGIA_VARIABLES.closedBusiness),
     change: pickRandom(NOSTALGIA_VARIABLES.change),
     years: pickRandom(NOSTALGIA_VARIABLES.years),
-    event: "the last Old Settlers Festival",
+    event: "the city's big annual festival",
   };
 
   const message = fillEngagementTemplate(template, extendedVars);
@@ -1900,6 +2094,277 @@ export async function generateConfessionBoothPost(
     is_bot: true,
     hidden: false,
     engagementType: "confession_booth",
+  };
+}
+
+/**
+ * Generate a Prediction post
+ * XP-staked predictions about local outcomes
+ *
+ * PHILOSOPHY: Predictions transform passive poll voters into active predictors.
+ * By staking XP, users become emotionally invested in outcomes.
+ * Correct predictors earn bonus XP and build "local oracle" reputation.
+ *
+ * Prediction types:
+ * - WEATHER: Auto-resolvable via OpenWeather API (highest frequency)
+ * - TRAFFIC: Manual or traffic API resolution
+ * - EVENTS: Manual resolution based on event outcomes
+ * - LOCAL: Community-verified predictions
+ * - CIVIC: Phase 3 - school board, city council decisions
+ */
+export async function generatePredictionPost(
+  ctx: SituationContext
+): Promise<EngagementPost | null> {
+  const { city, weather, time, events, traffic } = ctx;
+  const timeOfDay = getTimeOfDay(time.hour);
+  const dayType = time.isWeekday ? "weekday" : "weekend";
+
+  // Build variables for template filling
+  const vars = getCityVariables(city);
+  const extendedVars: Record<string, string> = {
+    ...vars,
+    temp: String(Math.round(weather.temperature)),
+    businessType: pickRandom(HOT_TAKE_VARIABLES.businessType),
+  };
+
+  // Add event variables if events exist
+  if (events && events.length > 0) {
+    extendedVars.eventName = events[0].name;
+    extendedVars.venue = events[0].venue;
+  }
+
+  // Collect matching prediction templates
+  const matchingTemplates: PredictionTemplate[] = [];
+
+  // Helper to check if prediction conditions match
+  const matchesPredictionConditions = (template: PredictionTemplate): boolean => {
+    const cond = template.conditions;
+    if (!cond) return true;  // No conditions = always matches
+
+    // Temperature checks
+    if (cond.minTemp !== undefined && weather.temperature < cond.minTemp) return false;
+    if (cond.maxTemp !== undefined && weather.temperature > cond.maxTemp) return false;
+
+    // Weather condition checks
+    if (cond.weatherConditions && cond.weatherConditions.length > 0) {
+      if (!cond.weatherConditions.includes(weather.condition)) return false;
+    }
+
+    // Time of day checks
+    if (cond.timeOfDay && cond.timeOfDay.length > 0) {
+      if (!cond.timeOfDay.includes(timeOfDay)) return false;
+    }
+
+    // Day type checks
+    if (cond.dayType && cond.dayType.length > 0) {
+      if (!cond.dayType.includes(dayType)) return false;
+    }
+
+    // Events required
+    if (cond.requiresEvents && (!events || events.length === 0)) return false;
+
+    // Traffic required
+    if (cond.requiresTraffic && (!traffic || traffic.congestionLevel <= 0.3)) return false;
+
+    return true;
+  };
+
+  // Check WEATHER predictions (most common, auto-resolvable)
+  for (const template of WEATHER_PREDICTIONS) {
+    if (matchesPredictionConditions(template)) {
+      matchingTemplates.push(template);
+    }
+  }
+
+  // Check TRAFFIC predictions
+  for (const template of TRAFFIC_PREDICTIONS) {
+    if (matchesPredictionConditions(template)) {
+      matchingTemplates.push(template);
+    }
+  }
+
+  // Check EVENT predictions (only if events exist)
+  if (events && events.length > 0) {
+    for (const template of EVENT_PREDICTIONS) {
+      if (matchesPredictionConditions(template)) {
+        matchingTemplates.push(template);
+      }
+    }
+  }
+
+  // Check LOCAL predictions
+  for (const template of LOCAL_PREDICTIONS) {
+    if (matchesPredictionConditions(template)) {
+      matchingTemplates.push(template);
+    }
+  }
+
+  // If no contextual matches, add some default weather predictions
+  if (matchingTemplates.length === 0) {
+    // Default to generic weather predictions
+    matchingTemplates.push({
+      question: `🔮 Prediction Time: Will ${city.name} see perfect weather (65-80°F) this weekend?`,
+      optionA: "☀️ YES - Beautiful days ahead",
+      optionB: "😬 NO - Mother nature has other plans",
+      category: "weather",
+      dataSource: "openweather",
+      resolvesInHours: 72,
+      xpReward: 25,
+    });
+  }
+
+  // Select a random matching template
+  const selected = pickRandom(matchingTemplates);
+
+  // Fill in the template variables
+  let message = fillEngagementTemplate(selected.question, extendedVars);
+
+  // Calculate resolution time
+  const resolvesAt = new Date(Date.now() + selected.resolvesInHours * 60 * 60 * 1000);
+
+  // Build the XP reward announcement into the message
+  const votingDeadline = new Date(resolvesAt.getTime() - 2 * 60 * 60 * 1000); // 2 hours before resolution
+  const deadlineStr = votingDeadline.toLocaleString("en-US", {
+    weekday: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  message += `\n\n💎 Correct guessers get ${selected.xpReward} XP! Voting closes ${deadlineStr}.`;
+
+  // Create prediction metadata
+  const predictionMeta: PredictionMetadata = {
+    resolvesAt,
+    xpReward: selected.xpReward,
+    category: selected.category,
+    dataSource: selected.dataSource,
+  };
+
+  return {
+    message,
+    tag: "General",
+    mood: "🔮",
+    author: `${city.name} oracle_bot 🎱`,
+    is_bot: true,
+    hidden: false,
+    engagementType: "prediction",
+    options: [selected.optionA, selected.optionB],
+    prediction: predictionMeta,
+  };
+}
+
+// ============================================================================
+// CIVIC ALERT POSTS - Morning Brew Style
+// ============================================================================
+
+/**
+ * Civic Alert Templates - for when we don't have real civic meeting data
+ *
+ * These are "civic awareness" posts that encourage engagement with local government.
+ * When actual civic meetings are available (via /api/civic/meetings), the system
+ * should use the dedicated civic-templates.ts generators instead.
+ */
+const CIVIC_AWARENESS_TEMPLATES = [
+  {
+    message: `🏛️ {city} Civic Question:\n\nDo you know when your local school board meets?\n\n📊 Quick poll:`,
+    optionA: "Yes, I follow it",
+    optionB: "No idea, honestly",
+    category: "awareness" as const,
+  },
+  {
+    message: `🏫 {city} Community Check:\n\nSchool board decisions affect property values, curriculum, and taxes.\n\nAre you paying attention?`,
+    optionA: "I try to follow along",
+    optionB: "I should probably start",
+    category: "awareness" as const,
+  },
+  {
+    message: `🏛️ Civic Truth Time:\n\nCity council meetings in {city} shape everything from zoning to taxes.\n\nHave you ever watched one?`,
+    optionA: "Yes, been there",
+    optionB: "Never, but curious",
+    category: "awareness" as const,
+  },
+  {
+    message: `🔮 Civic Prediction: Budget Season\n\n{city} budget discussions are coming up. What's your prediction?\n\nWill property taxes...`,
+    optionA: "Stay flat",
+    optionB: "Go up (again)",
+    category: "prediction" as const,
+  },
+  {
+    message: `🏫 School District Prediction:\n\nWith all the growth in {city}, will we see a new school announced this year?`,
+    optionA: "Yes, it's overdue",
+    optionB: "No, budget is tight",
+    category: "prediction" as const,
+  },
+  {
+    message: `🏛️ {city} Development Watch:\n\nThat big empty lot everyone keeps asking about... prediction time:\n\nWhat gets built next?`,
+    optionA: "More housing",
+    optionB: "Commercial/retail",
+    category: "prediction" as const,
+  },
+];
+
+/**
+ * Generate a Civic Alert Post
+ *
+ * Uses "Morning Brew" style civic content to make local government accessible.
+ * When real civic meeting data is available, this should defer to the
+ * dedicated civic-templates.ts generators for pre-meeting alerts and predictions.
+ *
+ * Civic predictions earn 50 XP (higher than standard 25 XP) to encourage
+ * civic engagement.
+ */
+export async function generateCivicAlertPost(
+  ctx: SituationContext
+): Promise<EngagementPost | null> {
+  const { city, time } = ctx;
+
+  // Select a random civic template
+  const template = pickRandom(CIVIC_AWARENESS_TEMPLATES);
+
+  // Fill in city name
+  const message = template.message.replace(/{city}/g, city.name);
+
+  // If it's a prediction type, add prediction metadata
+  if (template.category === "prediction") {
+    // Civic predictions resolve in ~48 hours and give 50 XP
+    const resolvesAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+    const deadlineStr = resolvesAt.toLocaleString("en-US", {
+      weekday: "short",
+      hour: "numeric",
+    });
+
+    const fullMessage = `${message}\n\n💎 Correct guessers earn 50 XP! Resolution by ${deadlineStr}.`;
+
+    const predictionMeta: PredictionMetadata = {
+      resolvesAt,
+      xpReward: 50, // Higher XP for civic predictions
+      category: "civic",
+      dataSource: "manual", // Civic predictions are manually resolved
+    };
+
+    return {
+      message: fullMessage,
+      tag: "General",
+      mood: "🏛️",
+      author: `${city.name} civic_oracle_bot 🔮`,
+      is_bot: true,
+      hidden: false,
+      engagementType: "civic_alert",
+      options: [template.optionA, template.optionB],
+      prediction: predictionMeta,
+    };
+  }
+
+  // Regular awareness poll (no XP stakes)
+  return {
+    message,
+    tag: "General",
+    mood: "🏛️",
+    author: `${city.name} civic_pulse_bot 🏛️`,
+    is_bot: true,
+    hidden: false,
+    engagementType: "civic_alert",
+    options: [template.optionA, template.optionB],
   };
 }
 
@@ -2070,7 +2535,44 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
     }
   }
 
+  // ========== CIVIC ALERTS (High priority on meeting days) ==========
+  // Civic meetings are time-sensitive - alert users about meetings happening today
+  // This uses external civic data, so it's triggered when civic meetings exist
+  // Note: Actual civic data comes from the /api/civic/meetings endpoint
+  // The bot scheduler should fetch civic meetings and include them in context
+  // For now, we check time windows when civic meetings typically occur (evenings on weekdays)
+  if (time.isWeekday && hour >= 16 && hour <= 19) {
+    // Civic meetings often happen Tuesday-Thursday evenings
+    if (time.dayOfWeek >= 2 && time.dayOfWeek <= 4) {
+      if (Math.random() < 0.25) {
+        return {
+          shouldPost: true,
+          engagementType: "civic_alert",
+          reason: "Weekday evening - prime civic meeting window (50 XP predictions)",
+        };
+      }
+    }
+  }
+
   // ========== TIER 2: HIGH-ENGAGEMENT (Viral potential) ==========
+
+  // PREDICTIONS - XP-staked predictions create investment and repeat engagement
+  // Higher chance during morning (predictions about the day) and evening (predictions about tomorrow)
+  if ((hour >= 7 && hour <= 10) || (hour >= 18 && hour <= 21)) {
+    if (Math.random() < 0.3) {
+      return {
+        shouldPost: true,
+        engagementType: "prediction",
+        reason: "Prime prediction window - stake XP on local outcomes",
+      };
+    }
+  } else if (Math.random() < 0.15) {
+    return {
+      shouldPost: true,
+      engagementType: "prediction",
+      reason: "Prediction post - create engagement through stakes",
+    };
+  }
 
   // Hot takes are gold - they demand responses
   // Higher chance during "controversy hours" (evening when people are relaxed)
@@ -2297,6 +2799,14 @@ export async function generateEngagementPost(
     case "farmers_market":
       return generateFarmersMarketPost(ctx);
 
+    // XP-STAKED PREDICTIONS
+    case "prediction":
+      return generatePredictionPost(ctx);
+
+    // CIVIC ALERTS (50 XP predictions)
+    case "civic_alert":
+      return generateCivicAlertPost(ctx);
+
     default:
       return null;
   }
@@ -2323,6 +2833,10 @@ export async function generateEngagementSeedPosts(
   // ========== INTERACTIVE POLLS (Highest priority - easy one-tap engagement) ==========
   // These generate voteable polls that users can interact with immediately
   // Moved to top priority to ensure every city gets at least one poll
+
+  // PREDICTIONS - XP-staked predictions create investment and repeat engagement
+  // Always include a prediction to hook users with stakes
+  priorities.push("prediction");
 
   // This or That - super quick one-tap engagement with poll options
   priorities.push("this_or_that");
@@ -2377,6 +2891,12 @@ export async function generateEngagementSeedPosts(
 
   // Challenges drive direct participation
   priorities.push("neighbor_challenge");
+
+  // Civic alerts on weekday evenings (when civic meetings happen)
+  // 50 XP predictions about school board/city council decisions
+  if (ctx.time.isWeekday && ctx.time.hour >= 16 && ctx.time.hour <= 20) {
+    priorities.push("civic_alert");
+  }
 
   // ========== IDENTITY BUILDERS (Community bonding) ==========
 
