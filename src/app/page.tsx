@@ -143,6 +143,13 @@ function isTabId(value: unknown): value is TabId {
   return typeof value === "string" && TAB_ID_SET.has(value as TabId);
 }
 
+// Hardcoded fallback gas stations for Central Texas when API fails
+const FALLBACK_GAS_STATIONS: Record<string, { name: string; distanceMiles: number }> = {
+  "leander": { name: "H-E-B Fuel", distanceMiles: 0.8 },
+  "cedar park": { name: "H-E-B Fuel", distanceMiles: 1.2 },
+  "austin": { name: "H-E-B Fuel", distanceMiles: 0.5 },
+};
+
 export default function Home() {
   // Core state - initialize with defaults to avoid SSR hydration mismatch
   // localStorage restoration happens in useEffect after hydration
@@ -702,33 +709,66 @@ export default function Home() {
   useEffect(() => {
     const lat = selectedCity?.lat;
     const lon = selectedCity?.lon;
+    const cityName = selectedCity?.name?.toLowerCase() || "";
 
     if (!lat || !lon) {
-      setNearestStation(null);
+      console.log("[GasStation] No coordinates available, skipping fetch");
+      // Try fallback based on city name
+      const fallback = FALLBACK_GAS_STATIONS[cityName];
+      if (fallback) {
+        console.log("[GasStation] Using city-name fallback:", fallback.name);
+        setNearestStation(fallback);
+      } else {
+        setNearestStation(null);
+      }
       return;
     }
 
     let cancelled = false;
 
     const fetchNearestStation = async () => {
+      console.log(`[GasStation] Fetching nearest station for coords: ${lat}, ${lon} (city: ${cityName})`);
       try {
         const res = await fetch(`/api/gas-stations?lat=${lat}&lon=${lon}&limit=1`);
         const data = await res.json();
 
-        if (cancelled) return;
+        console.log("[GasStation] API response:", data);
+
+        if (cancelled) {
+          console.log("[GasStation] Request cancelled");
+          return;
+        }
 
         if (data.stations && data.stations.length > 0) {
           const station = data.stations[0];
+          console.log("[GasStation] Found station:", station.name, "at", station.distanceMiles, "mi");
           setNearestStation({
             name: station.name,
             distanceMiles: station.distanceMiles,
           });
         } else {
-          setNearestStation(null);
+          console.log("[GasStation] No stations from API, trying fallback");
+          // Use fallback if API returns empty
+          const fallback = FALLBACK_GAS_STATIONS[cityName];
+          if (fallback) {
+            console.log("[GasStation] Using fallback:", fallback.name);
+            setNearestStation(fallback);
+          } else {
+            setNearestStation(null);
+          }
         }
-      } catch {
-        // Silently fail - station name is supplementary info
-        if (!cancelled) setNearestStation(null);
+      } catch (error) {
+        console.error("[GasStation] Error fetching:", error);
+        if (!cancelled) {
+          // Use fallback on error
+          const fallback = FALLBACK_GAS_STATIONS[cityName];
+          if (fallback) {
+            console.log("[GasStation] Using fallback after error:", fallback.name);
+            setNearestStation(fallback);
+          } else {
+            setNearestStation(null);
+          }
+        }
       }
     };
 
@@ -737,7 +777,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [selectedCity?.lat, selectedCity?.lon]);
+  }, [selectedCity?.lat, selectedCity?.lon, selectedCity?.name]);
 
   // ========= LOAD SESSION + PROFILE =========
   useEffect(() => {

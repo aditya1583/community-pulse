@@ -321,6 +321,134 @@ function getCoordinatesForCity(cityName: string): { lat: number; lon: number } |
   return CITY_COORDINATES[normalizedCity] || null;
 }
 
+/**
+ * Hardcoded fallback markets for Central Texas
+ * Ensures we always return data even when all APIs fail
+ */
+const CENTRAL_TEXAS_FALLBACK_MARKETS: Record<string, FarmersMarketData[]> = {
+  "leander": [
+    {
+      id: "fallback-leander-1",
+      name: "Leander Farmers Market",
+      address: "200 W Willis St, Leander, TX 78641",
+      schedule: "Saturdays 9am-1pm (seasonal)",
+      products: ["Fresh Produce", "Honey", "Baked Goods", "Eggs"],
+      isOpenToday: new Date().getDay() === 6,
+      distance: 0.5,
+      website: null,
+      facebook: null,
+      source: "usda" as const,
+      lat: 30.5792,
+      lon: -97.8556,
+    },
+  ],
+  "cedar park": [
+    {
+      id: "fallback-cedar-park-1",
+      name: "Cedar Park Farmers Market",
+      address: "1890 Ranch Shopping Center, Cedar Park, TX",
+      schedule: "Saturdays 9am-1pm",
+      products: ["Fresh Produce", "Organic", "Meat", "Dairy"],
+      isOpenToday: new Date().getDay() === 6,
+      distance: 3.2,
+      website: null,
+      facebook: null,
+      source: "usda" as const,
+      lat: 30.4847,
+      lon: -97.8189,
+    },
+  ],
+  "austin": [
+    {
+      id: "fallback-austin-1",
+      name: "SFC Farmers' Market Downtown",
+      address: "422 Guadalupe St, Austin, TX 78701",
+      schedule: "Saturdays 9am-1pm",
+      products: ["Fresh Produce", "Organic", "Meat", "Dairy", "Baked Goods"],
+      isOpenToday: new Date().getDay() === 6,
+      distance: null,
+      website: "https://www.sfcfarmersmarket.org/",
+      facebook: null,
+      source: "usda" as const,
+      lat: 30.2686,
+      lon: -97.7453,
+    },
+    {
+      id: "fallback-austin-2",
+      name: "Mueller Farmers' Market",
+      address: "4550 Mueller Blvd, Austin, TX 78723",
+      schedule: "Sundays 10am-2pm",
+      products: ["Fresh Produce", "Organic", "Honey", "Crafts"],
+      isOpenToday: new Date().getDay() === 0,
+      distance: null,
+      website: "https://www.sfcfarmersmarket.org/",
+      facebook: null,
+      source: "usda" as const,
+      lat: 30.2980,
+      lon: -97.7058,
+    },
+  ],
+};
+
+/**
+ * Get fallback markets based on city name or coordinates
+ */
+function getFallbackMarkets(cityName: string, coords: { lat: number; lon: number }): FarmersMarketData[] {
+  const normalizedCity = cityName.toLowerCase().trim();
+  const today = new Date().getDay();
+
+  // Helper to calculate distance
+  const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a = Math.sin(dLat / 2) ** 2 +
+      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c * 0.621371;
+  };
+
+  // Try exact city match first
+  let markets = CENTRAL_TEXAS_FALLBACK_MARKETS[normalizedCity];
+
+  // If no exact match, find nearest supported city
+  if (!markets) {
+    const distToLeander = haversineDistance(coords.lat, coords.lon, 30.5788, -97.8531);
+    const distToCedarPark = haversineDistance(coords.lat, coords.lon, 30.5052, -97.8203);
+    const distToAustin = haversineDistance(coords.lat, coords.lon, 30.2672, -97.7431);
+
+    if (distToLeander <= 5) {
+      markets = CENTRAL_TEXAS_FALLBACK_MARKETS["leander"];
+    } else if (distToCedarPark <= 5) {
+      markets = CENTRAL_TEXAS_FALLBACK_MARKETS["cedar park"];
+    } else if (distToAustin <= 10) {
+      markets = CENTRAL_TEXAS_FALLBACK_MARKETS["austin"];
+    }
+  }
+
+  if (!markets) return [];
+
+  // Update isOpenToday and recalculate distance
+  return markets.map(market => {
+    const scheduleLower = market.schedule.toLowerCase();
+    let marketDay = -1;
+
+    if (scheduleLower.includes("saturday")) marketDay = 6;
+    else if (scheduleLower.includes("sunday")) marketDay = 0;
+
+    const distance = market.lat && market.lon
+      ? Math.round(haversineDistance(coords.lat, coords.lon, market.lat, market.lon) * 10) / 10
+      : null;
+
+    return {
+      ...market,
+      isOpenToday: today === marketDay,
+      distance,
+    };
+  });
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const city = searchParams.get("city") || "";
@@ -432,6 +560,16 @@ export async function GET(req: NextRequest) {
       markets = await fetchFromOSM(coords.lat, coords.lon, city);
       if (markets.length > 0) {
         source = "osm";
+      }
+    }
+
+    // Final fallback: hardcoded local data for Central Texas
+    if (markets.length === 0 && coords) {
+      console.log("All APIs failed, using hardcoded fallback for Central Texas...");
+      markets = getFallbackMarkets(city, coords);
+      if (markets.length > 0) {
+        source = "local-fallback";
+        console.log(`Fallback provided ${markets.length} markets`);
       }
     }
 

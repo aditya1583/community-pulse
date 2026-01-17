@@ -2512,8 +2512,11 @@ export async function generateFarmersMarketPost(
 ): Promise<EngagementPost | null> {
   const { city, farmersMarkets, time } = ctx;
 
+  console.log(`[FarmersMarketPost] Generating for ${city.name}, markets available: ${farmersMarkets?.length ?? 0}`);
+
   // Need at least one farmers market to generate a post
   if (!farmersMarkets || farmersMarkets.length === 0) {
+    console.log("[FarmersMarketPost] No markets data, returning null");
     return null;
   }
 
