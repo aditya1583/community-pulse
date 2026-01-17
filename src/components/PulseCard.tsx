@@ -143,15 +143,22 @@ function parseBotAuthor(author: string): {
   // Default fallback
   const fallback = { displayName: author, location: null, emoji: "\uD83E\uDD16" };
 
-  // Try to match pattern: "Location bot_type_bot" or "Location bot_type"
+  // Try to match pattern: "Location bot_type_bot emoji" or "Location bot_type"
   const parts = author.split(" ");
   if (parts.length < 2) return fallback;
 
   // First part is typically the location (city name)
   const location = parts[0];
 
-  // Rest is the bot type - join and normalize
-  const botPart = parts.slice(1).join("_").toLowerCase().replace(/_bot$/, "");
+  // Extract emoji if present (last part if it's an emoji)
+  const lastPart = parts[parts.length - 1];
+  const emojiRegex = /^[\u{1F300}-\u{1F9FF}]$/u;
+  const hasTrailingEmoji = emojiRegex.test(lastPart);
+  const extractedEmoji = hasTrailingEmoji ? lastPart : null;
+
+  // Bot parts: everything except location and trailing emoji
+  const botParts = hasTrailingEmoji ? parts.slice(1, -1) : parts.slice(1);
+  const botPart = botParts.join("_").toLowerCase().replace(/_bot$/, "");
 
   // Look up the bot type
   const botInfo = BOT_TYPE_MAP[botPart];
@@ -159,7 +166,7 @@ function parseBotAuthor(author: string): {
     return {
       displayName: botInfo.name,
       location,
-      emoji: botInfo.emoji,
+      emoji: extractedEmoji || botInfo.emoji,
     };
   }
 
@@ -169,10 +176,15 @@ function parseBotAuthor(author: string): {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 
+  // Only append "Bot" if the name doesn't already contain "Bot" as a word
+  // This handles cases like "Oracle Bot" where emoji was at the end
+  const containsBot = /\bBot\b/i.test(titleCase);
+  const displayName = containsBot ? titleCase : `${titleCase} Bot`;
+
   return {
-    displayName: titleCase + " Bot",
+    displayName,
     location,
-    emoji: "\uD83E\uDD16",
+    emoji: extractedEmoji || "\uD83E\uDD16",
   };
 }
 

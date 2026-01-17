@@ -181,11 +181,6 @@ export default function PollVoting({
     [pulseId, userIdentifier, voteState, isLoading, onVote]
   );
 
-  // Dismiss sign-in prompt
-  const dismissSignInPrompt = useCallback(() => {
-    setShowSignInPrompt(false);
-  }, []);
-
   // Calculate percentages
   const getPercentage = (optionIndex: number): number => {
     if (voteState.totalVotes === 0) return 0;
@@ -300,22 +295,24 @@ export default function PollVoting({
         </p>
       )}
 
-      {/* Sign in prompt - dismissable */}
+      {/* Sign in prompt - clickable to trigger sign-in */}
       {showSignInPrompt && (
-        <div
-          className="flex items-center justify-center gap-2 text-xs text-amber-400 bg-amber-500/10 rounded-lg px-3 py-2"
+        <button
+          type="button"
+          onClick={() => {
+            setShowSignInPrompt(false);
+            // Dispatch custom event to trigger sign-in modal
+            window.dispatchEvent(new CustomEvent("showSignInModal"));
+          }}
+          className="w-full flex items-center justify-center gap-2 text-xs text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg px-3 py-2 transition-colors cursor-pointer"
           role="alert"
         >
           <span>Sign in to vote on polls</span>
-          <button
-            type="button"
-            onClick={dismissSignInPrompt}
-            className="text-amber-300 hover:text-amber-200 font-medium underline"
-            aria-label="Dismiss sign in prompt"
-          >
-            Dismiss
-          </button>
-        </div>
+          <span className="text-amber-300 font-medium">Sign in</span>
+          <svg className="w-3.5 h-3.5 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+          </svg>
+        </button>
       )}
     </div>
   );

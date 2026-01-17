@@ -811,6 +811,18 @@ export default function Home() {
     };
   }, []);
 
+  // Listen for sign-in modal requests from child components (e.g., PollVoting)
+  useEffect(() => {
+    const handleShowSignIn = () => {
+      setShowAuthModal(true);
+    };
+
+    window.addEventListener("showSignInModal", handleShowSignIn);
+    return () => {
+      window.removeEventListener("showSignInModal", handleShowSignIn);
+    };
+  }, []);
+
   const identityReady =
     authStatus === "signed_in" && !!sessionUser && !profileLoading && !!profile;
 
