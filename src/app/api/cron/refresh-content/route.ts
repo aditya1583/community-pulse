@@ -27,6 +27,7 @@ import { createClient } from "@supabase/supabase-js";
 import {
   generateIntelligentPost,
   hasIntelligentBotConfig,
+  getCityConfig,
 } from "@/lib/intelligent-bots";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -229,14 +230,22 @@ export async function GET(request: NextRequest) {
       // PERMANENT SEEDING: Always create POSTS_PER_CITY_PER_RUN posts
       const postsNeeded = POSTS_PER_CITY_PER_RUN;
 
-      // Try intelligent bot system first (if city has config or coords)
-      const hasConfig = hasIntelligentBotConfig(cityName);
-      const hasCoords = cityInfo.lat !== null && cityInfo.lon !== null;
+      // CRITICAL: Use city config coordinates, NOT database pulse coordinates
+      // Database coords might be wrong if early pulses had incorrect location
+      const cityConfig = getCityConfig(cityName);
+      const hasConfig = cityConfig !== null;
+
+      // Priority: city config coords > database pulse coords
+      let cityLat: number | null = cityConfig?.coords.lat ?? cityInfo.lat;
+      let cityLon: number | null = cityConfig?.coords.lon ?? cityInfo.lon;
+      const hasCoords = cityLat !== null && cityLon !== null;
+
+      console.log(`[Cron Refresh] ${cityName}: Using coords from ${cityConfig ? 'config' : 'database'} (${cityLat}, ${cityLon})`);
 
       if (hasConfig || hasCoords) {
         try {
           // Use intelligent post generation
-          const coords = hasCoords ? { lat: cityInfo.lat!, lon: cityInfo.lon! } : undefined;
+          const coords = hasCoords ? { lat: cityLat!, lon: cityLon! } : undefined;
 
           // Generate posts one at a time to respect cooldown
           let postsCreatedForCity = 0;
@@ -267,8 +276,8 @@ export async function GET(request: NextRequest) {
                   created_at: new Date().toISOString(),
                   expires_at: expiresAt,
                   poll_options: (result.post as { options?: string[] }).options || null,
-                  lat: cityInfo.lat,
-                  lon: cityInfo.lon,
+                  lat: cityLat,  // Use config coords, not database coords
+                  lon: cityLon,  // Use config coords, not database coords
                 });
 
               if (insertError) {
@@ -309,8 +318,8 @@ export async function GET(request: NextRequest) {
             hidden: false,
             created_at: createdAt,
             expires_at: expiresAt,
-            lat: cityInfo.lat,
-            lon: cityInfo.lon,
+            lat: cityLat,  // Use config coords, not database coords
+            lon: cityLon,  // Use config coords, not database coords
           };
         });
 
@@ -404,25 +413,33 @@ export async function POST(request: NextRequest) {
     // PERMANENT SEEDING: Always generate posts, no stale threshold check
     // The 'force' parameter is kept for compatibility but no longer affects behavior
 
-    // Get city coordinates from recent pulses
-    const { data: coordsData } = await supabase
-      .from("pulses")
-      .select("lat, lon")
-      .eq("city", targetCity)
-      .not("lat", "is", null)
-      .limit(1);
-
-    const cityLat = coordsData?.[0]?.lat || null;
-    const cityLon = coordsData?.[0]?.lon || null;
-
-    // PERMANENT SEEDING: Always generate POSTS_PER_CITY_PER_RUN posts
     const postsNeeded = POSTS_PER_CITY_PER_RUN;
     const citySlug = targetCity.split(",")[0].trim().replace(/\s+/g, "");
     const cityName = targetCity.split(",")[0].trim();
 
-    // Try intelligent bot system first
-    const hasConfig = hasIntelligentBotConfig(cityName);
+    // CRITICAL: Use city config coordinates, NOT database pulse coordinates
+    const cityConfig = getCityConfig(cityName);
+    const hasConfig = cityConfig !== null;
+
+    // Fallback to database coords only if no config
+    let cityLat: number | null = cityConfig?.coords.lat ?? null;
+    let cityLon: number | null = cityConfig?.coords.lon ?? null;
+
+    // If no config, try database as fallback
+    if (!cityLat || !cityLon) {
+      const { data: coordsData } = await supabase
+        .from("pulses")
+        .select("lat, lon")
+        .eq("city", targetCity)
+        .not("lat", "is", null)
+        .limit(1);
+
+      cityLat = coordsData?.[0]?.lat || null;
+      cityLon = coordsData?.[0]?.lon || null;
+    }
+
     const hasCoords = cityLat !== null && cityLon !== null;
+    console.log(`[Cron Manual] ${cityName}: Using coords from ${cityConfig ? 'config' : 'database'} (${cityLat}, ${cityLon})`);
 
     if (hasConfig || hasCoords) {
       const coords = hasCoords ? { lat: cityLat!, lon: cityLon! } : undefined;
