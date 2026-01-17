@@ -111,6 +111,71 @@ function parseActionableContent(message: string, author: string): ParsedActionDa
   return { type: null, venueName: null, address: null, directionsUrl: null };
 }
 
+// ============================================================================
+// BOT IDENTITY FORMATTING
+// ============================================================================
+
+/**
+ * Bot name mapping - converts snake_case bot types to friendly display names
+ */
+const BOT_TYPE_MAP: Record<string, { name: string; emoji: string }> = {
+  hot_take: { name: "Hot Take Bot", emoji: "\uD83C\uDF36\uFE0F" },
+  weather: { name: "Weather Bot", emoji: "\u2600\uFE0F" },
+  traffic: { name: "Traffic Bot", emoji: "\uD83D\uDE97" },
+  market_scout: { name: "Market Scout", emoji: "\uD83E\uDD55" },
+  community: { name: "Community Bot", emoji: "\uD83D\uDC65" },
+  event: { name: "Event Bot", emoji: "\uD83C\uDF89" },
+  poll: { name: "Poll Bot", emoji: "\uD83D\uDCCA" },
+  vibe_check: { name: "Vibe Check", emoji: "\u2728" },
+  local_guide: { name: "Local Guide", emoji: "\uD83D\uDCCD" },
+};
+
+/**
+ * Parse bot author name into friendly format
+ * Input: "Leander hot_take_bot" or "Austin weather_bot"
+ * Output: { displayName: "Hot Take Bot", location: "Leander", emoji: "pepper" }
+ */
+function parseBotAuthor(author: string): {
+  displayName: string;
+  location: string | null;
+  emoji: string;
+} {
+  // Default fallback
+  const fallback = { displayName: author, location: null, emoji: "\uD83E\uDD16" };
+
+  // Try to match pattern: "Location bot_type_bot" or "Location bot_type"
+  const parts = author.split(" ");
+  if (parts.length < 2) return fallback;
+
+  // First part is typically the location (city name)
+  const location = parts[0];
+
+  // Rest is the bot type - join and normalize
+  const botPart = parts.slice(1).join("_").toLowerCase().replace(/_bot$/, "");
+
+  // Look up the bot type
+  const botInfo = BOT_TYPE_MAP[botPart];
+  if (botInfo) {
+    return {
+      displayName: botInfo.name,
+      location,
+      emoji: botInfo.emoji,
+    };
+  }
+
+  // Fallback: convert snake_case to Title Case
+  const titleCase = botPart
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+
+  return {
+    displayName: titleCase + " Bot",
+    location,
+    emoji: "\uD83E\uDD16",
+  };
+}
+
 type PulseCardProps = {
   pulse: Pulse;
   isOwnPulse: boolean;
@@ -288,20 +353,18 @@ export default function PulseCard({
 
   const getBorderClass = () => {
     const style = getCategoryStyle();
-    // Expiry states add visual fade
-    if (isFading) {
-      return `border-l-4 ${style.leftBorder} border-slate-700/50 opacity-60`;
-    }
-    if (isExpiringSoon) {
-      return `border-l-4 ${style.leftBorder} border-slate-700/50 opacity-80`;
-    }
-    // Category-based left stripe + subtle background tint
-    return `border-l-4 ${style.leftBorder} border-slate-700/50 ${style.bg}`;
+    // Expiry states - subtle fade effect
+    if (isFading) return `border-l-3 ${style.leftBorder} opacity-50 bg-slate-900/30`;
+    if (isExpiringSoon) return `border-l-3 ${style.leftBorder} opacity-70 bg-slate-900/40`;
+
+    // Default: subtle semi-transparent background with colored left stripe
+    // No outer border, minimal shadow - let content breathe
+    return `border-l-3 ${style.leftBorder} bg-slate-900/50 hover:bg-slate-900/60 transition-colors`;
   };
 
   return (
     <article
-      className={`bg-slate-800/60 border rounded-xl p-4 transition ${getBorderClass()}`}
+      className={`rounded-r-xl p-4 mb-3 transition-all duration-200 border-0 ${getBorderClass()}`}
       style={{ opacity }}
     >
       <div className="flex gap-3">
@@ -314,11 +377,11 @@ export default function PulseCard({
           >
             <span className="text-2xl">{pulse.mood}</span>
           </StatusRing>
-          <span className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full ${
-            pulse.tag.toLowerCase() === "traffic" ? "text-amber-300 bg-amber-500/10 border border-amber-500/30" :
-            pulse.tag.toLowerCase() === "events" ? "text-purple-300 bg-purple-500/10 border border-purple-500/30" :
-            pulse.tag.toLowerCase() === "weather" ? "text-sky-300 bg-sky-500/10 border border-sky-500/30" :
-            "text-teal-300 bg-teal-500/10 border border-teal-500/30"
+          <span className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full font-medium ${
+            pulse.tag.toLowerCase() === "traffic" ? "text-amber-400/90 bg-amber-500/15" :
+            pulse.tag.toLowerCase() === "events" ? "text-purple-400/90 bg-purple-500/15" :
+            pulse.tag.toLowerCase() === "weather" ? "text-sky-400/90 bg-sky-500/15" :
+            "text-teal-400/90 bg-teal-500/15"
           }`}>
             {pulse.tag}
           </span>
@@ -400,13 +463,27 @@ export default function PulseCard({
 
           <div className="flex items-center justify-between text-xs gap-3 mt-3">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="text-cyan-400 font-medium truncate">{pulse.author}</span>
-              {pulse.is_bot && (
-                <span className="text-[9px] px-1.5 py-0.5 bg-slate-700 text-slate-400 rounded font-medium uppercase tracking-wide">
-                  Bot
-                </span>
+              {pulse.is_bot ? (
+                // Bot author: cleaner format "Hot Take Bot in Leander"
+                (() => {
+                  const botInfo = parseBotAuthor(pulse.author);
+                  return (
+                    <span className="flex items-center gap-1.5 text-slate-400">
+                      <span className="text-base leading-none">{botInfo.emoji}</span>
+                      <span className="font-medium text-slate-300">{botInfo.displayName}</span>
+                      {botInfo.location && (
+                        <span className="text-slate-500">in {botInfo.location}</span>
+                      )}
+                    </span>
+                  );
+                })()
+              ) : (
+                // Human author: standard display
+                <>
+                  <span className="text-cyan-400 font-medium truncate">{pulse.author}</span>
+                  <StatusIndicator rank={authorRank} level={authorLevel} />
+                </>
               )}
-              {!pulse.is_bot && <StatusIndicator rank={authorRank} level={authorLevel} />}
             </div>
 
             <div className="flex items-center gap-3 flex-shrink-0">

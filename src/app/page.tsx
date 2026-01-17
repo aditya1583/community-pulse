@@ -24,6 +24,7 @@ import { moderateContent } from "@/lib/moderation";
 import { generateUniqueUsername } from "@/lib/username";
 
 // New Neon Theme Components
+// Force rebuild: PulseCard styling update
 import Header from "@/components/Header";
 import CurrentVibeCard from "@/components/CurrentVibeCard";
 import QuickStats from "@/components/QuickStats";
@@ -2374,8 +2375,13 @@ export default function Home() {
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
 
-    // Only consider in-radius pulses for "Happening Now"
-    const candidates = inRadiusPulses
+    // Consider both in-radius pulses AND pulses without coordinates (treated as local)
+    // This ensures bot-generated alerts without geo-coords still appear in "Happening Now"
+    const localPulses = filteredPulses.filter(
+      (p) => p.distanceMiles === null || p.distanceMiles <= RADIUS_CONFIG.PRIMARY_RADIUS_MILES
+    );
+
+    const candidates = localPulses
       .filter((p) => {
         const created = new Date(p.createdAt);
         // Must be recent (within 2 hours)
@@ -2404,7 +2410,7 @@ export default function Home() {
       .sort((a, b) => b.priority - a.priority);
 
     return candidates.length > 0 ? candidates[0].pulse : null;
-  }, [inRadiusPulses]);
+  }, [filteredPulses]);
 
   // ========= ADD PULSE =========
   const handleAddPulse = async () => {
