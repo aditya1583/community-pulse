@@ -856,15 +856,23 @@ export async function fetchFarmersMarkets(
       console.log(`[IntelligentBots] OSM returned ${markets.length} markets`);
     }
 
-    // If both APIs failed, use local hardcoded fallback
-    if (markets.length === 0) {
-      console.log("[IntelligentBots] APIs returned nothing, using local fallback data...");
-      markets = getLocalFallbackMarkets(cityName, coords);
-      console.log(`[IntelligentBots] Local fallback provided ${markets.length} markets`);
+    // ALWAYS merge hardcoded real farmers markets (they're verified & accurate)
+    // OSM returns grocery stores, retail shops - not actual farmers markets
+    // Our hardcoded data has the REAL local markets with correct schedules
+    const hardcodedMarkets = getLocalFallbackMarkets(cityName, coords);
+    if (hardcodedMarkets.length > 0) {
+      console.log(`[IntelligentBots] Merging ${hardcodedMarkets.length} verified local markets`);
+      // Add hardcoded markets that aren't already in the list (by name)
+      const existingNames = new Set(markets.map(m => m.name.toLowerCase()));
+      for (const hm of hardcodedMarkets) {
+        if (!existingNames.has(hm.name.toLowerCase())) {
+          markets.push(hm);
+        }
+      }
     }
 
     if (markets.length === 0) {
-      console.log(`[IntelligentBots] No farmers markets found near ${cityName} (even with fallbacks)`);
+      console.log(`[IntelligentBots] No farmers markets found near ${cityName}`);
       return [];
     }
 

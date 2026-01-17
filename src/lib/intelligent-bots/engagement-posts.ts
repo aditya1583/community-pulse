@@ -2747,6 +2747,47 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
   const { time, events } = ctx;
   const hour = time.hour;
 
+  // ========== TIER 0: HYPERLOCAL REAL DATA (Highest priority) ==========
+  // When we have REAL local data (farmers markets open TODAY), this beats everything
+  // This is time-sensitive hyperlocal content that MUST be shown when relevant
+
+  if (ctx.farmersMarkets && ctx.farmersMarkets.length > 0) {
+    const hasOpenMarket = ctx.farmersMarkets.some(m => m.isOpenToday);
+    const hasMarketTomorrow = ctx.farmersMarkets.some(m => m.isOpenTomorrow);
+
+    // GUARANTEED post if market is open today (Saturday morning especially)
+    if (hasOpenMarket && time.isWeekend && hour >= 7 && hour <= 14) {
+      console.log("[AnalyzeEngagement] FARMERS MARKET: Open today, weekend morning - guaranteed post");
+      return {
+        shouldPost: true,
+        engagementType: "farmers_market",
+        reason: "Farmers market open TODAY - prime hyperlocal content",
+      };
+    }
+
+    // Very high priority if market is open today, any time (90% chance)
+    if (hasOpenMarket && Math.random() < 0.9) {
+      console.log("[AnalyzeEngagement] FARMERS MARKET: Open today - high priority");
+      return {
+        shouldPost: true,
+        engagementType: "farmers_market",
+        reason: "Farmers market open today - hyperlocal engagement",
+      };
+    }
+
+    // Friday evening heads-up for Saturday market (80% chance)
+    if (hasMarketTomorrow && time.dayOfWeek === 5 && hour >= 17) {
+      if (Math.random() < 0.8) {
+        console.log("[AnalyzeEngagement] FARMERS MARKET: Tomorrow heads-up");
+        return {
+          shouldPost: true,
+          engagementType: "farmers_market",
+          reason: "Heads-up: farmers market tomorrow",
+        };
+      }
+    }
+  }
+
   // ========== TIER 1: TIME-SENSITIVE (Always check first) ==========
 
   // School alert takes priority during school dismissal window
@@ -2860,60 +2901,8 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
   }
 
   // ========== HYPERLOCAL DATA (Real market/venue data) ==========
-
-  // Farmers market posts when we have market data - especially on weekends
-  // Increased probability: farmers markets are high-engagement hyperlocal content
-  if (ctx.farmersMarkets && ctx.farmersMarkets.length > 0) {
-    const hasOpenMarket = ctx.farmersMarkets.some(m => m.isOpenToday);
-    const hasMarketTomorrow = ctx.farmersMarkets.some(m => m.isOpenTomorrow);
-
-    // Very high priority if market is open today (80% chance)
-    if (hasOpenMarket && Math.random() < 0.8) {
-      return {
-        shouldPost: true,
-        engagementType: "farmers_market",
-        reason: "Farmers market open today - hyperlocal engagement",
-      };
-    }
-
-    // Friday/Saturday evening heads-up for tomorrow's market (60% chance)
-    // This creates anticipation and planning opportunities
-    const isFridayOrSaturdayEvening = (time.dayOfWeek === 5 || time.dayOfWeek === 6) && hour >= 17;
-    if (hasMarketTomorrow && isFridayOrSaturdayEvening && Math.random() < 0.6) {
-      return {
-        shouldPost: true,
-        engagementType: "farmers_market",
-        reason: "Heads-up: farmers market tomorrow",
-      };
-    }
-
-    // Weekend morning is prime farmers market time (70% chance)
-    if (time.isWeekend && hour >= 7 && hour <= 12 && Math.random() < 0.7) {
-      return {
-        shouldPost: true,
-        engagementType: "farmers_market",
-        reason: "Weekend morning - farmers market time",
-      };
-    }
-
-    // Weekday markets deserve attention too (50% chance if open today)
-    if (time.isWeekday && hasOpenMarket && Math.random() < 0.5) {
-      return {
-        shouldPost: true,
-        engagementType: "farmers_market",
-        reason: "Weekday farmers market - often overlooked gem",
-      };
-    }
-
-    // Otherwise still consider with moderate probability (30% chance)
-    if (Math.random() < 0.3) {
-      return {
-        shouldPost: true,
-        engagementType: "farmers_market",
-        reason: "Farmers market discovery post",
-      };
-    }
-  }
+  // NOTE: Farmers market is now handled in TIER 0 at the top for priority
+  // This section handles landmark food posts only
 
   // Landmark-anchored food posts - time-aware and hyperlocal
   // Higher chance during meal times when food is on people's minds
