@@ -2862,6 +2862,7 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
   // Increased probability: farmers markets are high-engagement hyperlocal content
   if (ctx.farmersMarkets && ctx.farmersMarkets.length > 0) {
     const hasOpenMarket = ctx.farmersMarkets.some(m => m.isOpenToday);
+    const hasMarketTomorrow = ctx.farmersMarkets.some(m => m.isOpenTomorrow);
 
     // Very high priority if market is open today (80% chance)
     if (hasOpenMarket && Math.random() < 0.8) {
@@ -2872,12 +2873,32 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
       };
     }
 
+    // Friday/Saturday evening heads-up for tomorrow's market (60% chance)
+    // This creates anticipation and planning opportunities
+    const isFridayOrSaturdayEvening = (time.dayOfWeek === 5 || time.dayOfWeek === 6) && hour >= 17;
+    if (hasMarketTomorrow && isFridayOrSaturdayEvening && Math.random() < 0.6) {
+      return {
+        shouldPost: true,
+        engagementType: "farmers_market",
+        reason: "Heads-up: farmers market tomorrow",
+      };
+    }
+
     // Weekend morning is prime farmers market time (70% chance)
     if (time.isWeekend && hour >= 7 && hour <= 12 && Math.random() < 0.7) {
       return {
         shouldPost: true,
         engagementType: "farmers_market",
         reason: "Weekend morning - farmers market time",
+      };
+    }
+
+    // Weekday markets deserve attention too (50% chance if open today)
+    if (time.isWeekday && hasOpenMarket && Math.random() < 0.5) {
+      return {
+        shouldPost: true,
+        engagementType: "farmers_market",
+        reason: "Weekday farmers market - often overlooked gem",
       };
     }
 
@@ -3161,15 +3182,17 @@ export async function generateEngagementSeedPosts(
   // The generator will return null if no market data exists
   const hasMarketData = ctx.farmersMarkets && ctx.farmersMarkets.length > 0;
   const hasOpenMarket = hasMarketData && ctx.farmersMarkets.some(m => m.isOpenToday);
+  const hasMarketTomorrow = hasMarketData && ctx.farmersMarkets.some(m => m.isOpenTomorrow);
 
-  if (hasOpenMarket || ctx.time.isWeekend) {
-    // High priority: Insert at position 2 for weekend/open market (after landmark_food)
+  if (hasOpenMarket || hasMarketTomorrow || ctx.time.isWeekend) {
+    // High priority: Insert at position 2 for weekend/open market/tomorrow market (after landmark_food)
     priorities.splice(2, 0, "farmers_market");
-  } else {
-    // Still force include, just after the top-priority items
+  } else if (hasMarketData) {
+    // Still force include if we have any market data
     // Insert at position 3 (after prediction, landmark_food, and any weekend-specific items)
     priorities.splice(3, 0, "farmers_market");
   }
+  // Note: If no market data at all, we don't include it (generator would return null anyway)
 
   // ========== HIGH-ENGAGEMENT (Always include for viral potential) ==========
 

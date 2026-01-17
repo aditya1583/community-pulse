@@ -104,6 +104,7 @@ export interface FarmersMarketData {
   schedule: string;       // e.g., "Saturdays 9am-1pm"
   products: string[];     // e.g., ["Fresh Produce", "Local Honey"]
   isOpenToday: boolean;
+  isOpenTomorrow?: boolean; // For "upcoming market" posts
   distance?: number;      // Miles from user
   lat?: number;           // Latitude for directions
   lon?: number;           // Longitude for directions

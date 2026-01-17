@@ -408,58 +408,356 @@ function mapWeatherCode(code: number): WeatherData["condition"] {
   return "clear";
 }
 
+// ============================================================================
+// Farmers Markets - Direct API calls (no internal HTTP dependency)
+// ============================================================================
+
+// Day name mappings for schedule parsing
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const DAY_ABBREVS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function getTodayDayName(): string {
+  return DAY_NAMES[new Date().getDay()];
+}
+
+function getTomorrowDayName(): string {
+  return DAY_NAMES[(new Date().getDay() + 1) % 7];
+}
+
+/**
+ * Check if a market is open today based on its schedule string
+ */
+function checkIfOpenToday(schedule: string): boolean {
+  const today = getTodayDayName().toLowerCase();
+  const todayAbbrev = DAY_ABBREVS[new Date().getDay()].toLowerCase();
+  const scheduleLower = schedule.toLowerCase();
+
+  if (scheduleLower.includes(today) || scheduleLower.includes(todayAbbrev)) {
+    return true;
+  }
+
+  if (scheduleLower.includes("daily") || scheduleLower.includes("every day")) {
+    return true;
+  }
+
+  const isWeekend = new Date().getDay() === 0 || new Date().getDay() === 6;
+  if (isWeekend && scheduleLower.includes("weekend")) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Check if a market is open tomorrow based on its schedule string
+ */
+function checkIfOpenTomorrow(schedule: string): boolean {
+  const tomorrow = getTomorrowDayName().toLowerCase();
+  const tomorrowAbbrev = DAY_ABBREVS[(new Date().getDay() + 1) % 7].toLowerCase();
+  const scheduleLower = schedule.toLowerCase();
+
+  if (scheduleLower.includes(tomorrow) || scheduleLower.includes(tomorrowAbbrev)) {
+    return true;
+  }
+
+  if (scheduleLower.includes("daily") || scheduleLower.includes("every day")) {
+    return true;
+  }
+
+  const isTomorrowWeekend = (new Date().getDay() + 1) % 7 === 0 || (new Date().getDay() + 1) % 7 === 6;
+  if (isTomorrowWeekend && scheduleLower.includes("weekend")) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Parse product list from USDA products string
+ */
+function parseMarketProducts(productsString: string): string[] {
+  if (!productsString) return [];
+
+  const products: string[] = [];
+  const productsLower = productsString.toLowerCase();
+
+  if (productsLower.includes("organic")) products.push("Organic");
+  if (productsLower.includes("vegetable") || productsLower.includes("produce")) products.push("Vegetables");
+  if (productsLower.includes("fruit")) products.push("Fruits");
+  if (productsLower.includes("meat") || productsLower.includes("beef") || productsLower.includes("pork")) products.push("Meat");
+  if (productsLower.includes("egg")) products.push("Eggs");
+  if (productsLower.includes("dairy") || productsLower.includes("cheese") || productsLower.includes("milk")) products.push("Dairy");
+  if (productsLower.includes("honey")) products.push("Honey");
+  if (productsLower.includes("baked") || productsLower.includes("bread")) products.push("Baked Goods");
+  if (productsLower.includes("flower") || productsLower.includes("plant")) products.push("Plants");
+  if (productsLower.includes("craft") || productsLower.includes("artisan")) products.push("Crafts");
+
+  return products.length > 0 ? products : ["Fresh Produce"];
+}
+
+/**
+ * Fetch farmers markets from USDA Local Food Directories API
+ * This is the primary data source - free, no API key required
+ */
+async function fetchFromUSDA(
+  lat: number,
+  lon: number
+): Promise<FarmersMarketData[]> {
+  try {
+    const apiUrl = `https://search.ams.usda.gov/farmersmarkets/v1/data.svc/locSearch?lat=${lat}&lng=${lon}`;
+
+    const response = await fetch(apiUrl, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!response.ok) {
+      console.log(`[IntelligentBots] USDA API returned ${response.status}`);
+      return [];
+    }
+
+    const data = await response.json();
+    const marketsRaw = data.results || [];
+
+    if (marketsRaw.length === 0) {
+      return [];
+    }
+
+    console.log(`[IntelligentBots] USDA found ${marketsRaw.length} markets`);
+
+    const markets: FarmersMarketData[] = [];
+
+    // Fetch details for first 10 markets (to get schedule, products)
+    for (const market of marketsRaw.slice(0, 10)) {
+      if (!market.id) continue;
+
+      try {
+        const detailsUrl = `https://search.ams.usda.gov/farmersmarkets/v1/data.svc/mktDetail?id=${market.id}`;
+        const detailsResponse = await fetch(detailsUrl, {
+          signal: AbortSignal.timeout(5000),
+        });
+
+        if (!detailsResponse.ok) continue;
+
+        const detailsData = await detailsResponse.json();
+        const details = detailsData.marketdetails || {};
+
+        const schedule = details.Schedule || market.schedule || "Schedule varies";
+        const address = details.Address || market.Address || "";
+        const products = details.Products || "";
+        const distance = market.distance ? parseFloat(market.distance) : undefined;
+
+        // Only include markets within 10-mile radius
+        if (distance !== undefined && distance > RADIUS_CONFIG.PRIMARY_RADIUS_MILES) {
+          continue;
+        }
+
+        const isOpenToday = checkIfOpenToday(schedule);
+        const isOpenTomorrow = checkIfOpenTomorrow(schedule);
+
+        // For farmers market posts, we want markets that are open today or tomorrow
+        // This makes the content timely and actionable
+        markets.push({
+          name: market.marketname?.replace(/^\d+\.\d+\s*/, "") || "Farmers Market", // Remove distance prefix from name
+          address,
+          schedule,
+          products: parseMarketProducts(products),
+          isOpenToday,
+          isOpenTomorrow,
+          distance,
+          lat: undefined, // USDA doesn't provide coordinates
+          lon: undefined,
+          website: details.Website || undefined,
+        });
+      } catch {
+        // If details fetch fails, skip this market
+        continue;
+      }
+    }
+
+    return markets;
+  } catch (error) {
+    console.error("[IntelligentBots] USDA fetch error:", error);
+    return [];
+  }
+}
+
+/**
+ * Fetch farmers markets from OpenStreetMap Overpass API
+ * This is the fallback - completely free, no API key required
+ */
+async function fetchFromOSM(
+  lat: number,
+  lon: number
+): Promise<FarmersMarketData[]> {
+  console.log(`[IntelligentBots] OSM fallback: Searching near ${lat},${lon}`);
+
+  try {
+    const radiusMeters = RADIUS_CONFIG.PRIMARY_RADIUS_METERS;
+    const query = `
+      [out:json][timeout:15];
+      (
+        node["amenity"="marketplace"](around:${radiusMeters},${lat},${lon});
+        way["amenity"="marketplace"](around:${radiusMeters},${lat},${lon});
+        node["shop"="farm"](around:${radiusMeters},${lat},${lon});
+        way["shop"="farm"](around:${radiusMeters},${lat},${lon});
+        node["name"~"farmer|market|produce",i]["shop"](around:${radiusMeters},${lat},${lon});
+        way["name"~"farmer|market|produce",i]["shop"](around:${radiusMeters},${lat},${lon});
+      );
+      out center body 20;
+    `.trim();
+
+    const overpassMirrors = [
+      "https://overpass-api.de/api/interpreter",
+      "https://overpass.kumi.systems/api/interpreter",
+    ];
+
+    let response: Response | null = null;
+
+    for (const overpassUrl of overpassMirrors) {
+      try {
+        response = await fetch(overpassUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "CommunityPulse/1.0",
+          },
+          body: `data=${encodeURIComponent(query)}`,
+          signal: AbortSignal.timeout(12000),
+        });
+
+        if (response.ok) break;
+      } catch {
+        response = null;
+      }
+    }
+
+    if (!response || !response.ok) {
+      console.log("[IntelligentBots] OSM fallback failed");
+      return [];
+    }
+
+    const data = await response.json();
+    const elements = data.elements || [];
+
+    console.log(`[IntelligentBots] OSM found ${elements.length} results`);
+
+    interface OSMElement {
+      lat?: number;
+      lon?: number;
+      center?: { lat: number; lon: number };
+      tags?: Record<string, string>;
+    }
+
+    return elements
+      .filter((el: OSMElement) => el.tags?.name)
+      .map((el: OSMElement) => {
+        const elLat = el.lat ?? el.center?.lat;
+        const elLon = el.lon ?? el.center?.lon;
+        if (!elLat || !elLon) return null;
+
+        const tags = el.tags || {};
+
+        // Build address
+        const addressParts: string[] = [];
+        if (tags["addr:housenumber"] && tags["addr:street"]) {
+          addressParts.push(`${tags["addr:housenumber"]} ${tags["addr:street"]}`);
+        } else if (tags["addr:street"]) {
+          addressParts.push(tags["addr:street"]);
+        }
+        if (tags["addr:city"]) {
+          addressParts.push(tags["addr:city"]);
+        }
+
+        // Parse opening hours
+        const openingHours = tags.opening_hours || "Schedule varies";
+        const isOpenToday = openingHours !== "Schedule varies" && checkIfOpenToday(openingHours);
+        const isOpenTomorrow = openingHours !== "Schedule varies" && checkIfOpenTomorrow(openingHours);
+
+        // Determine products based on tags
+        const products: string[] = ["Fresh Produce"];
+        if (tags.organic === "yes") products.push("Organic");
+        if (tags.cuisine) products.push("Prepared Foods");
+
+        // Calculate distance
+        const distance = calculateDistanceMiles({ lat, lon }, { lat: elLat, lon: elLon });
+
+        return {
+          name: tags.name,
+          address: addressParts.join(", ") || "Address not available",
+          schedule: openingHours,
+          products,
+          isOpenToday,
+          isOpenTomorrow,
+          distance: Math.round(distance * 10) / 10,
+          lat: elLat,
+          lon: elLon,
+          website: tags.website || tags["contact:website"] || undefined,
+        };
+      })
+      .filter(Boolean);
+  } catch (error) {
+    console.error("[IntelligentBots] OSM fallback error:", error);
+    return [];
+  }
+}
+
 /**
  * Fetch farmers markets near a location
- * Uses the app's existing farmers-markets API endpoint
+ *
+ * Calls external APIs directly (no internal HTTP dependency) for reliability.
+ * Uses USDA as primary source, with OSM as fallback.
+ *
+ * Returns markets sorted by: open today first, then by distance
  */
 export async function fetchFarmersMarkets(
   cityName: string,
   state: string = "TX",
   coords?: CityCoords
 ): Promise<FarmersMarketData[]> {
+  // Without coordinates, we cannot fetch farmers markets
+  if (!coords) {
+    console.log(`[IntelligentBots] No coordinates provided for ${cityName}, ${state} - skipping farmers markets`);
+    return [];
+  }
+
+  const { lat, lon } = coords;
+
   try {
-    // Build API URL - use internal API route
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    let url = `${baseUrl}/api/farmers-markets?city=${encodeURIComponent(cityName)}`;
-    if (state) url += `&state=${encodeURIComponent(state)}`;
-    if (coords) url += `&lat=${coords.lat}&lon=${coords.lon}`;
+    // Try USDA first (best data quality)
+    let markets = await fetchFromUSDA(lat, lon);
 
-    const response = await fetch(url, { next: { revalidate: 3600 } }); // 1 hour cache
+    // If USDA returned nothing, try OSM
+    if (markets.length === 0) {
+      markets = await fetchFromOSM(lat, lon);
+    }
 
-    if (!response.ok) {
-      console.error(`[IntelligentBots] Farmers markets API error: ${response.status}`);
+    if (markets.length === 0) {
+      console.log(`[IntelligentBots] No farmers markets found near ${cityName}`);
       return [];
     }
 
-    const data = await response.json();
+    // Sort: open today first, then open tomorrow, then by distance
+    markets.sort((a, b) => {
+      // Open today is highest priority
+      if (a.isOpenToday && !b.isOpenToday) return -1;
+      if (!a.isOpenToday && b.isOpenToday) return 1;
 
-    if (!data.markets || !Array.isArray(data.markets)) {
-      return [];
-    }
+      // Open tomorrow is second priority
+      if (a.isOpenTomorrow && !b.isOpenTomorrow) return -1;
+      if (!a.isOpenTomorrow && b.isOpenTomorrow) return 1;
 
-    // Map to our internal format
-    return data.markets.slice(0, 5).map((market: {
-      id: string;
-      name: string;
-      address: string;
-      schedule: string;
-      products: string[];
-      isOpenToday?: boolean;
-      distance?: number;
-      lat?: number | null;
-      lon?: number | null;
-      website?: string | null;
-    }) => ({
-      name: market.name,
-      address: market.address,
-      schedule: market.schedule,
-      products: market.products || [],
-      isOpenToday: market.isOpenToday ?? false,
-      distance: market.distance,
-      lat: market.lat ?? undefined,
-      lon: market.lon ?? undefined,
-      website: market.website ?? undefined,
-    }));
+      // Then sort by distance
+      if (a.distance === undefined) return 1;
+      if (b.distance === undefined) return -1;
+      return a.distance - b.distance;
+    });
+
+    console.log(`[IntelligentBots] Found ${markets.length} farmers markets near ${cityName}` +
+      (markets.some(m => m.isOpenToday) ? ` (${markets.filter(m => m.isOpenToday).length} open today)` : '') +
+      (markets.some(m => m.isOpenTomorrow) ? ` (${markets.filter(m => m.isOpenTomorrow).length} open tomorrow)` : ''));
+
+    return markets.slice(0, 5); // Return top 5 markets
   } catch (error) {
     console.error("[IntelligentBots] Failed to fetch farmers markets:", error);
     return [];
