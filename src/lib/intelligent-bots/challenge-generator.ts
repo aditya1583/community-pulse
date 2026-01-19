@@ -9,7 +9,8 @@
  * neighborhood's hidden gems.
  */
 
-import type { CityConfig, CityLandmarks } from "./types";
+import type { CityConfig, CityLandmarks, LandmarkEntry } from "./types";
+import { getLandmarkName } from "./types";
 
 // ============================================================================
 // TYPES
@@ -495,7 +496,10 @@ export function generateDailyChallenges(
   // Helper to get random landmark that hasn't been used
   function getUnusedLandmark(type: keyof CityLandmarks): string | null {
     const landmarks = city.landmarks[type];
-    const available = landmarks.filter((l) => !usedLocations.has(l));
+    // Convert LandmarkEntry to name strings and filter out already used
+    const available = landmarks
+      .map((l: LandmarkEntry) => getLandmarkName(l))
+      .filter((name: string) => !usedLocations.has(name));
     if (available.length === 0) return null;
     const selected = pickRandom(available);
     usedLocations.add(selected);
@@ -561,9 +565,10 @@ export function generateCityTrail(
   for (const venueType of themeConfig.venues as Array<keyof CityLandmarks>) {
     const venues = city.landmarks[venueType];
     for (const venue of venues) {
-      const lowerVenue = venue.toLowerCase();
+      const venueName = getLandmarkName(venue);
+      const lowerVenue = venueName.toLowerCase();
       if (themeConfig.keywords.some((kw) => lowerVenue.includes(kw))) {
-        matchingVenues.push(venue);
+        matchingVenues.push(venueName);
       }
     }
   }

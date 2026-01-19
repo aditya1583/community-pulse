@@ -43,33 +43,38 @@ export const LEANDER_CONFIG: CityConfig = {
 
   landmarks: {
     shopping: [
-      "HEB Plus",
-      "Gateway at Leander",
-      "Lowe's",
-      "Home Depot",
-      "Target",
-      "Walmart",
-      "Costco",
+      // HEB Plus - THE anchor for Leander, specify location!
+      { name: "HEB Plus", area: "on Hero Way", address: "651 N US-183, Leander, TX 78641" },
+      { name: "Gateway at Leander", area: "off 183", address: "2600 S US-183, Leander, TX 78641" },
+      { name: "Lowe's", area: "on 183", address: "1495 US-183, Leander, TX 78641" },
+      { name: "Home Depot", area: "by Gateway", address: "2831 S US-183, Leander, TX 78641" },
+      { name: "Target", area: "on Crystal Falls", address: "1335 E Crystal Falls Pkwy, Leander, TX 78641" },
+      { name: "Walmart", area: "on 183A", address: "1395 US-183 A, Leander, TX 78641" },
+      { name: "Costco", area: "off Crystal Falls", address: "2601 Crystal Falls Pkwy, Leander, TX 78641" },
     ],
     venues: [
       // VERIFIED LOCAL PARKS (within 10mi of Leander city center)
-      "Robin Bledsoe Park",        // 2300 Bagdad Rd, Leander - 2mi
-      "Devine Lake Park",          // 800 Crystal Falls Pkwy, Leander - 3mi
-      "Cap Metro Rail Station",    // 800 N US-183, Leander - 1mi
-      "Leander Public Library",    // 1011 S Bagdad Rd, Leander - 2mi
-      "Pat Bryson Municipal Hall", // 201 N Brushy St, Leander - 1mi
-      "Mason Creek Park",          // Off Crystal Falls Pkwy - 3mi
-      "Benbrook Ranch Park",       // 2900 Mel Mathis Blvd, Leander - 4mi
+      { name: "Robin Bledsoe Park", area: "off Bagdad", address: "2300 Bagdad Rd, Leander, TX 78641" },
+      { name: "Devine Lake Park", area: "on Crystal Falls", address: "800 Crystal Falls Pkwy, Leander, TX 78641" },
+      { name: "Cap Metro Rail Station", area: "downtown", address: "800 N US-183, Leander, TX 78641" },
+      { name: "Leander Public Library", area: "on Bagdad", address: "1011 S Bagdad Rd, Leander, TX 78641" },
+      { name: "Pat Bryson Municipal Hall", area: "downtown", address: "201 N Brushy St, Leander, TX 78641" },
+      { name: "Mason Creek Park", area: "off Crystal Falls" },
+      { name: "Benbrook Ranch Park", area: "off Mel Mathis", address: "2900 Mel Mathis Blvd, Leander, TX 78641" },
       // NOTE: Old Settlers Park is in Round Rock (~15mi away) - NOT included
     ],
     restaurants: [
-      "Torchy's Tacos",
-      "Chick-fil-A",
-      "Whataburger",
-      "In-N-Out",
-      "Dahlia Cafe",      // Local Leander spot
-      "Black Walnut Cafe",
-      "Pluckers Wing Bar",
+      { name: "Torchy's Tacos", area: "on 183", address: "1335 E Crystal Falls Pkwy #500, Leander, TX 78641" },
+      { name: "Chick-fil-A", area: "on Hero Way", address: "2051 S US-183, Leander, TX 78641" },
+      { name: "Whataburger", area: "on 183", address: "901 US-183, Leander, TX 78641" },
+      { name: "In-N-Out", area: "by Gateway", address: "3001 S US-183, Leander, TX 78641" },
+      { name: "Dahlia Cafe", area: "downtown Leander", address: "107 W Willis St, Leander, TX 78641" },
+      { name: "Black Walnut Cafe", area: "on 183", address: "1335 E Crystal Falls Pkwy, Leander, TX 78641" },
+      { name: "Pluckers Wing Bar", area: "on Crystal Falls", address: "651 N US Hwy 183 Ste 335, Leander, TX 78641" },
+      // Local favorites with specific locations
+      { name: "Dutch Bros", area: "on Hero Way", address: "1001 Hero Way W, Leander, TX 78641" },
+      { name: "Starbucks", area: "inside HEB Plus" },
+      { name: "MOD Pizza", area: "by Gateway", address: "2621 S US-183 Ste 500, Leander, TX 78641" },
     ],
   },
 

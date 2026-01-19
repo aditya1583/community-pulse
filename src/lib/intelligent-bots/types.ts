@@ -15,10 +15,36 @@ export interface CityRoads {
   schoolZones: string[]; // Roads near schools
 }
 
+/**
+ * Landmark with optional location specificity
+ * Can be a simple string OR an object with address details
+ */
+export type LandmarkEntry = string | {
+  name: string;
+  area?: string;      // e.g., "on Hero Way", "near 183A"
+  address?: string;   // Full address for directions
+};
+
 export interface CityLandmarks {
-  shopping: string[];   // HEB, Target, etc.
-  venues: string[];     // Concert halls, parks
-  restaurants: string[]; // Popular spots
+  shopping: LandmarkEntry[];   // HEB, Target, etc. - with location details
+  venues: LandmarkEntry[];     // Concert halls, parks
+  restaurants: LandmarkEntry[]; // Popular spots
+}
+
+/**
+ * Helper to get display name from a landmark entry
+ */
+export function getLandmarkName(entry: LandmarkEntry): string {
+  return typeof entry === 'string' ? entry : entry.name;
+}
+
+/**
+ * Helper to get full display string (name + area) for a landmark
+ * e.g., "HEB Plus on Hero Way" or just "HEB Plus"
+ */
+export function getLandmarkDisplay(entry: LandmarkEntry): string {
+  if (typeof entry === 'string') return entry;
+  return entry.area ? `${entry.name} ${entry.area}` : entry.name;
 }
 
 export interface CityFunFacts {
@@ -83,6 +109,20 @@ export interface WeatherData {
   uvIndex: number;
   windSpeed: number;
   precipitation: number;    // mm in last hour
+  forecast?: ForecastDay[]; // 3-day forecast for predictions
+}
+
+/**
+ * Single day forecast for prediction questions
+ * Used to ask weather questions based on actual forecast, not current conditions
+ */
+export interface ForecastDay {
+  date: string;             // ISO date string (YYYY-MM-DD)
+  condition: 'clear' | 'cloudy' | 'rain' | 'storm' | 'snow' | 'fog';
+  tempHigh: number;         // Fahrenheit
+  tempLow: number;          // Fahrenheit
+  precipitationMm: number;  // Total precipitation in mm
+  snowfallCm: number;       // Total snowfall in cm
 }
 
 export interface EventData {

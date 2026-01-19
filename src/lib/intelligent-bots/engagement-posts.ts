@@ -19,7 +19,8 @@
  * All content is AI-generated to avoid repetitive/static questions.
  */
 
-import type { CityConfig, SituationContext, PostType, GeneratedPost, PredictionMetadata, PredictionCategory, PredictionDataSource } from "./types";
+import type { CityConfig, SituationContext, PostType, GeneratedPost, PredictionMetadata, PredictionCategory, PredictionDataSource, LandmarkEntry, ForecastDay } from "./types";
+import { getLandmarkName, getLandmarkDisplay } from "./types";
 import { ExtendedPostType } from "./template-engine";
 
 // ============================================================================
@@ -1232,87 +1233,103 @@ const LANDMARK_TIERS = {
 
 /**
  * Time-aware templates for landmark-anchored food posts
- * Each template category is designed for its time window
+ *
+ * PHILOSOPHY: Mix of questions (30%) and value-giving tips (70%)
+ * Generic "where's good?" posts get ignored. Pro tips and recommendations
+ * that share actual local knowledge create engagement.
  */
 const LANDMARK_FOOD_TEMPLATES = {
   // MORNING (6-11am) - Coffee and breakfast focus
+  // Mix: 3 questions, 7 value-giving
   morning: [
-    "☕ Coffee run near {landmark} - where do you go?",
-    "🌅 What's your go-to coffee spot near {landmark}?",
-    "🥞 Need a quick breakfast near {landmark}. Suggestions?",
-    "☕ Coffee craving hitting hard - what's good near {landmark}?",
-    "🍳 Best breakfast tacos near {landmark}? Asking for myself.",
-    "☕ That coffee place by {landmark} - anyone tried it?",
-    "🌮 Morning taco run near {landmark}. Where am I going?",
-    "☕ Early morning coffee spot near {landmark}? Need it strong.",
-    "🥐 Grabbing breakfast near {landmark} - what's the move?",
-    "☕ {landmark} area coffee lovers - drop your spot below!",
+    // VALUE-GIVING (share actual knowledge)
+    "☕ Pro tip: Dutch Bros drive-thru near {landmark} is way faster than Starbucks when the HEB lot is packed.",
+    "🌅 If you're grabbing coffee by {landmark}, the one inside usually has shorter lines before 8am.",
+    "🥞 PSA: The breakfast tacos at Torchy's near {landmark} go fast on weekends. Get there early!",
+    "☕ Local hack: Park at {landmark} and walk to the coffee spot next door - saves 10 min in the drive-thru.",
+    "🍳 Tried the breakfast spot by {landmark} yesterday. Their migas are legit. 🔥",
+    "☕ FYI: The coffee place near {landmark} now has a mobile order pickup. Game changer for morning rush.",
+    "🌮 Morning taco run near {landmark}? Dahlia Cafe downtown has the best chorizo and egg. Worth the drive.",
+    // QUESTIONS (still engaging, but fewer)
+    "☕ Coffee run near {landmark} - found any hidden gems lately?",
+    "🥐 What's your move for breakfast near {landmark}? Trying to switch it up.",
+    "☕ {landmark} morning crew - anyone tried the new coffee spot that opened?",
   ],
 
   // LUNCH (11am-2pm) - Quick lunch, takeout focus
   lunch: [
-    "🍔 Best lunch spot near {landmark}? Need a quick bite.",
-    "🌮 That taco place by {landmark} - anyone tried it?",
-    "🥗 Quick lunch near {landmark} - what's the move?",
-    "🍕 Grabbing lunch near {landmark}. Where should I go?",
-    "🥡 Takeout near {landmark} - what's your go-to?",
-    "🍔 Need a solid lunch near {landmark}. Suggestions?",
-    "🌯 Best quick bite near {landmark}? Running on empty here.",
-    "🍜 Lunch spot near {landmark} that won't break the bank?",
-    "🥪 Sandwich shop near {landmark}? Or is there something better?",
-    "🍔 {landmark} lunch crew - where are you eating today?",
+    // VALUE-GIVING
+    "🍔 Lunch hack: Order online at Torchy's near {landmark}. Walk-in line is crazy at noon.",
+    "🌮 Heads up: The taco truck by {landmark} has lunch specials Mon-Thu. Better prices than weekends.",
+    "🥗 PSA: Chipotle near {landmark} is less packed around 1:30pm. The noon rush is brutal.",
+    "🍕 Pro tip: MOD Pizza near {landmark} does a quick lunch slice deal. In and out in 15 min.",
+    "🥡 If you're doing takeout near {landmark}, call ahead. Saves at least 10 min during lunch.",
+    "🍔 Just discovered: Whataburger near {landmark} has a shaded drive-thru. Your car will thank you.",
+    "🌯 The Tex-Mex spot by {landmark} has a lunch combo that's actually filling. Under $12.",
+    // QUESTIONS
+    "🍔 Best lunch spot near {landmark}? Tired of my usual rotation.",
+    "🥪 Anyone know a quick lunch near {landmark} that's not fast food?",
+    "🍜 {landmark} lunch break - what's your go-to when you only have 30 min?",
   ],
 
   // AFTERNOON (2-5pm) - Coffee/snack runs
   afternoon: [
-    "☕ Afternoon coffee run near {landmark} - where do you go?",
-    "🍩 Snack spot near {landmark}? Need that 3pm pick-me-up.",
-    "☕ Best afternoon coffee near {landmark}? Hitting a wall here.",
-    "🧁 Sweet treat near {landmark}? Need a sugar hit.",
-    "☕ That new coffee place near {landmark} - worth stopping?",
-    "🍪 Quick snack near {landmark} - what's good?",
-    "☕ Afternoon slump fix near {landmark}? Coffee or snack?",
-    "🥤 Smoothie or drink spot near {landmark}?",
-    "☕ {landmark} area - best late afternoon coffee?",
+    // VALUE-GIVING
+    "☕ Afternoon tip: The coffee near {landmark} does happy hour 2-4pm. Cheaper than usual!",
+    "🍩 Snack run success: Found that the bakery by {landmark} has fresh stuff around 3pm.",
+    "☕ FYI: That coffee place near {landmark} has outdoor seating now. Perfect for this weather.",
+    "🧁 Sweet tooth hack: Crumbl near {landmark} posts their weekly flavors on Monday. Plan accordingly.",
+    "☕ Pro tip: The Starbucks inside {landmark} is usually less crowded than the drive-thru one.",
+    "🍪 Just learned: The donut shop near {landmark} has afternoon discounts on day-olds. Still good!",
+    "🥤 Smoothie rec: The spot by {landmark} makes them fresh. Way better than chain ones.",
+    // QUESTIONS
+    "☕ Best afternoon coffee near {landmark}? Need something strong to survive 3pm.",
     "🍨 Ice cream near {landmark}? It's definitely that kind of day.",
+    "☕ {landmark} area afternoon crew - where's your pick-me-up spot?",
   ],
 
   // EVENING (5-9pm) - Dinner spots, restaurants
   evening: [
-    "🍽️ Dinner spot near {landmark}? Family-friendly preferred.",
-    "🍕 Pizza near {landmark} - what's the best option?",
-    "🌮 Taco Tuesday near {landmark}? Where's everyone going?",
-    "🍔 Burger spot near {landmark}? Craving something greasy.",
-    "🍝 Italian near {landmark}? Date night ideas welcome.",
-    "🥡 Good takeout near {landmark} for tonight?",
-    "🍗 Best wings near {landmark}? Asking the real questions.",
-    "🍽️ Restaurant near {landmark} that doesn't have a huge wait?",
-    "🌯 Tex-Mex near {landmark}? Need my fix.",
-    "🍔 {landmark} dinner crew - where are we eating?",
+    // VALUE-GIVING
+    "🍽️ Dinner hack: Call ahead to that restaurant near {landmark}. Walk-ins wait 45+ min on weekends.",
+    "🍕 Pro tip: The pizza place by {landmark} does takeout faster than delivery. Worth the drive.",
+    "🌮 Evening rec: Torchy's patio near {landmark} is nice when it cools down. Get there by 6pm.",
+    "🍔 Just learned: In-N-Out by {landmark} has shorter lines on Tuesday nights. 🤷",
+    "🍝 Date night tip: Black Walnut near {landmark} takes reservations now. Way less stressful.",
+    "🥡 Takeout move: Order from the Thai place near {landmark} by 5:30pm. Kitchen gets slammed later.",
+    "🍗 Wings rec: Pluckers near {landmark} has half-price wings on certain nights. Check their app.",
+    // QUESTIONS
+    "🍽️ Dinner near {landmark}? Looking for something family-friendly.",
+    "🌯 Tex-Mex near {landmark}? Need my fix but tired of the usual spots.",
+    "🍔 {landmark} dinner crew - what's the move tonight?",
   ],
 
   // LATE NIGHT (9pm+) - Late-night food options
   lateNight: [
-    "🌙 Late-night food near {landmark}? What's still open?",
-    "🍕 Pizza near {landmark} that's open late?",
-    "🌮 Late-night tacos near {landmark}? Asking for a friend.",
-    "🍔 What's open late near {landmark}? Need food ASAP.",
-    "🌙 Midnight snack run near {landmark} - options?",
-    "🍟 Fast food near {landmark} that's still serving?",
-    "🌯 Late-night drive-thru near {landmark}?",
+    // VALUE-GIVING
+    "🌙 Late-night PSA: Whataburger near {landmark} is 24/7. Drive-thru line dies down around 11pm.",
+    "🍕 Pro tip: The pizza place near {landmark} is open until 11pm weekdays. Just called to confirm.",
+    "🌮 Late-night hack: Torchy's near {landmark} closes at 10pm but lobby clears out around 9:30.",
+    "🍔 FYI: The 24-hour spots near {landmark} get a second rush around midnight. Go at 10:30pm.",
+    "🌙 Night owl tip: Fast food drive-thrus near {landmark} are way faster after 10pm.",
+    // QUESTIONS
+    "🌙 What's open late near {landmark}? Need options beyond Whataburger.",
+    "🍕 Late-night eats near {landmark}? The usual spots are closed.",
     "🌙 {landmark} area night owls - where do you eat after 10pm?",
   ],
 
-  // DISCOVERY - General "that new place" templates (anytime)
+  // DISCOVERY - Hidden gems and new spots
   discovery: [
-    "🆕 That new place by {landmark} - anyone tried it?",
-    "👀 What's the deal with that restaurant near {landmark}?",
-    "🤔 Keep seeing that spot by {landmark}. Worth trying?",
-    "📍 New food spot near {landmark}? What am I missing?",
-    "💭 Been meaning to try that place near {landmark}. Any reviews?",
-    "🔍 Hidden gem near {landmark}? Looking to explore.",
-    "🗣️ What opened near {landmark} recently? Need to try it.",
-    "✨ Best kept secret near {landmark}? Drop your spot.",
+    // VALUE-GIVING
+    "🆕 Update: That new spot by {landmark} just opened last week. Tried it - actually pretty solid.",
+    "👀 Heads up: The restaurant near {landmark} changed ownership. New menu worth checking out.",
+    "🔍 Hidden gem alert: There's a food trailer behind {landmark} most people miss. Legit BBQ.",
+    "📍 Local tip: Skip the chains near {landmark}. The family-owned spot on the corner is 10x better.",
+    "✨ Discovery: The coffee inside {landmark} started serving pastries from that local bakery. 👌",
+    // QUESTIONS
+    "🤔 Keep seeing that new spot by {landmark}. Anyone tried it yet?",
+    "🗣️ What opened near {landmark} recently? Feel like I'm always last to know.",
+    "💭 Best kept secret near {landmark}? Looking to try something new.",
   ],
 };
 
@@ -1461,7 +1478,8 @@ export async function generateVenueCheckinPost(
       ...city.landmarks.venues,
       ...city.landmarks.restaurants,
     ];
-    venue = venues[Math.floor(Math.random() * venues.length)];
+    const selectedEntry = venues[Math.floor(Math.random() * venues.length)];
+    venue = getLandmarkDisplay(selectedEntry);
   }
 
   const template = VENUE_CHECKIN_TEMPLATES[Math.floor(Math.random() * VENUE_CHECKIN_TEMPLATES.length)];
@@ -1543,9 +1561,10 @@ export async function generateLocalSpotlightPost(
     "🎯 Unpopular opinion time: {restaurant} > everywhere else. Agree?",
   ];
 
-  const restaurant = city.landmarks.restaurants[
+  const restaurantEntry = city.landmarks.restaurants[
     Math.floor(Math.random() * city.landmarks.restaurants.length)
   ];
+  const restaurant = getLandmarkDisplay(restaurantEntry);
 
   const template = spotlightTemplates[Math.floor(Math.random() * spotlightTemplates.length)];
   const message = template
@@ -1791,9 +1810,9 @@ export async function generateFomoAlertPost(
     if (minutesUntil > 0 && minutesUntil <= 45) {
       fomoType = "happyHour";
       templates = FOMO_TEMPLATES.happyHour;
-      const restaurant = city.landmarks.restaurants[Math.floor(Math.random() * city.landmarks.restaurants.length)];
+      const restaurantEntry = city.landmarks.restaurants[Math.floor(Math.random() * city.landmarks.restaurants.length)];
       variables = {
-        restaurant,
+        restaurant: getLandmarkDisplay(restaurantEntry),
         minutes: String(minutesUntil),
       };
     }
@@ -1803,9 +1822,9 @@ export async function generateFomoAlertPost(
   if (!fomoType && hour === 11 && new Date().getMinutes() < 30) {
     fomoType = "lunchRush";
     templates = FOMO_TEMPLATES.lunchRush;
-    const restaurant = city.landmarks.restaurants[Math.floor(Math.random() * city.landmarks.restaurants.length)];
+    const restaurantEntry = city.landmarks.restaurants[Math.floor(Math.random() * city.landmarks.restaurants.length)];
     variables = {
-      restaurant,
+      restaurant: getLandmarkDisplay(restaurantEntry),
       minutes: String(30 - new Date().getMinutes()),
     };
   }
@@ -1818,9 +1837,9 @@ export async function generateFomoAlertPost(
     if (minutesUntilSunset > 15 && minutesUntilSunset < 60) {
       fomoType = "sunsetAlert";
       templates = FOMO_TEMPLATES.sunsetAlert;
-      const venue = city.landmarks.venues[Math.floor(Math.random() * city.landmarks.venues.length)];
+      const venueEntry = city.landmarks.venues[Math.floor(Math.random() * city.landmarks.venues.length)];
       variables = {
-        venue,
+        venue: getLandmarkDisplay(venueEntry),
         minutes: String(minutesUntilSunset),
       };
     }
@@ -1927,6 +1946,7 @@ export async function generateWeeklyRoundupPost(
 
 /**
  * Helper to get random city-specific variables for templates
+ * Now uses getLandmarkDisplay for full location specificity (e.g., "HEB Plus on Hero Way")
  */
 function getCityVariables(city: CityConfig): Record<string, string> {
   const roads = city.roads.major;
@@ -1934,19 +1954,28 @@ function getCityVariables(city: CityConfig): Record<string, string> {
   const venues = city.landmarks.venues;
   const landmarks = city.landmarks.shopping;
 
+  // Helper to get random entry with full display
+  const randomDisplay = (arr: LandmarkEntry[]): string => {
+    return getLandmarkDisplay(arr[Math.floor(Math.random() * arr.length)]);
+  };
+
+  // Find a park from venues
+  const parkEntry = venues.find(v => getLandmarkName(v).toLowerCase().includes('park'));
+  const parkDisplay = parkEntry ? getLandmarkDisplay(parkEntry) : randomDisplay(venues);
+
   return {
     city: city.name,
     road: roads[Math.floor(Math.random() * roads.length)],
     altRoute: city.roads.highways[Math.floor(Math.random() * city.roads.highways.length)],
-    restaurant: restaurants[Math.floor(Math.random() * restaurants.length)],
-    venue: venues[Math.floor(Math.random() * venues.length)],
-    landmark: landmarks[Math.floor(Math.random() * landmarks.length)],
-    park: venues.find(v => v.toLowerCase().includes('park')) || venues[0],
-    alternative: restaurants[Math.floor(Math.random() * restaurants.length)],
-    business: restaurants[Math.floor(Math.random() * restaurants.length)],
-    location: landmarks[Math.floor(Math.random() * landmarks.length)],
-    hiddenSpot: venues[Math.floor(Math.random() * venues.length)],
-    parkingSpot: `the lot behind ${landmarks[0]}`,
+    restaurant: randomDisplay(restaurants),
+    venue: randomDisplay(venues),
+    landmark: randomDisplay(landmarks),
+    park: parkDisplay,
+    alternative: randomDisplay(restaurants),
+    business: randomDisplay(restaurants),
+    location: randomDisplay(landmarks),
+    hiddenSpot: randomDisplay(venues),
+    parkingSpot: `the lot behind ${getLandmarkDisplay(landmarks[0])}`,
     area: `the ${roads[0]} corridor`,
     destination: "downtown Austin",
   };
@@ -2322,18 +2351,153 @@ export async function generatePredictionPost(
     }
   }
 
-  // If no contextual matches, add some default weather predictions
+  // If no contextual matches, add weather-condition-aware default predictions
+  // Use FORECAST data for future predictions, not current conditions!
+  // This fixes the bug where we ask "will it rain?" when snow is actually forecast
   if (matchingTemplates.length === 0) {
-    // Default to generic weather predictions
-    matchingTemplates.push({
-      question: `🔮 Prediction Time: Will ${city.name} see perfect weather (65-80°F) this weekend?`,
-      optionA: "☀️ YES - Beautiful days ahead",
-      optionB: "😬 NO - Mother nature has other plans",
-      category: "weather",
-      dataSource: "openweather",
-      resolvesInHours: 72,
-      xpReward: 25,
-    });
+    // Get weekend forecast days (Saturday = 6, Sunday = 0)
+    const getWeekendForecast = (forecast: ForecastDay[] | undefined): ForecastDay | null => {
+      if (!forecast || forecast.length === 0) return null;
+      // Find first Saturday or Sunday in forecast
+      for (const day of forecast) {
+        const dayOfWeek = new Date(day.date).getDay();
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+          return day;
+        }
+      }
+      // If no weekend in 3-day forecast, use the last available day
+      return forecast[forecast.length - 1];
+    };
+
+    const weekendForecast = getWeekendForecast(weather.forecast);
+
+    // Use forecast data if available, otherwise fall back to current conditions
+    if (weekendForecast) {
+      // FORECAST-BASED predictions - much more accurate!
+      if (weekendForecast.snowfallCm > 0) {
+        // Snow forecast - ask about snow, NOT rain!
+        matchingTemplates.push({
+          question: `🔮 Prediction Time: How much snow will ${city.name} actually get this weekend?`,
+          optionA: "❄️ More than forecast - Winter wonderland!",
+          optionB: "🥱 Less than expected - Texas tease",
+          category: "weather",
+          dataSource: "openweather",
+          resolvesInHours: 72,
+          xpReward: 25,
+        });
+      } else if (weekendForecast.precipitationMm > 1 || weekendForecast.condition === 'rain' || weekendForecast.condition === 'storm') {
+        // Rain forecast - ask about rain
+        matchingTemplates.push({
+          question: `🔮 Prediction Time: Will the rain in ${city.name} this weekend ruin outdoor plans?`,
+          optionA: "🌧️ YES - Stay inside this weekend",
+          optionB: "☀️ NO - Still plenty of dry time",
+          category: "weather",
+          dataSource: "openweather",
+          resolvesInHours: 72,
+          xpReward: 25,
+        });
+      } else if (weekendForecast.tempLow < 40) {
+        // Cold weekend forecast
+        matchingTemplates.push({
+          question: `🔮 Prediction Time: Will ${city.name} actually dip below freezing this weekend?`,
+          optionA: "🥶 YES - Protect the pipes!",
+          optionB: "🌡️ NO - Cold but not that cold",
+          category: "weather",
+          dataSource: "openweather",
+          resolvesInHours: 72,
+          xpReward: 25,
+        });
+      } else if (weekendForecast.tempHigh > 85) {
+        // Hot weekend forecast
+        matchingTemplates.push({
+          question: `🔮 Prediction Time: Will ${city.name} hit ${Math.round(weekendForecast.tempHigh)}°F this weekend?`,
+          optionA: "🔥 YES - Pool weather confirmed",
+          optionB: "🌤️ NO - Slightly cooler than forecast",
+          category: "weather",
+          dataSource: "openweather",
+          resolvesInHours: 72,
+          xpReward: 25,
+        });
+      } else if (weekendForecast.condition === 'clear' && weekendForecast.tempHigh >= 60 && weekendForecast.tempHigh <= 80) {
+        // Perfect weather forecast
+        matchingTemplates.push({
+          question: `🔮 Prediction Time: Will ${city.name}'s perfect weekend weather (${weekendForecast.tempLow}-${weekendForecast.tempHigh}°F) actually hold?`,
+          optionA: "☀️ YES - Lock in those outdoor plans!",
+          optionB: "😬 NO - Something will change",
+          category: "weather",
+          dataSource: "openweather",
+          resolvesInHours: 72,
+          xpReward: 25,
+        });
+      } else {
+        // Generic weekend prediction with forecast temps
+        matchingTemplates.push({
+          question: `🔮 Prediction Time: Will ${city.name} stay around ${weekendForecast.tempHigh}°F this weekend?`,
+          optionA: "☀️ YES - Right on target",
+          optionB: "🎲 NO - Weather will surprise us",
+          category: "weather",
+          dataSource: "openweather",
+          resolvesInHours: 72,
+          xpReward: 25,
+        });
+      }
+    } else {
+      // FALLBACK: No forecast data available, use current conditions
+      const currentTemp = weather.temperature;
+      const currentCondition = weather.condition;
+
+      if (currentCondition === 'rain' || currentCondition === 'storm') {
+        matchingTemplates.push({
+          question: `🔮 Prediction Time: Will the rain clear up in ${city.name} by tomorrow?`,
+          optionA: "☀️ YES - Sun's coming back",
+          optionB: "🌧️ NO - More rain on the way",
+          category: "weather",
+          dataSource: "openweather",
+          resolvesInHours: 24,
+          xpReward: 25,
+        });
+      } else if (currentCondition === 'snow') {
+        matchingTemplates.push({
+          question: `🔮 Prediction Time: Will ${city.name} see more snow this week?`,
+          optionA: "❄️ YES - More flurries coming",
+          optionB: "☀️ NO - That was it",
+          category: "weather",
+          dataSource: "openweather",
+          resolvesInHours: 72,
+          xpReward: 25,
+        });
+      } else if (currentTemp < 55) {
+        matchingTemplates.push({
+          question: `🔮 Prediction Time: Will ${city.name} warm up above 60°F this week?`,
+          optionA: "☀️ YES - Warmer days coming",
+          optionB: "🥶 NO - Bundle up all week",
+          category: "weather",
+          dataSource: "openweather",
+          resolvesInHours: 72,
+          xpReward: 25,
+        });
+      } else if (currentTemp > 85) {
+        matchingTemplates.push({
+          question: `🔮 Prediction Time: Will ${city.name} get any relief from this heat this week?`,
+          optionA: "🌡️ YES - Cooler temps coming",
+          optionB: "🔥 NO - Stay hot all week",
+          category: "weather",
+          dataSource: "openweather",
+          resolvesInHours: 72,
+          xpReward: 25,
+        });
+      } else {
+        matchingTemplates.push({
+          question: `🔮 Prediction Time: Will ${city.name} have perfect patio weather (65-80°F) this weekend?`,
+          optionA: "☀️ YES - Beautiful days ahead",
+          optionB: "😬 NO - Mother nature has other plans",
+          category: "weather",
+          dataSource: "openweather",
+          resolvesInHours: 72,
+          xpReward: 25,
+        });
+      }
+    }
   }
 
   // Select a random matching template
@@ -2644,35 +2808,39 @@ export async function generateLandmarkFoodPost(
   }
 
   // Get landmarks from city config, with fallbacks
-  const cityLandmarks = city.landmarks.shopping || [];
-  const cityVenues = city.landmarks.venues || [];
+  // Now supports LandmarkEntry (string | { name, area, address })
+  const cityLandmarks: LandmarkEntry[] = city.landmarks.shopping || [];
+  const cityVenues: LandmarkEntry[] = city.landmarks.venues || [];
 
   // Build landmark pool with tier weighting
   // Tier 1 landmarks (HEB) should appear more often
-  const landmarkPool: string[] = [];
+  const landmarkPool: LandmarkEntry[] = [];
+
+  // Helper to check if landmark name matches a tier
+  const matchesTier = (entry: LandmarkEntry, tierNames: string[]): boolean => {
+    const name = getLandmarkName(entry).toLowerCase();
+    return tierNames.some(t => name.includes(t.toLowerCase()));
+  };
 
   // Add Tier 1 (highest weight - add 3x)
-  const tier1Matches = cityLandmarks.filter(l =>
-    LANDMARK_TIERS.tier1.some(t => l.toLowerCase().includes(t.toLowerCase()))
-  );
+  const tier1Matches = cityLandmarks.filter(l => matchesTier(l, LANDMARK_TIERS.tier1));
   if (tier1Matches.length > 0) {
     landmarkPool.push(...tier1Matches, ...tier1Matches, ...tier1Matches);
   }
 
   // Add Tier 2 (medium weight - add 2x)
-  const tier2Matches = cityLandmarks.filter(l =>
-    LANDMARK_TIERS.tier2.some(t => l.toLowerCase().includes(t.toLowerCase()))
-  );
+  const tier2Matches = cityLandmarks.filter(l => matchesTier(l, LANDMARK_TIERS.tier2));
   if (tier2Matches.length > 0) {
     landmarkPool.push(...tier2Matches, ...tier2Matches);
   }
 
   // Add Tier 3 from venues (parks, transit - add 1x)
-  const tier3Matches = cityVenues.filter(l =>
-    LANDMARK_TIERS.tier3.some(t => l.toLowerCase().includes(t.toLowerCase())) ||
-    l.toLowerCase().includes("park") ||
-    l.toLowerCase().includes("station")
-  );
+  const tier3Matches = cityVenues.filter(l => {
+    const name = getLandmarkName(l).toLowerCase();
+    return matchesTier(l, LANDMARK_TIERS.tier3) ||
+           name.includes("park") ||
+           name.includes("station");
+  });
   if (tier3Matches.length > 0) {
     landmarkPool.push(...tier3Matches);
   }
@@ -2682,13 +2850,15 @@ export async function generateLandmarkFoodPost(
     landmarkPool.push(...cityLandmarks);
   }
 
-  // Still empty? Use hardcoded fallback
+  // Still empty? Use hardcoded fallback (strings are valid LandmarkEntry)
   if (landmarkPool.length === 0) {
     landmarkPool.push("HEB", "Target", "the shopping center");
   }
 
-  // Pick a random landmark
-  const landmark = landmarkPool[Math.floor(Math.random() * landmarkPool.length)];
+  // Pick a random landmark and get its FULL display name (with area)
+  // e.g., "HEB Plus on Hero Way" instead of just "HEB Plus"
+  const landmarkEntry = landmarkPool[Math.floor(Math.random() * landmarkPool.length)];
+  const landmark = getLandmarkDisplay(landmarkEntry);
 
   // Pick a template from the time category
   const templates = LANDMARK_FOOD_TEMPLATES[timeCategory];
@@ -2746,6 +2916,47 @@ export interface EngagementDecision {
 export function analyzeForEngagement(ctx: SituationContext): EngagementDecision {
   const { time, events } = ctx;
   const hour = time.hour;
+
+  // ========== TIER 0: HYPERLOCAL REAL DATA (Highest priority) ==========
+  // When we have REAL local data (farmers markets open TODAY), this beats everything
+  // This is time-sensitive hyperlocal content that MUST be shown when relevant
+
+  if (ctx.farmersMarkets && ctx.farmersMarkets.length > 0) {
+    const hasOpenMarket = ctx.farmersMarkets.some(m => m.isOpenToday);
+    const hasMarketTomorrow = ctx.farmersMarkets.some(m => m.isOpenTomorrow);
+
+    // GUARANTEED post if market is open today (Saturday morning especially)
+    if (hasOpenMarket && time.isWeekend && hour >= 7 && hour <= 14) {
+      console.log("[AnalyzeEngagement] FARMERS MARKET: Open today, weekend morning - guaranteed post");
+      return {
+        shouldPost: true,
+        engagementType: "farmers_market",
+        reason: "Farmers market open TODAY - prime hyperlocal content",
+      };
+    }
+
+    // Very high priority if market is open today, any time (90% chance)
+    if (hasOpenMarket && Math.random() < 0.9) {
+      console.log("[AnalyzeEngagement] FARMERS MARKET: Open today - high priority");
+      return {
+        shouldPost: true,
+        engagementType: "farmers_market",
+        reason: "Farmers market open today - hyperlocal engagement",
+      };
+    }
+
+    // Friday evening heads-up for Saturday market (80% chance)
+    if (hasMarketTomorrow && time.dayOfWeek === 5 && hour >= 17) {
+      if (Math.random() < 0.8) {
+        console.log("[AnalyzeEngagement] FARMERS MARKET: Tomorrow heads-up");
+        return {
+          shouldPost: true,
+          engagementType: "farmers_market",
+          reason: "Heads-up: farmers market tomorrow",
+        };
+      }
+    }
+  }
 
   // ========== TIER 1: TIME-SENSITIVE (Always check first) ==========
 
@@ -2860,60 +3071,8 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
   }
 
   // ========== HYPERLOCAL DATA (Real market/venue data) ==========
-
-  // Farmers market posts when we have market data - especially on weekends
-  // Increased probability: farmers markets are high-engagement hyperlocal content
-  if (ctx.farmersMarkets && ctx.farmersMarkets.length > 0) {
-    const hasOpenMarket = ctx.farmersMarkets.some(m => m.isOpenToday);
-    const hasMarketTomorrow = ctx.farmersMarkets.some(m => m.isOpenTomorrow);
-
-    // Very high priority if market is open today (80% chance)
-    if (hasOpenMarket && Math.random() < 0.8) {
-      return {
-        shouldPost: true,
-        engagementType: "farmers_market",
-        reason: "Farmers market open today - hyperlocal engagement",
-      };
-    }
-
-    // Friday/Saturday evening heads-up for tomorrow's market (60% chance)
-    // This creates anticipation and planning opportunities
-    const isFridayOrSaturdayEvening = (time.dayOfWeek === 5 || time.dayOfWeek === 6) && hour >= 17;
-    if (hasMarketTomorrow && isFridayOrSaturdayEvening && Math.random() < 0.6) {
-      return {
-        shouldPost: true,
-        engagementType: "farmers_market",
-        reason: "Heads-up: farmers market tomorrow",
-      };
-    }
-
-    // Weekend morning is prime farmers market time (70% chance)
-    if (time.isWeekend && hour >= 7 && hour <= 12 && Math.random() < 0.7) {
-      return {
-        shouldPost: true,
-        engagementType: "farmers_market",
-        reason: "Weekend morning - farmers market time",
-      };
-    }
-
-    // Weekday markets deserve attention too (50% chance if open today)
-    if (time.isWeekday && hasOpenMarket && Math.random() < 0.5) {
-      return {
-        shouldPost: true,
-        engagementType: "farmers_market",
-        reason: "Weekday farmers market - often overlooked gem",
-      };
-    }
-
-    // Otherwise still consider with moderate probability (30% chance)
-    if (Math.random() < 0.3) {
-      return {
-        shouldPost: true,
-        engagementType: "farmers_market",
-        reason: "Farmers market discovery post",
-      };
-    }
-  }
+  // NOTE: Farmers market is now handled in TIER 0 at the top for priority
+  // This section handles landmark food posts only
 
   // Landmark-anchored food posts - time-aware and hyperlocal
   // Higher chance during meal times when food is on people's minds
