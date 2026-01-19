@@ -109,6 +109,20 @@ export interface WeatherData {
   uvIndex: number;
   windSpeed: number;
   precipitation: number;    // mm in last hour
+  forecast?: ForecastDay[]; // 3-day forecast for predictions
+}
+
+/**
+ * Single day forecast for prediction questions
+ * Used to ask weather questions based on actual forecast, not current conditions
+ */
+export interface ForecastDay {
+  date: string;             // ISO date string (YYYY-MM-DD)
+  condition: 'clear' | 'cloudy' | 'rain' | 'storm' | 'snow' | 'fog';
+  tempHigh: number;         // Fahrenheit
+  tempLow: number;          // Fahrenheit
+  precipitationMm: number;  // Total precipitation in mm
+  snowfallCm: number;       // Total snowfall in cm
 }
 
 export interface EventData {

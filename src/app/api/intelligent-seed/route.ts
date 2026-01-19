@@ -189,13 +189,24 @@ export async function POST(request: NextRequest) {
         const tagLower = tag.toLowerCase();
         const msgLower = message.toLowerCase();
 
+        // Restaurant Bet polls - extract the restaurant name
+        if (msgLower.includes("restaurant bet") || msgLower.includes("will") && (msgLower.includes("have a wait") || msgLower.includes("line"))) {
+          // Extract restaurant: "Will Torchy's Tacos on 183 have a wait" -> "torchy's tacos"
+          const restMatch = message.match(/Will\s+([A-Z][A-Za-z'']+(?:'s)?(?:\s+[A-Za-z]+)*?)(?:\s+on\s+|\s+by\s+|\s+near\s+|\s+have)/i);
+          if (restMatch) {
+            return `${tag}:restaurant_bet:${restMatch[1].toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+          }
+        }
+
         // Prediction polls: signature is the prediction topic
         if (msgLower.includes("prediction") || pollOptions) {
           // Extract the topic: "Will Leander see perfect weather" -> "weather_prediction"
-          if (msgLower.includes("weather")) return `${tag}:prediction:weather`;
-          if (msgLower.includes("traffic")) return `${tag}:prediction:traffic`;
-          if (msgLower.includes("game") || msgLower.includes("stars")) return `${tag}:prediction:sports`;
-          return `${tag}:prediction:general`;
+          if (msgLower.includes("weather") || msgLower.includes("rain") || msgLower.includes("snow") || msgLower.includes("°f")) return `${tag}:prediction:weather`;
+          if (msgLower.includes("traffic") || msgLower.includes("congestion") || msgLower.includes("commute")) return `${tag}:prediction:traffic`;
+          if (msgLower.includes("game") || msgLower.includes("stars") || msgLower.includes("vs")) return `${tag}:prediction:sports`;
+          // For other polls, use first 30 chars of the question to differentiate
+          const questionPart = msgLower.replace(/[^a-z0-9\s]/g, '').substring(0, 30);
+          return `${tag}:prediction:${questionPart}`;
         }
 
         // Farmers market: signature is the market name
@@ -229,14 +240,28 @@ export async function POST(request: NextRequest) {
           return `${tag}:weather:general`;
         }
 
-        // Events: signature is the venue name (prevents multiple posts about same venue)
+        // Events: signature is the NORMALIZED EVENT NAME + VENUE
+        // Must aggressively normalize to catch "Six (Touring)" vs "Six" as same event
         if (tagLower === 'events') {
-          // Extract venue - everything after "at " until ( or end punctuation
+          // Extract venue FIRST (most reliable - "at Venue Name")
           const venueMatch = message.match(/\bat\s+([A-Z][A-Za-z\s\-']+?)(?:\s*\(|\.|,|\!|\?|$)/);
-          if (venueMatch) {
-            return `${tag}:event:${venueMatch[1].trim().toLowerCase()}`;
+          const venueName = venueMatch ? venueMatch[1].trim().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+
+          // Extract event name - strip dates, emojis, parentheticals like "(Touring)"
+          // First remove all parentheticals: "(Touring)", "(21.4 mi away)", etc.
+          const cleanedMsg = message.replace(/\([^)]*\)/g, '').trim();
+          // Remove date prefixes like "Jan 20:" and emojis
+          const eventNameMatch = cleanedMsg.match(/(?:🎭|🎪|🎵|🎫|🎬|Theater alert:|[A-Z][a-z]{2}\s+\d+:)?\s*([A-Z][A-Za-z0-9\s\-']+?)(?:\s+on\s+|\s+at\s+)/i);
+          let eventName = eventNameMatch ? eventNameMatch[1].trim().toLowerCase() : '';
+          // Final normalization: only keep alphanumeric
+          eventName = eventName.replace(/[^a-z0-9]/g, '');
+
+          // VENUE is the primary key - same venue = likely same event
+          // Event name is secondary (helps distinguish different events at same venue)
+          if (venueName) {
+            return `${tag}:event:${venueName}:${eventName.substring(0, 20)}`;
           }
-          // Fallback: use normalized message
+          // No venue found - use first 40 chars of normalized message
           return `${tag}:event:${msgLower.replace(/[^a-z0-9]/g, '').substring(0, 40)}`;
         }
 
@@ -375,24 +400,54 @@ export async function POST(request: NextRequest) {
       .eq("is_bot", true)
       .gte("created_at", singleFourHoursAgo);
 
-    // Semantic signature for deduplication
+    // Semantic signature for deduplication (same logic as cold-start mode)
     const getSig = (tag: string, msg: string, opts?: string[] | null): string => {
       const t = tag.toLowerCase(), m = msg.toLowerCase();
-      if (m.includes("prediction") || opts) {
-        if (m.includes("weather")) return `${tag}:prediction:weather`;
-        if (m.includes("traffic")) return `${tag}:prediction:traffic`;
-        if (m.includes("game") || m.includes("stars")) return `${tag}:prediction:sports`;
-        return `${tag}:prediction:general`;
+
+      // Restaurant Bet polls - extract the restaurant name
+      if (m.includes("restaurant bet") || (m.includes("will") && (m.includes("have a wait") || m.includes("line")))) {
+        const restMatch = msg.match(/Will\s+([A-Z][A-Za-z'']+(?:'s)?(?:\s+[A-Za-z]+)*?)(?:\s+on\s+|\s+by\s+|\s+near\s+|\s+have)/i);
+        if (restMatch) {
+          return `${tag}:restaurant_bet:${restMatch[1].toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+        }
       }
+
+      // Prediction polls
+      if (m.includes("prediction") || opts) {
+        if (m.includes("weather") || m.includes("rain") || m.includes("snow") || m.includes("°f")) return `${tag}:prediction:weather`;
+        if (m.includes("traffic") || m.includes("congestion") || m.includes("commute")) return `${tag}:prediction:traffic`;
+        if (m.includes("game") || m.includes("stars") || m.includes("vs")) return `${tag}:prediction:sports`;
+        const questionPart = m.replace(/[^a-z0-9\s]/g, '').substring(0, 30);
+        return `${tag}:prediction:${questionPart}`;
+      }
+
+      // Farmers market
       if (m.includes("farmers market") || m.includes("market day")) {
         const match = msg.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+Farmers\s+Market/i);
         return `${tag}:farmers_market:${match ? match[1].toLowerCase() : 'local'}`;
       }
+
+      // Weather posts
       if (t === 'weather') {
         if (m.includes('rain')) return `${tag}:weather:rain`;
         if (m.includes('cold') || m.includes('chilly')) return `${tag}:weather:cold`;
+        if (m.includes('hot') || m.includes('heat')) return `${tag}:weather:hot`;
         return `${tag}:weather:general`;
       }
+
+      // Events - extract NORMALIZED event name + venue (same logic as cold-start)
+      if (t === 'events') {
+        const venueMatch = msg.match(/\bat\s+([A-Z][A-Za-z\s\-']+?)(?:\s*\(|\.|,|\!|\?|$)/);
+        const venueName = venueMatch ? venueMatch[1].trim().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+        // Strip parentheticals like "(Touring)", "(21.4 mi away)"
+        const cleanedMsg = msg.replace(/\([^)]*\)/g, '').trim();
+        const eventNameMatch = cleanedMsg.match(/(?:🎭|🎪|🎵|🎫|🎬|Theater alert:|[A-Z][a-z]{2}\s+\d+:)?\s*([A-Z][A-Za-z0-9\s\-']+?)(?:\s+on\s+|\s+at\s+)/i);
+        let eventName = eventNameMatch ? eventNameMatch[1].trim().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+        if (venueName) {
+          return `${tag}:event:${venueName}:${eventName.substring(0, 20)}`;
+        }
+      }
+
       return `${tag}:${msg.substring(0, 60).toLowerCase().replace(/[^a-z0-9]/g, '')}`;
     };
 

@@ -4,7 +4,7 @@
  * Fetches traffic, weather, and event data to inform bot posts
  */
 
-import type { CityCoords, TrafficData, WeatherData, EventData, TrafficIncident, FarmersMarketData } from "./types";
+import type { CityCoords, TrafficData, WeatherData, EventData, TrafficIncident, FarmersMarketData, ForecastDay } from "./types";
 import { RADIUS_CONFIG } from "@/lib/constants/radius";
 import { calculateDistanceMiles } from "@/lib/geo/distance";
 
@@ -108,11 +108,13 @@ export async function fetchTrafficIncidents(
 
 /**
  * Fetch weather data from Open-Meteo (free, no API key needed)
+ * Includes 3-day forecast for prediction questions
  */
 export async function fetchWeatherData(coords: CityCoords): Promise<WeatherData> {
   try {
     const { lat, lon } = coords;
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,uv_index&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch`;
+    // Include daily forecast data for 3 days
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum&forecast_days=3&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=mm`;
 
     const response = await fetch(url, { next: { revalidate: 600 } }); // 10 min cache
 
@@ -128,6 +130,22 @@ export async function fetchWeatherData(coords: CityCoords): Promise<WeatherData>
       return getDefaultWeatherData();
     }
 
+    // Parse daily forecast into ForecastDay array
+    const forecast: ForecastDay[] = [];
+    const daily = data.daily;
+    if (daily && daily.time) {
+      for (let i = 0; i < daily.time.length; i++) {
+        forecast.push({
+          date: daily.time[i],
+          condition: mapWeatherCode(daily.weather_code[i]),
+          tempHigh: Math.round(daily.temperature_2m_max[i]),
+          tempLow: Math.round(daily.temperature_2m_min[i]),
+          precipitationMm: daily.precipitation_sum[i] || 0,
+          snowfallCm: daily.snowfall_sum[i] || 0,
+        });
+      }
+    }
+
     return {
       condition: mapWeatherCode(current.weather_code),
       temperature: Math.round(current.temperature_2m),
@@ -136,6 +154,7 @@ export async function fetchWeatherData(coords: CityCoords): Promise<WeatherData>
       uvIndex: current.uv_index || 0,
       windSpeed: Math.round(current.wind_speed_10m),
       precipitation: current.precipitation || 0,
+      forecast,
     };
   } catch (error) {
     console.error("[IntelligentBots] Failed to fetch weather:", error);
@@ -234,16 +253,37 @@ export async function fetchEventData(
     // Filter out nonsensical event-venue pairings
     const validEvents = mappedEvents.filter((event: EventData) => isValidEventVenuePairing(event));
 
+    // DEDUPLICATE events by normalized name + venue
+    // Ticketmaster often returns "Six (Touring)" and "Six" as separate results
+    const seenEventKeys = new Set<string>();
+    const deduplicatedEvents = validEvents.filter((event: EventData) => {
+      // Normalize: remove parentheticals like "(Touring)", "(Moving)", lowercase, strip non-alphanumeric
+      const normalizedName = event.name
+        .replace(/\([^)]*\)/g, '')  // Remove all parentheticals
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+        .substring(0, 30);  // First 30 chars of cleaned name
+      const normalizedVenue = event.venue.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const key = `${normalizedVenue}:${normalizedName}`;
+
+      if (seenEventKeys.has(key)) {
+        console.log(`[IntelligentBots] Deduped event: "${event.name}" at "${event.venue}" (key: ${key})`);
+        return false;
+      }
+      seenEventKeys.add(key);
+      return true;
+    });
+
     // Sort by distance - LOCAL events first (hyperlocal priority!)
-    validEvents.sort((a: EventData, b: EventData) => {
+    deduplicatedEvents.sort((a: EventData, b: EventData) => {
       const distA = a.distanceMiles ?? 999;
       const distB = b.distanceMiles ?? 999;
       return distA - distB;
     });
 
-    console.log(`[IntelligentBots] Events sorted by distance: ${validEvents.slice(0, 3).map((e: EventData) => `${e.name} (${e.distanceMiles?.toFixed(1) || '?'}mi)`).join(', ')}`);
+    console.log(`[IntelligentBots] Events after dedup: ${deduplicatedEvents.length} (was ${validEvents.length}). Top: ${deduplicatedEvents.slice(0, 3).map((e: EventData) => `${e.name} (${e.distanceMiles?.toFixed(1) || '?'}mi)`).join(', ')}`);
 
-    return validEvents;
+    return deduplicatedEvents;
   } catch (error) {
     console.error("[IntelligentBots] Failed to fetch events:", error);
     return [];

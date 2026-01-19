@@ -19,7 +19,7 @@
  * All content is AI-generated to avoid repetitive/static questions.
  */
 
-import type { CityConfig, SituationContext, PostType, GeneratedPost, PredictionMetadata, PredictionCategory, PredictionDataSource, LandmarkEntry } from "./types";
+import type { CityConfig, SituationContext, PostType, GeneratedPost, PredictionMetadata, PredictionCategory, PredictionDataSource, LandmarkEntry, ForecastDay } from "./types";
 import { getLandmarkName, getLandmarkDisplay } from "./types";
 import { ExtendedPostType } from "./template-engine";
 
@@ -2352,67 +2352,151 @@ export async function generatePredictionPost(
   }
 
   // If no contextual matches, add weather-condition-aware default predictions
-  // Don't ask "will we see perfect weather?" when it's already cold/rainy - that's tone-deaf
+  // Use FORECAST data for future predictions, not current conditions!
+  // This fixes the bug where we ask "will it rain?" when snow is actually forecast
   if (matchingTemplates.length === 0) {
-    const currentTemp = weather.temperature;
-    const currentCondition = weather.condition;
+    // Get weekend forecast days (Saturday = 6, Sunday = 0)
+    const getWeekendForecast = (forecast: ForecastDay[] | undefined): ForecastDay | null => {
+      if (!forecast || forecast.length === 0) return null;
+      // Find first Saturday or Sunday in forecast
+      for (const day of forecast) {
+        const dayOfWeek = new Date(day.date).getDay();
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+          return day;
+        }
+      }
+      // If no weekend in 3-day forecast, use the last available day
+      return forecast[forecast.length - 1];
+    };
 
-    // Weather-aware defaults based on CURRENT conditions
-    if (currentCondition === 'rain' || currentCondition === 'storm') {
-      // Rainy now - ask when it will clear up
-      matchingTemplates.push({
-        question: `🔮 Prediction Time: Will the rain clear up in ${city.name} by tomorrow?`,
-        optionA: "☀️ YES - Sun's coming back",
-        optionB: "🌧️ NO - More rain on the way",
-        category: "weather",
-        dataSource: "openweather",
-        resolvesInHours: 24,
-        xpReward: 25,
-      });
-    } else if (currentTemp < 55) {
-      // Cold now - ask when it will warm up
-      matchingTemplates.push({
-        question: `🔮 Prediction Time: Will ${city.name} warm up above 60°F this week?`,
-        optionA: "☀️ YES - Warmer days coming",
-        optionB: "🥶 NO - Bundle up all week",
-        category: "weather",
-        dataSource: "openweather",
-        resolvesInHours: 72,
-        xpReward: 25,
-      });
-    } else if (currentTemp > 85) {
-      // Hot now - ask about relief
-      matchingTemplates.push({
-        question: `🔮 Prediction Time: Will ${city.name} get any relief from this heat this week?`,
-        optionA: "🌡️ YES - Cooler temps coming",
-        optionB: "🔥 NO - Stay hot all week",
-        category: "weather",
-        dataSource: "openweather",
-        resolvesInHours: 72,
-        xpReward: 25,
-      });
-    } else if (currentCondition === 'cloudy') {
-      // Cloudy - ask about sun
-      matchingTemplates.push({
-        question: `🔮 Prediction Time: Will ${city.name} see sunshine tomorrow?`,
-        optionA: "☀️ YES - Clear skies coming",
-        optionB: "☁️ NO - Clouds sticking around",
-        category: "weather",
-        dataSource: "openweather",
-        resolvesInHours: 24,
-        xpReward: 25,
-      });
+    const weekendForecast = getWeekendForecast(weather.forecast);
+
+    // Use forecast data if available, otherwise fall back to current conditions
+    if (weekendForecast) {
+      // FORECAST-BASED predictions - much more accurate!
+      if (weekendForecast.snowfallCm > 0) {
+        // Snow forecast - ask about snow, NOT rain!
+        matchingTemplates.push({
+          question: `🔮 Prediction Time: How much snow will ${city.name} actually get this weekend?`,
+          optionA: "❄️ More than forecast - Winter wonderland!",
+          optionB: "🥱 Less than expected - Texas tease",
+          category: "weather",
+          dataSource: "openweather",
+          resolvesInHours: 72,
+          xpReward: 25,
+        });
+      } else if (weekendForecast.precipitationMm > 1 || weekendForecast.condition === 'rain' || weekendForecast.condition === 'storm') {
+        // Rain forecast - ask about rain
+        matchingTemplates.push({
+          question: `🔮 Prediction Time: Will the rain in ${city.name} this weekend ruin outdoor plans?`,
+          optionA: "🌧️ YES - Stay inside this weekend",
+          optionB: "☀️ NO - Still plenty of dry time",
+          category: "weather",
+          dataSource: "openweather",
+          resolvesInHours: 72,
+          xpReward: 25,
+        });
+      } else if (weekendForecast.tempLow < 40) {
+        // Cold weekend forecast
+        matchingTemplates.push({
+          question: `🔮 Prediction Time: Will ${city.name} actually dip below freezing this weekend?`,
+          optionA: "🥶 YES - Protect the pipes!",
+          optionB: "🌡️ NO - Cold but not that cold",
+          category: "weather",
+          dataSource: "openweather",
+          resolvesInHours: 72,
+          xpReward: 25,
+        });
+      } else if (weekendForecast.tempHigh > 85) {
+        // Hot weekend forecast
+        matchingTemplates.push({
+          question: `🔮 Prediction Time: Will ${city.name} hit ${Math.round(weekendForecast.tempHigh)}°F this weekend?`,
+          optionA: "🔥 YES - Pool weather confirmed",
+          optionB: "🌤️ NO - Slightly cooler than forecast",
+          category: "weather",
+          dataSource: "openweather",
+          resolvesInHours: 72,
+          xpReward: 25,
+        });
+      } else if (weekendForecast.condition === 'clear' && weekendForecast.tempHigh >= 60 && weekendForecast.tempHigh <= 80) {
+        // Perfect weather forecast
+        matchingTemplates.push({
+          question: `🔮 Prediction Time: Will ${city.name}'s perfect weekend weather (${weekendForecast.tempLow}-${weekendForecast.tempHigh}°F) actually hold?`,
+          optionA: "☀️ YES - Lock in those outdoor plans!",
+          optionB: "😬 NO - Something will change",
+          category: "weather",
+          dataSource: "openweather",
+          resolvesInHours: 72,
+          xpReward: 25,
+        });
+      } else {
+        // Generic weekend prediction with forecast temps
+        matchingTemplates.push({
+          question: `🔮 Prediction Time: Will ${city.name} stay around ${weekendForecast.tempHigh}°F this weekend?`,
+          optionA: "☀️ YES - Right on target",
+          optionB: "🎲 NO - Weather will surprise us",
+          category: "weather",
+          dataSource: "openweather",
+          resolvesInHours: 72,
+          xpReward: 25,
+        });
+      }
     } else {
-      // Actually nice weather now (60-85F, clear) - then ask about perfect weekend
-      matchingTemplates.push({
-        question: `🔮 Prediction Time: Will ${city.name} have perfect patio weather (65-80°F) this weekend?`,
-        optionA: "☀️ YES - Beautiful days ahead",
-        optionB: "😬 NO - Mother nature has other plans",
-        category: "weather",
-        dataSource: "openweather",
-        resolvesInHours: 72,
-        xpReward: 25,
-      });
+      // FALLBACK: No forecast data available, use current conditions
+      const currentTemp = weather.temperature;
+      const currentCondition = weather.condition;
+
+      if (currentCondition === 'rain' || currentCondition === 'storm') {
+        matchingTemplates.push({
+          question: `🔮 Prediction Time: Will the rain clear up in ${city.name} by tomorrow?`,
+          optionA: "☀️ YES - Sun's coming back",
+          optionB: "🌧️ NO - More rain on the way",
+          category: "weather",
+          dataSource: "openweather",
+          resolvesInHours: 24,
+          xpReward: 25,
+        });
+      } else if (currentCondition === 'snow') {
+        matchingTemplates.push({
+          question: `🔮 Prediction Time: Will ${city.name} see more snow this week?`,
+          optionA: "❄️ YES - More flurries coming",
+          optionB: "☀️ NO - That was it",
+          category: "weather",
+          dataSource: "openweather",
+          resolvesInHours: 72,
+          xpReward: 25,
+        });
+      } else if (currentTemp < 55) {
+        matchingTemplates.push({
+          question: `🔮 Prediction Time: Will ${city.name} warm up above 60°F this week?`,
+          optionA: "☀️ YES - Warmer days coming",
+          optionB: "🥶 NO - Bundle up all week",
+          category: "weather",
+          dataSource: "openweather",
+          resolvesInHours: 72,
+          xpReward: 25,
+        });
+      } else if (currentTemp > 85) {
+        matchingTemplates.push({
+          question: `🔮 Prediction Time: Will ${city.name} get any relief from this heat this week?`,
+          optionA: "🌡️ YES - Cooler temps coming",
+          optionB: "🔥 NO - Stay hot all week",
+          category: "weather",
+          dataSource: "openweather",
+          resolvesInHours: 72,
+          xpReward: 25,
+        });
+      } else {
+        matchingTemplates.push({
+          question: `🔮 Prediction Time: Will ${city.name} have perfect patio weather (65-80°F) this weekend?`,
+          optionA: "☀️ YES - Beautiful days ahead",
+          optionB: "😬 NO - Mother nature has other plans",
+          category: "weather",
+          dataSource: "openweather",
+          resolvesInHours: 72,
+          xpReward: 25,
+        });
+      }
     }
   }
 
