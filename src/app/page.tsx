@@ -3536,12 +3536,10 @@ export default function Home() {
             setActiveTab("local");
           }} />
 
-          {/* Tab Content */}
+          {/* Tab Content - Using CSS hiding for pulse tab to prevent remounting */}
           <div className="space-y-4">
-            {(() => {
-              switch (safeActiveTab) {
-                case "events":
-                  return (
+            {/* Events Tab - conditionally rendered */}
+            {safeActiveTab === "events" && (
                     <EventCard
                       events={ticketmasterEvents}
                       isLoading={ticketmasterLoading}
@@ -3572,9 +3570,10 @@ export default function Home() {
                       onSubmit={handleEventsPulseSubmit}
                       onSignInClick={() => setShowAuthModal(true)}
                     />
-                  );
-                case "traffic":
-                  return (
+            )}
+
+            {/* Traffic Tab - conditionally rendered */}
+            {safeActiveTab === "traffic" && (
                     <TrafficContent
                       trafficLevel={trafficLevel}
                       trafficLoading={trafficLoading}
@@ -3601,9 +3600,10 @@ export default function Home() {
                       onSubmit={handleTrafficPulseSubmit}
                       onSignInClick={() => setShowAuthModal(true)}
                     />
-                  );
-                case "local":
-                  return (
+            )}
+
+            {/* Local Tab - conditionally rendered */}
+            {safeActiveTab === "local" && (
                     <LocalTab
                       cityName={city}
                       state={localState}
@@ -3632,18 +3632,19 @@ export default function Home() {
                       }}
                       onSubmit={handleLocalPulseSubmit}
                     />
-                  );
-                case "status":
-                  return (
+            )}
+
+            {/* Status Tab - conditionally rendered */}
+            {safeActiveTab === "status" && (
                     <StatusTab
                       userId={sessionUser?.id ?? null}
                       city={city}
                     />
-                  );
-                case "pulse":
-                default:
-                  return (
-                    <>
+            )}
+
+            {/* Pulse Tab - ALWAYS rendered, hidden with CSS when not active */}
+            {/* This prevents remounting the large pulse list when switching tabs */}
+            <div className={safeActiveTab === "pulse" ? "" : "hidden"}>
                       {/* Pulse Input */}
                       <div id="drop-a-pulse">
                         <PulseInput
@@ -3837,10 +3838,7 @@ export default function Home() {
                           </>
                         )}
                       </section>
-                    </>
-                  );
-              }
-            })()}
+            </div>
           </div>
 
           {/* Disclaimer */}
