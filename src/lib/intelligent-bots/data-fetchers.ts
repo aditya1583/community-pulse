@@ -465,51 +465,77 @@ function getTomorrowDayName(): string {
 }
 
 /**
- * Check if a market is open today based on its schedule string
+ * Check if schedule includes a specific day number (0=Sun, 1=Mon, ..., 6=Sat)
+ * Handles multiple formats: "Saturday", "Sa-Su", "Mo-Fr", "Daily", "Weekend", etc.
  */
-function checkIfOpenToday(schedule: string): boolean {
-  const today = getTodayDayName().toLowerCase();
-  const todayAbbrev = DAY_ABBREVS[new Date().getDay()].toLowerCase();
+function isScheduleOpenOnDay(schedule: string, dayNum: number): boolean {
   const scheduleLower = schedule.toLowerCase();
 
-  if (scheduleLower.includes(today) || scheduleLower.includes(todayAbbrev)) {
+  const dayAbbrevs: Record<number, string[]> = {
+    0: ["su", "sun", "sunday"],
+    1: ["mo", "mon", "monday"],
+    2: ["tu", "tue", "tuesday"],
+    3: ["we", "wed", "wednesday"],
+    4: ["th", "thu", "thursday"],
+    5: ["fr", "fri", "friday"],
+    6: ["sa", "sat", "saturday"],
+  };
+
+  // Check "daily" or "every day" or "7 days"
+  if (scheduleLower.includes("daily") || scheduleLower.includes("every day") || scheduleLower.includes("7 days")) {
     return true;
   }
 
-  if (scheduleLower.includes("daily") || scheduleLower.includes("every day")) {
+  // Check "weekend" (Sat or Sun)
+  const isWeekendDay = dayNum === 0 || dayNum === 6;
+  if (isWeekendDay && scheduleLower.includes("weekend")) {
     return true;
   }
 
-  const isWeekend = new Date().getDay() === 0 || new Date().getDay() === 6;
-  if (isWeekend && scheduleLower.includes("weekend")) {
-    return true;
+  // Check for date ranges like "mo-su" (mon-sun), "sa-su" (sat-sun), "mo-fr" (mon-fri)
+  const rangePattern = /\b(mo|tu|we|th|fr|sa|su|mon|tue|wed|thu|fri|sat|sun)[\s-]+(mo|tu|we|th|fr|sa|su|mon|tue|wed|thu|fri|sat|sun)\b/i;
+  const rangeMatch = scheduleLower.match(rangePattern);
+  if (rangeMatch) {
+    const startDay = rangeMatch[1].substring(0, 2).toLowerCase();
+    const endDay = rangeMatch[2].substring(0, 2).toLowerCase();
+    const dayOrder = ["su", "mo", "tu", "we", "th", "fr", "sa"];
+    const startIdx = dayOrder.indexOf(startDay);
+    const endIdx = dayOrder.indexOf(endDay);
+
+    if (startIdx !== -1 && endIdx !== -1) {
+      // Handle wrap-around (e.g., Fr-Mo means Fri, Sat, Sun, Mon)
+      if (startIdx <= endIdx) {
+        if (dayNum >= startIdx && dayNum <= endIdx) return true;
+      } else {
+        if (dayNum >= startIdx || dayNum <= endIdx) return true;
+      }
+    }
+  }
+
+  // Check for individual day mentions
+  for (const abbrev of dayAbbrevs[dayNum]) {
+    // Match whole word to avoid false positives
+    const regex = new RegExp(`\\b${abbrev}\\b`, "i");
+    if (regex.test(scheduleLower)) {
+      return true;
+    }
   }
 
   return false;
 }
 
 /**
+ * Check if a market is open today based on its schedule string
+ */
+function checkIfOpenToday(schedule: string): boolean {
+  return isScheduleOpenOnDay(schedule, new Date().getDay());
+}
+
+/**
  * Check if a market is open tomorrow based on its schedule string
  */
 function checkIfOpenTomorrow(schedule: string): boolean {
-  const tomorrow = getTomorrowDayName().toLowerCase();
-  const tomorrowAbbrev = DAY_ABBREVS[(new Date().getDay() + 1) % 7].toLowerCase();
-  const scheduleLower = schedule.toLowerCase();
-
-  if (scheduleLower.includes(tomorrow) || scheduleLower.includes(tomorrowAbbrev)) {
-    return true;
-  }
-
-  if (scheduleLower.includes("daily") || scheduleLower.includes("every day")) {
-    return true;
-  }
-
-  const isTomorrowWeekend = (new Date().getDay() + 1) % 7 === 0 || (new Date().getDay() + 1) % 7 === 6;
-  if (isTomorrowWeekend && scheduleLower.includes("weekend")) {
-    return true;
-  }
-
-  return false;
+  return isScheduleOpenOnDay(schedule, (new Date().getDay() + 1) % 7);
 }
 
 /**
@@ -836,21 +862,62 @@ function getLocalFallbackMarkets(cityName: string, coords: CityCoords): FarmersM
   // Recalculate isOpenToday/isOpenTomorrow based on current day
   return markets.map(market => {
     // Parse schedule to determine which day(s) the market is open
+    // Handles multiple formats: "Saturday", "Sa-Su", "Mo-Fr", "Daily", etc.
     const scheduleLower = market.schedule.toLowerCase();
-    let marketDay = -1;
 
-    if (scheduleLower.includes("saturday")) marketDay = 6;
-    else if (scheduleLower.includes("sunday")) marketDay = 0;
-    else if (scheduleLower.includes("monday")) marketDay = 1;
-    else if (scheduleLower.includes("tuesday")) marketDay = 2;
-    else if (scheduleLower.includes("wednesday")) marketDay = 3;
-    else if (scheduleLower.includes("thursday")) marketDay = 4;
-    else if (scheduleLower.includes("friday")) marketDay = 5;
+    // Helper to check if a day number is in the schedule
+    const isOpenOnDay = (dayNum: number): boolean => {
+      const dayAbbrevs: Record<number, string[]> = {
+        0: ["su", "sun", "sunday"],
+        1: ["mo", "mon", "monday"],
+        2: ["tu", "tue", "tuesday"],
+        3: ["we", "wed", "wednesday"],
+        4: ["th", "thu", "thursday"],
+        5: ["fr", "fri", "friday"],
+        6: ["sa", "sat", "saturday"],
+      };
+
+      // Check "daily" or "every day" or "7 days"
+      if (scheduleLower.includes("daily") || scheduleLower.includes("every day") || scheduleLower.includes("7 days")) {
+        return true;
+      }
+
+      // Check for date ranges like "mo-su" (mon-sun), "sa-su" (sat-sun), "mo-fr" (mon-fri)
+      const rangePattern = /\b(mo|tu|we|th|fr|sa|su|mon|tue|wed|thu|fri|sat|sun)[\s-]*(mo|tu|we|th|fr|sa|su|mon|tue|wed|thu|fri|sat|sun)\b/i;
+      const rangeMatch = scheduleLower.match(rangePattern);
+      if (rangeMatch) {
+        const startDay = rangeMatch[1].substring(0, 2).toLowerCase();
+        const endDay = rangeMatch[2].substring(0, 2).toLowerCase();
+        const dayOrder = ["su", "mo", "tu", "we", "th", "fr", "sa"];
+        const startIdx = dayOrder.indexOf(startDay);
+        const endIdx = dayOrder.indexOf(endDay);
+
+        if (startIdx !== -1 && endIdx !== -1) {
+          // Handle wrap-around (e.g., Fr-Mo means Fri, Sat, Sun, Mon)
+          if (startIdx <= endIdx) {
+            return dayNum >= startIdx && dayNum <= endIdx;
+          } else {
+            return dayNum >= startIdx || dayNum <= endIdx;
+          }
+        }
+      }
+
+      // Check for individual day mentions
+      for (const abbrev of dayAbbrevs[dayNum]) {
+        // Match whole word to avoid "monday" matching "mo" in "amount"
+        const regex = new RegExp(`\\b${abbrev}\\b`, "i");
+        if (regex.test(scheduleLower)) {
+          return true;
+        }
+      }
+
+      return false;
+    };
 
     return {
       ...market,
-      isOpenToday: today === marketDay,
-      isOpenTomorrow: (today + 1) % 7 === marketDay,
+      isOpenToday: isOpenOnDay(today),
+      isOpenTomorrow: isOpenOnDay((today + 1) % 7),
       // Recalculate distance from user's actual coords
       distance: market.lat && market.lon
         ? Math.round(calculateDistanceMiles(coords, { lat: market.lat, lon: market.lon }) * 10) / 10

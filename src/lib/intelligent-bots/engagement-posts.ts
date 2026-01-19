@@ -46,7 +46,8 @@ export type EngagementType =
   | "farmers_market"         // Hyperlocal farmers market content
   | "prediction"             // XP-staked predictions about local outcomes
   | "civic_alert"            // Civic meeting alerts and predictions (50 XP)
-  | "landmark_food";         // Food/coffee spots anchored to local landmarks
+  | "landmark_food"          // Food/coffee spots anchored to local landmarks
+  | "weather_alert";         // Proactive weather alerts for forecast outliers (snow, storms, extreme temps)
 
 /**
  * Action metadata for actionable posts (e.g., farmers market posts with directions)
@@ -2676,6 +2677,119 @@ export async function generateCivicAlertPost(
 }
 
 /**
+ * Generate a Weather ALERT post
+ * Uses FORECAST data to proactively warn users about upcoming weather events
+ *
+ * This is DIFFERENT from regular weather posts:
+ * - Regular posts: "It's 61°F and sunny" (current conditions)
+ * - Alert posts: "❄️ Snow expected this weekend!" (forecast warnings)
+ *
+ * Triggers for:
+ * - Snow in forecast (rare in Texas - high priority!)
+ * - Storms/heavy precipitation
+ * - Freezing temperatures
+ * - Extreme heat (100°F+)
+ */
+export async function generateWeatherAlertPost(
+  ctx: SituationContext
+): Promise<EngagementPost | null> {
+  const { city, weather } = ctx;
+
+  if (!weather.forecast || weather.forecast.length === 0) {
+    console.log("[WeatherAlert] No forecast data available");
+    return null;
+  }
+
+  // Find the most significant weather event in the forecast
+  let alertType: "snow" | "storm" | "freeze" | "heat" | null = null;
+  let alertDay: typeof weather.forecast[0] | null = null;
+
+  for (const day of weather.forecast) {
+    // Snow takes highest priority (rare in Texas!)
+    if (day.snowfallCm > 0) {
+      alertType = "snow";
+      alertDay = day;
+      break;
+    }
+    // Storm is second priority
+    if (day.condition === "storm" || day.precipitationMm > 25) {
+      if (!alertType || alertType === "freeze" || alertType === "heat") {
+        alertType = "storm";
+        alertDay = day;
+      }
+    }
+    // Freeze is third priority
+    if (day.tempLow < 32) {
+      if (!alertType || alertType === "heat") {
+        alertType = "freeze";
+        alertDay = day;
+      }
+    }
+    // Extreme heat is fourth priority
+    if (day.tempHigh > 100) {
+      if (!alertType) {
+        alertType = "heat";
+        alertDay = day;
+      }
+    }
+  }
+
+  if (!alertType || !alertDay) {
+    return null;
+  }
+
+  // Format the date for the alert
+  const alertDate = new Date(alertDay.date);
+  const dayName = alertDate.toLocaleDateString("en-US", { weekday: "long" });
+  const isToday = alertDate.toDateString() === new Date().toDateString();
+  const isTomorrow = alertDate.toDateString() === new Date(Date.now() + 86400000).toDateString();
+  const timeframe = isToday ? "TODAY" : isTomorrow ? "tomorrow" : dayName;
+
+  // Generate alert message based on type
+  let message: string;
+  let mood: string;
+
+  switch (alertType) {
+    case "snow":
+      const snowAmount = alertDay.snowfallCm;
+      message = `❄️ SNOW ALERT: ${city.name} may see snow ${timeframe}!` +
+        (snowAmount > 1 ? ` Expecting ~${Math.round(snowAmount / 2.54)} inches.` : "") +
+        `\n\n🚗 Roads could get icy - plan ahead!\n📍 Stock up on essentials if you haven't already.`;
+      mood = "❄️";
+      break;
+
+    case "storm":
+      message = `⛈️ STORM ALERT: Heavy weather heading to ${city.name} ${timeframe}!` +
+        `\n\n🌧️ Expected: ${Math.round(alertDay.precipitationMm / 25.4)}"+ of rain` +
+        `\n⚡ Possible thunderstorms - stay weather aware!`;
+      mood = "⛈️";
+      break;
+
+    case "freeze":
+      message = `🥶 FREEZE WARNING: ${city.name} dropping to ${alertDay.tempLow}°F ${timeframe}!` +
+        `\n\n💧 Protect pipes - let faucets drip!\n🌱 Bring plants inside\n🚗 Watch for icy bridges`;
+      mood = "🥶";
+      break;
+
+    case "heat":
+      message = `🔥 EXTREME HEAT: ${city.name} hitting ${alertDay.tempHigh}°F ${timeframe}!` +
+        `\n\n💧 Stay hydrated - drink water constantly\n🐕 Keep pets inside during peak heat\n👴 Check on elderly neighbors`;
+      mood = "🔥";
+      break;
+  }
+
+  return {
+    message,
+    tag: "Weather",
+    mood,
+    author: `${city.name} weather_alert_bot ⚠️`,
+    is_bot: true,
+    hidden: false,
+    engagementType: "weather_alert",
+  };
+}
+
+/**
  * Generate a Farmers Market post
  * Uses REAL farmers market data from the user's area (hyperlocal - 10mi radius)
  *
@@ -2975,6 +3089,57 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
           reason: "Heads-up: farmers market tomorrow",
         };
       }
+    }
+  }
+
+  // ========== TIER 0.5: WEATHER ALERTS (Forecast outliers) ==========
+  // Proactively alert users about upcoming weather events BEFORE they happen
+  // This uses FORECAST data, not just current conditions
+  if (ctx.weather.forecast && ctx.weather.forecast.length > 0) {
+    // Check for snow in forecast - RARE and important in Texas!
+    const snowInForecast = ctx.weather.forecast.some(day => day.snowfallCm > 0);
+    if (snowInForecast) {
+      console.log("[AnalyzeEngagement] WEATHER ALERT: Snow in forecast!");
+      return {
+        shouldPost: true,
+        engagementType: "weather_alert",
+        reason: "Snow in forecast - rare weather alert",
+      };
+    }
+
+    // Check for storms in forecast
+    const stormInForecast = ctx.weather.forecast.some(day =>
+      day.condition === 'storm' || day.precipitationMm > 25
+    );
+    if (stormInForecast) {
+      console.log("[AnalyzeEngagement] WEATHER ALERT: Storm in forecast!");
+      return {
+        shouldPost: true,
+        engagementType: "weather_alert",
+        reason: "Storm in forecast - severe weather alert",
+      };
+    }
+
+    // Check for freezing temps in forecast
+    const freezeInForecast = ctx.weather.forecast.some(day => day.tempLow < 32);
+    if (freezeInForecast) {
+      console.log("[AnalyzeEngagement] WEATHER ALERT: Freezing temps in forecast!");
+      return {
+        shouldPost: true,
+        engagementType: "weather_alert",
+        reason: "Freezing temps in forecast - cold weather alert",
+      };
+    }
+
+    // Check for extreme heat in forecast
+    const extremeHeatInForecast = ctx.weather.forecast.some(day => day.tempHigh > 100);
+    if (extremeHeatInForecast) {
+      console.log("[AnalyzeEngagement] WEATHER ALERT: Extreme heat in forecast!");
+      return {
+        shouldPost: true,
+        engagementType: "weather_alert",
+        reason: "Extreme heat in forecast - heat advisory",
+      };
     }
   }
 
@@ -3290,6 +3455,10 @@ export async function generateEngagementPost(
     // CIVIC ALERTS (50 XP predictions)
     case "civic_alert":
       return generateCivicAlertPost(ctx);
+
+    // WEATHER ALERTS (proactive forecast-based alerts)
+    case "weather_alert":
+      return generateWeatherAlertPost(ctx);
 
     default:
       return null;
