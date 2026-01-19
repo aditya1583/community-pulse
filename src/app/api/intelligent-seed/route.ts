@@ -229,11 +229,15 @@ export async function POST(request: NextRequest) {
           return `${tag}:weather:general`;
         }
 
-        // Events: signature is the event/venue name
+        // Events: signature is the venue name (prevents multiple posts about same venue)
         if (tagLower === 'events') {
-          // Extract venue or event name
-          const venueMatch = message.match(/(?:at|@)\s+([A-Z][A-Za-z\s\-]+?)(?:\.|,|\!|\?|on\s)/);
-          return `${tag}:event:${venueMatch ? venueMatch[1].trim().toLowerCase().substring(0, 30) : message.substring(0, 40)}`;
+          // Extract venue - everything after "at " until ( or end punctuation
+          const venueMatch = message.match(/\bat\s+([A-Z][A-Za-z\s\-']+?)(?:\s*\(|\.|,|\!|\?|$)/);
+          if (venueMatch) {
+            return `${tag}:event:${venueMatch[1].trim().toLowerCase()}`;
+          }
+          // Fallback: use normalized message
+          return `${tag}:event:${msgLower.replace(/[^a-z0-9]/g, '').substring(0, 40)}`;
         }
 
         // Default: use first 60 chars for general content
@@ -244,14 +248,25 @@ export async function POST(request: NextRequest) {
         (recentPosts || []).map((p) => getContentSignature(p.tag, p.message, p.poll_options))
       );
 
-      // Filter out semantic duplicates
+      // Filter out semantic duplicates (both against DB AND within this batch)
+      const batchSignatures = new Set<string>();
       const uniqueRecords = records.filter((r) => {
         const sig = getContentSignature(r.tag as string, r.message as string, r.poll_options as string[] | null);
-        const isDupe = recentSignatures.has(sig);
-        if (isDupe) {
-          console.log(`[IntelligentSeed] Filtered duplicate: ${sig}`);
+
+        // Check against recent posts in DB
+        if (recentSignatures.has(sig)) {
+          console.log(`[IntelligentSeed] Filtered DB duplicate: ${sig}`);
+          return false;
         }
-        return !isDupe;
+
+        // Check against other posts in THIS batch (prevents 5 event posts about same venue)
+        if (batchSignatures.has(sig)) {
+          console.log(`[IntelligentSeed] Filtered batch duplicate: ${sig}`);
+          return false;
+        }
+
+        batchSignatures.add(sig);
+        return true;
       });
 
       if (uniqueRecords.length === 0) {
