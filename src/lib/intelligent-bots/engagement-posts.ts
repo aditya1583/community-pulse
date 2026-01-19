@@ -3528,22 +3528,17 @@ export async function generateEngagementSeedPosts(
   // ALWAYS inserted at position 1 (after first prediction) to guarantee inclusion
   priorities.splice(1, 0, "landmark_food");
 
-  // Farmers market posts - FORCE INCLUDE to guarantee attempt
-  // These use REAL market names from the user's area when available
-  // The generator will return null if no market data exists
+  // Farmers market posts - ALWAYS INCLUDE if we have ANY market data
+  // Users want to know about nearby markets regardless of whether they're open today
+  // This provides useful info and fills the feed with hyperlocal content
   const hasMarketData = ctx.farmersMarkets && ctx.farmersMarkets.length > 0;
-  const hasOpenMarket = hasMarketData && ctx.farmersMarkets.some(m => m.isOpenToday);
-  const hasMarketTomorrow = hasMarketData && ctx.farmersMarkets.some(m => m.isOpenTomorrow);
 
-  if (hasOpenMarket || hasMarketTomorrow || ctx.time.isWeekend) {
-    // High priority: Insert at position 2 for weekend/open market/tomorrow market (after landmark_food)
+  if (hasMarketData) {
+    // ALWAYS include farmers market post if we have data - it's informative content
+    // Insert at position 2 (after prediction and landmark_food) for visibility
     priorities.splice(2, 0, "farmers_market");
-  } else if (hasMarketData) {
-    // Still force include if we have any market data
-    // Insert at position 3 (after prediction, landmark_food, and any weekend-specific items)
-    priorities.splice(3, 0, "farmers_market");
+    console.log(`[SeedPosts] Including farmers_market - found ${ctx.farmersMarkets.length} markets, closest: ${ctx.farmersMarkets[0]?.name}`);
   }
-  // Note: If no market data at all, we don't include it (generator would return null anyway)
 
   // ========== HIGH-ENGAGEMENT (Always include for viral potential) ==========
 
