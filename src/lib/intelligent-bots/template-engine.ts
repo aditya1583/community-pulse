@@ -120,11 +120,13 @@ const WEATHER_TEMPLATES = {
 };
 
 const GENERAL_TEMPLATES = {
+  // NOTE: Weather judgments ("beautiful", "perfect") belong in WEATHER_TEMPLATES only.
+  // General templates report temperature factually without claiming it's good or bad.
   goodMorning: [
-    "☀️ Beautiful morning in {city}! {temp}°F and clear. Perfect for a walk at {park}.",
-    "🌅 Good morning {city}! {weather} and {traffic} - rare combo. Enjoy it!",
-    "☕ Rise and shine! Gorgeous day ahead - {temp}°F and sunny.",
-    "🌤️ {city}'s having a good hair day. {temp}°F, light traffic, no complaints!",
+    "☕ Good morning {city}! It's {temp}°F out there - how's everyone starting the day?",
+    "🌅 Rise and shine, {city}! {temp}°F this morning. What's on your agenda?",
+    "☕ Morning {city}! {temp}°F and {condition}. Grab that coffee and let's go.",
+    "🌤️ {city} morning check-in: {temp}°F, {traffic}. How's your commute?",
   ],
   afternoon: [
     "📍 {city} afternoon check-in. How's your day going?",
@@ -133,15 +135,16 @@ const GENERAL_TEMPLATES = {
     "📍 Quick afternoon pulse check - how's {city} treating you today?",
   ],
   weekend: [
-    "🎉 Happy weekend, {city}! Great day for {park} - {temp}°F and {condition}.",
-    "🌳 Weekend vibes. {venue} should be nice today with this weather.",
-    "☀️ Saturday in {city} looking good! {temp}°F - perfect for being outside.",
-    "🍕 Lazy Sunday energy. {restaurant} or {park}? Decisions, decisions.",
+    // Weather-neutral: focus on weekend vibes, not weather claims
+    "🎉 Happy weekend, {city}! What's everyone getting into?",
+    "🌳 Weekend vibes in {city}. {temp}°F outside - any plans?",
+    "📍 Saturday in {city}! What's the move today?",
+    "🍕 Lazy Sunday energy. {restaurant} or couch? Decisions, decisions.",
   ],
   lateNight: [
-    "🌙 Quiet night in {city}. Roads clear, {temp}°F. Safe travels!",
-    "🦉 Late night {city}: {temp}°F and peaceful. Drive safe out there.",
-    "✨ Night owl update: Roads are empty, weather's nice. Good time to be out.",
+    "🌙 Quiet night in {city}. Roads are clear. Safe travels!",
+    "🦉 Late night {city} crew - anyone else still up?",
+    "✨ Night owl update: {city} is peaceful. Drive safe out there.",
   ],
 };
 

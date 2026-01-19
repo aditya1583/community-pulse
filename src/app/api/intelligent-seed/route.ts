@@ -172,23 +172,86 @@ export async function POST(request: NextRequest) {
         return record;
       });
 
-      // DEDUPLICATION: Check for similar posts in the last hour to prevent redundancy
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      // DEDUPLICATION: Semantic content signature prevents redundant posts
+      // Old approach: 50-char prefix matching (BROKEN - missed duplicates)
+      // New approach: Extract semantic signature based on content type
+      const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
       const { data: recentPosts } = await supabase
         .from("pulses")
-        .select("message, tag")
+        .select("message, tag, poll_options")
         .eq("city", body.city)
         .eq("is_bot", true)
-        .gte("created_at", oneHourAgo);
+        .gte("created_at", fourHoursAgo);
 
-      const recentMessages = new Set(
-        (recentPosts || []).map((p) => `${p.tag}:${p.message.substring(0, 50)}`)
+      // Extract semantic signature from a post for deduplication
+      // This identifies the CORE CONTENT, not just the first 50 chars
+      const getContentSignature = (tag: string, message: string, pollOptions?: string[] | null): string => {
+        const tagLower = tag.toLowerCase();
+        const msgLower = message.toLowerCase();
+
+        // Prediction polls: signature is the prediction topic
+        if (msgLower.includes("prediction") || pollOptions) {
+          // Extract the topic: "Will Leander see perfect weather" -> "weather_prediction"
+          if (msgLower.includes("weather")) return `${tag}:prediction:weather`;
+          if (msgLower.includes("traffic")) return `${tag}:prediction:traffic`;
+          if (msgLower.includes("game") || msgLower.includes("stars")) return `${tag}:prediction:sports`;
+          return `${tag}:prediction:general`;
+        }
+
+        // Farmers market: signature is the market name
+        if (msgLower.includes("farmers market") || msgLower.includes("market day")) {
+          const marketMatch = message.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+Farmers\s+Market/i);
+          return `${tag}:farmers_market:${marketMatch ? marketMatch[1].toLowerCase() : 'local'}`;
+        }
+
+        // Landmark food: signature is landmark + time category
+        if (msgLower.includes("near heb") || msgLower.includes("near target") ||
+            msgLower.includes("coffee") || msgLower.includes("lunch") ||
+            msgLower.includes("dinner") || msgLower.includes("breakfast")) {
+          const landmarkMatch = message.match(/near\s+([A-Za-z\s]+?)(?:\?|\.|\!|$)/i);
+          const landmark = landmarkMatch ? landmarkMatch[1].trim().toLowerCase() : 'generic';
+          const hour = new Date().getHours();
+          const timeSlot = hour < 11 ? 'morning' : hour < 14 ? 'lunch' : hour < 17 ? 'afternoon' : 'evening';
+          return `${tag}:landmark_food:${landmark}:${timeSlot}`;
+        }
+
+        // Traffic: signature is the road mentioned
+        if (tagLower === 'traffic') {
+          const roadMatch = message.match(/(?:on|at|near)\s+([A-Z0-9][A-Za-z0-9\s\-]+?)(?:\.|,|\!|\?|$)/);
+          return `${tag}:traffic:${roadMatch ? roadMatch[1].trim().toLowerCase().substring(0, 20) : 'general'}`;
+        }
+
+        // Weather: one weather post per category per 4 hours
+        if (tagLower === 'weather') {
+          if (msgLower.includes('rain')) return `${tag}:weather:rain`;
+          if (msgLower.includes('cold') || msgLower.includes('chilly')) return `${tag}:weather:cold`;
+          if (msgLower.includes('hot') || msgLower.includes('heat')) return `${tag}:weather:hot`;
+          return `${tag}:weather:general`;
+        }
+
+        // Events: signature is the event/venue name
+        if (tagLower === 'events') {
+          // Extract venue or event name
+          const venueMatch = message.match(/(?:at|@)\s+([A-Z][A-Za-z\s\-]+?)(?:\.|,|\!|\?|on\s)/);
+          return `${tag}:event:${venueMatch ? venueMatch[1].trim().toLowerCase().substring(0, 30) : message.substring(0, 40)}`;
+        }
+
+        // Default: use first 60 chars for general content
+        return `${tag}:general:${message.substring(0, 60).toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+      };
+
+      const recentSignatures = new Set(
+        (recentPosts || []).map((p) => getContentSignature(p.tag, p.message, p.poll_options))
       );
 
-      // Filter out duplicates
+      // Filter out semantic duplicates
       const uniqueRecords = records.filter((r) => {
-        const key = `${r.tag}:${(r.message as string).substring(0, 50)}`;
-        return !recentMessages.has(key);
+        const sig = getContentSignature(r.tag as string, r.message as string, r.poll_options as string[] | null);
+        const isDupe = recentSignatures.has(sig);
+        if (isDupe) {
+          console.log(`[IntelligentSeed] Filtered duplicate: ${sig}`);
+        }
+        return !isDupe;
       });
 
       if (uniqueRecords.length === 0) {
@@ -288,18 +351,39 @@ export async function POST(request: NextRequest) {
       insertRecord.prediction_data_source = result.post.prediction.dataSource;
     }
 
-    // DEDUPLICATION: Check for similar posts in the last hour
-    const singleOneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    // DEDUPLICATION: Semantic signature check (same logic as cold-start)
+    const singleFourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
     const { data: singleRecentPosts } = await supabase
       .from("pulses")
-      .select("message")
+      .select("message, tag, poll_options")
       .eq("city", body.city)
-      .eq("tag", result.post.tag)
       .eq("is_bot", true)
-      .gte("created_at", singleOneHourAgo);
+      .gte("created_at", singleFourHoursAgo);
 
+    // Semantic signature for deduplication
+    const getSig = (tag: string, msg: string, opts?: string[] | null): string => {
+      const t = tag.toLowerCase(), m = msg.toLowerCase();
+      if (m.includes("prediction") || opts) {
+        if (m.includes("weather")) return `${tag}:prediction:weather`;
+        if (m.includes("traffic")) return `${tag}:prediction:traffic`;
+        if (m.includes("game") || m.includes("stars")) return `${tag}:prediction:sports`;
+        return `${tag}:prediction:general`;
+      }
+      if (m.includes("farmers market") || m.includes("market day")) {
+        const match = msg.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+Farmers\s+Market/i);
+        return `${tag}:farmers_market:${match ? match[1].toLowerCase() : 'local'}`;
+      }
+      if (t === 'weather') {
+        if (m.includes('rain')) return `${tag}:weather:rain`;
+        if (m.includes('cold') || m.includes('chilly')) return `${tag}:weather:cold`;
+        return `${tag}:weather:general`;
+      }
+      return `${tag}:${msg.substring(0, 60).toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+    };
+
+    const newSig = getSig(result.post.tag, result.post.message, result.post.options);
     const isDuplicate = (singleRecentPosts || []).some(
-      (p) => p.message.substring(0, 50) === result.post!.message.substring(0, 50)
+      (p) => getSig(p.tag, p.message, p.poll_options) === newSig
     );
 
     if (isDuplicate) {

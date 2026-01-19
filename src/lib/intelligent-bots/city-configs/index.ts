@@ -9,6 +9,7 @@
  */
 
 import type { CityConfig, CityCoords } from "../types";
+import { getLandmarkDisplay } from "../types";
 import { LEANDER_CONFIG } from "./leander";
 import { CEDAR_PARK_CONFIG } from "./cedar-park";
 import { AUSTIN_CONFIG } from "./austin";
@@ -148,10 +149,12 @@ export function getRandomRoad(config: CityConfig, type: "major" | "highways" | "
 
 /**
  * Get a random landmark from the city config
+ * Returns display string like "HEB Plus on Hero Way" or just "HEB Plus"
  */
 export function getRandomLandmark(config: CityConfig, type: "shopping" | "venues" | "restaurants" = "venues"): string {
   const landmarks = config.landmarks[type];
-  return landmarks[Math.floor(Math.random() * landmarks.length)];
+  const landmark = landmarks[Math.floor(Math.random() * landmarks.length)];
+  return getLandmarkDisplay(landmark);
 }
 
 /**
