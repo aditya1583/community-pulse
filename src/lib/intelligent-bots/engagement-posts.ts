@@ -2286,6 +2286,10 @@ export async function generatePredictionPost(
   // Collect matching prediction templates
   const matchingTemplates: PredictionTemplate[] = [];
 
+  // CRITICAL: Check forecast for snow FIRST before static templates
+  // This prevents asking "will it rain?" when snow is actually forecast
+  const hasSnowInForecast = weather.forecast?.some(day => day.snowfallCm > 0) ?? false;
+
   // Helper to check if prediction conditions match
   const matchesPredictionConditions = (template: PredictionTemplate): boolean => {
     const cond = template.conditions;
@@ -2320,9 +2324,25 @@ export async function generatePredictionPost(
   };
 
   // Check WEATHER predictions (most common, auto-resolvable)
-  for (const template of WEATHER_PREDICTIONS) {
-    if (matchesPredictionConditions(template)) {
-      matchingTemplates.push(template);
+  // SKIP static rain templates when snow is in the forecast!
+  // Snow is rare and exciting - we should ask about snow, not rain
+  if (hasSnowInForecast) {
+    // Snow is forecast - add snow-specific prediction immediately!
+    // This takes priority over generic "will it rain?" questions
+    matchingTemplates.push({
+      question: `🔮 Prediction Time: How much snow will ${city.name} actually get?`,
+      optionA: "❄️ More than forecast - Winter wonderland!",
+      optionB: "🥱 Less than expected - Texas tease",
+      category: "weather",
+      dataSource: "openweather",
+      resolvesInHours: 72,
+      xpReward: 25,
+    });
+  } else {
+    for (const template of WEATHER_PREDICTIONS) {
+      if (matchesPredictionConditions(template)) {
+        matchingTemplates.push(template);
+      }
     }
   }
 
