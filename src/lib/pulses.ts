@@ -265,12 +265,44 @@ export function isPulseVisible(
 /**
  * Filter an array of pulses to only include visible ones
  * This is the client-side safety net for expiry filtering
+ * 
+ * UPDATE: Now enforces STRICT implicit expiry based on tag to prevent stale
+ * Traffic/Weather updates from persisting even if database expiry is missing.
  */
-export function filterVisiblePulses<T extends { expiresAt?: string | null }>(
+export function filterVisiblePulses<T extends { expiresAt?: string | null; tag: string; createdAt: string }>(
   pulses: T[],
   now: Date = new Date()
 ): T[] {
-  return pulses.filter((pulse) => isPulseVisible(pulse.expiresAt, now));
+  return pulses.filter((pulse) => {
+    // 1. Check explicit expiry first
+    if (!isPulseVisible(pulse.expiresAt, now)) {
+      return false;
+    }
+
+    // 2. Enforce strict implicit expiry for time-sensitive tags
+    // This catches "zombie posts" that might have missed their expiry window
+    // or have bad data.
+    const created = new Date(pulse.createdAt);
+    const ageInHours = (now.getTime() - created.getTime()) / (1000 * 60 * 60);
+
+    // Safety check for future dates (allow 10 min clock skewed future posts)
+    if (ageInHours < -0.16) return true;
+
+    // STRICT RULES:
+    // Traffic: Gone after 3 hours (no matter what)
+    if (pulse.tag === "Traffic" && ageInHours > 3) return false;
+
+    // Weather: Gone after 4 hours
+    if (pulse.tag === "Weather" && ageInHours > 4) return false;
+
+    // Events: Gone after 24 hours
+    if (pulse.tag === "Events" && ageInHours > 24) return false;
+
+    // General: Gone after 48 hours (allow conversation to linger)
+    if ((pulse.tag === "General" || !pulse.tag) && ageInHours > 48) return false;
+
+    return true;
+  });
 }
 
 /**

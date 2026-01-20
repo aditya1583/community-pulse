@@ -1131,8 +1131,7 @@ export default function Home() {
           const restoredCity: GeocodedCity = {
             id:
               parsed.id ||
-              `${parsed.displayName}-${parsed.lat ?? "unknown"}-${
-                parsed.lon ?? "unknown"
+              `${parsed.displayName}-${parsed.lat ?? "unknown"}-${parsed.lon ?? "unknown"
               }`,
             name:
               parsed.name ||
@@ -1447,11 +1446,15 @@ export default function Home() {
 
   useEffect(() => {
     const triggerAutoSeed = async () => {
+      // Use visible pulses for logic to ensure we don't count hidden/expired content
+      // This ensures that if we have 50 old posts that are all hidden, we still trigger a refresh
+      const validPulses = filterVisiblePulses(pulses);
+
       // Determine if this is a cold start (empty) or stale content situation
-      const isEmpty = pulses.length === 0;
+      const isEmpty = validPulses.length === 0;
       const isStale = !isEmpty && (
-        pulses.length < STALE_PULSE_THRESHOLD ||
-        (pulses.length > 0 && isContentStale(pulses))
+        validPulses.length < STALE_PULSE_THRESHOLD ||
+        (validPulses.length > 0 && isContentStale(validPulses))
       );
 
       // Check if content is stale (oldest non-expired pulse is too old)
@@ -1475,7 +1478,8 @@ export default function Home() {
       console.log("[Content Refresh] Checking conditions:", {
         city,
         initialPulsesFetched,
-        pulsesCount: pulses.length,
+        totalPulses: pulses.length,
+        visiblePulses: validPulses.length,
         isEmpty,
         isStale,
         autoSeedAttempted,
@@ -1546,31 +1550,31 @@ export default function Home() {
         const endpoint = isEmpty ? "/api/auto-seed" : "/api/cron/refresh-content";
         const requestBody = isEmpty
           ? {
-              city,
-              // CRITICAL: Pass coordinates for universal intelligent bot support
-              // This enables contextual polls, farmers markets, and weather-based
-              // content for ANY city, not just pre-configured Texas cities
-              lat: selectedCity?.lat,
-              lon: selectedCity?.lon,
-              events: ticketmasterEvents.slice(0, 3).map((e) => ({
-                name: e.name,
-                venue: e.venue,
-                date: e.date,
-                category: e.category,
-              })),
-              // Only include weather if it matches the current city
-              weather: weather && weatherMatchesCity
-                ? {
-                    description: weather.description,
-                    temp: weather.temp,
-                    icon: weather.icon,
-                  }
-                : null,
-            }
+            city,
+            // CRITICAL: Pass coordinates for universal intelligent bot support
+            // This enables contextual polls, farmers markets, and weather-based
+            // content for ANY city, not just pre-configured Texas cities
+            lat: selectedCity?.lat,
+            lon: selectedCity?.lon,
+            events: ticketmasterEvents.slice(0, 3).map((e) => ({
+              name: e.name,
+              venue: e.venue,
+              date: e.date,
+              category: e.category,
+            })),
+            // Only include weather if it matches the current city
+            weather: weather && weatherMatchesCity
+              ? {
+                description: weather.description,
+                temp: weather.temp,
+                icon: weather.icon,
+              }
+              : null,
+          }
           : {
-              city,
-              force: false, // Let server decide if refresh is needed
-            };
+            city,
+            force: false, // Let server decide if refresh is needed
+          };
 
         const res = await fetch(endpoint, {
           method: "POST",
@@ -2043,8 +2047,8 @@ export default function Home() {
 
         if (signUpError) {
           if (signUpError.message.toLowerCase().includes("already registered") ||
-              signUpError.message.toLowerCase().includes("already exists") ||
-              signUpError.message.toLowerCase().includes("user already")) {
+            signUpError.message.toLowerCase().includes("already exists") ||
+            signUpError.message.toLowerCase().includes("user already")) {
             setAuthError("This email is already registered. Please check your email for a confirmation link, or try signing in.");
             return;
           }
@@ -3062,11 +3066,10 @@ export default function Home() {
                       setAuthSuccess(null);
                       setAuthPasswordConfirm("");
                     }}
-                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
-                      authMode === "signin"
+                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${authMode === "signin"
                         ? "bg-emerald-500 text-slate-950"
                         : "bg-slate-800/60 text-slate-400 hover:text-white"
-                    }`}
+                      }`}
                   >
                     Sign In
                   </button>
@@ -3077,11 +3080,10 @@ export default function Home() {
                       setAuthError(null);
                       setAuthSuccess(null);
                     }}
-                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
-                      authMode === "signup"
+                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${authMode === "signup"
                         ? "bg-emerald-500 text-slate-950"
                         : "bg-slate-800/60 text-slate-400 hover:text-white"
-                    }`}
+                      }`}
                   >
                     Create Account
                   </button>
@@ -3204,10 +3206,10 @@ export default function Home() {
                 {authLoading
                   ? "Please wait..."
                   : authMode === "signup"
-                  ? "Create Account"
-                  : authMode === "forgot"
-                  ? "Send Reset Link"
-                  : "Sign In"}
+                    ? "Create Account"
+                    : authMode === "forgot"
+                      ? "Send Reset Link"
+                      : "Sign In"}
               </button>
 
               {authMode === "forgot" && (
@@ -3228,8 +3230,8 @@ export default function Home() {
                 {authMode === "signup"
                   ? "We'll assign you a fun anonymous username after you create your account."
                   : authMode === "forgot"
-                  ? "Enter the email you used to sign up and we'll send you a reset link."
-                  : "Your password is securely encrypted."}
+                    ? "Enter the email you used to sign up and we'll send you a reset link."
+                    : "Your password is securely encrypted."}
               </p>
             </form>
           </div>
@@ -3409,11 +3411,10 @@ export default function Home() {
                   {/* Backdrop: click-outside-to-close + ensures correct z-index stacking */}
                   <div
                     aria-hidden="true"
-                    className={`fixed inset-0 z-40 transition-opacity duration-150 ${
-                      cityDropdownOpen
+                    className={`fixed inset-0 z-40 transition-opacity duration-150 ${cityDropdownOpen
                         ? "opacity-100 pointer-events-auto"
                         : "opacity-0 pointer-events-none"
-                    }`}
+                      }`}
                     onClick={() => {
                       setShowCitySuggestions(false);
                       clearSuggestions();
@@ -3422,11 +3423,10 @@ export default function Home() {
 
                   <div
                     ref={cityDropdownRef}
-                    className={`absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 bg-slate-900 border border-slate-700/50 rounded-lg shadow-xl max-h-64 overflow-y-auto transform transition duration-150 origin-top motion-reduce:transition-none ${
-                      cityDropdownOpen
+                    className={`absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 bg-slate-900 border border-slate-700/50 rounded-lg shadow-xl max-h-64 overflow-y-auto transform transition duration-150 origin-top motion-reduce:transition-none ${cityDropdownOpen
                         ? "opacity-100 translate-y-0 scale-100 pointer-events-auto"
                         : "opacity-0 -translate-y-1 scale-[0.98] pointer-events-none"
-                    }`}
+                      }`}
                     role="listbox"
                     aria-label="City suggestions"
                     aria-hidden={!cityDropdownOpen}
@@ -3438,11 +3438,10 @@ export default function Home() {
                         tabIndex={cityDropdownOpen ? 0 : -1}
                         onMouseEnter={() => setHighlightedIndex(idx)}
                         onClick={() => handleCitySelect(suggestion)}
-                        className={`w-full px-4 py-3 text-left text-sm transition flex items-center justify-between border-b border-slate-800 last:border-b-0 ${
-                          highlightedIndex === idx
+                        className={`w-full px-4 py-3 text-left text-sm transition flex items-center justify-between border-b border-slate-800 last:border-b-0 ${highlightedIndex === idx
                             ? "bg-slate-800 text-emerald-200"
                             : "hover:bg-slate-800 text-slate-100"
-                        }`}
+                          }`}
                         role="option"
                         aria-selected={highlightedIndex === idx}
                       >
@@ -3540,304 +3539,301 @@ export default function Home() {
           <div className="space-y-4">
             {/* Events Tab - conditionally rendered */}
             {safeActiveTab === "events" && (
-                    <EventCard
-                      events={ticketmasterEvents}
-                      isLoading={ticketmasterLoading}
-                      error={ticketmasterError}
-                      hasLocation={!!(selectedCity?.lat && selectedCity?.lon)}
-                      fallback={ticketmasterFallback}
-                      cityName={city}
-                      state={selectedCity?.state}
-                      lat={selectedCity?.lat}
-                      lon={selectedCity?.lon}
-                      isSignedIn={!!sessionUser}
-                      identityReady={identityReady}
-                      displayName={displayName}
-                      pulseLoading={loading}
-                      pulseMood={eventsMood}
-                      pulseMessage={eventsMessage}
-                      moodValidationError={tabMoodValidationError}
-                      messageValidationError={tabMessageValidationError}
-                      showValidationErrors={showTabValidationErrors}
-                      onMoodChange={(m) => {
-                        setEventsMood(m);
-                        setTabMoodValidationError(null);
-                      }}
-                      onMessageChange={(m) => {
-                        setEventsMessage(m);
-                        setTabMessageValidationError(null);
-                      }}
-                      onSubmit={handleEventsPulseSubmit}
-                      onSignInClick={() => setShowAuthModal(true)}
-                    />
+              <EventCard
+                events={ticketmasterEvents}
+                isLoading={ticketmasterLoading}
+                error={ticketmasterError}
+                hasLocation={!!(selectedCity?.lat && selectedCity?.lon)}
+                fallback={ticketmasterFallback}
+                cityName={city}
+                state={selectedCity?.state}
+                lat={selectedCity?.lat}
+                lon={selectedCity?.lon}
+                isSignedIn={!!sessionUser}
+                identityReady={identityReady}
+                displayName={displayName}
+                pulseLoading={loading}
+                pulseMood={eventsMood}
+                pulseMessage={eventsMessage}
+                moodValidationError={tabMoodValidationError}
+                messageValidationError={tabMessageValidationError}
+                showValidationErrors={showTabValidationErrors}
+                onMoodChange={(m) => {
+                  setEventsMood(m);
+                  setTabMoodValidationError(null);
+                }}
+                onMessageChange={(m) => {
+                  setEventsMessage(m);
+                  setTabMessageValidationError(null);
+                }}
+                onSubmit={handleEventsPulseSubmit}
+                onSignInClick={() => setShowAuthModal(true)}
+              />
             )}
 
             {/* Traffic Tab - conditionally rendered */}
             {safeActiveTab === "traffic" && (
-                    <TrafficContent
-                      trafficLevel={trafficLevel}
-                      trafficLoading={trafficLoading}
-                      trafficError={trafficError}
-                      trafficPulses={trafficPulses}
-                      cityName={city}
-                      isSignedIn={!!sessionUser}
-                      identityReady={identityReady}
-                      displayName={displayName}
-                      pulseLoading={loading}
-                      pulseMood={trafficMood}
-                      pulseMessage={trafficMessage}
-                      moodValidationError={tabMoodValidationError}
-                      messageValidationError={tabMessageValidationError}
-                      showValidationErrors={showTabValidationErrors}
-                      onMoodChange={(m) => {
-                        setTrafficMood(m);
-                        setTabMoodValidationError(null);
-                      }}
-                      onMessageChange={(m) => {
-                        setTrafficMessage(m);
-                        setTabMessageValidationError(null);
-                      }}
-                      onSubmit={handleTrafficPulseSubmit}
-                      onSignInClick={() => setShowAuthModal(true)}
-                    />
+              <TrafficContent
+                trafficLevel={trafficLevel}
+                trafficLoading={trafficLoading}
+                trafficError={trafficError}
+                trafficPulses={trafficPulses}
+                cityName={city}
+                isSignedIn={!!sessionUser}
+                identityReady={identityReady}
+                displayName={displayName}
+                pulseLoading={loading}
+                pulseMood={trafficMood}
+                pulseMessage={trafficMessage}
+                moodValidationError={tabMoodValidationError}
+                messageValidationError={tabMessageValidationError}
+                showValidationErrors={showTabValidationErrors}
+                onMoodChange={(m) => {
+                  setTrafficMood(m);
+                  setTabMoodValidationError(null);
+                }}
+                onMessageChange={(m) => {
+                  setTrafficMessage(m);
+                  setTabMessageValidationError(null);
+                }}
+                onSubmit={handleTrafficPulseSubmit}
+                onSignInClick={() => setShowAuthModal(true)}
+              />
             )}
 
             {/* Local Tab - conditionally rendered */}
             {safeActiveTab === "local" && (
-                    <LocalTab
-                      cityName={city}
-                      state={localState}
-                      lat={localLat}
-                      lon={localLon}
-                      section={localSection}
-                      onSectionChange={setLocalSection}
-                      userId={sessionUser?.id ?? null}
-                      onSignInClick={() => setShowAuthModal(true)}
-                      isSignedIn={!!sessionUser}
-                      identityReady={identityReady}
-                      displayName={displayName}
-                      pulseLoading={loading}
-                      pulseMood={localMood}
-                      pulseMessage={localMessage}
-                      moodValidationError={tabMoodValidationError}
-                      messageValidationError={tabMessageValidationError}
-                      showValidationErrors={showTabValidationErrors}
-                      onMoodChange={(m) => {
-                        setLocalMood(m);
-                        setTabMoodValidationError(null);
-                      }}
-                      onMessageChange={(m) => {
-                        setLocalMessage(m);
-                        setTabMessageValidationError(null);
-                      }}
-                      onSubmit={handleLocalPulseSubmit}
-                    />
+              <LocalTab
+                cityName={city}
+                state={localState}
+                lat={localLat}
+                lon={localLon}
+                section={localSection}
+                onSectionChange={setLocalSection}
+                userId={sessionUser?.id ?? null}
+                onSignInClick={() => setShowAuthModal(true)}
+                isSignedIn={!!sessionUser}
+                identityReady={identityReady}
+                displayName={displayName}
+                pulseLoading={loading}
+                pulseMood={localMood}
+                pulseMessage={localMessage}
+                moodValidationError={tabMoodValidationError}
+                messageValidationError={tabMessageValidationError}
+                showValidationErrors={showTabValidationErrors}
+                onMoodChange={(m) => {
+                  setLocalMood(m);
+                  setTabMoodValidationError(null);
+                }}
+                onMessageChange={(m) => {
+                  setLocalMessage(m);
+                  setTabMessageValidationError(null);
+                }}
+                onSubmit={handleLocalPulseSubmit}
+              />
             )}
 
             {/* Status Tab - conditionally rendered */}
             {safeActiveTab === "status" && (
-                    <StatusTab
-                      userId={sessionUser?.id ?? null}
-                      city={city}
-                    />
+              <StatusTab
+                userId={sessionUser?.id ?? null}
+                city={city}
+              />
             )}
 
             {/* Pulse Tab - ALWAYS rendered, hidden with CSS when not active */}
             {/* This prevents remounting the large pulse list when switching tabs */}
             <div className={safeActiveTab === "pulse" ? "" : "hidden"}>
-                      {/* Pulse Input */}
-                      <div id="drop-a-pulse">
-                        <PulseInput
-                          ref={pulseTextareaRef}
-                          mood={mood}
-                          tag={tag}
-                          message={message}
-                          displayName={displayName}
-                          isSignedIn={!!sessionUser}
-                          identityReady={identityReady}
-                          loading={loading}
-                          moodValidationError={moodValidationError}
-                          tagValidationError={tagValidationError}
-                          messageValidationError={validationError}
-                          showValidationErrors={showValidationErrors}
-                          onMoodChange={(m) => {
-                            setMood(m);
-                            setMoodValidationError(null);
-                          }}
-                          onTagChange={(t) => {
-                            setTag(t);
-                            setTagValidationError(null);
-                          }}
-                          onMessageChange={(m) => {
-                            setMessage(m);
-                            setValidationError(null);
-                          }}
-                          onSubmit={handleAddPulse}
-                          onSignInClick={() => setShowAuthModal(true)}
-                          weather={weather}
-                        />
-                      </div>
+              {/* Pulse Input */}
+              <div id="drop-a-pulse">
+                <PulseInput
+                  ref={pulseTextareaRef}
+                  mood={mood}
+                  tag={tag}
+                  message={message}
+                  displayName={displayName}
+                  isSignedIn={!!sessionUser}
+                  identityReady={identityReady}
+                  loading={loading}
+                  moodValidationError={moodValidationError}
+                  tagValidationError={tagValidationError}
+                  messageValidationError={validationError}
+                  showValidationErrors={showValidationErrors}
+                  onMoodChange={(m) => {
+                    setMood(m);
+                    setMoodValidationError(null);
+                  }}
+                  onTagChange={(t) => {
+                    setTag(t);
+                    setTagValidationError(null);
+                  }}
+                  onMessageChange={(m) => {
+                    setMessage(m);
+                    setValidationError(null);
+                  }}
+                  onSubmit={handleAddPulse}
+                  onSignInClick={() => setShowAuthModal(true)}
+                  weather={weather}
+                />
+              </div>
 
-                      {errorMsg && (
-                        <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/40 rounded-lg px-3 py-2">
-                          {errorMsg}
-                        </p>
-                      )}
+              {errorMsg && (
+                <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/40 rounded-lg px-3 py-2">
+                  {errorMsg}
+                </p>
+              )}
 
-                      {/* Filter chips */}
-                      <div className="flex flex-wrap gap-2">
-                        {TAGS.map((t) => (
-                          <button
-                            key={t}
-                            onClick={() => setTagFilter(t)}
-                            className={`px-3 py-1.5 rounded-lg text-xs border transition ${
-                              tagFilter === t
-                                ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow shadow-emerald-500/40"
-                                : "bg-slate-800/60 border-slate-700/50 text-slate-300 hover:bg-slate-700"
-                            }`}
-                          >
-                            {t}
-                          </button>
-                        ))}
-                      </div>
+              {/* Filter chips */}
+              <div className="flex flex-wrap gap-2">
+                {TAGS.map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setTagFilter(t)}
+                    className={`px-3 py-1.5 rounded-lg text-xs border transition ${tagFilter === t
+                        ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow shadow-emerald-500/40"
+                        : "bg-slate-800/60 border-slate-700/50 text-slate-300 hover:bg-slate-700"
+                      }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
 
-                      {/* Pulses list */}
-                      {/* "Happening Now" Banner - Pin critical active event/alert */}
-                      {happeningNowPulse && tagFilter === "All" && (
-                        <div className="mb-4 relative">
-                          <div className={`rounded-xl p-3 border-2 ${
-                            happeningNowPulse.tag === "Traffic"
-                              ? "bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/50"
-                              : happeningNowPulse.tag === "Events"
-                              ? "bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/50"
-                              : "bg-gradient-to-r from-sky-500/10 to-blue-500/10 border-sky-500/50"
-                          }`}>
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full animate-pulse ${
-                                happeningNowPulse.tag === "Traffic"
-                                  ? "bg-amber-500/30 text-amber-200"
-                                  : happeningNowPulse.tag === "Events"
-                                  ? "bg-purple-500/30 text-purple-200"
-                                  : "bg-sky-500/30 text-sky-200"
-                              }`}>
-                                <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                                Happening Now
-                              </span>
-                              <span className="text-[10px] text-slate-400 uppercase tracking-wide">
-                                {happeningNowPulse.tag}
-                              </span>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <span className="text-xl flex-shrink-0">{happeningNowPulse.mood}</span>
-                              <p className="text-sm text-white leading-snug line-clamp-2">
-                                {happeningNowPulse.message.split('\n')[0]}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+              {/* Pulses list */}
+              {/* "Happening Now" Banner - Pin critical active event/alert */}
+              {happeningNowPulse && tagFilter === "All" && (
+                <div className="mb-4 relative">
+                  <div className={`rounded-xl p-3 border-2 ${happeningNowPulse.tag === "Traffic"
+                      ? "bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/50"
+                      : happeningNowPulse.tag === "Events"
+                        ? "bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/50"
+                        : "bg-gradient-to-r from-sky-500/10 to-blue-500/10 border-sky-500/50"
+                    }`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full animate-pulse ${happeningNowPulse.tag === "Traffic"
+                          ? "bg-amber-500/30 text-amber-200"
+                          : happeningNowPulse.tag === "Events"
+                            ? "bg-purple-500/30 text-purple-200"
+                            : "bg-sky-500/30 text-sky-200"
+                        }`}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                        Happening Now
+                      </span>
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wide">
+                        {happeningNowPulse.tag}
+                      </span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-xl flex-shrink-0">{happeningNowPulse.mood}</span>
+                      <p className="text-sm text-white leading-snug line-clamp-2">
+                        {happeningNowPulse.message.split('\n')[0]}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-                      {/* FIXED: Show loading state until initial fetch completes to prevent
+              {/* FIXED: Show loading state until initial fetch completes to prevent
                           the "No pulses yet" flash that was causing user confusion */}
-                      <section className="space-y-3 pb-12">
-                        {(loading || !initialPulsesFetched) && pulses.length === 0 ? (
-                          <div className="bg-slate-800/60 border border-dashed border-slate-700/50 rounded-xl px-4 py-10 text-center text-sm text-slate-400">
-                            Loading pulses for{" "}
-                            <span className="font-semibold text-white">
-                              {city}
-                            </span>
-                            ...
-                          </div>
-                        ) : filteredPulses.length === 0 ? (
-                          <div className="bg-slate-800/60 border border-dashed border-slate-700/50 rounded-xl px-4 py-10 text-center text-sm text-slate-400">
-                            {tagFilter === "All" ? (
-                              <>
-                                No pulses yet for{" "}
-                                <span className="font-semibold text-white">
-                                  {city}
-                                </span>
-                                . Be the first to set the vibe.
-                              </>
-                            ) : (
-                              <>
-                                No <span className="font-semibold text-white">{tagFilter}</span> pulses in{" "}
-                                <span className="font-semibold text-white">{city}</span>.{" "}
-                                <button
-                                  onClick={() => setTagFilter("All")}
-                                  className="text-emerald-400 hover:text-emerald-300 underline underline-offset-2"
-                                >
-                                  Show all
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        ) : (
-                          <>
-                            {/* In-radius pulses (within 10 miles) - exclude happeningNow to avoid duplication */}
-                            {inRadiusPulses
-                              .filter((pulse) => !happeningNowPulse || pulse.id !== happeningNowPulse.id)
-                              .map((pulse) => (
-                              <PulseCard
-                                key={pulse.id}
-                                pulse={pulse}
-                                isOwnPulse={sessionUser?.id === pulse.user_id}
-                                isFavorite={favoritePulseIds.includes(pulse.id)}
-                                onToggleFavorite={handleToggleFavorite}
-                                onDelete={handleDeletePulse}
-                                reporterId={sessionUser?.id}
-                                userIdentifier={sessionUser ? displayName : undefined}
-                                authorRank={pulse.user_id ? authorStats[pulse.user_id]?.rank : null}
-                                authorLevel={pulse.user_id ? authorStats[pulse.user_id]?.level : undefined}
-                              />
-                            ))}
+              <section className="space-y-3 pb-12">
+                {(loading || !initialPulsesFetched) && pulses.length === 0 ? (
+                  <div className="bg-slate-800/60 border border-dashed border-slate-700/50 rounded-xl px-4 py-10 text-center text-sm text-slate-400">
+                    Loading pulses for{" "}
+                    <span className="font-semibold text-white">
+                      {city}
+                    </span>
+                    ...
+                  </div>
+                ) : filteredPulses.length === 0 ? (
+                  <div className="bg-slate-800/60 border border-dashed border-slate-700/50 rounded-xl px-4 py-10 text-center text-sm text-slate-400">
+                    {tagFilter === "All" ? (
+                      <>
+                        No pulses yet for{" "}
+                        <span className="font-semibold text-white">
+                          {city}
+                        </span>
+                        . Be the first to set the vibe.
+                      </>
+                    ) : (
+                      <>
+                        No <span className="font-semibold text-white">{tagFilter}</span> pulses in{" "}
+                        <span className="font-semibold text-white">{city}</span>.{" "}
+                        <button
+                          onClick={() => setTagFilter("All")}
+                          className="text-emerald-400 hover:text-emerald-300 underline underline-offset-2"
+                        >
+                          Show all
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    {/* In-radius pulses (within 10 miles) - exclude happeningNow to avoid duplication */}
+                    {inRadiusPulses
+                      .filter((pulse) => !happeningNowPulse || pulse.id !== happeningNowPulse.id)
+                      .map((pulse) => (
+                        <PulseCard
+                          key={pulse.id}
+                          pulse={pulse}
+                          isOwnPulse={sessionUser?.id === pulse.user_id}
+                          isFavorite={favoritePulseIds.includes(pulse.id)}
+                          onToggleFavorite={handleToggleFavorite}
+                          onDelete={handleDeletePulse}
+                          reporterId={sessionUser?.id}
+                          userIdentifier={sessionUser ? displayName : undefined}
+                          authorRank={pulse.user_id ? authorStats[pulse.user_id]?.rank : null}
+                          authorLevel={pulse.user_id ? authorStats[pulse.user_id]?.level : undefined}
+                        />
+                      ))}
 
-                            {/* Visual separator for out-of-radius content */}
-                            {outOfRadiusPulses.length > 0 && inRadiusPulses.length > 0 && (
-                              <div className="relative my-6">
-                                <div className="absolute inset-0 flex items-center">
-                                  <div className="w-full border-t border-dashed border-amber-500/30" />
-                                </div>
-                                <div className="relative flex justify-center">
-                                  <span className="bg-slate-950 px-4 py-1 text-xs text-amber-400/80 font-medium rounded-full border border-amber-500/30">
-                                    Beyond 10-mile radius
-                                  </span>
-                                </div>
-                              </div>
-                            )}
+                    {/* Visual separator for out-of-radius content */}
+                    {outOfRadiusPulses.length > 0 && inRadiusPulses.length > 0 && (
+                      <div className="relative my-6">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-dashed border-amber-500/30" />
+                        </div>
+                        <div className="relative flex justify-center">
+                          <span className="bg-slate-950 px-4 py-1 text-xs text-amber-400/80 font-medium rounded-full border border-amber-500/30">
+                            Beyond 10-mile radius
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
-                            {/* Out-of-radius pulses (beyond 10 miles) */}
-                            {outOfRadiusPulses.map((pulse) => (
-                              <PulseCard
-                                key={pulse.id}
-                                pulse={pulse}
-                                isOwnPulse={sessionUser?.id === pulse.user_id}
-                                isFavorite={favoritePulseIds.includes(pulse.id)}
-                                onToggleFavorite={handleToggleFavorite}
-                                onDelete={handleDeletePulse}
-                                reporterId={sessionUser?.id}
-                                userIdentifier={sessionUser ? displayName : undefined}
-                                authorRank={pulse.user_id ? authorStats[pulse.user_id]?.rank : null}
-                                authorLevel={pulse.user_id ? authorStats[pulse.user_id]?.level : undefined}
-                              />
-                            ))}
+                    {/* Out-of-radius pulses (beyond 10 miles) */}
+                    {outOfRadiusPulses.map((pulse) => (
+                      <PulseCard
+                        key={pulse.id}
+                        pulse={pulse}
+                        isOwnPulse={sessionUser?.id === pulse.user_id}
+                        isFavorite={favoritePulseIds.includes(pulse.id)}
+                        onToggleFavorite={handleToggleFavorite}
+                        onDelete={handleDeletePulse}
+                        reporterId={sessionUser?.id}
+                        userIdentifier={sessionUser ? displayName : undefined}
+                        authorRank={pulse.user_id ? authorStats[pulse.user_id]?.rank : null}
+                        authorLevel={pulse.user_id ? authorStats[pulse.user_id]?.level : undefined}
+                      />
+                    ))}
 
-                            {/* Load more button */}
-                            {hasMorePulses && tagFilter === "All" && (
-                              <div className="flex justify-center pt-4">
-                                <button
-                                  onClick={handleLoadMorePulses}
-                                  disabled={loadingMore}
-                                  className="px-6 py-2 rounded-lg bg-slate-800/60 border border-slate-700/50 text-sm text-slate-300 hover:bg-slate-700 hover:border-emerald-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                                >
-                                  {loadingMore
-                                    ? "Loading..."
-                                    : "Load more pulses"}
-                                </button>
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </section>
+                    {/* Load more button */}
+                    {hasMorePulses && tagFilter === "All" && (
+                      <div className="flex justify-center pt-4">
+                        <button
+                          onClick={handleLoadMorePulses}
+                          disabled={loadingMore}
+                          className="px-6 py-2 rounded-lg bg-slate-800/60 border border-slate-700/50 text-sm text-slate-300 hover:bg-slate-700 hover:border-emerald-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                        >
+                          {loadingMore
+                            ? "Loading..."
+                            : "Load more pulses"}
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </section>
             </div>
           </div>
 
