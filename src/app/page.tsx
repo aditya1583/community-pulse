@@ -1441,8 +1441,10 @@ export default function Home() {
   const [staleRefreshAttempted, setStaleRefreshAttempted] = useState<string | null>(null);
 
   // Constants for stale content detection
-  const STALE_PULSE_THRESHOLD = 3; // Trigger refresh if fewer than this many pulses
-  const STALE_AGE_HOURS = 2; // Trigger refresh if newest pulse is older than this
+  const STALE_PULSE_THRESHOLD = 5; // Trigger refresh if fewer than this many pulses
+  const STALE_AGE_HOURS = 1; // Trigger refresh if newest pulse is older than this
+
+  const isSeedingRef = useRef(false);
 
   useEffect(() => {
     const triggerAutoSeed = async () => {
@@ -1456,6 +1458,11 @@ export default function Home() {
         validPulses.length < STALE_PULSE_THRESHOLD ||
         (validPulses.length > 0 && isContentStale(validPulses))
       );
+
+      if (isSeedingRef.current) {
+        console.log("[Content Refresh] Skipping - seeding already in progress");
+        return;
+      }
 
       // Check if content is stale (oldest non-expired pulse is too old)
       function isContentStale(pulsesToCheck: Pulse[]): boolean {
@@ -1544,6 +1551,7 @@ export default function Home() {
       console.log(`[Content Refresh] Triggering ${refreshType} for:`, city);
 
       try {
+        isSeedingRef.current = true;
         console.log(`[Content Refresh] ${refreshType} for ${city}...`);
 
         // For stale refresh, use the cron refresh endpoint; for cold-start, use auto-seed
@@ -1656,6 +1664,8 @@ export default function Home() {
         }
       } catch (err) {
         console.error("[Content Refresh] Error:", err);
+      } finally {
+        isSeedingRef.current = false;
       }
     };
 
@@ -3067,8 +3077,8 @@ export default function Home() {
                       setAuthPasswordConfirm("");
                     }}
                     className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${authMode === "signin"
-                        ? "bg-emerald-500 text-slate-950"
-                        : "bg-slate-800/60 text-slate-400 hover:text-white"
+                      ? "bg-emerald-500 text-slate-950"
+                      : "bg-slate-800/60 text-slate-400 hover:text-white"
                       }`}
                   >
                     Sign In
@@ -3081,8 +3091,8 @@ export default function Home() {
                       setAuthSuccess(null);
                     }}
                     className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${authMode === "signup"
-                        ? "bg-emerald-500 text-slate-950"
-                        : "bg-slate-800/60 text-slate-400 hover:text-white"
+                      ? "bg-emerald-500 text-slate-950"
+                      : "bg-slate-800/60 text-slate-400 hover:text-white"
                       }`}
                   >
                     Create Account
@@ -3412,8 +3422,8 @@ export default function Home() {
                   <div
                     aria-hidden="true"
                     className={`fixed inset-0 z-40 transition-opacity duration-150 ${cityDropdownOpen
-                        ? "opacity-100 pointer-events-auto"
-                        : "opacity-0 pointer-events-none"
+                      ? "opacity-100 pointer-events-auto"
+                      : "opacity-0 pointer-events-none"
                       }`}
                     onClick={() => {
                       setShowCitySuggestions(false);
@@ -3424,8 +3434,8 @@ export default function Home() {
                   <div
                     ref={cityDropdownRef}
                     className={`absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 bg-slate-900 border border-slate-700/50 rounded-lg shadow-xl max-h-64 overflow-y-auto transform transition duration-150 origin-top motion-reduce:transition-none ${cityDropdownOpen
-                        ? "opacity-100 translate-y-0 scale-100 pointer-events-auto"
-                        : "opacity-0 -translate-y-1 scale-[0.98] pointer-events-none"
+                      ? "opacity-100 translate-y-0 scale-100 pointer-events-auto"
+                      : "opacity-0 -translate-y-1 scale-[0.98] pointer-events-none"
                       }`}
                     role="listbox"
                     aria-label="City suggestions"
@@ -3439,8 +3449,8 @@ export default function Home() {
                         onMouseEnter={() => setHighlightedIndex(idx)}
                         onClick={() => handleCitySelect(suggestion)}
                         className={`w-full px-4 py-3 text-left text-sm transition flex items-center justify-between border-b border-slate-800 last:border-b-0 ${highlightedIndex === idx
-                            ? "bg-slate-800 text-emerald-200"
-                            : "hover:bg-slate-800 text-slate-100"
+                          ? "bg-slate-800 text-emerald-200"
+                          : "hover:bg-slate-800 text-slate-100"
                           }`}
                         role="option"
                         aria-selected={highlightedIndex === idx}
@@ -3690,8 +3700,8 @@ export default function Home() {
                     key={t}
                     onClick={() => setTagFilter(t)}
                     className={`px-3 py-1.5 rounded-lg text-xs border transition ${tagFilter === t
-                        ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow shadow-emerald-500/40"
-                        : "bg-slate-800/60 border-slate-700/50 text-slate-300 hover:bg-slate-700"
+                      ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow shadow-emerald-500/40"
+                      : "bg-slate-800/60 border-slate-700/50 text-slate-300 hover:bg-slate-700"
                       }`}
                   >
                     {t}
@@ -3704,17 +3714,17 @@ export default function Home() {
               {happeningNowPulse && tagFilter === "All" && (
                 <div className="mb-4 relative">
                   <div className={`rounded-xl p-3 border-2 ${happeningNowPulse.tag === "Traffic"
-                      ? "bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/50"
-                      : happeningNowPulse.tag === "Events"
-                        ? "bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/50"
-                        : "bg-gradient-to-r from-sky-500/10 to-blue-500/10 border-sky-500/50"
+                    ? "bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/50"
+                    : happeningNowPulse.tag === "Events"
+                      ? "bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/50"
+                      : "bg-gradient-to-r from-sky-500/10 to-blue-500/10 border-sky-500/50"
                     }`}>
                     <div className="flex items-center gap-2 mb-2">
                       <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full animate-pulse ${happeningNowPulse.tag === "Traffic"
-                          ? "bg-amber-500/30 text-amber-200"
-                          : happeningNowPulse.tag === "Events"
-                            ? "bg-purple-500/30 text-purple-200"
-                            : "bg-sky-500/30 text-sky-200"
+                        ? "bg-amber-500/30 text-amber-200"
+                        : happeningNowPulse.tag === "Events"
+                          ? "bg-purple-500/30 text-purple-200"
+                          : "bg-sky-500/30 text-sky-200"
                         }`}>
                         <span className="w-1.5 h-1.5 rounded-full bg-current" />
                         Happening Now

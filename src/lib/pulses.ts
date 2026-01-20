@@ -289,11 +289,11 @@ export function filterVisiblePulses<T extends { expiresAt?: string | null; tag: 
     if (ageInHours < -0.16) return true;
 
     // STRICT RULES:
-    // Traffic: Gone after 3 hours (no matter what)
-    if (pulse.tag === "Traffic" && ageInHours > 3) return false;
+    // Traffic: Gone after 1.5 hours (no matter what)
+    if (pulse.tag === "Traffic" && ageInHours > 1.5) return false;
 
-    // Weather: Gone after 4 hours
-    if (pulse.tag === "Weather" && ageInHours > 4) return false;
+    // Weather: Gone after 3 hours
+    if (pulse.tag === "Weather" && ageInHours > 3) return false;
 
     // Events: Gone after 24 hours
     if (pulse.tag === "Events" && ageInHours > 24) return false;
