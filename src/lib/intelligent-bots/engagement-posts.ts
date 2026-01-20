@@ -2972,8 +2972,8 @@ export async function generateLandmarkFoodPost(
   const tier3Matches = cityVenues.filter(l => {
     const name = getLandmarkName(l).toLowerCase();
     return matchesTier(l, LANDMARK_TIERS.tier3) ||
-           name.includes("park") ||
-           name.includes("station");
+      name.includes("park") ||
+      name.includes("station");
   });
   if (tier3Matches.length > 0) {
     landmarkPool.push(...tier3Matches);
@@ -3535,8 +3535,8 @@ export async function generateEngagementSeedPosts(
 
   if (hasMarketData) {
     // ALWAYS include farmers market post if we have data - it's informative content
-    // Insert at position 2 (after prediction and landmark_food) for visibility
-    priorities.splice(2, 0, "farmers_market");
+    // Insert at position 1 (Top priority after prediction) to ensure visibility even with low post counts
+    priorities.splice(1, 0, "farmers_market");
     console.log(`[SeedPosts] Including farmers_market - found ${ctx.farmersMarkets.length} markets, closest: ${ctx.farmersMarkets[0]?.name}`);
   }
 

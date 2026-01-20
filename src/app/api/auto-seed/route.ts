@@ -501,7 +501,7 @@ export async function POST(req: NextRequest) {
       // Generate 4 varied posts (Traffic, Weather, Events, Engagement)
       const coords = hasCoords ? { lat: body.lat!, lon: body.lon! } : undefined;
       const result = await generateColdStartPosts(cityName, {
-        count: 4,
+        count: 5,
         force: true,
         coords,
       });
