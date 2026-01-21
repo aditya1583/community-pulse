@@ -209,7 +209,7 @@ export async function generateIntelligentPost(
     };
   }
 
-  // Fetch real-time data in parallel (pass coords for better event coverage)
+  // Fetch real-time data in parallel
   const [traffic, weather, events, farmersMarkets] = await Promise.all([
     fetchTrafficData(config.coords),
     fetchWeatherData(config.coords),
@@ -224,21 +224,38 @@ export async function generateIntelligentPost(
   // Check for engagement post opportunity first (if enabled)
   if (options.includeEngagement !== false) {
     const engagementDecision = analyzeForEngagement(ctx);
+
     if (engagementDecision.shouldPost && engagementDecision.engagementType) {
-      const engagementPost = await generateEngagementPost(ctx, engagementDecision.engagementType);
-      if (engagementPost) {
-        return {
-          success: true,
-          posted: true,
-          reason: engagementDecision.reason,
-          post: engagementPost,
-          situationSummary,
-        };
+      // Check cooldown for engagement posts
+      // Note: We ALWAYS check cooldown even with force:true to prevent instant duplicates in loops
+      const cooldown = checkCooldown(
+        cityName,
+        "General", // Engagement posts are usually "General" tag
+        options.force ? 10 : 5, // Force = high priority
+        engagementDecision.engagementType
+      );
+
+      if (cooldown.allowed) {
+        const engagementPost = await generateEngagementPost(ctx, engagementDecision.engagementType);
+        if (engagementPost) {
+          // Record the post in cooldown state
+          recordPost(cityName, engagementPost.tag as PostType || "General", engagementDecision.engagementType);
+
+          return {
+            success: true,
+            posted: true,
+            reason: engagementDecision.reason,
+            post: engagementPost,
+            situationSummary,
+          };
+        }
+      } else {
+        console.log(`[IntelligentPost] Engagement ${engagementDecision.engagementType} blocked: ${cooldown.reason}`);
       }
     }
   }
 
-  // Analyze what to post
+  // Analyze what to post (regular informational posts)
   const decision = analyzeForPost(ctx);
 
   if (!decision.shouldPost || !decision.postType) {
@@ -250,24 +267,28 @@ export async function generateIntelligentPost(
     };
   }
 
-  // Check cooldown (unless forced)
-  if (!options.force) {
-    const cooldown = checkCooldown(cityName, decision.postType, decision.priority);
-    if (!cooldown.allowed) {
-      return {
-        success: true,
-        posted: false,
-        reason: cooldown.reason,
-        situationSummary,
-        cooldownStatus: {
-          allowed: false,
-          waitTimeMs: cooldown.waitTimeMs,
-        },
-      };
-    }
+  // Check cooldown for regular posts
+  // Note: We ALWAYS check cooldown even with force:true to prevent instant duplicates in loops
+  const cooldown = checkCooldown(
+    cityName,
+    decision.postType,
+    options.force ? 10 : decision.priority
+  );
+
+  if (!cooldown.allowed) {
+    return {
+      success: true,
+      posted: false,
+      reason: cooldown.reason,
+      situationSummary,
+      cooldownStatus: {
+        allowed: false,
+        waitTimeMs: cooldown.waitTimeMs,
+      },
+    };
   }
 
-  // Generate the post (now with AI-powered fun facts!)
+  // Generate the post
   const post = await generatePost(ctx, decision);
 
   if (!post) {

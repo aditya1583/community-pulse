@@ -121,21 +121,21 @@ const PulseInput = forwardRef<HTMLTextAreaElement, PulseInputProps>(
     }
 
     return (
-      <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 space-y-4">
+      <div className="glass-card rounded-2xl p-5 mb-6 premium-border shadow-2xl space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-white">
+          <h3 className="text-sm font-bold text-white tracking-tight uppercase">
             Drop a <span className="text-emerald-400">pulse</span>
           </h3>
-          <div className="flex items-center gap-1.5 text-xs text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Live board</span>
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-500/10 text-[10px] font-black text-emerald-400 uppercase tracking-widest border border-emerald-500/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Live
           </div>
         </div>
 
         {/* Category Selection Pills */}
-        <div className="space-y-2">
-          <span className="text-xs text-slate-400">Category</span>
+        <div className="space-y-3">
+          <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Select Category</span>
           <div className="flex flex-wrap gap-2">
             {POST_TAGS.map((category) => {
               const isActive = selectedCategory === category;
@@ -144,11 +144,10 @@ const PulseInput = forwardRef<HTMLTextAreaElement, PulseInputProps>(
                   key={category}
                   type="button"
                   onClick={() => handleCategorySelect(category as PulseCategory)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                    isActive
-                      ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"
-                      : "bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:border-slate-600"
-                  }`}
+                  className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-300 border ${isActive
+                    ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow-lg shadow-emerald-500/30 scale-105"
+                    : "bg-white/5 border-white/5 text-slate-400 hover:text-white hover:bg-white/10"
+                    }`}
                 >
                   {category}
                 </button>
@@ -161,17 +160,16 @@ const PulseInput = forwardRef<HTMLTextAreaElement, PulseInputProps>(
         </div>
 
         {/* Mood Selection (MANDATORY) */}
-        <div id="mood-selector" tabIndex={-1} className="space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">Vibe</span>
-            <span className="text-[10px] text-amber-400/80">*required</span>
+        <div id="mood-selector" tabIndex={-1} className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Select Vibe</span>
+            <span className="text-[9px] font-black text-amber-500 uppercase tracking-tighter opacity-80">* required</span>
           </div>
           <div
-            className={`flex flex-wrap gap-2 p-2 rounded-lg ${
-              showValidationErrors && moodValidationError
-                ? "bg-red-500/10 border border-red-500/40"
-                : "bg-slate-900/50"
-            }`}
+            className={`flex flex-wrap gap-2 p-1.5 rounded-xl transition-all duration-300 ${showValidationErrors && moodValidationError
+              ? "bg-red-500/10 border border-red-500/40"
+              : "bg-white/5 border border-white/5"
+              }`}
           >
             {categoryMoods.map(({ emoji, label }) => {
               const isSelected = mood === emoji;
@@ -180,14 +178,13 @@ const PulseInput = forwardRef<HTMLTextAreaElement, PulseInputProps>(
                   key={emoji}
                   type="button"
                   onClick={() => onMoodChange(emoji)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition ${
-                    isSelected
-                      ? "bg-emerald-500/20 border border-emerald-500 text-white"
-                      : "bg-slate-800/60 border border-slate-700/50 text-slate-300 hover:border-slate-600 hover:text-white"
-                  }`}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all duration-300 ${isSelected
+                    ? "bg-emerald-500/20 border border-emerald-500 text-white shadow-lg shadow-emerald-500/5 scale-105"
+                    : "bg-slate-900/50 border border-white/5 text-slate-400 hover:border-white/20 hover:text-white"
+                    }`}
                 >
-                  <span className="text-lg">{emoji}</span>
-                  <span className="text-xs">{label}</span>
+                  <span className="text-xl filter drop-shadow-sm">{emoji}</span>
+                  <span>{label}</span>
                 </button>
               );
             })}
@@ -199,14 +196,14 @@ const PulseInput = forwardRef<HTMLTextAreaElement, PulseInputProps>(
 
         {/* Context Section (Dynamic based on category) */}
         {selectedCategory === "Weather" && weather && (
-          <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700/30">
-            <span className="text-xs text-slate-400">Current conditions</span>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-lg font-medium text-white">
+          <div className="bg-sky-500/5 rounded-xl p-3 border border-sky-500/20 flex items-center justify-between">
+            <span className="text-[10px] font-bold text-sky-400/80 uppercase tracking-widest">Current Weather</span>
+            <div className="flex items-center gap-3">
+              <span className="text-lg font-black text-white px-2 py-0.5 rounded-lg bg-sky-500/10">
                 {Math.round(weather.temp)}
                 {"\u00B0F"}
               </span>
-              <span className="text-sm text-slate-300 capitalize">
+              <span className="text-xs font-bold text-sky-200 capitalize tracking-tight px-3 py-1 rounded-full bg-white/5">
                 {weather.description}
               </span>
             </div>
@@ -214,69 +211,75 @@ const PulseInput = forwardRef<HTMLTextAreaElement, PulseInputProps>(
         )}
 
         {/* Message input */}
-        <div className="space-y-2">
+        <div className="space-y-3 pt-2">
           {/* Suggestion chip - tappable prompt that auto-fills */}
           {!message && (
             <button
               type="button"
               onClick={() => onMessageChange(placeholder)}
-              className="group flex items-center gap-2 w-full px-3 py-2 text-left text-sm bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-lg hover:from-amber-500/20 hover:to-orange-500/20 hover:border-amber-500/40 transition-all"
+              className="group flex items-center gap-3 w-full px-4 py-2.5 text-left text-sm bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-xl hover:from-amber-500/15 hover:to-orange-500/15 hover:border-amber-500/30 transition-all duration-300 shadow-sm shadow-amber-900/10"
             >
-              <span className="text-amber-400 text-base animate-pulse">💡</span>
-              <span className="text-amber-200/90 flex-1 line-clamp-1">{placeholder}</span>
-              <span className="text-[10px] text-amber-400/60 group-hover:text-amber-400 transition-colors whitespace-nowrap">tap to use</span>
+              <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center animate-pulse">
+                <span className="text-amber-400 text-lg">💡</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-amber-200/90 font-bold text-xs truncate">{placeholder}</p>
+                <p className="text-[9px] text-amber-500/60 uppercase font-black tracking-widest">Tap to auto-fill</p>
+              </div>
             </button>
           )}
 
-          <textarea
-            ref={ref}
-            value={message}
-            onChange={(e) => {
-              const value = e.target.value;
-              if (value.length <= MAX_MESSAGE_LENGTH) {
-                onMessageChange(value);
-              }
-            }}
-            rows={3}
-            className={`w-full rounded-lg bg-slate-900/70 border px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:border-transparent resize-none ${
-              showValidationErrors && messageValidationError
-                ? "border-red-500/60"
-                : "border-slate-700/50"
-            }`}
-            placeholder="Share what's happening..."
-          />
+          <div className="relative group/textarea">
+            <textarea
+              ref={ref}
+              value={message}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value.length <= MAX_MESSAGE_LENGTH) {
+                  onMessageChange(value);
+                }
+              }}
+              rows={3}
+              className={`w-full rounded-xl bg-slate-900/80 border p-4 text-[15px] text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 transition-all duration-300 resize-none font-medium leading-relaxed ${showValidationErrors && messageValidationError
+                ? "border-red-500/60 shadow-[0_0_10px_rgba(239,68,68,0.1)]"
+                : "border-white/5 shadow-inner"
+                }`}
+              placeholder="What's the vibe right now?"
+            />
 
-          {/* Character count + validation error */}
-          <div className="flex items-center justify-between text-[11px]">
-            <span className="text-slate-500">
+            {/* Character count floating overlay */}
+            <div className={`absolute bottom-3 right-3 px-1.5 py-0.5 rounded bg-black/40 text-[9px] font-black tracking-tighter ${message.length >= MAX_MESSAGE_LENGTH ? 'text-red-400' : 'text-slate-500'}`}>
               {message.length}/{MAX_MESSAGE_LENGTH}
-            </span>
-            {showValidationErrors && messageValidationError && (
-              <span className="text-red-400">{messageValidationError}</span>
-            )}
+            </div>
           </div>
 
+          {showValidationErrors && messageValidationError && (
+            <p className="text-red-400 text-[10px] font-bold px-1">{messageValidationError}</p>
+          )}
+
           {/* Submit row */}
-          <div className="flex items-center justify-between pt-1">
-            <span className="text-[11px] text-slate-500">
-              Posting as <span className="text-cyan-400">{displayName}</span>
-            </span>
+          <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                Posting as <span className="text-cyan-400">{displayName}</span>
+              </span>
+            </div>
             <button
               onClick={onSubmit}
               disabled={!isPostEnabled}
-              className={`inline-flex items-center gap-1.5 px-4 py-1.5 font-medium text-xs rounded-lg shadow-lg transition ${
-                isPostEnabled
-                  ? "bg-gradient-to-r from-emerald-400 to-emerald-600 text-slate-950 shadow-emerald-500/30 hover:from-emerald-300 hover:to-emerald-500"
-                  : "bg-slate-700 text-slate-400 cursor-not-allowed opacity-50"
-              }`}
+              className={`group relative inline-flex items-center gap-2 px-6 py-2.5 font-black text-xs uppercase tracking-widest rounded-full transition-all duration-500 ${isPostEnabled
+                ? "bg-emerald-500 text-slate-950 shadow-[0_0_20px_-5px_rgba(16,185,129,0.5)] hover:scale-105 hover:bg-emerald-400"
+                : "bg-white/5 text-slate-600 cursor-not-allowed border border-white/5"
+                }`}
             >
-              <span>{identityReady ? "Post pulse" : "Please wait..."}</span>
+              <span>{identityReady ? "Post Pulse" : "Wait..."}</span>
               <svg
-                className="w-3.5 h-3.5"
+                className={`w-4 h-4 transition-transform duration-500 ${isPostEnabled ? 'group-hover:translate-x-1 group-hover:-translate-y-1' : ''}`}
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
-                strokeWidth={2}
+                strokeWidth={3}
               >
                 <path
                   strokeLinecap="round"

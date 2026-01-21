@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import type { TrafficLevel, Pulse } from "./types";
+import type { TrafficLevel, Pulse, TrafficIncident } from "./types";
 import TabPulseInput from "./TabPulseInput";
 
 type TrafficContentProps = {
@@ -10,6 +10,9 @@ type TrafficContentProps = {
   trafficError: string | null;
   trafficPulses: Pulse[];
   cityName: string;
+  // Real-time traffic incidents
+  trafficIncidents?: TrafficIncident[];
+  hasRoadClosure?: boolean;
   // Pulse input props
   isSignedIn: boolean;
   identityReady: boolean;
@@ -69,6 +72,8 @@ export default function TrafficContent({
   trafficError,
   trafficPulses,
   cityName,
+  trafficIncidents = [],
+  hasRoadClosure = false,
   isSignedIn,
   identityReady,
   displayName,
@@ -193,31 +198,171 @@ export default function TrafficContent({
 
   const config = getTrafficConfig();
 
+  // Determine if flash news should show (heavy traffic, incidents, or closures)
+  const showFlashNews =
+    trafficLevel === "Heavy" ||
+    hasRoadClosure ||
+    trafficIncidents.some((i) => i.severity >= 3);
+
+  // Get the most important alert to display
+  const flashNewsContent = useMemo(() => {
+    // Priority 1: Road closures
+    const closure = trafficIncidents.find((i) => i.type === "closure");
+    if (closure || hasRoadClosure) {
+      const road = closure?.roadName || "road";
+      return {
+        icon: "🚧",
+        type: "CLOSURE",
+        message: closure?.description || `Road closure reported on ${road}`,
+        severity: "high" as const,
+      };
+    }
+
+    // Priority 2: Major accidents
+    const accident = trafficIncidents.find(
+      (i) => i.type === "accident" && i.severity >= 3
+    );
+    if (accident) {
+      return {
+        icon: "🚨",
+        type: "ACCIDENT",
+        message: accident.description || `Accident reported${accident.roadName ? ` on ${accident.roadName}` : ""}`,
+        severity: "high" as const,
+      };
+    }
+
+    // Priority 3: Heavy traffic
+    if (trafficLevel === "Heavy") {
+      const congestion = trafficIncidents.find((i) => i.type === "congestion");
+      return {
+        icon: "🔴",
+        type: "HEAVY TRAFFIC",
+        message: congestion?.description || "Major delays expected. Consider alternate routes.",
+        severity: "medium" as const,
+      };
+    }
+
+    // Priority 4: Other significant incidents
+    const significant = trafficIncidents.find((i) => i.severity >= 3);
+    if (significant) {
+      return {
+        icon: "⚠️",
+        type: "ALERT",
+        message: significant.description,
+        severity: "medium" as const,
+      };
+    }
+
+    return null;
+  }, [trafficLevel, trafficIncidents, hasRoadClosure]);
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Flash News Banner - Blinking alert for road conditions */}
+      {showFlashNews && flashNewsContent && !trafficLoading && (
+        <div
+          className={`
+            relative overflow-hidden glass-card rounded-2xl p-4 border-2
+            ${flashNewsContent.severity === "high"
+              ? "bg-red-500/10 border-red-500/40"
+              : "bg-amber-500/10 border-amber-500/40"
+            }
+          `}
+        >
+          {/* Animated Background Pulse */}
+          <div className={`absolute inset-0 opacity-10 ${flashNewsContent.severity === "high" ? "bg-red-500 animate-pulse" : "bg-amber-500 animate-pulse"}`} />
+
+          <div className="relative z-10 flex items-center gap-4">
+            <div className="flex-shrink-0 relative">
+              <div className="w-12 h-12 rounded-xl bg-black/20 flex items-center justify-center text-3xl shadow-inner border border-white/5">
+                {flashNewsContent.icon}
+              </div>
+              <span
+                className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-black ${flashNewsContent.severity === "high"
+                    ? "bg-red-500 shadow-[0_0_10px_#ef4444]"
+                    : "bg-amber-500 shadow-[0_0_10px_#f59e0b]"
+                  } animate-ping`}
+              />
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span
+                  className={`text-[9px] font-black uppercase tracking-[0.2em] px-2 py-0.5 rounded-md ${flashNewsContent.severity === "high"
+                      ? "bg-red-500/20 text-red-400"
+                      : "bg-amber-500/20 text-amber-400"
+                    }`}
+                >
+                  {flashNewsContent.type}
+                </span>
+                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                  Live Alert
+                </span>
+              </div>
+              <p
+                className={`text-[15px] font-bold leading-tight ${flashNewsContent.severity === "high"
+                    ? "text-red-100"
+                    : "text-amber-100"
+                  }`}
+              >
+                {flashNewsContent.message}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main traffic status card */}
       <div
-        className={`${config.bgColor} border ${config.borderColor} rounded-xl p-6 text-center`}
+        className={`
+          relative overflow-hidden glass-card premium-border rounded-[2.5rem] p-8 text-center
+          bg-gradient-to-br ${config.bgColor} to-transparent
+          ${config.borderColor}
+        `}
       >
+        {/* Decorative elements */}
+        <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-gradient-to-r from-transparent via-${trafficLevel === "Heavy" ? "red" : trafficLevel === "Moderate" ? "amber" : "emerald"}-400/50 to-transparent`} />
+
         {trafficLoading ? (
-          <div className="space-y-3">
-            <div className="w-16 h-16 mx-auto bg-slate-700/50 rounded-full animate-pulse" />
-            <div className="h-6 w-40 mx-auto bg-slate-700/50 rounded animate-pulse" />
-            <div className="h-4 w-64 mx-auto bg-slate-700/50 rounded animate-pulse" />
+          <div className="space-y-4">
+            <div className="w-20 h-20 mx-auto bg-white/5 rounded-full animate-pulse" />
+            <div className="h-8 w-48 mx-auto bg-white/5 rounded-xl animate-pulse" />
+            <div className="h-4 w-64 mx-auto bg-white/5 rounded-lg animate-pulse" />
           </div>
         ) : trafficError ? (
-          <div>
-            <span className="text-3xl mb-3 block">⚠️</span>
-            <p className="text-sm text-red-400">{trafficError}</p>
+          <div className="py-4">
+            <span className="text-5xl mb-4 block">⚠️</span>
+            <p className="text-sm font-bold text-red-400">{trafficError}</p>
           </div>
         ) : (
-          <>
-            <span className="text-5xl mb-3 block">{config.icon}</span>
-            <h3 className={`text-xl font-semibold ${config.color} mb-2`}>
-              {trafficLevel ? `${trafficLevel} Traffic` : "No Data"}
-            </h3>
-            <p className="text-sm text-slate-400">{config.description}</p>
-          </>
+          <div className="relative z-10 space-y-4">
+            <div className="text-7xl mb-4 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)] transform transition-transform hover:scale-110 duration-500">
+              {config.icon}
+            </div>
+            <div>
+              <h3 className={`text-4xl font-black tracking-tighter ${config.color} leading-none mb-2`}>
+                {trafficLevel ? `${trafficLevel} Flow` : "No Data"}
+              </h3>
+              <p className="text-sm font-bold text-slate-400 text-balance tracking-tight">
+                {config.description}
+              </p>
+            </div>
+
+            {/* TomTom Attribution */}
+            <div className="pt-4">
+              <a
+                href="https://www.tomtom.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-3 py-1 bg-black/20 rounded-full border border-white/5 text-[9px] font-black uppercase tracking-[0.15em] text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
+                </svg>
+                Verified by TomTom
+              </a>
+            </div>
+          </div>
         )}
       </div>
 
@@ -241,92 +386,73 @@ export default function TrafficContent({
       />
 
       {/* Traffic intelligence cards */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-4">
         {/* Recent Reports / Time Pattern Card */}
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 text-center">
+        <div className="glass-card premium-border rounded-3xl p-5 text-center transition-transform hover:scale-[1.02] duration-300">
           {intelligence.hasUserData ? (
             <>
-              <div className="text-2xl font-bold text-emerald-400 mb-1">
-                {intelligence.lastHourCount > 0
-                  ? intelligence.lastHourCount
-                  : intelligence.recentCount}
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-3">
+                <div className="text-xl font-black text-emerald-400">
+                  {intelligence.lastHourCount > 0
+                    ? intelligence.lastHourCount
+                    : intelligence.recentCount}
+                </div>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-1">
                 {intelligence.lastHourCount > 0
-                  ? "reports this hour"
-                  : "recent reports"}
+                  ? "Reports / Hour"
+                  : "Recent Reports"}
               </p>
-              <p className="text-[10px] text-slate-500 mt-1">
-                from community
+              <p className="text-xs font-bold text-white tracking-tight">
+                Crowdsourced Info
               </p>
             </>
           ) : (
             <>
-              <svg
-                className="w-6 h-6 mx-auto text-emerald-400 mb-2"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <p className="text-xs text-slate-400">Best Time</p>
-              <p className="text-sm font-medium text-white">
-                {isLateNight ? "Now (late night)" : "Before 7am"}
+              <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-1">Travel Tip</p>
+              <p className="text-xs font-bold text-white tracking-tight">
+                {isLateNight ? "Smooth night flow" : "Morning advantage"}
               </p>
             </>
           )}
         </div>
 
         {/* Traffic Mood / Rush Hour Card */}
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 text-center">
+        <div className="glass-card premium-border rounded-3xl p-5 text-center transition-transform hover:scale-[1.02] duration-300">
           {intelligence.hasUserData && intelligence.dominantMood ? (
             <>
-              <div className="text-2xl mb-1">{intelligence.dominantMood}</div>
-              <p className="text-xs text-slate-400">Traffic Mood</p>
+              <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-3 text-2xl">
+                {intelligence.dominantMood}
+              </div>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-1">Commuter Mood</p>
               <p
-                className={`text-sm font-medium ${
-                  intelligence.sentimentLabel === "Good"
+                className={`text-xs font-bold tracking-tight ${intelligence.sentimentLabel === "Good"
                     ? "text-emerald-400"
                     : intelligence.sentimentLabel === "Rough"
-                    ? "text-red-400"
-                    : "text-amber-400"
-                }`}
+                      ? "text-red-400"
+                      : "text-amber-400"
+                  }`}
               >
-                {intelligence.sentimentLabel}
+                {intelligence.sentimentLabel} Profile
               </p>
             </>
           ) : (
             <>
-              <svg
-                className={`w-6 h-6 mx-auto mb-2 ${
-                  isRushHour ? "text-red-400" : "text-amber-400"
-                }`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-                />
-              </svg>
-              <p className="text-xs text-slate-400">
-                {isRushHour ? "Rush Hour" : "Typical Rush"}
+              <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-3">
+                <svg className={`w-6 h-6 ${isRushHour ? "text-red-400" : "text-amber-400"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+              </div>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-1">
+                {isRushHour ? "Rush Active" : "Typical Rush"}
               </p>
-              <p
-                className={`text-sm font-medium ${
-                  isRushHour ? "text-red-400" : "text-white"
-                }`}
-              >
-                {isRushHour ? "Active Now" : "7-9am, 5-7pm"}
+              <p className={`text-xs font-bold tracking-tight ${isRushHour ? "text-red-400" : "text-white"}`}>
+                {isRushHour ? "Heavy Volume" : "7-9am | 4-7pm"}
               </p>
             </>
           )}
@@ -334,55 +460,57 @@ export default function TrafficContent({
       </div>
 
       {/* Community traffic reports */}
-      <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
-        <h4 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
-          <svg
-            className="w-4 h-4 text-emerald-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"
-            />
-          </svg>
-          Community Reports
-        </h4>
+      <div className="glass-card premium-border rounded-3xl p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+              <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+              </svg>
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-white uppercase tracking-wider">Reports</h4>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Community Pulses</p>
+            </div>
+          </div>
+          {trafficPulses.length > 0 && (
+            <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-md border border-emerald-500/20 uppercase tracking-widest">
+              {trafficPulses.length} Total
+            </span>
+          )}
+        </div>
 
         {trafficPulses.length === 0 ? (
-          <p className="text-sm text-slate-400 text-center py-4">
-            No recent traffic reports from the community in {cityName}.
-            <br />
-            <span className="text-xs text-slate-500">
-              Be the first to share traffic conditions!
-            </span>
-          </p>
+          <div className="text-center py-10 space-y-2">
+            <div className="text-4xl opacity-20">📡</div>
+            <p className="text-sm font-bold text-slate-400">
+              Quiet on the airwaves
+            </p>
+            <p className="text-[11px] font-medium text-slate-500 mx-auto max-w-[200px]">
+              No recent traffic reports from the community in {cityName}.
+            </p>
+          </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {trafficPulses.slice(0, 5).map((pulse) => (
               <div
                 key={pulse.id}
-                className="flex items-start gap-2 p-2 bg-slate-900/50 rounded-lg"
+                className="group flex items-start gap-4 p-4 bg-black/20 hover:bg-black/30 rounded-2xl border border-white/5 transition-all duration-300"
               >
-                <span className="text-lg flex-shrink-0">{pulse.mood}</span>
+                <div className="text-2xl transform group-hover:scale-110 transition-transform duration-500">{pulse.mood}</div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-white line-clamp-2">
+                  <p className="text-[14px] font-bold text-white leading-snug tracking-tight">
                     {pulse.message}
                   </p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    <span className="text-cyan-400">{pulse.author}</span>
-                    <span className="font-mono">
-                      {" "}
-                      ·{" "}
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-[10px] font-black text-cyan-400 uppercase tracking-widest">{pulse.author}</span>
+                    <span className="text-[9px] font-black font-mono text-slate-600 uppercase tracking-widest">
                       {new Date(pulse.createdAt).toLocaleTimeString("en-US", {
                         hour: "numeric",
                         minute: "2-digit",
                       })}
                     </span>
-                  </p>
+                  </div>
                 </div>
               </div>
             ))}

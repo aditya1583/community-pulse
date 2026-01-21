@@ -88,10 +88,10 @@ export default function AISummaryStories({
       subtitle: summaryLoading
         ? "Loading..."
         : summaryError
-        ? "Error loading"
-        : pulsesCount > 0
-        ? summary?.split(".")[0] || "Recent activity"
-        : "Be the first to share",
+          ? "Error loading"
+          : pulsesCount > 0
+            ? summary?.split(".")[0] || "Recent activity"
+            : "Be the first to share",
       color: "text-emerald-400",
       bgGradient: "from-emerald-500/20 to-emerald-600/10",
     });
@@ -110,20 +110,20 @@ export default function AISummaryStories({
       subtitle: trafficLoading
         ? "Checking roads..."
         : trafficError
-        ? "Unable to load"
-        : trafficLevel === "Light"
-        ? "Roads are clear"
-        : trafficLevel === "Moderate"
-        ? "Some congestion"
-        : trafficLevel === "Heavy"
-        ? "Expect delays"
-        : "No data",
+          ? "Unable to load"
+          : trafficLevel === "Light"
+            ? "Roads are clear"
+            : trafficLevel === "Moderate"
+              ? "Some congestion"
+              : trafficLevel === "Heavy"
+                ? "Expect delays"
+                : "No data",
       color: trafficLevel ? trafficColors[trafficLevel] : "text-slate-400",
       bgGradient: trafficLevel === "Heavy"
         ? "from-red-500/20 to-red-600/10"
         : trafficLevel === "Moderate"
-        ? "from-amber-500/20 to-amber-600/10"
-        : "from-emerald-500/20 to-emerald-600/10",
+          ? "from-amber-500/20 to-amber-600/10"
+          : "from-emerald-500/20 to-emerald-600/10",
     });
 
     // Events card
@@ -135,10 +135,10 @@ export default function AISummaryStories({
       subtitle: eventsLoading
         ? "Finding events..."
         : eventsError
-        ? "Unable to load"
-        : uniqueEvents.length > 0
-        ? uniqueEvents[0].name.slice(0, 40) + (uniqueEvents[0].name.length > 40 ? "..." : "")
-        : "Nothing nearby",
+          ? "Unable to load"
+          : uniqueEvents.length > 0
+            ? uniqueEvents[0].name.slice(0, 40) + (uniqueEvents[0].name.length > 40 ? "..." : "")
+            : "Nothing nearby",
       color: "text-purple-400",
       bgGradient: "from-purple-500/20 to-purple-600/10",
     });
@@ -179,38 +179,25 @@ export default function AISummaryStories({
   }, [onNavigateTab]);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
-          <svg
-            className="w-4 h-4 text-emerald-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M13 10V3L4 14h7v7l9-11h-7z"
-            />
-          </svg>
-          <span className="text-sm font-mono text-emerald-400 uppercase tracking-wider">
-            Quick Brief
+          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">
+            Hyperlocal Brief
           </span>
         </div>
 
         {/* Progress dots */}
-        <div className="flex gap-1.5">
+        <div className="flex gap-1">
           {stories.map((_, idx) => (
             <div
               key={idx}
-              className={`w-1.5 h-1.5 rounded-full transition-all duration-200 ${
-                idx === activeIndex
-                  ? "bg-emerald-400 w-3"
-                  : "bg-slate-600"
-              }`}
+              className={`h-1 rounded-full transition-all duration-500 ${idx === activeIndex
+                  ? "bg-emerald-400 w-4 shadow-[0_0_8px_rgba(52,211,153,0.5)]"
+                  : "bg-white/10 w-1"
+                }`}
             />
           ))}
         </div>
@@ -220,40 +207,54 @@ export default function AISummaryStories({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide"
+        className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide px-0.5"
         style={{
           scrollbarWidth: "none",
           msOverflowStyle: "none",
         }}
       >
         {stories.map((card) => {
-          const baseClasses = "flex-shrink-0 w-[140px] snap-start border border-white/[0.06] rounded-xl p-3 transition-all duration-200 hover:scale-[1.02] hover:border-white/10 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50";
-          const activeClasses = activeTab === card.id ? "ring-2 ring-emerald-500/40" : "";
+          const isActiveItem = activeTab === card.id;
 
           return (
-          <button
-            key={card.id}
-            onClick={() => handleCardTap(card)}
-            className={`${baseClasses} bg-gradient-to-br ${card.bgGradient} ${activeClasses}`}
-          >
-            <div className="flex flex-col items-start gap-2 text-left">
-              <div className="flex items-center justify-between w-full">
-                <span className="text-2xl">{card.icon}</span>
-                <span className={`text-lg font-bold ${card.color}`}>
-                  {card.value}
-                </span>
+            <button
+              key={card.id}
+              onClick={() => handleCardTap(card)}
+              className={`
+              flex-shrink-0 w-[160px] snap-start relative group
+              glass-card premium-border rounded-2xl p-4 transition-all duration-500
+              hover:scale-[1.05] hover:-rotate-1 active:scale-[0.98]
+              focus-visible:outline-none 
+              ${isActiveItem ? "border-emerald-500/50 shadow-lg shadow-emerald-500/10" : ""}
+            `}
+            >
+              {/* Background Accent Gradient */}
+              <div className={`absolute inset-0 bg-gradient-to-br ${card.bgGradient} opacity-30 group-hover:opacity-50 transition-opacity duration-500 z-0`} />
+
+              <div className="relative z-10 flex flex-col items-start gap-3 text-left">
+                <div className="flex items-center justify-between w-full">
+                  <div className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center text-2xl shadow-inner group-hover:scale-110 transition-transform duration-500">
+                    {card.icon}
+                  </div>
+                  <div className={`text-xl font-black ${card.color} drop-shadow-sm`}>
+                    {card.value}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-400 group-hover:text-white transition-colors">
+                    {card.title}
+                  </p>
+                  <p className="text-[11px] font-bold text-slate-200 line-clamp-2 leading-[1.4] tracking-tight">
+                    {card.subtitle}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wide">
-                  {card.title}
-                </p>
-                <p className="text-xs text-slate-300 mt-0.5 line-clamp-2 leading-snug">
-                  {card.subtitle}
-                </p>
-              </div>
-            </div>
-          </button>
-        );
+
+              {isActiveItem && (
+                <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+              )}
+            </button>
+          );
         })}
       </div>
 

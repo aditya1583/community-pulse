@@ -283,59 +283,92 @@ export default function CurrentVibeCard({
   const weatherDisplay = getWeatherDisplay();
 
   return (
-    <div className={`bento-card elevation-2 p-4 transition-all duration-500 ${getBorderGlow()}`}>
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          {/* Header row with title and weather badge */}
-          <div className="flex items-center gap-2 mb-1">
-            <p className="text-xs text-slate-400 uppercase tracking-wider font-medium">
-              Current Vibe
-            </p>
-            {/* Weather Badge - prominently displayed */}
-            {weatherDisplay && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-700/50 rounded-full text-xs">
-                <span>{weatherDisplay.emoji}</span>
-                <span className="text-slate-300 font-medium">{weatherDisplay.text}</span>
+    <div className={`
+      relative overflow-hidden glass-card premium-border rounded-[2rem] p-6 
+      transition-all duration-700 group
+      ${getBorderGlow()}
+    `}>
+      {/* Background Animated Gradient Layer */}
+      <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-transparent opacity-50 z-0" />
+
+      {/* Floating Sparkles / Particles effect if buzzing */}
+      {cityMood?.vibeIntensity === "buzzing" && (
+        <div className="absolute inset-0 pointer-events-none z-0">
+          <div className="absolute top-1/4 left-1/4 w-1 h-1 bg-amber-400 rounded-full animate-ping opacity-20" />
+          <div className="absolute bottom-1/3 right-1/4 w-1 h-1 bg-amber-400 rounded-full animate-ping opacity-10 [animation-delay:1s]" />
+        </div>
+      )}
+
+      <div className="relative z-10 flex flex-col gap-6">
+        <div className="flex items-start justify-between">
+          <div className="space-y-1">
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">
+                Current Local Vibe
               </span>
+              {/* Live Scan indicator */}
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400">Scanning</span>
+              </div>
+            </div>
+
+            {isLoading ? (
+              <div className="h-10 w-64 bg-white/5 rounded-xl animate-pulse mt-2" />
+            ) : (
+              <h2 className={`text-4xl font-black leading-[0.9] tracking-tighter ${getEmotionColor()} drop-shadow-sm transition-all duration-500 group-hover:tracking-normal`}>
+                {getHeadline()}
+              </h2>
             )}
           </div>
 
-          {isLoading ? (
-            <>
-              <div className="h-7 w-48 bg-slate-700/50 rounded animate-pulse mb-2" />
-              <div className="h-4 w-64 bg-slate-700/50 rounded animate-pulse" />
-            </>
-          ) : (
-            <>
-              <h2 className={`text-xl font-semibold mb-1 ${getEmotionColor()}`}>
-                {getHeadline()}
-              </h2>
-              <p className="text-sm text-slate-400 flex flex-wrap items-center">
-                {getSubtext()}
-              </p>
-            </>
+          <div className="relative">
+            <div className="text-6xl drop-shadow-[0_0_20px_rgba(255,255,255,0.2)] transform transition-transform duration-700 group-hover:scale-110 group-hover:rotate-6">
+              {getVibeEmoji()}
+            </div>
+            {/* Vibe Intensity Aura */}
+            <div className={`absolute -inset-4 blur-3xl opacity-20 -z-10 transition-opacity duration-700 group-hover:opacity-40 rounded-full ${cityMood?.vibeIntensity === "intense" ? "bg-red-500" : cityMood?.vibeIntensity === "buzzing" ? "bg-amber-500" : "bg-emerald-500"}`} />
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4">
+          {/* Weather Pill */}
+          {weatherDisplay && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-black/20 backdrop-blur-md rounded-2xl border border-white/5 shadow-inner">
+              <span className="text-xl">{weatherDisplay.emoji}</span>
+              <span className="text-sm font-black text-white/90">{weatherDisplay.text}</span>
+            </div>
           )}
+
+          {/* Activity Info */}
+          <div className="flex-1 min-w-[200px]">
+            <p className="text-sm font-bold text-slate-400 leading-relaxed">
+              {getSubtext()}
+            </p>
+          </div>
         </div>
 
-        <div className="text-3xl ml-4 transition-transform hover:scale-110">
-          {getVibeEmoji()}
-        </div>
+        {/* Gas Station Quick View */}
+        {gasStationName && (
+          <button
+            onClick={onGasPriceClick}
+            className="flex items-center gap-3 w-full px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl transition-all duration-300 group/gas"
+          >
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-lg">⛽</div>
+            <div className="flex flex-col items-start">
+              <span className="text-xs font-black uppercase tracking-wider text-slate-500">Nearest Gas</span>
+              <span className="text-sm font-bold text-white group-hover/gas:text-emerald-400 transition-colors">
+                {gasStationName}
+              </span>
+            </div>
+            <div className="ml-auto w-6 h-6 rounded-full bg-white/5 flex items-center justify-center transform group-hover/gas:translate-x-1 transition-transform">
+              <svg className="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </button>
+        )}
       </div>
-
-      {/* Gas Station Quick View - Shows nearest station (price is regional average, not station-specific) */}
-      {gasStationName && (
-        <button
-          onClick={onGasPriceClick}
-          className="mt-3 flex items-center gap-2 px-3 py-1.5 bg-slate-700/40 hover:bg-slate-700/60 border border-slate-600/30 rounded-lg transition-colors group"
-        >
-          <span className="text-base">{"\u26FD"}</span>
-          <span className="text-sm font-medium text-slate-200">{gasStationName}</span>
-          <span className="text-xs text-slate-500">nearby</span>
-          <svg className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-400 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-      )}
     </div>
   );
 }

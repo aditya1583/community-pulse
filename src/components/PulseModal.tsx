@@ -119,45 +119,45 @@ export default function PulseModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in duration-500"
         onClick={onClose}
       />
 
       {/* Modal content */}
-      <div className="relative w-full sm:max-w-lg mx-4 mb-4 sm:mb-0 bg-slate-900 border border-slate-700/50 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-4 duration-300 max-h-[90vh] overflow-y-auto">
+      <div className="relative w-full sm:max-w-xl bg-slate-900 glass-card premium-border sm:rounded-3xl rounded-t-[2.5rem] shadow-2xl animate-in slide-in-from-bottom-8 duration-500 max-h-[92vh] flex flex-col overflow-hidden">
+        {/* Decorative Top Bar */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-white/10 rounded-full mt-3 sm:hidden" />
+
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/50 sticky top-0 bg-slate-900 z-10">
-          <h2 className="text-sm font-medium text-white">
-            Drop a <span className="text-emerald-400">pulse</span>
-          </h2>
+        <div className="flex items-center justify-between px-6 py-5 border-b border-white/5 sticky top-0 bg-slate-900/80 backdrop-blur-xl z-10 mt-2 sm:mt-0">
+          <div className="flex flex-col">
+            <h2 className="text-xl font-black text-white tracking-tighter leading-none">
+              Drop a <span className="text-emerald-400">Pulse</span>
+            </h2>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mt-1">
+              Local broadcast active
+            </p>
+          </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-all duration-300"
           >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
         {/* Body */}
-        <div className="p-4 space-y-4">
+        <div className="p-6 space-y-8 overflow-y-auto custom-scrollbar">
           {/* Category Selection Pills */}
-          <div className="space-y-2">
-            <span className="text-xs text-slate-400">Category</span>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Broadcast Category</span>
+            </div>
             <div className="flex flex-wrap gap-2">
               {POST_TAGS.map((category) => {
                 const isActive = selectedCategory === category;
@@ -166,11 +166,10 @@ export default function PulseModal({
                     key={category}
                     type="button"
                     onClick={() => handleCategorySelect(category as PulseCategory)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                      isActive
-                        ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"
-                        : "bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:border-slate-600"
-                    }`}
+                    className={`px-5 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-300 transform active:scale-95 ${isActive
+                        ? "bg-emerald-500 text-slate-950 shadow-[0_0_20px_rgba(16,185,129,0.4)]"
+                        : "bg-white/5 border border-white/5 text-slate-500 hover:text-white hover:bg-white/10"
+                      }`}
                   >
                     {category}
                   </button>
@@ -178,22 +177,21 @@ export default function PulseModal({
               })}
             </div>
             {showValidationErrors && tagValidationError && (
-              <p className="text-[11px] text-red-400">{tagValidationError}</p>
+              <p className="text-[11px] font-bold text-red-500 uppercase tracking-widest px-1">{tagValidationError}</p>
             )}
           </div>
 
           {/* Mood Selection (MANDATORY) */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">Vibe</span>
-              <span className="text-[10px] text-amber-400/80">*required</span>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">The Vibe</span>
+              <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest bg-emerald-500/10 px-1.5 py-0.5 rounded">Required</span>
             </div>
             <div
-              className={`flex flex-wrap gap-2 p-2 rounded-lg ${
-                showValidationErrors && moodValidationError
-                  ? "bg-red-500/10 border border-red-500/40"
-                  : "bg-slate-800/50"
-              }`}
+              className={`flex flex-wrap gap-2.5 p-3 rounded-2xl transition-all duration-300 ${showValidationErrors && moodValidationError
+                  ? "bg-red-500/5 border-2 border-red-500/20"
+                  : "bg-black/30 border border-white/5"
+                }`}
             >
               {categoryMoods.map(({ emoji, label }) => {
                 const isSelected = mood === emoji;
@@ -202,33 +200,33 @@ export default function PulseModal({
                     key={emoji}
                     type="button"
                     onClick={() => onMoodChange(emoji)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition ${
-                      isSelected
-                        ? "bg-emerald-500/20 border border-emerald-500 text-white"
-                        : "bg-slate-800/60 border border-slate-700/50 text-slate-300 hover:border-slate-600 hover:text-white"
-                    }`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all duration-500 group/vibe ${isSelected
+                        ? "bg-emerald-500/20 border border-emerald-500 text-white shadow-[0_0_15px_-5px_#10b981]"
+                        : "bg-white/5 border border-white/5 text-slate-400 hover:border-white/20 hover:text-white"
+                      }`}
                   >
-                    <span className="text-lg">{emoji}</span>
-                    <span className="text-xs">{label}</span>
+                    <span className="text-xl transform transition-transform group-hover/vibe:scale-125 duration-300">{emoji}</span>
+                    <span className="tracking-tight">{label}</span>
                   </button>
                 );
               })}
             </div>
             {showValidationErrors && moodValidationError && (
-              <p className="text-[11px] text-red-400">{moodValidationError}</p>
+              <p className="text-[11px] font-bold text-red-500 uppercase tracking-widest px-1">{moodValidationError}</p>
             )}
           </div>
 
           {/* Context Section (Dynamic based on category) */}
           {selectedCategory === "Weather" && weather && (
-            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/30">
-              <span className="text-xs text-slate-400">Current conditions</span>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-lg font-medium text-white">
+            <div className="glass-card bg-gradient-to-r from-emerald-500/10 via-transparent to-transparent rounded-2xl p-4 border border-emerald-500/20">
+              <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-2 block">Live conditions</span>
+              <div className="flex items-center gap-4">
+                <span className="text-3xl font-black text-white leading-none">
                   {Math.round(weather.temp)}
                   {"\u00B0F"}
                 </span>
-                <span className="text-sm text-slate-300 capitalize">
+                <div className="h-6 w-px bg-white/10" />
+                <span className="text-sm font-bold text-slate-300 capitalize tracking-tight">
                   {weather.description}
                 </span>
               </div>
@@ -236,86 +234,93 @@ export default function PulseModal({
           )}
 
           {/* Message input */}
-          <div className="space-y-2">
-            {/* Suggestion chip - tappable prompt that auto-fills */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Your Message</span>
+            </div>
+
             {!message && (
               <button
                 type="button"
                 onClick={() => onMessageChange(placeholder)}
-                className="group flex items-center gap-2 w-full px-3 py-2 text-left text-sm bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-lg hover:from-amber-500/20 hover:to-orange-500/20 hover:border-amber-500/40 transition-all"
+                className="group flex items-center gap-4 w-full px-4 py-3 text-left bg-gradient-to-r from-amber-500/10 to-transparent border border-amber-500/20 rounded-2xl hover:from-amber-500/20 transition-all duration-500"
               >
-                <span className="text-amber-400 text-base animate-pulse">💡</span>
-                <span className="text-amber-200/90 flex-1 line-clamp-1">{placeholder}</span>
-                <span className="text-[10px] text-amber-400/60 group-hover:text-amber-400 transition-colors whitespace-nowrap">tap to use</span>
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center text-lg shadow-inner">💡</div>
+                <div className="flex flex-col flex-1 overflow-hidden">
+                  <p className="text-[11px] font-bold text-amber-200/90 line-clamp-1">{placeholder}</p>
+                  <p className="text-[9px] font-black text-amber-500/60 uppercase tracking-widest">Tap to use prompt</p>
+                </div>
               </button>
             )}
 
-            <textarea
-              ref={textareaRef}
-              value={message}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value.length <= MAX_MESSAGE_LENGTH) {
-                  onMessageChange(value);
-                }
-              }}
-              rows={4}
-              className={`w-full rounded-lg bg-slate-800/70 border px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:border-transparent resize-none ${
-                showValidationErrors && messageValidationError
-                  ? "border-red-500/60"
-                  : "border-slate-700/50"
-              }`}
-              placeholder="Share what's happening..."
-            />
+            <div className="relative group/textarea">
+              <textarea
+                ref={textareaRef}
+                value={message}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value.length <= MAX_MESSAGE_LENGTH) {
+                    onMessageChange(value);
+                  }
+                }}
+                rows={5}
+                className={`w-full rounded-[2rem] bg-black/40 backdrop-blur-sm border px-6 py-5 text-[15px] text-white placeholder:text-slate-600 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all duration-500 resize-none ${showValidationErrors && messageValidationError
+                    ? "border-red-500/40"
+                    : "border-white/5 group-hover/textarea:border-white/20"
+                  }`}
+                placeholder="What's happening in the neighborhood?"
+              />
 
-            {/* Character count + validation error */}
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="text-slate-500">
-                {message.length}/{MAX_MESSAGE_LENGTH}
-              </span>
-              {showValidationErrors && messageValidationError && (
-                <span className="text-red-400">{messageValidationError}</span>
-              )}
+              {/* Character count overlay */}
+              <div className="absolute bottom-4 right-6 pointer-events-none">
+                <span className={`text-[10px] font-black uppercase tracking-widest font-mono ${message.length > MAX_MESSAGE_LENGTH * 0.9 ? "text-amber-500" : "text-slate-600"}`}>
+                  {message.length}/{MAX_MESSAGE_LENGTH}
+                </span>
+              </div>
             </div>
+
+            {showValidationErrors && messageValidationError && (
+              <p className="text-[11px] font-bold text-red-500 uppercase tracking-widest px-1">{messageValidationError}</p>
+            )}
           </div>
 
-          {/* Posting as */}
-          <p className="text-[11px] text-slate-500">
-            Posting as <span className="text-cyan-400">{displayName}</span>.
-            Pulses are public.
-          </p>
+          {/* Posting Info */}
+          <div className="flex items-center gap-3 px-2 py-4 bg-white/2 rounded-2xl border border-white/5">
+            <div className="w-10 h-10 rounded-full bg-cyan-500/10 flex items-center justify-center text-xl">👤</div>
+            <div className="flex flex-col">
+              <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+                Posting as <span className="text-cyan-400">{displayName}</span>
+              </p>
+              <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Visible to everyone in 10-mile radius</p>
+            </div>
+          </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-4 py-3 border-t border-slate-700/50 sticky bottom-0 bg-slate-900">
+        <div className="flex items-center justify-end gap-4 px-6 py-5 border-t border-white/5 bg-slate-900/80 backdrop-blur-xl sticky bottom-0">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-slate-400 hover:text-white transition"
+            className="px-6 py-3 text-[11px] font-black text-slate-500 hover:text-white uppercase tracking-widest transition-colors duration-300"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={!isPostEnabled}
-            className={`inline-flex items-center gap-1.5 px-5 py-2 font-medium text-sm rounded-lg shadow-lg transition ${
-              isPostEnabled
-                ? "bg-gradient-to-r from-emerald-400 to-emerald-600 text-slate-950 shadow-emerald-500/30 hover:from-emerald-300 hover:to-emerald-500"
-                : "bg-slate-700 text-slate-400 cursor-not-allowed opacity-50"
-            }`}
+            className={`group inline-flex items-center gap-3 px-8 py-4 font-black text-[12px] uppercase tracking-[0.2em] rounded-2xl shadow-2xl transition-all duration-500 ${isPostEnabled
+                ? "bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 text-slate-950 shadow-emerald-500/20 hover:scale-[1.02] active:scale-95"
+                : "bg-slate-800 text-slate-600 cursor-not-allowed opacity-50 grayscale"
+              }`}
           >
-            <span>{identityReady ? "Post pulse" : "Please wait..."}</span>
+            <span>{identityReady ? "Launch Pulse" : "Syncing..."}</span>
             <svg
-              className="w-4 h-4"
+              className={`w-4 h-4 transition-transform duration-500 ${isPostEnabled ? "group-hover:translate-x-1" : ""}`}
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
-              strokeWidth={2}
+              strokeWidth={3}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M13 10V3L4 14h7v7l9-11h-7z"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
           </button>
         </div>

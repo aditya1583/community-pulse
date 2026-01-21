@@ -62,23 +62,27 @@ export default function StatusTab({ userId, city, className = "" }: StatusTabPro
     return (
       <div className={`space-y-6 ${className}`}>
         {/* Sign in prompt */}
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-6 text-center">
-          <div className="text-4xl mb-3">🏆</div>
-          <h3 className="text-lg font-semibold text-white mb-2">
-            Join the Leaderboard
+        <div className="relative overflow-hidden glass-card premium-border rounded-[2rem] p-8 text-center bg-gradient-to-br from-emerald-500/10 to-transparent">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-emerald-500/40" />
+          <div className="text-6xl mb-6 transform transition-transform hover:scale-110 duration-500">🏆</div>
+          <h3 className="text-2xl font-black text-white tracking-tighter mb-3 uppercase">
+            Claim Your Legacy
           </h3>
-          <p className="text-slate-400 text-sm mb-4">
-            Sign in to track your stats, earn badges, and compete for the top spot!
+          <p className="text-slate-400 text-sm font-bold leading-relaxed mb-8 max-w-[240px] mx-auto text-balance">
+            Sync your profile to track progression, earn elite badges, and dominate the local rankings.
           </p>
-          <div className="flex justify-center gap-4 text-sm">
-            <div className="flex items-center gap-2 text-slate-500">
-              <span>🥇</span> Weekly rankings
+          <div className="grid grid-cols-3 gap-2 text-[9px] font-black uppercase tracking-widest text-slate-500">
+            <div className="space-y-2 group">
+              <span className="text-2xl block group-hover:scale-125 transition-transform duration-300">🥇</span>
+              <span>Regional Rankings</span>
             </div>
-            <div className="flex items-center gap-2 text-slate-500">
-              <span>🏅</span> Achievement badges
+            <div className="space-y-2 group">
+              <span className="text-2xl block group-hover:scale-125 transition-transform duration-300">🏅</span>
+              <span>Elite Achievement</span>
             </div>
-            <div className="flex items-center gap-2 text-slate-500">
-              <span>📈</span> Level progression
+            <div className="space-y-2 group">
+              <span className="text-2xl block group-hover:scale-125 transition-transform duration-300">📈</span>
+              <span>Level Matrix</span>
             </div>
           </div>
         </div>
@@ -119,22 +123,25 @@ export default function StatusTab({ userId, city, className = "" }: StatusTabPro
       />
 
       {/* Badge Collection */}
-      <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-700/50 flex items-center justify-between">
-          <h3 className="font-semibold text-white flex items-center gap-2">
-            <span className="text-lg">🏅</span>
-            Badge Collection
-          </h3>
+      <div className="glass-card premium-border rounded-3xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-white/2">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-xl">🏅</div>
+            <div>
+              <h3 className="text-[11px] font-black text-white uppercase tracking-widest leading-none">Badge Collection</h3>
+              <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-1">Verified achievements</p>
+            </div>
+          </div>
           <button
             onClick={loadAllBadges}
             disabled={badgesLoading}
-            className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors disabled:opacity-50"
+            className="text-[10px] font-black text-emerald-400 hover:text-white uppercase tracking-[0.15em] transition-all disabled:opacity-50"
           >
-            {badgesLoading ? "Loading..." : showAllBadges ? "Hide all" : "View all badges"}
+            {badgesLoading ? "Syncing..." : showAllBadges ? "Hide Grid" : "Analyze Map"}
           </button>
         </div>
 
-        <div className="p-4">
+        <div className="p-6">
           {showAllBadges ? (
             <BadgeShowcase
               earnedBadges={badges}
@@ -142,15 +149,18 @@ export default function StatusTab({ userId, city, className = "" }: StatusTabPro
               grouped
             />
           ) : (
-            <div className="text-center py-4">
-              <p className="text-slate-400 text-sm mb-3">
-                You have earned <span className="text-emerald-400 font-semibold">{badges.length}</span> badges
+            <div className="text-center py-6 space-y-4">
+              <p className="text-xs font-bold text-slate-400 tracking-tight">
+                You have unlocked <span className="text-emerald-400 px-1">{badges.length}</span> prestige markers
               </p>
               <button
                 onClick={loadAllBadges}
-                className="text-sm text-emerald-400 hover:text-emerald-300 underline"
+                className="group flex items-center gap-2 mx-auto text-[10px] font-black text-emerald-400 hover:text-white uppercase tracking-[0.2em] transition-all duration-300"
               >
-                View all available badges
+                <span>View Full Inventory</span>
+                <svg className="w-3 h-3 transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                </svg>
               </button>
             </div>
           )}
@@ -239,12 +249,17 @@ function MotivationCard({
   const { emoji, title, message } = getMessage();
 
   return (
-    <div className="bg-gradient-to-r from-emerald-900/20 to-slate-800/60 border border-emerald-500/20 rounded-xl p-4">
-      <div className="flex items-start gap-3">
-        <span className="text-2xl">{emoji}</span>
-        <div>
-          <h4 className="font-semibold text-white mb-1">{title}</h4>
-          <p className="text-sm text-slate-400">{message}</p>
+    <div className="relative overflow-hidden glass-card premium-border rounded-[2rem] p-6 bg-gradient-to-r from-emerald-500/10 to-transparent">
+      <div className="absolute top-0 right-0 p-4 opacity-10">
+        <span className="text-6xl transform rotate-12 block">{emoji}</span>
+      </div>
+      <div className="relative z-10 flex items-start gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-3xl shadow-inner border border-white/5">
+          {emoji}
+        </div>
+        <div className="flex-1">
+          <h4 className="text-sm font-black text-white uppercase tracking-wider mb-1">{title}</h4>
+          <p className="text-[13px] font-bold text-slate-400 leading-snug tracking-tight text-balance">{message}</p>
         </div>
       </div>
     </div>
@@ -273,17 +288,16 @@ export function StatusWidget({
     <button
       onClick={onClick}
       className={`
-        flex items-center gap-2 px-2 py-1 rounded-lg
-        bg-slate-800/40 hover:bg-slate-800/60
-        border border-slate-700/30 hover:border-slate-600/50
-        transition-colors
+        flex items-center gap-2 px-3 py-1.5 rounded-xl
+        glass-card premium-border bg-white/5 hover:bg-white/10
+        transition-all duration-300
         ${className}
       `}
       title="View your status"
     >
-      <span className="text-xs text-slate-400">Lv.{level}</span>
+      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Lv.{level}</span>
       {weeklyRank && weeklyRank <= 50 && (
-        <span className={`text-[10px] font-bold ${tier.badgeColor} px-1.5 py-0.5 rounded`}>
+        <span className={`text-[9px] font-black ${tier.badgeColor} px-2 py-0.5 rounded-lg border border-white/10 shadow-sm`}>
           #{weeklyRank}
         </span>
       )}

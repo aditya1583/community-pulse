@@ -244,6 +244,55 @@ function checkForWeatherPost(ctx: SituationContext): PostDecision {
     };
   }
 
+  // --- FORECAST CHECKS (Tomorrow) ---
+  if (weather.forecast && weather.forecast.length > 0) {
+    const tomorrow = weather.forecast[0];
+
+    // Tomorrow: Rain/Storm/Snow
+    if (["rain", "storm", "snow"].includes(tomorrow.condition)) {
+      return {
+        shouldPost: true,
+        postType: "Weather",
+        reason: `Forecast: ${tomorrow.condition} tomorrow`,
+        priority: 6,
+        templateCategory: "forecast",
+      };
+    }
+
+    // Tomorrow: Perfect Weather
+    if (tomorrow.condition === "clear" && tomorrow.tempHigh >= 70 && tomorrow.tempHigh <= 85) {
+      return {
+        shouldPost: true,
+        postType: "Weather",
+        reason: "Forecast: Perfect weather tomorrow",
+        priority: 5,
+        templateCategory: "forecast",
+      };
+    }
+
+    // Tomorrow: Big Temp Drop (Cold Front)
+    if (weather.temperature - tomorrow.tempHigh > 15) {
+      return {
+        shouldPost: true,
+        postType: "Weather",
+        reason: `Forecast: Big temp drop (${weather.temperature}°F -> ${tomorrow.tempHigh}°F)`,
+        priority: 7,
+        templateCategory: "forecast",
+      };
+    }
+
+    // Tomorrow: General Forecast (Low priority filler)
+    if (Math.random() < 0.3) {
+      return {
+        shouldPost: true,
+        postType: "Weather",
+        reason: "General forecast",
+        priority: 4,
+        templateCategory: "forecast",
+      };
+    }
+  }
+
   return {
     shouldPost: false,
     postType: "Weather",
@@ -430,6 +479,8 @@ function checkForEventPost(ctx: SituationContext): PostDecision {
     templateCategory: "",
   };
 }
+
+
 
 /**
  * Check if a general mood post is appropriate

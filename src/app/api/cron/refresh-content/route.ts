@@ -258,6 +258,54 @@ export async function GET(request: NextRequest) {
             });
 
             if (result.posted && result.post) {
+              // DEDUPLICATION: semantic signature check to prevent redundant content
+              // This identifies the CORE CONTENT, not just the exact message
+              const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+              const { data: recentPosts } = await supabase
+                .from("pulses")
+                .select("message, tag, poll_options")
+                .eq("city", cityInfo.city)
+                .eq("is_bot", true)
+                .gte("created_at", fourHoursAgo);
+
+              // Extract semantic signature from a post
+              const getSig = (tag: string, msg: string, opts?: string[] | null): string => {
+                const t = tag.toLowerCase(), m = msg.toLowerCase();
+
+                // Prediction/Polls
+                if (m.includes("prediction") || opts) {
+                  if (m.includes("weather") || m.includes("°f")) return `${tag}:prediction:weather`;
+                  if (m.includes("traffic") || m.includes("congestion")) return `${tag}:prediction:traffic`;
+                  const questionPart = m.replace(/[^a-z0-9\s]/g, '').substring(0, 30);
+                  return `${tag}:poll:${questionPart}`;
+                }
+
+                // Farmers market
+                if (m.includes("farmers market") || m.includes("market day") || m.includes("fresh produce")) {
+                  const match = msg.match(/(?:🥬|🍅|🌽|🥕|🍯)\s*([A-Z][A-Za-z\s&']+?)(?:\s+is\s+OPEN|\s+Farmers\s+Market)/i);
+                  return `${tag}:market:${match ? match[1].trim().toLowerCase().replace(/[^a-z0-9]/g, '') : 'generic'}`;
+                }
+
+                // Events
+                if (t === 'events') {
+                  const venueMatch = msg.match(/\bat\s+([A-Z][A-Za-z\s\-']+?)(?:\s*\(|\.|,|\!|\?|$)/);
+                  const venue = venueMatch ? venueMatch[1].trim().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+                  const eventMatch = msg.replace(/\([^)]*\)/g, '').match(/(?:🎭|🎪|🎵|🎫|🎬)?\s*([A-Z][A-Za-z0-9\s\-']+?)(?:\s+on\s+|\s+at\s+)/i);
+                  const event = eventMatch ? eventMatch[1].trim().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+                  return `${tag}:event:${venue}:${event.substring(0, 20)}`;
+                }
+
+                return `${tag}:${msg.substring(0, 40).toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+              };
+
+              const newSig = getSig(result.post.tag, result.post.message, (result.post as any).options);
+              const isDuplicate = (recentPosts || []).some(p => getSig(p.tag, p.message, p.poll_options) === newSig);
+
+              if (isDuplicate) {
+                console.log(`[Cron Refresh] Skipping semantic duplicate for ${cityInfo.city}: ${newSig}`);
+                continue;
+              }
+
               // Insert the generated post with smart expiration based on content type
               const expirationHours = getExpirationHours(result.post.tag);
               const expiresAt = new Date(Date.now() + expirationHours * 60 * 60 * 1000).toISOString();

@@ -117,6 +117,12 @@ const WEATHER_TEMPLATES = {
     "🌨️ Actual snow! {road} conditions deteriorating. Stay home if you can.",
     "⚠️ Winter weather in {city}. {bridge} will ice first - be careful!",
   ],
+  forecast: [
+    "🔮 Forecast: Tomorrow looks like {forecastCondition} with a high of {forecastHigh}°F.",
+    "☀️ Look ahead: {forecastDay} will be {forecastCondition}, high of {forecastHigh}°F and low of {forecastLow}°F.",
+    "🌡️ Weather update: Tomorrow's high {forecastHigh}°F, low {forecastLow}°F. Plan accordingly!",
+    "📅 Forecast for {forecastDay}: {forecastCondition}, {forecastHigh}°F/{forecastLow}°F.",
+  ],
 };
 
 const GENERAL_TEMPLATES = {
@@ -146,6 +152,7 @@ const GENERAL_TEMPLATES = {
     "🦉 Late night {city} crew - anyone else still up?",
     "✨ Night owl update: {city} is peaceful. Drive safe out there.",
   ],
+
 };
 
 const EVENT_TEMPLATES = {
@@ -543,6 +550,11 @@ interface TemplateVariables {
   eventDistanceCallout: string;
   eventDate: string;
   venueCity: string;
+  // New variables
+  forecastHigh: string;
+  forecastLow: string;
+  forecastCondition: string;
+  forecastDay: string;
 }
 
 /**
@@ -613,6 +625,11 @@ function buildVariables(ctx: SituationContext, eventIndex: number = 0): Template
     eventDistanceCallout: distanceCallout,
     eventDate,
     venueCity: "", // Will be populated when we have venue city data
+    // New variables logic
+    forecastHigh: ctx.weather.forecast?.[0]?.tempHigh.toString() || "--",
+    forecastLow: ctx.weather.forecast?.[0]?.tempLow.toString() || "--",
+    forecastCondition: ctx.weather.forecast?.[0]?.condition || "clear",
+    forecastDay: "Tomorrow",
   };
 }
 

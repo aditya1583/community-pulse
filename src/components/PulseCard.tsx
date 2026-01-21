@@ -212,13 +212,13 @@ function ActionButtons({ actionData }: { actionData: ParsedActionData }) {
   }
 
   return (
-    <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-slate-700/50">
+    <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-white/5">
       {/* Get Directions button */}
       <a
         href={actionData.directionsUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 transition-colors"
+        className="inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-all active:scale-95 shadow-lg shadow-emerald-500/5"
         onClick={(e) => e.stopPropagation()}
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -231,17 +231,14 @@ function ActionButtons({ actionData }: { actionData: ParsedActionData }) {
       {actionData.address && (
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-700/50 hover:bg-slate-700 text-slate-300 border border-slate-600/50 transition-colors"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-full bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-all active:scale-95"
           onClick={(e) => {
             e.stopPropagation();
-            // Store navigation intent in sessionStorage for the main page to read
             try {
               sessionStorage.setItem("cp-active-tab", "local");
               sessionStorage.setItem("cp-local-section", "markets");
-              // Navigate to home page which will pick up the sessionStorage values
               window.location.href = "/";
             } catch {
-              // Fallback: just go to home
               window.location.href = "/";
             }
           }}
@@ -249,7 +246,7 @@ function ActionButtons({ actionData }: { actionData: ParsedActionData }) {
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />
           </svg>
-          See on Markets Tab
+          See on Markets
         </button>
       )}
     </div>
@@ -353,96 +350,111 @@ export default function PulseCard({
     return null;
   }
 
-  // Color-coded LEFT STRIPE by category - highly visible
-  // Traffic = amber, Events = purple, Weather = blue, General = teal
   const getCategoryStyle = () => {
     const tag = pulse.tag.toLowerCase();
-    if (tag === "traffic") return { leftBorder: "border-l-amber-500", bg: "bg-amber-500/5" };
-    if (tag === "events") return { leftBorder: "border-l-purple-500", bg: "bg-purple-500/5" };
-    if (tag === "weather") return { leftBorder: "border-l-sky-400", bg: "bg-sky-500/5" };
-    return { leftBorder: "border-l-teal-500", bg: "bg-teal-500/5" }; // General
+    if (tag === "traffic") return {
+      accent: "var(--accent-traffic)",
+      badge: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+      glow: "shadow-amber-500/5",
+    };
+    if (tag === "events") return {
+      accent: "var(--accent-event)",
+      badge: "text-purple-400 bg-purple-500/10 border-purple-500/20",
+      glow: "shadow-purple-500/5",
+    };
+    if (tag === "weather") return {
+      accent: "var(--accent-weather)",
+      badge: "text-sky-400 bg-sky-500/10 border-sky-500/20",
+      glow: "shadow-sky-500/5",
+    };
+    return {
+      accent: "var(--accent-primary)",
+      badge: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+      glow: "shadow-emerald-500/5",
+    };
   };
 
-  const getBorderClass = () => {
-    const style = getCategoryStyle();
-    // Expiry states - subtle fade effect
-    if (isFading) return `border-l-3 ${style.leftBorder} opacity-50 bg-slate-900/30`;
-    if (isExpiringSoon) return `border-l-3 ${style.leftBorder} opacity-70 bg-slate-900/40`;
-
-    // Default: subtle semi-transparent background with colored left stripe
-    // No outer border, minimal shadow - let content breathe
-    return `border-l-3 ${style.leftBorder} bg-slate-900/50 hover:bg-slate-900/60 transition-colors`;
-  };
+  const style = getCategoryStyle();
 
   return (
     <article
-      className={`rounded-r-xl p-4 mb-3 transition-all duration-200 border-0 ${getBorderClass()}`}
+      className={`glass-card rounded-2xl p-5 mb-4 transition-all duration-300 premium-border hover:shadow-2xl ${style.glow} group ${isFading ? 'opacity-40 grayscale-[0.2]' : ''}`}
       style={{ opacity }}
     >
-      <div className="flex gap-3">
-        <div className="flex flex-col items-center gap-2 flex-shrink-0">
+      {/* Subtle indicator bar */}
+      <div
+        className="absolute top-0 left-0 bottom-0 w-1 rounded-l-2xl transition-all group-hover:w-1.5"
+        style={{ backgroundColor: style.accent }}
+      />
+      <div className="flex gap-4 relative">
+        <div className="flex flex-col items-center gap-3 flex-shrink-0">
           <StatusRing
             rank={authorRank}
             level={authorLevel}
             showLevel={authorLevel !== undefined && authorLevel > 1}
-            size="md"
+            size="lg"
           >
-            <span className="text-2xl">{pulse.mood}</span>
+            <span className="text-3xl filter drop-shadow-md select-none">{pulse.mood}</span>
           </StatusRing>
-          <span className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full font-medium ${
-            pulse.tag.toLowerCase() === "traffic" ? "text-amber-400/90 bg-amber-500/15" :
-            pulse.tag.toLowerCase() === "events" ? "text-purple-400/90 bg-purple-500/15" :
-            pulse.tag.toLowerCase() === "weather" ? "text-sky-400/90 bg-sky-500/15" :
-            "text-teal-400/90 bg-teal-500/15"
-          }`}>
-            {pulse.tag}
-          </span>
-          {/* Distance badge for out-of-radius content */}
-          {pulse.distanceMiles !== undefined &&
-            pulse.distanceMiles !== null &&
-            pulse.distanceMiles > RADIUS_CONFIG.PRIMARY_RADIUS_MILES && (
-              <DistanceBadge distanceMiles={pulse.distanceMiles} size="xs" />
-            )}
+
+          <div className="flex flex-col items-center gap-1.5">
+            <span className={`text-[9px] font-bold uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border ${style.badge}`}>
+              {pulse.tag}
+            </span>
+
+            {/* Distance badge for out-of-radius content */}
+            {pulse.distanceMiles !== undefined &&
+              pulse.distanceMiles !== null &&
+              pulse.distanceMiles > RADIUS_CONFIG.PRIMARY_RADIUS_MILES && (
+                <DistanceBadge distanceMiles={pulse.distanceMiles} size="xs" />
+              )}
+          </div>
         </div>
 
-        <div className="flex-1 min-w-0">
-          {/* Trending/New badges */}
-          {(() => {
-            const isNew = new Date().getTime() - new Date(pulse.createdAt).getTime() < 30 * 60 * 1000; // 30 min
-            const hasPoll = pulse.poll_options && pulse.poll_options.length >= 2;
-            const isPrediction = pulse.is_prediction;
+        <div className="flex-1 min-w-0 pt-0.5">
+          {/* Metadata Row: Badges and Status */}
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            {(() => {
+              const isNew = new Date().getTime() - new Date(pulse.createdAt).getTime() < 30 * 60 * 1000;
+              const hasPoll = pulse.poll_options && pulse.poll_options.length >= 2;
+              const isPrediction = pulse.is_prediction;
 
-            if (isPrediction) {
-              return (
-                <div className="flex items-center gap-1.5 mb-2">
-                  <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 border border-amber-500/30">
+              if (isPrediction) {
+                return (
+                  <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-amber-500 text-slate-950 shadow-sm shadow-amber-500/20">
                     Predict
                   </span>
-                </div>
-              );
-            }
-            if (hasPoll) {
-              return (
-                <div className="flex items-center gap-1.5 mb-2">
-                  <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-gradient-to-r from-pink-500/20 to-purple-500/20 text-pink-300 border border-pink-500/30">
-                    Vote
+                );
+              }
+              if (hasPoll) {
+                return (
+                  <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-violet-500 text-white shadow-sm shadow-violet-500/20">
+                    Vibe Check
                   </span>
-                </div>
-              );
-            }
-            if (isNew) {
-              return (
-                <div className="flex items-center gap-1.5 mb-2">
-                  <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                );
+              }
+              if (isNew) {
+                return (
+                  <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-emerald-500 text-slate-950 shadow-sm shadow-emerald-500/20">
                     New
                   </span>
-                </div>
-              );
-            }
-            return null;
-          })()}
-          {/* Message content - preserve line breaks for multi-line posts */}
-          <p className="text-sm text-white leading-snug mb-3 whitespace-pre-line">{pulse.message}</p>
+                );
+              }
+              return null;
+            })()}
+
+            {pulse.is_bot && (
+              <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center gap-1">
+                <span className="w-1 h-1 rounded-full bg-sky-400 animate-pulse" />
+                AI Generated
+              </span>
+            )}
+          </div>
+
+          {/* Message content - increased readability */}
+          <p className="text-[15px] text-white/90 leading-[1.6] mb-4 whitespace-pre-line font-medium tracking-tight text-balance">
+            {pulse.message}
+          </p>
 
           {/* Action buttons for actionable content (farmers markets, venues) */}
           {actionData.type && <ActionButtons actionData={actionData} />}
@@ -473,28 +485,32 @@ export default function PulseCard({
             />
           )}
 
-          <div className="flex items-center justify-between text-xs gap-3 mt-3">
-            <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center justify-between gap-3 pt-2 mt-auto border-t border-white/5">
+            <div className="flex items-center gap-2.5 min-w-0">
               {pulse.is_bot ? (
-                // Bot author: cleaner format "Hot Take Bot in Leander"
                 (() => {
                   const botInfo = parseBotAuthor(pulse.author);
                   return (
-                    <span className="flex items-center gap-1.5 text-slate-400">
-                      <span className="text-base leading-none">{botInfo.emoji}</span>
-                      <span className="font-medium text-slate-300">{botInfo.displayName}</span>
-                      {botInfo.location && (
-                        <span className="text-slate-500">in {botInfo.location}</span>
-                      )}
-                    </span>
+                    <div className="flex items-center gap-2 text-slate-400 group/bot cursor-default">
+                      <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-sm border border-white/5 shadow-sm">
+                        {botInfo.emoji}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-bold text-slate-200 leading-tight">{botInfo.displayName}</span>
+                        {botInfo.location && (
+                          <span className="text-[10px] text-slate-500 font-medium">in {botInfo.location}</span>
+                        )}
+                      </div>
+                    </div>
                   );
                 })()
               ) : (
-                // Human author: standard display
-                <>
-                  <span className="text-cyan-400 font-medium truncate">{pulse.author}</span>
-                  <StatusIndicator rank={authorRank} level={authorLevel} />
-                </>
+                <div className="flex flex-col min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-cyan-400 truncate tracking-tight">{pulse.author}</span>
+                    <StatusIndicator rank={authorRank} level={authorLevel} />
+                  </div>
+                </div>
               )}
             </div>
 
@@ -559,11 +575,10 @@ export default function PulseCard({
               <button
                 type="button"
                 onClick={() => onToggleFavorite(pulse.id)}
-                className={`transition ${
-                  isFavorite
-                    ? "text-amber-400"
-                    : "text-slate-500 hover:text-amber-300"
-                }`}
+                className={`transition ${isFavorite
+                  ? "text-amber-400"
+                  : "text-slate-500 hover:text-amber-300"
+                  }`}
                 title={isFavorite ? "Remove from favorites" : "Add to favorites"}
               >
                 {isFavorite ? (

@@ -2848,8 +2848,10 @@ export async function generateFarmersMarketPost(
     ? ` (${market.distance.toFixed(1)} mi)`
     : "";
 
-  // Clean up address - remove city name if it's redundant
-  const address = market.address || city.name;
+  // Clean up address - provide a better fallback if specific address is missing
+  const address = market.address && market.address !== "Address not available"
+    ? market.address
+    : `near ${city.name}`;
 
   const extendedVars: Record<string, string> = {
     marketName: market.name,

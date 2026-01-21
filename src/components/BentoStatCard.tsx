@@ -116,13 +116,12 @@ export default function BentoStatCard({
         aria-label={ariaLabel ?? `${label}: ${value}`}
         aria-expanded={isExpanded}
         className={[
-          "stat-card-hover bento-card elevation-1",
-          "flex flex-col items-center justify-center gap-2 p-4",
-          "bg-[var(--background-card)] border border-white/[0.06] rounded-2xl",
-          "transition-all duration-300 motion-reduce:transition-none",
+          "group relative flex flex-col items-center justify-center gap-2 p-4",
+          "glass-card premium-border rounded-2xl overflow-hidden",
+          "transition-all duration-500 motion-reduce:transition-none",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70",
           isClickable
-            ? `cursor-pointer ${colors.hover}`
+            ? `cursor-pointer hover:scale-[1.02] hover:shadow-xl`
             : "cursor-default opacity-60",
         ].join(" ")}
         style={{
@@ -130,14 +129,18 @@ export default function BentoStatCard({
           ["--glow-color" as string]: colors.glow,
         }}
       >
-        <div className={`${colors.accent} transition-colors`}>{icon}</div>
-        <div className="text-white font-bold text-base tracking-tight">{value}</div>
-        <div className="text-slate-400 text-[11px] uppercase tracking-wider font-medium">
+        {/* Hover Gradient Overlay */}
+        <div className={`absolute inset-0 bg-gradient-to-br from-transparent to-${accentColor}-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
+
+        <div className={`${colors.accent} transition-all duration-500 group-hover:scale-110 group-hover:drop-shadow-[0_0_10px_currentColor]`}>{icon}</div>
+        <div className="text-white font-black text-lg tracking-tight z-10">{value}</div>
+        <div className="text-slate-400 text-[9px] uppercase tracking-[0.2em] font-black z-10 opacity-70 group-hover:opacity-100 transition-opacity">
           {label}
         </div>
+
         {/* Expansion indicator */}
         {expandedContent && isClickable && (
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-1 -translate-y-1 group-hover:translate-x-0 group-hover:translate-y-0">
             <svg
               className="w-3 h-3 text-slate-500"
               fill="none"
@@ -154,9 +157,8 @@ export default function BentoStatCard({
       {isExpanded && typeof document !== "undefined" &&
         createPortal(
           <div
-            className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 ${
-              isClosing ? "" : "backdrop-animate"
-            }`}
+            className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 ${isClosing ? "" : "backdrop-animate"
+              }`}
             onClick={handleClose}
             role="dialog"
             aria-modal="true"
@@ -164,16 +166,14 @@ export default function BentoStatCard({
           >
             {/* Backdrop */}
             <div
-              className={`absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity ${
-                isClosing ? "opacity-0" : "opacity-100"
-              }`}
+              className={`absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity ${isClosing ? "opacity-0" : "opacity-100"
+                }`}
             />
 
             {/* Expanded Card Content */}
             <div
-              className={`relative w-full max-w-lg max-h-[80vh] overflow-y-auto bg-[var(--background-elevated)] border border-white/10 rounded-2xl shadow-2xl ${
-                isClosing ? "card-expand-exit" : "card-expand-enter"
-              }`}
+              className={`relative w-full max-w-lg max-h-[80vh] overflow-y-auto bg-[var(--background-elevated)] border border-white/10 rounded-2xl shadow-2xl ${isClosing ? "card-expand-exit" : "card-expand-enter"
+                }`}
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}

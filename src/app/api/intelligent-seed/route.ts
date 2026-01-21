@@ -209,10 +209,23 @@ export async function POST(request: NextRequest) {
           return `${tag}:prediction:${questionPart}`;
         }
 
-        // Farmers market: signature is the market name
-        if (msgLower.includes("farmers market") || msgLower.includes("market day")) {
-          const marketMatch = message.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+Farmers\s+Market/i);
-          return `${tag}:farmers_market:${marketMatch ? marketMatch[1].toLowerCase() : 'local'}`;
+        // Farmers market: detect by market-specific patterns
+        // Posts say things like "Farmers Grass & Nursery is OPEN NOW!" not "Farmers Market"
+        // Key patterns: "is OPEN", "MARKET DAY", "Fresh produce", "local vendors", "→ Tap for directions"
+        const isMarketPost =
+          msgLower.includes("farmers market") ||
+          msgLower.includes("market day") ||
+          (msgLower.includes("is open") && (msgLower.includes("fresh produce") || msgLower.includes("local vendors") || msgLower.includes("tap for directions"))) ||
+          (msgLower.includes("market run") && msgLower.includes("📍"));
+
+        if (isMarketPost) {
+          // Extract market name: "🥬 Farmers Grass & Nursery is OPEN NOW!" → "farmers grass nursery"
+          // Or "Leander Farmers Market" → "leander"
+          const marketMatch = message.match(/(?:🥬|🍅|🌽|🥕|🍯)\s*([A-Z][A-Za-z\s&']+?)(?:\s+is\s+OPEN|\s+Farmers\s+Market)/i);
+          const marketName = marketMatch
+            ? marketMatch[1].trim().toLowerCase().replace(/[^a-z0-9]/g, '')
+            : msgLower.substring(0, 40).replace(/[^a-z0-9]/g, '');
+          return `${tag}:farmers_market:${marketName}`;
         }
 
         // Landmark food: signature is landmark + time category
@@ -421,10 +434,19 @@ export async function POST(request: NextRequest) {
         return `${tag}:prediction:${questionPart}`;
       }
 
-      // Farmers market
-      if (m.includes("farmers market") || m.includes("market day")) {
-        const match = msg.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+Farmers\s+Market/i);
-        return `${tag}:farmers_market:${match ? match[1].toLowerCase() : 'local'}`;
+      // Farmers market: detect by market-specific patterns (same logic as cold-start)
+      const isMarketPost =
+        m.includes("farmers market") ||
+        m.includes("market day") ||
+        (m.includes("is open") && (m.includes("fresh produce") || m.includes("local vendors") || m.includes("tap for directions"))) ||
+        (m.includes("market run") && m.includes("📍"));
+
+      if (isMarketPost) {
+        const match = msg.match(/(?:🥬|🍅|🌽|🥕|🍯)\s*([A-Z][A-Za-z\s&']+?)(?:\s+is\s+OPEN|\s+Farmers\s+Market)/i);
+        const marketName = match
+          ? match[1].trim().toLowerCase().replace(/[^a-z0-9]/g, '')
+          : m.substring(0, 40).replace(/[^a-z0-9]/g, '');
+        return `${tag}:farmers_market:${marketName}`;
       }
 
       // Weather posts

@@ -27,31 +27,38 @@ export default function Header({ cityName, isLive = true, radiusMiles = 10 }: He
     : cityName;                    // Already "Austin, TX" or just "Austin"
 
   return (
-    <header className="flex items-center justify-between px-4 py-3">
+    <header className="flex items-center justify-between px-4 py-6">
       {/* Left side: City name + Radar visualization */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4">
         {/* Animated radar replacing static icon */}
-        <RadarPulse
-          radiusMiles={radiusMiles}
-          isScanning={isLive}
-          size="md"
-        />
+        <div className="relative">
+          <RadarPulse
+            radiusMiles={radiusMiles}
+            isScanning={isLive}
+            size="md"
+          />
+          {/* Subtle glow behind radar */}
+          <div className="absolute inset-0 bg-emerald-500/20 blur-xl -z-10" />
+        </div>
 
         <div className="flex flex-col">
-          <h1 className="text-lg font-bold text-white tracking-tight">
+          <h1 className="text-2xl font-black text-white tracking-tighter leading-none">
             {displayCity}
           </h1>
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mt-1">
+            Local Monitoring Active
+          </p>
         </div>
       </div>
 
       {/* Right side: LIVE badge */}
       {isLive && (
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/60 border border-slate-700/50">
-          <span className="relative flex h-2 w-2">
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl glass-card premium-border shadow-lg">
+          <span className="relative flex h-1.5 w-1.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
           </span>
-          <span className="text-xs font-mono text-emerald-400 uppercase tracking-wider">
+          <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">
             Live
           </span>
         </div>

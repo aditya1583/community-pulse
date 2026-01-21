@@ -115,33 +115,37 @@ export default function GasPricesCard({ state, cityName, lat, lon }: GasPricesCa
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-white flex items-center gap-2">
-          <span className="text-lg">⛽</span>
-          Gas Prices
-          {prices?.regionName && (
-            <span className="text-xs text-slate-400">({prices.regionName})</span>
-          )}
-        </h3>
+      <div className="flex items-center justify-between px-2">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-amber-500/10 flex items-center justify-center text-2xl shadow-inner border border-amber-500/20">
+            ⛽
+          </div>
+          <div>
+            <h3 className="text-sm font-black text-white uppercase tracking-wider">Gas Prices</h3>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+              {prices?.regionName || state} Market
+            </p>
+          </div>
+        </div>
         <button
           onClick={fetchPrices}
           disabled={loading}
-          className="text-xs text-emerald-400 hover:text-emerald-300 disabled:opacity-50"
+          className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-[10px] font-black text-slate-400 hover:text-white uppercase tracking-[0.15em] rounded-xl border border-white/5 transition-all duration-300 disabled:opacity-30"
         >
-          Refresh
+          {loading ? "Syncing..." : "Refresh"}
         </button>
       </div>
 
       {/* Loading State */}
       {loading && (
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
-          <div className="grid grid-cols-4 gap-3">
+        <div className="glass-card premium-border rounded-3xl p-6">
+          <div className="grid grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="text-center animate-pulse">
-                <div className="h-4 w-12 mx-auto bg-slate-700/50 rounded mb-2" />
-                <div className="h-6 w-14 mx-auto bg-slate-700/50 rounded" />
+                <div className="h-3 w-10 mx-auto bg-white/5 rounded-full mb-3" />
+                <div className="h-6 w-14 mx-auto bg-white/5 rounded-lg" />
               </div>
             ))}
           </div>
@@ -150,112 +154,86 @@ export default function GasPricesCard({ state, cityName, lat, lon }: GasPricesCa
 
       {/* Error State */}
       {!loading && error && (
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-6 text-center">
-          <div className="text-2xl mb-2">⛽</div>
-          <p className="text-slate-400 text-sm">{error}</p>
+        <div className="glass-card border border-red-500/20 bg-red-500/5 rounded-3xl p-8 text-center space-y-4">
+          <div className="text-4xl opacity-50">⚠️</div>
+          <p className="text-red-400 text-xs font-bold uppercase tracking-widest">{error}</p>
           <button
             onClick={fetchPrices}
-            className="mt-2 text-xs text-emerald-400 hover:text-emerald-300"
+            className="px-6 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[10px] font-black uppercase tracking-widest rounded-xl border border-red-500/20 transition-all"
           >
-            Try again
+            Reconnect
           </button>
         </div>
       )}
 
       {/* Prices Card */}
       {!loading && !error && prices && (
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
+        <div className="glass-card premium-border rounded-[2.5rem] p-6 space-y-6">
           {/* Main Prices Grid */}
-          <div className="grid grid-cols-4 gap-3 mb-4">
-            <div className="text-center">
-              <p className="text-xs text-slate-400 mb-1">Regular</p>
-              <p className="text-lg font-bold text-white">{formatPrice(prices.regular)}</p>
-              {getChangeIndicator(prices.regularChange)}
-            </div>
-            <div className="text-center">
-              <p className="text-xs text-slate-400 mb-1">Midgrade</p>
-              <p className="text-lg font-bold text-slate-300">{formatPrice(prices.midgrade)}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs text-slate-400 mb-1">Premium</p>
-              <p className="text-lg font-bold text-slate-300">{formatPrice(prices.premium)}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs text-slate-400 mb-1">Diesel</p>
-              <p className="text-lg font-bold text-amber-400">{formatPrice(prices.diesel)}</p>
-            </div>
-          </div>
-
-          {/* Averages Comparison */}
-          <div className="flex items-center justify-between pt-3 border-t border-slate-700/50 text-xs">
-            {prices.stateAvg && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-slate-500">State Avg:</span>
-                <span className="text-slate-300 font-medium">{formatPrice(prices.stateAvg)}</span>
+          <div className="grid grid-cols-4 gap-3">
+            {[
+              { label: "Regular", price: prices.regular, change: prices.regularChange, color: "text-white" },
+              { label: "Mid", price: prices.midgrade, color: "text-slate-300" },
+              { label: "Prem", price: prices.premium, color: "text-slate-300" },
+              { label: "Diesel", price: prices.diesel, color: "text-amber-400" },
+            ].map((item, idx) => (
+              <div key={idx} className="text-center space-y-1">
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{item.label}</p>
+                <p className={`text-xl font-black tracking-tighter ${item.color}`}>
+                  {formatPrice(item.price)}
+                </p>
+                {item.change !== undefined && getChangeIndicator(item.change)}
               </div>
-            )}
-            <div className="flex items-center gap-1.5">
-              <span className="text-slate-500">National Avg:</span>
-              <span className="text-slate-300 font-medium">{formatPrice(prices.nationalAvg)}</span>
-            </div>
+            ))}
           </div>
 
-          {/* Last Updated */}
-          <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-700/30">
-            <p className="text-[10px] text-slate-500">
-              Updated {new Date(prices.lastUpdated).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-                hour: "numeric",
-                minute: "2-digit"
-              })}
-            </p>
+          {/* Comparables */}
+          <div className="grid grid-cols-2 gap-4 py-4 border-t border-white/5">
+            <div className="flex flex-col items-center">
+              <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">State Average</span>
+              <span className="text-xs font-bold text-slate-400">{prices.stateAvg ? formatPrice(prices.stateAvg) : "N/A"}</span>
+            </div>
+            <div className="flex flex-col items-center border-l border-white/5">
+              <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">National Avg</span>
+              <span className="text-xs font-bold text-slate-400">{prices.nationalAvg ? formatPrice(prices.nationalAvg) : "N/A"}</span>
+            </div>
           </div>
 
           {/* Closest Station - Featured */}
           {stations.length > 0 && (
             <button
               onClick={() => openDirections(stations[0])}
-              className="w-full mt-4 pt-3 border-t border-slate-700/50 flex items-center justify-between group hover:bg-slate-700/20 -mx-4 px-4 pb-1 rounded-b-xl transition"
+              className="group relative overflow-hidden w-full p-4 bg-black/40 hover:bg-black/60 rounded-3xl border border-white/5 transition-all duration-500 text-left"
             >
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                  <span className="text-emerald-400 text-sm">⛽</span>
+              <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative z-10 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform duration-500">⛽</div>
+                  <div>
+                    <p className="text-[10px] font-black text-emerald-500/80 uppercase tracking-widest mb-0.5">Closest Station</p>
+                    <p className="text-[13px] font-bold text-white tracking-tight truncate max-w-[160px]">
+                      {stations[0].name}
+                    </p>
+                  </div>
                 </div>
-                <div className="text-left">
-                  <p className="text-xs text-slate-400">Closest Station</p>
-                  <p className="text-sm font-medium text-white truncate max-w-[180px]">
-                    {stations[0].name}
-                  </p>
+                <div className="flex flex-col items-end">
+                  <span className="text-xs font-black text-emerald-400 mb-1">{stations[0].distanceMiles} mi</span>
+                  <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest group-hover:text-emerald-500 transition-colors">Tap for Directions</span>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-emerald-400 font-medium">
-                  {stations[0].distanceMiles} mi
-                </span>
-                <svg
-                  className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 transition"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
               </div>
             </button>
           )}
 
           {/* Loading closest station */}
           {stationsLoading && stations.length === 0 && (
-            <div className="mt-4 pt-3 border-t border-slate-700/50 flex items-center gap-2 animate-pulse">
-              <div className="w-8 h-8 rounded-lg bg-slate-700/50" />
-              <div className="flex-1">
-                <div className="h-3 w-20 bg-slate-700/50 rounded mb-1" />
-                <div className="h-4 w-32 bg-slate-700/50 rounded" />
-              </div>
-            </div>
+            <div className="h-20 bg-white/5 rounded-3xl animate-pulse" />
           )}
+
+          <div className="flex justify-center">
+            <span className="text-[9px] font-black text-slate-700 uppercase tracking-[0.2em]">
+              Market Update: {new Date(prices.lastUpdated).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+            </span>
+          </div>
         </div>
       )}
 
@@ -263,15 +241,15 @@ export default function GasPricesCard({ state, cityName, lat, lon }: GasPricesCa
       {lat && lon && stations.length > 1 && (
         <button
           onClick={() => setShowStations(!showStations)}
-          className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-slate-800/40 hover:bg-slate-800/60 text-slate-400 hover:text-white text-sm transition"
+          className="w-full py-4 glass-card border border-white/5 hover:border-white/10 rounded-2xl text-[10px] font-black text-slate-500 hover:text-white uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-2"
         >
-          {showStations ? "Hide other stations" : `See ${stations.length - 1} more stations nearby`}
+          {showStations ? "Collapse Directory" : `View ${stations.length - 1} More Local Stations`}
           <svg
-            className={`w-4 h-4 transition-transform ${showStations ? "rotate-180" : ""}`}
+            className={`w-4 h-4 transition-transform duration-500 ${showStations ? "rotate-180" : ""}`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
-            strokeWidth={2}
+            strokeWidth={3}
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
@@ -280,96 +258,69 @@ export default function GasPricesCard({ state, cityName, lat, lon }: GasPricesCa
 
       {/* Stations List */}
       {showStations && (
-        <div className="space-y-2">
-          {stationsLoading && (
-            <div className="space-y-2">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="bg-slate-800/60 border border-slate-700/50 rounded-lg p-3 animate-pulse">
-                  <div className="h-4 w-32 bg-slate-700/50 rounded mb-2" />
-                  <div className="h-3 w-48 bg-slate-700/50 rounded" />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {!stationsLoading && stations.length === 0 && (
-            <div className="bg-slate-800/60 border border-slate-700/50 rounded-lg p-4 text-center">
-              <p className="text-slate-400 text-sm">No gas stations found nearby</p>
-              <a
-                href={`https://www.google.com/maps/search/gas+stations+near+${encodeURIComponent(cityName || state)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block mt-2 text-xs text-emerald-400 hover:text-emerald-300"
-              >
-                Search on Google Maps →
-              </a>
-            </div>
-          )}
-
+        <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-500">
           {!stationsLoading && stations.length > 1 && (
             <>
               {stations.slice(1).map((station) => (
                 <button
                   key={station.id}
                   onClick={() => openDirections(station)}
-                  className="w-full text-left bg-slate-800/60 border border-slate-700/50 rounded-lg p-3 hover:border-emerald-500/30 hover:bg-slate-800/80 transition group"
+                  className="group w-full flex items-center justify-between p-4 glass-card premium-border rounded-2xl hover:bg-white/5 transition-all duration-300 text-left"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <h4 className="font-medium text-white text-sm truncate">
-                        {station.name}
-                      </h4>
-                      {station.address && (
-                        <p className="text-xs text-slate-400 truncate mt-0.5">
-                          {station.address}
-                        </p>
-                      )}
-                      {station.amenities.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1.5">
-                          {station.amenities.slice(0, 3).map((amenity, i) => (
-                            <span
-                              key={i}
-                              className="px-1.5 py-0.5 text-[9px] bg-slate-700/50 text-slate-400 rounded"
-                            >
-                              {amenity}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                  <div className="flex-1 min-w-0 pr-4">
+                    <h4 className="text-[13px] font-bold text-white tracking-tight truncate border-b border-white/5 pb-1 mb-2 group-hover:border-emerald-500/30 transition-colors">
+                      {station.name}
+                    </h4>
+                    {station.address && (
+                      <p className="text-[11px] font-medium text-slate-500 truncate mb-2">
+                        {station.address}
+                      </p>
+                    )}
+                    {station.amenities.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {station.amenities.slice(0, 3).map((amenity, i) => (
+                          <span
+                            key={i}
+                            className="px-2 py-0.5 text-[8px] font-black uppercase tracking-widest bg-black/40 text-slate-600 rounded-md border border-white/5"
+                          >
+                            {amenity}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                    <div className="px-2 py-1 bg-emerald-500/10 rounded-lg border border-emerald-500/20 group-hover:bg-emerald-500/20 transition-colors text-center">
+                      <span className="text-[10px] font-black text-emerald-400 block">{station.distanceMiles}</span>
+                      <span className="text-[7px] font-black text-emerald-600 uppercase tracking-widest">Miles</span>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className="text-xs text-slate-400">
-                        {station.distanceMiles} mi
-                      </span>
-                      <span className="text-[10px] text-emerald-400 opacity-0 group-hover:opacity-100 transition flex items-center gap-0.5">
-                        Directions
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                        </svg>
-                      </span>
+                    <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-slate-600 group-hover:bg-emerald-500 group-hover:text-slate-950 transition-all duration-500">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                      </svg>
                     </div>
                   </div>
                 </button>
               ))}
-              <p className="text-center text-[10px] text-slate-500 pt-1">
-                Station data from OpenStreetMap
-              </p>
+              <div className="text-center pt-2">
+                <p className="text-[8px] font-black text-slate-700 uppercase tracking-[0.3em]">Mapping by OpenStreetMap Contributors</p>
+              </div>
             </>
           )}
         </div>
       )}
 
       {/* EIA Attribution */}
-      <div className="text-center">
-        <p className="text-[10px] text-slate-500">
-          Price data from{" "}
+      <div className="text-center pt-2">
+        <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity">
+          Price intelligence by{" "}
           <a
             href="https://www.eia.gov/"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-slate-400 hover:text-emerald-400 transition"
+            className="text-slate-500 hover:text-emerald-400 transition-colors"
           >
-            U.S. Energy Information Administration
+            U.S. EIA
           </a>
         </p>
       </div>

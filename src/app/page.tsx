@@ -311,6 +311,15 @@ export default function Home() {
   const [trafficLevel, setTrafficLevel] = useState<TrafficLevel | null>(null);
   const [trafficLoading, setTrafficLoading] = useState(false);
   const [trafficError, setTrafficError] = useState<string | null>(null);
+  const [trafficIncidents, setTrafficIncidents] = useState<Array<{
+    id: string;
+    type: "accident" | "roadwork" | "closure" | "congestion" | "other";
+    description: string;
+    roadName?: string;
+    delay?: number;
+    severity: 1 | 2 | 3 | 4;
+  }>>([]);
+  const [hasRoadClosure, setHasRoadClosure] = useState(false);
 
   // Summary
   const [summary, setSummary] = useState<string | null>(null);
@@ -1791,25 +1800,54 @@ export default function Home() {
         setTrafficLoading(true);
         setTrafficError(null);
 
-        const res = await fetch(`/api/traffic?city=${encodeURIComponent(city)}`);
+        // Fetch both AI-based traffic level AND live TomTom incidents in parallel
+        const trafficUrl = `/api/traffic?city=${encodeURIComponent(city)}`;
+        const liveUrl = selectedCity?.lat && selectedCity?.lon
+          ? `/api/traffic-live?lat=${selectedCity.lat}&lon=${selectedCity.lon}`
+          : `/api/traffic-live?city=${encodeURIComponent(city)}`;
 
-        let data: { level?: TrafficLevel; error?: string } | null = null;
-        try {
-          data = await res.json();
-        } catch {
-          // ignore JSON parse error
-        }
+        const [trafficRes, liveRes] = await Promise.allSettled([
+          fetch(trafficUrl),
+          fetch(liveUrl),
+        ]);
 
-        if (!res.ok || !data?.level) {
-          const message =
-            (data && data.error) || "Unable to load traffic right now.";
-          setTrafficError(message);
+        // Process AI-based traffic level
+        if (trafficRes.status === "fulfilled" && trafficRes.value.ok) {
+          try {
+            const data = await trafficRes.value.json();
+            if (data?.level) {
+              setTrafficLevel(data.level);
+              setTrafficError(null);
+            }
+          } catch {
+            // ignore JSON parse error
+          }
+        } else {
+          setTrafficError("Unable to load traffic right now.");
           setTrafficLevel(null);
-          return;
         }
 
-        setTrafficLevel(data.level);
-        setTrafficError(null);
+        // Process live TomTom incidents
+        if (liveRes.status === "fulfilled" && liveRes.value.ok) {
+          try {
+            const liveData = await liveRes.value.json();
+            if (liveData?.incidents) {
+              setTrafficIncidents(liveData.incidents);
+            }
+            if (liveData?.hasRoadClosure !== undefined) {
+              setHasRoadClosure(liveData.hasRoadClosure);
+            }
+            // If we have TomTom level but not AI level, use TomTom
+            if (!trafficRes || trafficRes.status !== "fulfilled") {
+              if (liveData?.level) {
+                setTrafficLevel(liveData.level);
+                setTrafficError(null);
+              }
+            }
+          } catch {
+            // ignore JSON parse error for live data
+          }
+        }
       } catch (err: unknown) {
         console.error("Error fetching traffic:", err);
         setTrafficError("Unable to load traffic right now.");
@@ -1820,7 +1858,7 @@ export default function Home() {
     };
 
     fetchTraffic();
-  }, [city, pulses.length]);
+  }, [city, pulses.length, selectedCity?.lat, selectedCity?.lon]);
 
   // ========= CREATE EVENT HANDLER =========
   async function handleCreateEvent(e: React.FormEvent) {
@@ -3589,6 +3627,8 @@ export default function Home() {
                 trafficError={trafficError}
                 trafficPulses={trafficPulses}
                 cityName={city}
+                trafficIncidents={trafficIncidents}
+                hasRoadClosure={hasRoadClosure}
                 isSignedIn={!!sessionUser}
                 identityReady={identityReady}
                 displayName={displayName}
@@ -3694,14 +3734,14 @@ export default function Home() {
               )}
 
               {/* Filter chips */}
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2.5 pb-2">
                 {TAGS.map((t) => (
                   <button
                     key={t}
                     onClick={() => setTagFilter(t)}
-                    className={`px-3 py-1.5 rounded-lg text-xs border transition ${tagFilter === t
-                      ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow shadow-emerald-500/40"
-                      : "bg-slate-800/60 border-slate-700/50 text-slate-300 hover:bg-slate-700"
+                    className={`px-4 py-2 rounded-full text-xs font-bold tracking-wide transition-all duration-300 border ${tagFilter === t
+                      ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow-[0_0_15px_-3px_rgba(16,185,129,0.5)] scale-105 z-10"
+                      : "bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:text-white hover:border-white/10"
                       }`}
                   >
                     {t}
@@ -3712,34 +3752,45 @@ export default function Home() {
               {/* Pulses list */}
               {/* "Happening Now" Banner - Pin critical active event/alert */}
               {happeningNowPulse && tagFilter === "All" && (
-                <div className="mb-4 relative">
-                  <div className={`rounded-xl p-3 border-2 ${happeningNowPulse.tag === "Traffic"
-                    ? "bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/50"
+                <div className="mb-6 relative group cursor-default">
+                  <div className={`glass-card rounded-2xl p-4 border-2 transition-all duration-500 hover:shadow-[0_0_30px_-10px_rgba(255,255,255,0.1)] ${happeningNowPulse.tag === "Traffic"
+                    ? "bg-gradient-to-br from-amber-500/10 via-transparent to-orange-500/10 border-amber-500/30"
                     : happeningNowPulse.tag === "Events"
-                      ? "bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/50"
-                      : "bg-gradient-to-r from-sky-500/10 to-blue-500/10 border-sky-500/50"
+                      ? "bg-gradient-to-br from-purple-500/10 via-transparent to-pink-500/10 border-purple-500/30"
+                      : "bg-gradient-to-br from-sky-500/10 via-transparent to-blue-500/10 border-sky-500/30"
                     }`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full animate-pulse ${happeningNowPulse.tag === "Traffic"
-                        ? "bg-amber-500/30 text-amber-200"
-                        : happeningNowPulse.tag === "Events"
-                          ? "bg-purple-500/30 text-purple-200"
-                          : "bg-sky-500/30 text-sky-200"
-                        }`}>
-                        <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                        Happening Now
-                      </span>
-                      <span className="text-[10px] text-slate-400 uppercase tracking-wide">
-                        {happeningNowPulse.tag}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] px-2.5 py-1 rounded-full animate-pulse ${happeningNowPulse.tag === "Traffic"
+                          ? "bg-amber-500/20 text-amber-300"
+                          : happeningNowPulse.tag === "Events"
+                            ? "bg-purple-500/20 text-purple-300"
+                            : "bg-sky-500/20 text-sky-300"
+                          }`}>
+                          <span className="w-1.5 h-1.5 rounded-full bg-current shadow-[0_0_8px_currentColor]" />
+                          Live Now
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest group-hover:text-white/60 transition-colors">
+                        {happeningNowPulse.tag} Update
                       </span>
                     </div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-xl flex-shrink-0">{happeningNowPulse.mood}</span>
-                      <p className="text-sm text-white leading-snug line-clamp-2">
-                        {happeningNowPulse.message.split('\n')[0]}
-                      </p>
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-3xl shadow-inner border border-white/5 group-hover:scale-110 transition-transform duration-500">
+                        {happeningNowPulse.mood}
+                      </div>
+                      <div className="flex-1 pt-1">
+                        <p className="text-[15px] font-bold text-white leading-tight mb-1 group-hover:text-emerald-400 transition-colors">
+                          {happeningNowPulse.message.split('\n')[0]}
+                        </p>
+                        <p className="text-xs text-white/50 line-clamp-1 font-medium italic">
+                          Stay updated as it unfolds within the next few hours.
+                        </p>
+                      </div>
                     </div>
                   </div>
+                  {/* Subtle outer glow layer */}
+                  <div className={`absolute -inset-1 rounded-[20px] blur-xl opacity-20 -z-10 group-hover:opacity-30 transition-opacity ${happeningNowPulse.tag === "Traffic" ? "bg-amber-500" : happeningNowPulse.tag === "Events" ? "bg-purple-500" : "bg-sky-500"}`} />
                 </div>
               )}
 

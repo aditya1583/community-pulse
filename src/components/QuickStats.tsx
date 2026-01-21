@@ -29,21 +29,27 @@ function TrafficExpandedContent({
   const trafficInfo = {
     Light: {
       color: "text-emerald-400",
-      bg: "bg-emerald-500/20",
-      description: "Roads are clear. Great time to drive!",
+      accent: "emerald",
+      bg: "bg-emerald-500/10",
+      border: "border-emerald-500/20",
+      description: "Roads are clear. Great time to travel!",
       tip: "Enjoy the smooth commute",
       icon: "🚗",
     },
     Moderate: {
       color: "text-amber-400",
-      bg: "bg-amber-500/20",
+      accent: "amber",
+      bg: "bg-amber-500/10",
+      border: "border-amber-500/20",
       description: "Some congestion on main routes.",
       tip: "Consider alternate routes",
       icon: "🚙",
     },
     Heavy: {
       color: "text-red-400",
-      bg: "bg-red-500/20",
+      accent: "red",
+      bg: "bg-red-500/10",
+      border: "border-red-500/20",
       description: "Significant delays expected.",
       tip: "Delay travel if possible",
       icon: "🚦",
@@ -54,36 +60,43 @@ function TrafficExpandedContent({
 
   if (!info) {
     return (
-      <div className="text-center py-8 text-slate-400">
-        <p>Traffic data unavailable</p>
+      <div className="text-center py-10 space-y-4">
+        <div className="text-4xl opacity-20">📡</div>
+        <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Data Unavailable</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Status indicator */}
-      <div className={`${info.bg} rounded-xl p-4 text-center`}>
-        <span className="text-4xl">{info.icon}</span>
-        <h3 className={`text-2xl font-bold mt-2 ${info.color}`}>{level} Traffic</h3>
-        <p className="text-slate-300 mt-1">{info.description}</p>
-      </div>
-
-      {/* Tip */}
-      <div className="flex items-start gap-3 bg-white/5 rounded-lg p-3">
-        <span className="text-lg">💡</span>
-        <div>
-          <p className="text-sm font-medium text-slate-200">Pro tip</p>
-          <p className="text-sm text-slate-400">{info.tip}</p>
+      <div className={`relative overflow-hidden glass-card ${info.bg} ${info.border} border rounded-3xl p-8 text-center`}>
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-50" />
+        <div className="relative z-10">
+          <span className="text-6xl mb-4 block transform transition-transform hover:scale-110 duration-500">{info.icon}</span>
+          <h3 className={`text-3xl font-black tracking-tighter mb-2 ${info.color}`}>{level} Flow</h3>
+          <p className="text-sm font-bold text-slate-300 leading-relaxed max-w-[200px] mx-auto">{info.description}</p>
         </div>
       </div>
 
-      {/* View more button */}
+      {/* Tip */}
+      <div className="flex items-start gap-4 glass-card premium-border rounded-2xl p-5 bg-white/5">
+        <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-xl shadow-inner">💡</div>
+        <div>
+          <p className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Local Insight</p>
+          <p className="text-sm font-bold text-slate-200 leading-snug">{info.tip}</p>
+        </div>
+      </div>
+
+      {/* Action button */}
       <button
-        className="w-full py-3 bg-white/5 hover:bg-white/10 rounded-lg text-sm text-slate-300 transition-colors"
         onClick={onViewDetails}
+        className="group w-full py-4 glass-card premium-border rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-white hover:bg-white/5 transition-all duration-300 flex items-center justify-center gap-2"
       >
-        View full traffic details →
+        <span>View Full Dashboard</span>
+        <svg className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+        </svg>
       </button>
     </div>
   );
@@ -100,34 +113,40 @@ function EventsExpandedContent({
   onExplore?: () => void;
 }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Count display */}
-      <div className="bg-purple-500/20 rounded-xl p-4 text-center">
-        <span className="text-5xl font-bold text-purple-400">{count}</span>
-        <p className="text-slate-300 mt-1">
-          {count === 1 ? "Event happening today" : "Events happening today"}
-        </p>
+      <div className="relative overflow-hidden glass-card bg-purple-500/10 border-purple-500/20 border rounded-3xl p-8 text-center">
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-50" />
+        <div className="relative z-10">
+          <span className="text-6xl font-black text-white tracking-tighter drop-shadow-[0_0_15px_rgba(168,85,247,0.3)]">{count}</span>
+          <p className="text-xs font-black text-purple-400 uppercase tracking-[0.2em] mt-2">
+            Local Events Today
+          </p>
+        </div>
       </div>
 
       {/* Categories preview */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-3">
         {["🎵 Music", "🎭 Arts", "🏃 Sports", "🍔 Food"].map((cat) => (
           <button
             key={cat}
             onClick={onExplore}
-            className="bg-white/5 hover:bg-white/10 rounded-lg p-2.5 text-sm text-slate-300 text-center transition-colors"
+            className="glass-card bg-white/5 border border-white/5 hover:bg-white/10 rounded-2xl py-3 px-4 text-xs font-bold text-slate-300 text-center transition-all duration-300 hover:scale-[1.05]"
           >
             {cat}
           </button>
         ))}
       </div>
 
-      {/* Explore button */}
+      {/* Action button */}
       <button
-        className="w-full py-3 bg-purple-500/20 hover:bg-purple-500/30 rounded-lg text-sm text-purple-300 transition-colors"
         onClick={onExplore}
+        className="group w-full py-4 glass-card border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] text-purple-300 transition-all duration-300 flex items-center justify-center gap-2"
       >
-        Explore all events →
+        <span>Discover Everything</span>
+        <svg className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+        </svg>
       </button>
     </div>
   );
@@ -145,80 +164,94 @@ function MoodExpandedContent({
 }) {
   if (!mood || mood.pulseCount === 0) {
     return (
-      <div className="text-center py-8">
-        <span className="text-5xl">😐</span>
-        <p className="text-slate-400 mt-3">No mood data yet</p>
+      <div className="text-center py-10 space-y-6">
+        <span className="text-6xl block transform animate-bounce">😐</span>
+        <div className="space-y-2">
+          <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Quiet in the City</p>
+          <p className="text-[11px] font-bold text-slate-500 max-w-[180px] mx-auto leading-relaxed">No mood pulses recorded yet in this area.</p>
+        </div>
         <button
           onClick={onSetVibe}
-          className="text-sm text-emerald-400 hover:text-emerald-300 mt-1 underline underline-offset-2 transition-colors"
+          className="px-6 py-3 bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl border border-emerald-500/30 hover:bg-emerald-500/20 transition-all duration-300"
         >
-          Be the first to set the vibe!
+          Initialize the Vibe
         </button>
       </div>
     );
   }
 
   const moodLabels: Record<string, string> = {
-    "😊": "Happy",
-    "😐": "Neutral",
-    "😢": "Sad",
-    "😡": "Angry",
-    "😴": "Sleepy",
-    "🤩": "Excited",
+    "😊": "Radiant",
+    "😐": "Balanced",
+    "😢": "Low Energy",
+    "😡": "Heated",
+    "😴": "Quiet",
+    "🤩": "Electric",
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Dominant mood */}
-      <div className="bg-amber-500/20 rounded-xl p-4 text-center">
-        <span className="text-5xl">{mood.dominantMood}</span>
-        <h3 className="text-xl font-bold text-amber-400 mt-2">
-          {moodLabels[mood.dominantMood || ""] || "Mixed"} Vibes
-        </h3>
-        <p className="text-sm text-slate-400 mt-1">
-          Based on {mood.pulseCount} {mood.pulseCount === 1 ? "pulse" : "pulses"}
-        </p>
+      <div className="relative overflow-hidden glass-card bg-amber-500/10 border-amber-500/20 border rounded-3xl p-8 text-center">
+        <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-amber-500/10 to-transparent" />
+        <div className="relative z-10">
+          <span className="text-7xl mb-4 block drop-shadow-xl">{mood.dominantMood}</span>
+          <h3 className="text-3xl font-black text-amber-100 tracking-tighter">
+            {moodLabels[mood.dominantMood || ""] || "Pulsing"} State
+          </h3>
+          <div className="inline-flex items-center gap-2 mt-3 px-3 py-1 bg-black/30 rounded-full border border-white/5">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              {mood.pulseCount} Active Pulses
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Mood breakdown bars */}
       {mood.scores && mood.scores.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs uppercase tracking-wider text-slate-500 font-medium">
-            Mood breakdown
+        <div className="glass-card premium-border rounded-2xl p-5 bg-white/5 space-y-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+            Sentiment Breakdown
           </p>
-          {mood.scores.slice(0, 5).map((score: MoodScore) => (
-            <div key={score.mood} className="flex items-center gap-3">
-              <span className="text-lg w-8">{score.mood}</span>
-              <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full transition-all duration-500"
-                  style={{ width: `${score.percent}%` }}
-                />
+          <div className="space-y-3">
+            {mood.scores.slice(0, 5).map((score: MoodScore) => (
+              <div key={score.mood} className="flex items-center gap-4">
+                <span className="text-xl w-6 flex-shrink-0">{score.mood}</span>
+                <div className="flex-1 h-3 bg-white/5 rounded-full overflow-hidden shadow-inner border border-white/5">
+                  <div
+                    className="h-full bg-gradient-to-r from-amber-500 via-amber-400 to-amber-300 rounded-full transition-all duration-700 ease-out"
+                    style={{ width: `${score.percent}%` }}
+                  />
+                </div>
+                <span className="text-[10px] font-black text-slate-400 w-8 text-right font-mono">
+                  {score.percent}%
+                </span>
               </div>
-              <span className="text-xs text-slate-400 w-10 text-right">
-                {score.percent}%
-              </span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
       {/* Vibe headline */}
       {mood.vibeHeadline && (
-        <div className="bg-white/5 rounded-lg p-3 text-center">
-          <p className="text-sm text-slate-300">{mood.vibeHeadline}</p>
+        <div className="glass-card border border-white/5 bg-gradient-to-br from-white/5 to-transparent rounded-2xl p-5 text-center">
+          <p className="text-sm font-bold text-slate-200 leading-snug tracking-tight mb-1">"{mood.vibeHeadline}"</p>
           {mood.vibeSubtext && (
-            <p className="text-xs text-slate-500 mt-1">{mood.vibeSubtext}</p>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{mood.vibeSubtext}</p>
           )}
         </div>
       )}
 
-      {/* Add vibe button */}
+      {/* Action button */}
       <button
-        className="w-full py-3 bg-amber-500/20 hover:bg-amber-500/30 rounded-lg text-sm text-amber-300 transition-colors"
         onClick={onSetVibe}
+        className="group w-full py-4 glass-card border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] text-amber-300 transition-all duration-300 flex items-center justify-center gap-2"
       >
-        Drop your pulse →
+        <span>Contribute Your Pulse</span>
+        <svg className="w-4 h-4 transform group-hover:scale-125 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
       </button>
     </div>
   );

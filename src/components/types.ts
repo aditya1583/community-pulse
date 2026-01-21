@@ -167,6 +167,18 @@ export type CityMood = {
 
 export type TrafficLevel = "Light" | "Moderate" | "Heavy";
 
+/**
+ * Real-time traffic incident from TomTom
+ */
+export type TrafficIncident = {
+  id: string;
+  type: "accident" | "roadwork" | "closure" | "congestion" | "other";
+  description: string;
+  roadName?: string;
+  delay?: number; // delay in seconds
+  severity: 1 | 2 | 3 | 4; // 1=minor, 4=major
+};
+
 export const MOODS = ["😊", "😐", "😢", "😡", "😴", "🤩"] as const;
 export type Mood = (typeof MOODS)[number];
 

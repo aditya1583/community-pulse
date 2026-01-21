@@ -72,12 +72,9 @@ export default function BottomNavigation({
 }: BottomNavigationProps) {
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 bg-[var(--background-elevated)]/95 backdrop-blur-lg border-t border-white/[0.06] safe-area-inset-bottom"
-      style={{
-        paddingBottom: "env(safe-area-inset-bottom, 0px)",
-      }}
+      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-md"
     >
-      <div className="max-w-lg mx-auto px-2">
+      <div className="glass-card premium-border rounded-2xl shadow-2xl overflow-hidden px-2 py-1">
         <div className="flex items-center justify-around relative">
           {/* Left nav items */}
           {NAV_ITEMS.slice(0, 2).map((item) => (
@@ -90,14 +87,14 @@ export default function BottomNavigation({
           ))}
 
           {/* Center FAB - Post Pulse */}
-          <div className="relative -mt-6">
+          <div className="relative group">
             <button
               onClick={onPostPulse}
-              className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/30 flex items-center justify-center transition-all duration-200 hover:scale-105 hover:shadow-emerald-500/40 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]"
+              className="w-14 h-14 -mt-6 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/40 flex items-center justify-center transition-all duration-500 group-hover:scale-110 group-hover:shadow-emerald-500/60 group-hover:-rotate-3 group-active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50"
               aria-label="Post a pulse"
             >
               <svg
-                className="w-7 h-7 text-slate-950"
+                className="w-8 h-8 text-slate-950 transition-transform duration-500 group-hover:rotate-90"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -110,7 +107,9 @@ export default function BottomNavigation({
                 />
               </svg>
             </button>
-            <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[10px] text-emerald-400 font-medium whitespace-nowrap">
+            {/* FAB Glow */}
+            <div className="absolute -inset-1 bg-emerald-500 blur-xl opacity-0 group-hover:opacity-20 transition-opacity duration-500 -z-10" />
+            <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-emerald-400 font-black uppercase tracking-[0.15em] opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">
               Post
             </span>
           </div>
@@ -139,21 +138,34 @@ function NavButton({
   isActive: boolean;
   onClick: () => void;
 }) {
-  const baseClasses = "flex flex-col items-center justify-center gap-0.5 min-w-[64px] min-h-[56px] py-2 px-3 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 rounded-lg";
-  const activeClasses = isActive ? "text-emerald-400" : "text-slate-500 hover:text-slate-300 active:text-emerald-400";
-
   return (
     <button
       onClick={onClick}
-      className={`${baseClasses} ${activeClasses}`}
+      className={`relative flex flex-col items-center justify-center gap-1 min-w-[64px] py-1.5 transition-all duration-300 focus-visible:outline-none group`}
       aria-current={isActive ? "page" : undefined}
     >
-      <span className={`transition-transform duration-200 ${isActive ? "scale-110" : ""}`}>
+      <div className={`
+        absolute inset-x-2 inset-y-1 rounded-xl transition-all duration-300 -z-10
+        ${isActive ? "bg-emerald-500/10" : "bg-transparent group-hover:bg-white/5"}
+      `} />
+
+      <span className={`
+        transition-all duration-500 
+        ${isActive ? "text-emerald-400 scale-110 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]" : "text-slate-500 group-hover:text-slate-300"}
+      `}>
         {item.icon}
       </span>
-      <span className={`text-[10px] font-medium ${isActive ? "text-emerald-400" : ""}`}>
+
+      <span className={`
+        text-[9px] font-black uppercase tracking-[0.1em] transition-all duration-300
+        ${isActive ? "text-emerald-400 opacity-100" : "text-slate-500 opacity-60 group-hover:opacity-100"}
+      `}>
         {item.label}
       </span>
+
+      {isActive && (
+        <div className="absolute -bottom-1 w-1 h-1 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+      )}
     </button>
   );
 }
