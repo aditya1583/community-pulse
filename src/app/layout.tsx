@@ -64,7 +64,6 @@ export default function RootLayout({
           <footer className="border-t border-white/5 bg-white/5 backdrop-blur-md text-sm text-slate-400">
             <div className="mx-auto flex max-w-5xl flex-col gap-2 px-4 py-6 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col gap-1 items-center sm:items-start">
-                <span className="font-bold text-slate-200">Voxlo</span>
                 <span className="text-xs opacity-60">
                   Built for the 10-mile radius. Trust your neighbors.
                 </span>

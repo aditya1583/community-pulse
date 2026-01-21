@@ -52,7 +52,7 @@ export default function InstallPrompt() {
                         <Download className="w-6 h-6 text-slate-950" />
                     </div>
                     <div>
-                        <h3 className="text-lg font-black text-white tracking-tight">Install Voxlo</h3>
+                        <h3 className="text-lg font-black text-white tracking-tight">Install App</h3>
                         <p className="text-xs text-slate-400 font-medium">Add to your home screen for the full hyperlocal experience.</p>
                     </div>
                 </div>

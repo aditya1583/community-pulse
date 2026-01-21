@@ -44,9 +44,6 @@ export default function LocationPrompt({
         {/* Main Card */}
         <div className="glass-card premium-border rounded-[2.5rem] p-8 backdrop-blur-xl bg-white/5 border-white/10 shadow-2xl">
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-black text-white tracking-tighter mb-2">
-              Voxlo
-            </h1>
             <p className="text-slate-400 font-medium">
               Hyperlocal Monitoring Active.
             </p>

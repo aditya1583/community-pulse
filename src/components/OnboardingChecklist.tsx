@@ -45,7 +45,7 @@ export default function OnboardingChecklist({
             <div className="flex items-center justify-between mb-4">
                 <div>
                     <h2 className="text-lg font-black text-white tracking-tight flex items-center gap-2">
-                        Welcome to Voxlo
+                        Welcome
                         <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full uppercase tracking-widest font-black">
                             {progressPercent}% Done
                         </span>
