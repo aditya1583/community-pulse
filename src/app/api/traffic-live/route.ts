@@ -282,6 +282,31 @@ export async function GET(req: NextRequest) {
       source: "tomtom"
     };
 
+    // --- ALERT TRIGGER ---
+    // If there is a road closure, asynchronously trigger a notification
+    // We don't await this to keep the API response fast
+    if (hasRoadClosure && incidents.length > 0) {
+      const closure = incidents.find(i => i.type === "closure");
+      if (closure && city) {
+        // Fire and forget (in a real serverless env, use waitUntil or after())
+        // For standard Node/Vercel functions, this might complete if fast enough
+        // or require background handling.
+        Promise.resolve().then(async () => {
+          try {
+            const { sendCityNotification } = await import("@/lib/pushNotifications");
+            await sendCityNotification(city, "road_closure", {
+              type: "road_closure",
+              city: city,
+              roadName: closure.roadName || "Road",
+              description: closure.description || "Traffic blocked due to closure"
+            });
+          } catch (err) {
+            console.error("Failed to send closure notification:", err);
+          }
+        });
+      }
+    }
+
     // --- QPS Protection: Cache the response ---
     trafficCache.set(cacheKey, { data: response, timestamp: Date.now() });
 

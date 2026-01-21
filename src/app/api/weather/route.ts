@@ -113,6 +113,30 @@ export async function POST(req: Request) {
       cityName: city.split(",")[0].trim(), // Use the city name from request
     };
 
+    // --- ALERT TRIGGER ---
+    // 56/57 (Freezing Drizzle), 66/67 (Freezing Rain), 75 (Heavy Snow), 86 (Heavy Snow Showers), 95/96/99 (Thunderstorm)
+    const SEVERE_CODES = [56, 57, 66, 67, 75, 86, 95, 96, 99];
+
+    if (SEVERE_CODES.includes(current.weather_code)) {
+      Promise.resolve().then(async () => {
+        try {
+          // Dynamic import to avoid circular deps if any
+          const { sendCityNotification } = await import("@/lib/pushNotifications");
+          const isSevere = [67, 75, 96, 99].includes(current.weather_code);
+
+          await sendCityNotification(city, "weather_alert", {
+            type: "weather_alert",
+            city: city,
+            condition: weatherInfo.description,
+            description: `Current condition: ${weatherInfo.description}. Stay safe!`,
+            severity: isSevere ? "severe" : "moderate"
+          });
+        } catch (err) {
+          console.error("Failed to send weather notification:", err);
+        }
+      });
+    }
+
     return new Response(JSON.stringify(payload), {
       status: 200,
       headers: {

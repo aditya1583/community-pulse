@@ -97,13 +97,12 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as { elements?: Array<{ id: number; type: string; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> }> };
     const elements = data.elements || [];
 
     // Transform OSM elements to our format
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const stations: GasStation[] = elements
-      .map((element: any) => {
+      .map((element) => {
         const tags = element.tags || {};
 
         // Get coordinates (for ways, use center point)
@@ -147,7 +146,7 @@ export async function GET(req: NextRequest) {
           openingHours: tags.opening_hours || null,
         };
       })
-      .filter(Boolean)
+      .filter((s): s is GasStation => s !== null)
       .sort((a: GasStation, b: GasStation) => a.distance - b.distance)
       .slice(0, limit);
 

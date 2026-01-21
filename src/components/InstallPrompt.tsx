@@ -11,17 +11,18 @@ import { Download, X, Share } from "lucide-react";
  */
 export default function InstallPrompt() {
     const [show, setShow] = useState(false);
-    const [platform, setPlatform] = useState<"ios" | "android" | "other">("other");
-
-    useEffect(() => {
-        // Check if search param ?install=true is present or if it's the first visit
+    const [platform] = useState<"ios" | "android" | "other">(() => {
+        if (typeof window === "undefined") return "other";
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
         const isAndroid = /Android/.test(navigator.userAgent);
+        if (isIOS) return "ios";
+        if (isAndroid) return "android";
+        return "other";
+    });
 
-        if (isIOS) setPlatform("ios");
-        else if (isAndroid) setPlatform("android");
-
+    useEffect(() => {
         const hasSeen = localStorage.getItem("voxlo-install-prompt-seen");
+
         // Show after 30 seconds of first visit
         const timer = setTimeout(() => {
             if (!hasSeen && window.matchMedia('(display-mode: browser)').matches) {

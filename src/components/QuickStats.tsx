@@ -236,12 +236,13 @@ function MoodExpandedContent({
       {/* Vibe headline */}
       {mood.vibeHeadline && (
         <div className="glass-card border border-white/5 bg-gradient-to-br from-white/5 to-transparent rounded-2xl p-5 text-center">
-          <p className="text-sm font-bold text-slate-200 leading-snug tracking-tight mb-1">"{mood.vibeHeadline}"</p>
+          <p className="text-sm font-bold text-slate-200 leading-snug tracking-tight mb-1">&quot;{mood.vibeHeadline}&quot;</p>
           {mood.vibeSubtext && (
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{mood.vibeSubtext}</p>
           )}
         </div>
       )}
+
 
       {/* Action button */}
       <button

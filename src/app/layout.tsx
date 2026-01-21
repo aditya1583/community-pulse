@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Outfit } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
-import { BotLabButton } from "@/components/BotLabButton";
 
 // Premium modern font
 const outfit = Outfit({
@@ -57,7 +56,6 @@ export default function RootLayout({
         className={`${outfit.variable} font-sans antialiased bg-slate-950 text-slate-50`}
       >
         <ServiceWorkerRegister />
-        <BotLabButton />
         <div className="flex min-h-screen flex-col bg-background text-foreground">
           <main className="flex-1">{children}</main>
 

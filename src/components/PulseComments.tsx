@@ -450,7 +450,7 @@ export default function PulseComments({
                 maxLength={550} // Allow a bit over to show error
                 disabled={isSubmitting}
                 className={`
-                  w-full bg-slate-800/50 border rounded-lg px-3 py-2 text-sm text-slate-200
+                  w-full bg-slate-800/50 border rounded-lg pl-3 pr-16 py-2 text-sm text-slate-200
                   placeholder:text-slate-500
                   focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent
                   disabled:opacity-50 disabled:cursor-not-allowed
@@ -462,9 +462,8 @@ export default function PulseComments({
               {/* Character count (only show when typing) */}
               {charCount > 0 && (
                 <span
-                  className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs ${
-                    isOverLimit ? "text-red-400" : "text-slate-500"
-                  }`}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs ${isOverLimit ? "text-red-400" : "text-slate-500"
+                    }`}
                   aria-live="polite"
                 >
                   {charCount}/500

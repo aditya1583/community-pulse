@@ -10,7 +10,7 @@
  * - SSR-safe (only runs on client)
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   getPulseExpiryStatus,
   getRemainingSeconds,
@@ -72,99 +72,43 @@ export function useExpiryCountdown(
   } = options;
 
   const [now, setNow] = useState(() => new Date());
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Calculate derived values
-  const calculateInfo = useCallback(
-    (currentTime: Date): ExpiryInfo => {
-      const status = getPulseExpiryStatus(expiresAt, currentTime);
-      const remainingSeconds = getRemainingSeconds(expiresAt, currentTime);
-      const remainingText = formatRemainingTime(expiresAt, currentTime);
-      const opacity = getPulseOpacity(expiresAt, currentTime);
+  // Derive all info from 'now' and 'expiresAt'
+  const info = useMemo((): ExpiryInfo => {
+    const status = getPulseExpiryStatus(expiresAt, now);
+    const remainingSeconds = getRemainingSeconds(expiresAt, now);
+    const remainingText = formatRemainingTime(expiresAt, now);
+    const opacity = getPulseOpacity(expiresAt, now);
 
-      return {
-        status,
-        remainingText,
-        remainingSeconds,
-        opacity,
-        isExpired: status === "expired",
-        isExpiringSoon: status === "expiring-soon",
-        isFading: status === "fading",
-      };
-    },
-    [expiresAt]
-  );
-
-  // Get initial info
-  const [info, setInfo] = useState<ExpiryInfo>(() => calculateInfo(new Date()));
-
-  // Update the countdown
-  useEffect(() => {
-    // Skip if disabled or no expiry
-    if (disabled || !expiresAt) {
-      return;
-    }
-
-    // Clear any existing interval
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-    }
-
-    // Calculate current info
-    const currentNow = new Date();
-    const currentInfo = calculateInfo(currentNow);
-    setInfo(currentInfo);
-    setNow(currentNow);
-
-    // If already expired, no need to update
-    if (currentInfo.isExpired) {
-      return;
-    }
-
-    // Determine update interval based on urgency
-    const intervalMs =
-      currentInfo.isExpiringSoon || currentInfo.isFading
-        ? urgentIntervalMs
-        : activeIntervalMs;
-
-    // Set up interval for updates
-    intervalRef.current = setInterval(() => {
-      const newNow = new Date();
-      const newInfo = calculateInfo(newNow);
-      setNow(newNow);
-      setInfo(newInfo);
-
-      // Stop updates if fully expired
-      if (newInfo.isExpired && intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    }, intervalMs);
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
+    return {
+      status,
+      remainingText,
+      remainingSeconds,
+      opacity,
+      isExpired: status === "expired",
+      isExpiringSoon: status === "expiring-soon",
+      isFading: status === "fading",
     };
-  }, [expiresAt, disabled, activeIntervalMs, urgentIntervalMs, calculateInfo]);
+  }, [expiresAt, now]);
 
-  // Recalculate when transitioning between phases
+  // Handle periodic updates
   useEffect(() => {
     if (disabled || !expiresAt || info.isExpired) {
       return;
     }
 
-    // Check if we need to switch to urgent updates
-    const currentInfo = calculateInfo(new Date());
-    const wasUrgent = info.isExpiringSoon || info.isFading;
-    const isNowUrgent = currentInfo.isExpiringSoon || currentInfo.isFading;
+    // Determine update interval based on urgency
+    const intervalMs =
+      info.isExpiringSoon || info.isFading
+        ? urgentIntervalMs
+        : activeIntervalMs;
 
-    // If urgency changed, recalculate interval
-    if (wasUrgent !== isNowUrgent) {
-      setInfo(currentInfo);
-    }
-  }, [info, expiresAt, disabled, calculateInfo]);
+    const interval = setInterval(() => {
+      setNow(new Date());
+    }, intervalMs);
+
+    return () => clearInterval(interval);
+  }, [expiresAt, disabled, activeIntervalMs, urgentIntervalMs, info.isExpired, info.isExpiringSoon, info.isFading]);
 
   return info;
 }

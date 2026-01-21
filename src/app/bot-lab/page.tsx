@@ -179,8 +179,8 @@ export default function BotLabPage() {
                 <button
                   onClick={() => setMode("generic")}
                   className={`px-3 py-1 text-xs rounded-md transition-all ${mode === "generic"
-                      ? "bg-slate-700 text-slate-300"
-                      : "text-slate-500 hover:text-white"
+                    ? "bg-slate-700 text-slate-300"
+                    : "text-slate-500 hover:text-white"
                     }`}
                 >
                   Generic Bot
@@ -188,8 +188,8 @@ export default function BotLabPage() {
                 <button
                   onClick={() => setMode("intelligent")}
                   className={`px-3 py-1 text-xs rounded-md transition-all ${mode === "intelligent"
-                      ? "bg-pink-500 text-white font-bold shadow-lg shadow-pink-500/20"
-                      : "text-slate-500 hover:text-white"
+                    ? "bg-pink-500 text-white font-bold shadow-lg shadow-pink-500/20"
+                    : "text-slate-500 hover:text-white"
                     }`}
                 >
                   Intelligent Bot
@@ -213,16 +213,16 @@ export default function BotLabPage() {
                     <div className="flex items-end gap-2">
                       <div
                         className={`w-6 h-6 rounded-full ${msg.mode === "intelligent"
-                            ? "bg-pink-500 shadow-lg shadow-pink-500/50"
-                            : "bg-slate-600"
+                          ? "bg-pink-500 shadow-lg shadow-pink-500/50"
+                          : "bg-slate-600"
                           } flex items-center justify-center text-[10px]`}
                       >
                         🤖
                       </div>
                       <div
                         className={`px-4 py-2 rounded-r-xl rounded-tl-xl max-w-[85%] text-sm shadow-md ${msg.mode === "intelligent"
-                            ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 text-blue-300"
-                            : "bg-slate-800 text-slate-300"
+                          ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 text-blue-300"
+                          : "bg-slate-800 text-slate-300"
                           }`}
                       >
                         {msg.content}
@@ -336,7 +336,7 @@ export default function BotLabPage() {
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-0.5">✓</span>
                   <span>
-                    <strong>TomTom / Mapbox:</strong> Use their "Flow Segment"
+                    <strong>TomTom / Mapbox:</strong> Use their &quot;Flow Segment&quot;
                     API, not just general tiles.
                   </span>
                 </li>
@@ -366,7 +366,7 @@ export default function BotLabPage() {
                   <span className="text-green-500 mt-0.5">✓</span>
                   <span>
                     <strong>Geofence Triggers:</strong> If Pulse is inside
-                    "School Zone Geofence" during "Active Hours," append warning.
+                    &quot;School Zone Geofence&quot; during &quot;Active Hours,&quot; append warning.
                   </span>
                 </li>
               </ul>

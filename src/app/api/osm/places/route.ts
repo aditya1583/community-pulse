@@ -75,9 +75,9 @@ function haversineDistance(
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
@@ -174,13 +174,36 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const data = await response.json();
+    interface OSMElement {
+      id: number;
+      type: string;
+      lat?: number;
+      lon?: number;
+      center?: { lat: number; lon: number };
+      tags?: {
+        name?: string;
+        brand?: string;
+        operator?: string;
+        amenity?: string;
+        shop?: string;
+        "addr:housenumber"?: string;
+        "addr:street"?: string;
+        "addr:city"?: string;
+        phone?: string;
+        "contact:phone"?: string;
+        website?: string;
+        "contact:website"?: string;
+        opening_hours?: string;
+      };
+    }
+
+    const data = (await response.json()) as { elements?: OSMElement[] };
     const elements = data.elements || [];
 
     // Transform OSM elements to our format
     const places: OSMPlace[] = elements
-      .filter((el: any) => el.tags?.name) // Must have a name
-      .map((el: any) => {
+      .filter((el) => el.tags?.name) // Must have a name
+      .map((el) => {
         // For ways, use the center coordinates
         const elLat = el.lat ?? el.center?.lat;
         const elLon = el.lon ?? el.center?.lon;
@@ -202,21 +225,20 @@ export async function GET(req: NextRequest) {
         }
 
         return {
-          id: `osm-${el.type}-${el.id}`,
-          name: tags.name,
+          id: `osm-${el.id}`,
+          name: tags.name || tags.brand || tags.operator || "Place",
           category: TAG_LABELS[amenity] || amenity,
-          address: addressParts.join(", ") || "Address not available",
+          address: addressParts.length > 0 ? addressParts.join(", ") : "Address unknown",
           distance: haversineDistance(parsedLat, parsedLon, elLat, elLon),
           lat: elLat,
           lon: elLon,
           phone: tags.phone || tags["contact:phone"],
           website: tags.website || tags["contact:website"],
           openingHours: tags.opening_hours,
-        };
+        } as OSMPlace;
       })
-      .filter(Boolean)
-      // Sort by distance
-      .sort((a: OSMPlace, b: OSMPlace) => (a.distance || 0) - (b.distance || 0))
+      .filter((s): s is OSMPlace => s !== null)
+      .sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0))
       // Limit results
       .slice(0, limit);
 

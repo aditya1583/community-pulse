@@ -65,17 +65,8 @@ export default function PulseModal({
       ? (tag as PulseCategory)
       : "General";
 
-  // Time-based placeholder prompt (refreshes when category changes or modal opens)
-  const [placeholder, setPlaceholder] = useState(() =>
-    getStablePulsePrompt(selectedCategory)
-  );
-
-  // Update placeholder when category changes or modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setPlaceholder(getStablePulsePrompt(selectedCategory));
-    }
-  }, [selectedCategory, isOpen]);
+  // Time-based placeholder prompt (Stable derived value)
+  const suggestedPrompt = getStablePulsePrompt(selectedCategory);
 
   // Handle category selection
   const handleCategorySelect = (category: PulseCategory) => {
@@ -83,6 +74,7 @@ export default function PulseModal({
     // Clear mood when category changes since moods are category-specific
     onMoodChange("");
   };
+
 
   // Get moods for current category
   const categoryMoods = CATEGORY_MOODS[selectedCategory];
@@ -167,8 +159,8 @@ export default function PulseModal({
                     type="button"
                     onClick={() => handleCategorySelect(category as PulseCategory)}
                     className={`px-5 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-300 transform active:scale-95 ${isActive
-                        ? "bg-emerald-500 text-slate-950 shadow-[0_0_20px_rgba(16,185,129,0.4)]"
-                        : "bg-white/5 border border-white/5 text-slate-500 hover:text-white hover:bg-white/10"
+                      ? "bg-emerald-500 text-slate-950 shadow-[0_0_20px_rgba(16,185,129,0.4)]"
+                      : "bg-white/5 border border-white/5 text-slate-500 hover:text-white hover:bg-white/10"
                       }`}
                   >
                     {category}
@@ -189,8 +181,8 @@ export default function PulseModal({
             </div>
             <div
               className={`flex flex-wrap gap-2.5 p-3 rounded-2xl transition-all duration-300 ${showValidationErrors && moodValidationError
-                  ? "bg-red-500/5 border-2 border-red-500/20"
-                  : "bg-black/30 border border-white/5"
+                ? "bg-red-500/5 border-2 border-red-500/20"
+                : "bg-black/30 border border-white/5"
                 }`}
             >
               {categoryMoods.map(({ emoji, label }) => {
@@ -201,8 +193,8 @@ export default function PulseModal({
                     type="button"
                     onClick={() => onMoodChange(emoji)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all duration-500 group/vibe ${isSelected
-                        ? "bg-emerald-500/20 border border-emerald-500 text-white shadow-[0_0_15px_-5px_#10b981]"
-                        : "bg-white/5 border border-white/5 text-slate-400 hover:border-white/20 hover:text-white"
+                      ? "bg-emerald-500/20 border border-emerald-500 text-white shadow-[0_0_15px_-5px_#10b981]"
+                      : "bg-white/5 border border-white/5 text-slate-400 hover:border-white/20 hover:text-white"
                       }`}
                   >
                     <span className="text-xl transform transition-transform group-hover/vibe:scale-125 duration-300">{emoji}</span>
@@ -242,12 +234,12 @@ export default function PulseModal({
             {!message && (
               <button
                 type="button"
-                onClick={() => onMessageChange(placeholder)}
+                onClick={() => onMessageChange(suggestedPrompt)}
                 className="group flex items-center gap-4 w-full px-4 py-3 text-left bg-gradient-to-r from-amber-500/10 to-transparent border border-amber-500/20 rounded-2xl hover:from-amber-500/20 transition-all duration-500"
               >
                 <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center text-lg shadow-inner">💡</div>
                 <div className="flex flex-col flex-1 overflow-hidden">
-                  <p className="text-[11px] font-bold text-amber-200/90 line-clamp-1">{placeholder}</p>
+                  <p className="text-[11px] font-bold text-amber-200/90 line-clamp-1">{suggestedPrompt}</p>
                   <p className="text-[9px] font-black text-amber-500/60 uppercase tracking-widest">Tap to use prompt</p>
                 </div>
               </button>
@@ -264,9 +256,9 @@ export default function PulseModal({
                   }
                 }}
                 rows={5}
-                className={`w-full rounded-[2rem] bg-black/40 backdrop-blur-sm border px-6 py-5 text-[15px] text-white placeholder:text-slate-600 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all duration-500 resize-none ${showValidationErrors && messageValidationError
-                    ? "border-red-500/40"
-                    : "border-white/5 group-hover/textarea:border-white/20"
+                className={`w-full rounded-[2rem] bg-black/40 backdrop-blur-sm border pl-6 pr-6 pt-5 pb-10 text-[15px] text-white placeholder:text-slate-600 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all duration-500 resize-none ${showValidationErrors && messageValidationError
+                  ? "border-red-500/40"
+                  : "border-white/5 group-hover/textarea:border-white/20"
                   }`}
                 placeholder="What's happening in the neighborhood?"
               />
@@ -308,8 +300,8 @@ export default function PulseModal({
             onClick={handleSubmit}
             disabled={!isPostEnabled}
             className={`group inline-flex items-center gap-3 px-8 py-4 font-black text-[12px] uppercase tracking-[0.2em] rounded-2xl shadow-2xl transition-all duration-500 ${isPostEnabled
-                ? "bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 text-slate-950 shadow-emerald-500/20 hover:scale-[1.02] active:scale-95"
-                : "bg-slate-800 text-slate-600 cursor-not-allowed opacity-50 grayscale"
+              ? "bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 text-slate-950 shadow-emerald-500/20 hover:scale-[1.02] active:scale-95"
+              : "bg-slate-800 text-slate-600 cursor-not-allowed opacity-50 grayscale"
               }`}
           >
             <span>{identityReady ? "Launch Pulse" : "Syncing..."}</span>

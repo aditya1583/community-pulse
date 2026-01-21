@@ -282,8 +282,9 @@ export default function ChallengeCard({
       ? challenge.expiresAt
       : new Date(challenge.expiresAt);
 
-  // Check if expired (calculate in useMemo to avoid impure render warning)
-  const isExpired = React.useMemo(() => expiresAt.getTime() < Date.now(), [expiresAt]);
+  // Stable now for expiry calculation
+  const [now] = useState(() => Date.now());
+  const isExpired = expiresAt.getTime() < now;
 
   // Calculate distance from user
   const distanceMiles = userLocation

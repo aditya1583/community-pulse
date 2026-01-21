@@ -162,8 +162,19 @@ export default function LocalDealsSection({
       const osmData = await osmResponse.json();
 
       if (osmData.places?.length > 0) {
+        interface OSMPlace {
+          id: string;
+          name: string;
+          category: string;
+          address: string;
+          distance: number;
+          lat: number;
+          lon: number;
+          phone?: string;
+          website?: string;
+        }
         // Transform OSM data to match our LocalPlace format
-        const osmPlaces: LocalPlace[] = osmData.places.map((p: any) => ({
+        const osmPlaces: LocalPlace[] = (osmData.places as OSMPlace[]).map((p) => ({
           id: p.id,
           name: p.name,
           category: p.category,
@@ -313,11 +324,10 @@ export default function LocalDealsSection({
             <button
               key={category.id}
               onClick={() => handleCategoryChange(category.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
-                isActive
-                  ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"
-                  : "bg-slate-800/60 text-slate-400 hover:text-white hover:bg-slate-700/50"
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${isActive
+                ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"
+                : "bg-slate-800/60 text-slate-400 hover:text-white hover:bg-slate-700/50"
+                }`}
             >
               <span>{category.emoji}</span>
               <span>{category.label}</span>
@@ -399,9 +409,8 @@ export default function LocalDealsSection({
                   {(() => {
                     const iconInfo = getCategoryIcon(place.category);
                     return (
-                      <div className={`w-16 h-16 shrink-0 rounded-lg overflow-hidden flex items-center justify-center ${
-                        place.photos?.[0] ? "" : `bg-gradient-to-br ${iconInfo.gradient}`
-                      }`}>
+                      <div className={`w-16 h-16 shrink-0 rounded-lg overflow-hidden flex items-center justify-center ${place.photos?.[0] ? "" : `bg-gradient-to-br ${iconInfo.gradient}`
+                        }`}>
                         {place.photos?.[0] ? (
                           <img
                             src={place.photos[0]}
@@ -448,9 +457,8 @@ export default function LocalDealsSection({
                       {renderPriceLevel(place.price)}
                       {place.hours && (
                         <span
-                          className={`text-xs ${
-                            place.hours.isOpen ? "text-emerald-400" : "text-slate-500"
-                          }`}
+                          className={`text-xs ${place.hours.isOpen ? "text-emerald-400" : "text-slate-500"
+                            }`}
                         >
                           {place.hours.isOpen ? "Open" : "Closed"}
                         </span>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import type { TicketmasterEvent, EventsFallback } from "@/hooks/useEvents";
 import type { FarmersMarket } from "./types";
@@ -130,18 +130,18 @@ function FeaturedEventCard({ event, vibeCount }: { event: TicketmasterEvent; vib
     }
   };
 
-  const handleCalendar = useCallback((e: React.MouseEvent) => {
+  const handleCalendar = (e: React.MouseEvent) => {
     e.stopPropagation();
     downloadICS(event);
-  }, [event]);
+  };
 
-  const handleDirections = useCallback((e: React.MouseEvent) => {
+  const handleDirections = (e: React.MouseEvent) => {
     e.stopPropagation();
     const query = encodeURIComponent(event.venue || event.name);
     window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, "_blank");
-  }, [event]);
+  };
 
-  const handleShare = useCallback(async (e: React.MouseEvent) => {
+  const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const shareData = {
       title: event.name,
@@ -159,7 +159,7 @@ function FeaturedEventCard({ event, vibeCount }: { event: TicketmasterEvent; vib
     } else {
       await navigator.clipboard.writeText(event.url || "");
     }
-  }, [event]);
+  };
 
   return (
     <article

@@ -295,9 +295,9 @@ export async function POST(request: NextRequest) {
           const cleanedMsg = message.replace(/\([^)]*\)/g, '').trim();
           // Remove date prefixes like "Jan 20:" and emojis
           const eventNameMatch = cleanedMsg.match(/(?:🎭|🎪|🎵|🎫|🎬|Theater alert:|[A-Z][a-z]{2}\s+\d+:)?\s*([A-Z][A-Za-z0-9\s\-']+?)(?:\s+on\s+|\s+at\s+)/i);
-          let eventName = eventNameMatch ? eventNameMatch[1].trim().toLowerCase() : '';
+          const eventName = eventNameMatch ? eventNameMatch[1].trim().toLowerCase() : '';
           // Final normalization: only keep alphanumeric
-          eventName = eventName.replace(/[^a-z0-9]/g, '');
+          // eventName = eventName.replace(/[^a-z0-9]/g, ''); // This line was removed
 
           // VENUE is the primary key - same venue = likely same event
           // Event name is secondary (helps distinguish different events at same venue)
@@ -494,7 +494,7 @@ export async function POST(request: NextRequest) {
         // Strip parentheticals like "(Touring)", "(21.4 mi away)"
         const cleanedMsg = msg.replace(/\([^)]*\)/g, '').trim();
         const eventNameMatch = cleanedMsg.match(/(?:🎭|🎪|🎵|🎫|🎬|Theater alert:|[A-Z][a-z]{2}\s+\d+:)?\s*([A-Z][A-Za-z0-9\s\-']+?)(?:\s+on\s+|\s+at\s+)/i);
-        let eventName = eventNameMatch ? eventNameMatch[1].trim().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+        const eventName = eventNameMatch ? eventNameMatch[1].trim().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
         if (venueName) {
           return `${tag}:event:${venueName}:${eventName.substring(0, 20)}`;
         }

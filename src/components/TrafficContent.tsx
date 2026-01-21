@@ -158,7 +158,7 @@ export default function TrafficContent({
       sentimentLabel,
       hasUserData: trafficPulses.length > 0,
     };
-  }, [trafficPulses]);
+  }, [trafficPulses, now]);
 
   // Get current hour for time-based patterns
   const currentHour = new Date().getHours();

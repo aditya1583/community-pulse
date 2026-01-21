@@ -307,11 +307,38 @@ const SOCIAL_HANDLE_PATTERNS: RegExp[] = [
  * Known spam/offensive words that aren't caught by other filters
  */
 const SPAM_WORDS: RegExp[] = [
+  // Hindi profanity
   /\blanjodka\b/i,
   /\bchutiya\b/i,
   /\bbhosdike?\b/i,
   /\bmadarchod\b/i,
   /\bbenchod\b/i,
+  /\bgaand\b/i,
+  /\brandi\b/i,
+  /\bharami\b/i,
+  /\bsaala?\b/i,
+  /\bkutta\b/i,
+  /\bkamina\b/i,
+  // Telugu profanity
+  /\bmodda\b/i,
+  /\bcheeku\b/i,  // Often paired with modda
+  /\blanja\b/i,
+  /\bdengey?\b/i,
+  /\bpodha\b/i,
+  /\bpukulo\b/i,
+  /\bbokka\b/i,
+  // Tamil profanity
+  /\bthevadiya\b/i,
+  /\botha\b/i,
+  /\bpunda\b/i,
+  /\bmayiru?\b/i,
+  // Spanish profanity (common in TX)
+  /\bputa\b/i,
+  /\bcabron\b/i,
+  /\bpendejo\b/i,
+  /\bchinga\b/i,
+  /\bmierda\b/i,
+  /\bpinche\b/i,
 ];
 
 /**

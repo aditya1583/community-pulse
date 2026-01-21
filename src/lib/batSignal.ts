@@ -19,7 +19,7 @@ import type { VibeIntensity } from "@/components/types";
 // TYPES
 // ============================================================================
 
-export type NotificationType = "vibe_shift" | "spike_alert" | "keyword_cluster" | "engagement_prompt";
+export type NotificationType = "vibe_shift" | "spike_alert" | "keyword_cluster" | "engagement_prompt" | "road_closure" | "weather_alert";
 
 export type VibeShiftPayload = {
   type: "vibe_shift";
@@ -57,11 +57,28 @@ export type EngagementPromptPayload = {
   promptText: string;
 };
 
+export type RoadClosurePayload = {
+  type: "road_closure";
+  city: string;
+  roadName: string;
+  description: string;
+};
+
+export type WeatherAlertPayload = {
+  type: "weather_alert";
+  city: string;
+  condition: string;
+  description: string;
+  severity: "moderate" | "severe";
+};
+
 export type NotificationPayload =
   | VibeShiftPayload
   | SpikeAlertPayload
   | KeywordClusterPayload
-  | EngagementPromptPayload;
+  | EngagementPromptPayload
+  | RoadClosurePayload
+  | WeatherAlertPayload;
 
 export type NotificationPreferences = {
   id: string;
@@ -270,6 +287,33 @@ export function generateNotificationMessage(payload: NotificationPayload): {
         },
       };
     }
+
+    case "road_closure": {
+      return {
+        title: `⛔ Road Closure in ${cityName}`,
+        body: `${payload.roadName} is closed. ${payload.description}`,
+        tag: `closure-${payload.city}-${Date.now()}`,
+        data: {
+          type: "road_closure",
+          city: payload.city,
+          url: `/?city=${encodeURIComponent(payload.city)}&tab=traffic`,
+        },
+      };
+    }
+
+    case "weather_alert": {
+      const emoji = payload.severity === "severe" ? "🚨" : "⚠️";
+      return {
+        title: `${emoji} Weather Alert: ${payload.condition}`,
+        body: payload.description,
+        tag: `weather-${payload.city}-${Date.now()}`,
+        data: {
+          type: "weather_alert",
+          city: payload.city,
+          url: `/?city=${encodeURIComponent(payload.city)}&tab=pulse`,
+        },
+      };
+    }
   }
 }
 
@@ -381,6 +425,8 @@ const NOTIFICATION_COOLDOWNS: Record<NotificationType, number> = {
   vibe_shift: 30 * 60 * 1000, // 30 minutes
   keyword_cluster: 60 * 60 * 1000, // 1 hour
   engagement_prompt: 6 * 60 * 60 * 1000, // 6 hours between prompts
+  road_closure: 4 * 60 * 60 * 1000, // 4 hours
+  weather_alert: 2 * 60 * 60 * 1000, // 2 hours
 };
 
 /**

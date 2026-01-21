@@ -727,13 +727,13 @@ function VerifyPanel({
   confirmedVibes: Map<string, "confirm" | "contradict">;
   error: string | null;
 }) {
+  // Stable timestamp for the duration of the component lifecycle
+  const [now] = useState(() => Date.now());
+
   if (typeof document === "undefined") return null;
 
   // Filter out user's own vibes
   const verifiableVibes = vibes.filter((v) => v.userId !== currentUserId);
-
-  // Stable now for purity
-  const now = React.useMemo(() => Date.now(), []);
 
   // Format time ago
   const timeAgo = (dateStr: string) => {
@@ -907,7 +907,7 @@ function VerifyPanel({
                             <svg className="w-3.5 h-3.5 group-hover/contradict:rotate-90 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                             </svg>
-                            <span>That's changed</span>
+                            <span>That&apos;s changed</span>
                           </>
                         )}
                       </button>

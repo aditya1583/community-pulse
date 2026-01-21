@@ -4,6 +4,19 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import { createClient } from "@supabase/supabase-js";
 import VenueDetailPage from "@/components/VenueDetailPage";
+import type { User } from "@supabase/supabase-js";
+
+interface Venue {
+  id: string;
+  name: string;
+  category?: string;
+  address?: string;
+  lat?: number;
+  lon?: number;
+  isPartner: boolean;
+  image_url?: string;
+  description?: string;
+}
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,10 +29,10 @@ function VenuePageContent() {
   const searchParams = useSearchParams();
   const venueId = params.id as string;
 
-  const [venue, setVenue] = useState<any>(null);
+  const [venue, setVenue] = useState<Venue | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sessionUser, setSessionUser] = useState<any>(null);
+  const [sessionUser, setSessionUser] = useState<User | null>(null);
 
   // Load user session
   useEffect(() => {
