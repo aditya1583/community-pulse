@@ -113,7 +113,7 @@ export default function LiveVibes({ city, onNavigateToLocal }: LiveVibesProps) {
         </div>
 
         <p className="text-sm text-slate-300 mb-3">
-          Know what's <span className="text-violet-400 font-medium">really</span> happening at local spots.
+          Know what&apos;s <span className="text-violet-400 font-medium">really</span> happening at local spots.
           Is the coffee shop packed? Is the bar chill tonight?
         </p>
 

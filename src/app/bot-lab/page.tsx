@@ -78,7 +78,7 @@ export default function BotLabPage() {
               <span className="text-pink-400">🧠</span> Sentient City Protocol
             </h1>
             <p className="text-slate-400 text-sm mt-1">
-              Transforming the Bot from "Observer" to "Participant"
+              Transforming the Bot from &quot;Observer&quot; to &quot;Participant&quot;
             </p>
           </div>
           <div className="flex gap-3">
@@ -106,7 +106,7 @@ export default function BotLabPage() {
                 <span className="text-pink-400 font-semibold">lie</span>.
                 <br />
                 <br />
-                When a bot says <em>"Traffic is light"</em> because the
+                When a bot says <em>&quot;Traffic is light&quot;</em> because the
                 city-wide average is low, but <strong>Ronald Reagan Blvd</strong>{" "}
                 is a parking lot due to school drop-off, users lose trust.
                 <br />
@@ -120,7 +120,7 @@ export default function BotLabPage() {
             {/* Architecture */}
             <div className="bg-slate-900/70 backdrop-blur-sm p-6 rounded-xl border border-slate-800">
               <h3 className="text-lg font-bold text-white mb-4">
-                The "Sentient" Brain Architecture
+                The &quot;Sentient&quot; Brain Architecture
               </h3>
               <div className="space-y-4">
                 <div className="flex items-center gap-4">
@@ -162,7 +162,7 @@ export default function BotLabPage() {
                       Contextual Sass
                     </h4>
                     <p className="text-xs text-slate-400">
-                      Don't apologize. Commiserate. Use real landmarks and
+                      Don&apos;t apologize. Commiserate. Use real landmarks and
                       slang.
                     </p>
                   </div>
@@ -178,21 +178,19 @@ export default function BotLabPage() {
               <div className="flex gap-2 bg-slate-950 p-1 rounded-lg">
                 <button
                   onClick={() => setMode("generic")}
-                  className={`px-3 py-1 text-xs rounded-md transition-all ${
-                    mode === "generic"
+                  className={`px-3 py-1 text-xs rounded-md transition-all ${mode === "generic"
                       ? "bg-slate-700 text-slate-300"
                       : "text-slate-500 hover:text-white"
-                  }`}
+                    }`}
                 >
                   Generic Bot
                 </button>
                 <button
                   onClick={() => setMode("intelligent")}
-                  className={`px-3 py-1 text-xs rounded-md transition-all ${
-                    mode === "intelligent"
+                  className={`px-3 py-1 text-xs rounded-md transition-all ${mode === "intelligent"
                       ? "bg-pink-500 text-white font-bold shadow-lg shadow-pink-500/20"
                       : "text-slate-500 hover:text-white"
-                  }`}
+                    }`}
                 >
                   Intelligent Bot
                 </button>
@@ -204,9 +202,8 @@ export default function BotLabPage() {
               {messages.map((msg, i) => (
                 <div
                   key={i}
-                  className={`flex ${
-                    msg.role === "user" ? "justify-end" : "justify-start"
-                  } animate-in fade-in slide-in-from-bottom-2 duration-300`}
+                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"
+                    } animate-in fade-in slide-in-from-bottom-2 duration-300`}
                 >
                   {msg.role === "user" ? (
                     <div className="bg-slate-700 text-white px-4 py-2 rounded-l-xl rounded-tr-xl max-w-[80%] text-sm">
@@ -215,20 +212,18 @@ export default function BotLabPage() {
                   ) : (
                     <div className="flex items-end gap-2">
                       <div
-                        className={`w-6 h-6 rounded-full ${
-                          msg.mode === "intelligent"
+                        className={`w-6 h-6 rounded-full ${msg.mode === "intelligent"
                             ? "bg-pink-500 shadow-lg shadow-pink-500/50"
                             : "bg-slate-600"
-                        } flex items-center justify-center text-[10px]`}
+                          } flex items-center justify-center text-[10px]`}
                       >
                         🤖
                       </div>
                       <div
-                        className={`px-4 py-2 rounded-r-xl rounded-tl-xl max-w-[85%] text-sm shadow-md ${
-                          msg.mode === "intelligent"
+                        className={`px-4 py-2 rounded-r-xl rounded-tl-xl max-w-[85%] text-sm shadow-md ${msg.mode === "intelligent"
                             ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 text-blue-300"
                             : "bg-slate-800 text-slate-300"
-                        }`}
+                          }`}
                       >
                         {msg.content}
                       </div>
@@ -261,7 +256,7 @@ export default function BotLabPage() {
                   onClick={() => runScenario("traffic")}
                   className="whitespace-nowrap px-3 py-1 rounded-full border border-slate-600 text-xs text-slate-300 hover:bg-slate-800 hover:border-blue-500 transition"
                 >
-                  🚗 The "Reagan" Commute
+                  🚗 The &quot;Reagan&quot; Commute
                 </button>
                 <button
                   onClick={() => runScenario("rain")}
@@ -283,12 +278,12 @@ export default function BotLabPage() {
         {/* Section 2: The "Weird" Features */}
         <section>
           <h2 className="text-2xl font-bold text-white mb-6">
-            4 "Weirdly Capable" Features to Build
+            4 &quot;Weirdly Capable&quot; Features to Build
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <FeatureCard
               emoji="🕵️"
-              title="The 'Fact Check'"
+              title="The &quot;Fact Check&quot;"
               description={`Bot doesn't just reply; it validates. User: "Traffic sucks!" Bot: *Checks API* "Actually, average speed is 55mph. Are you just stuck behind a tractor?"`}
               tech="Google Traffic API"
               color="pink"
@@ -296,7 +291,7 @@ export default function BotLabPage() {
 
             <FeatureCard
               emoji="📢"
-              title="The 'Solicitor'"
+              title="The &quot;Solicitor&quot;"
               description={`Bot initiates the pulse. Bot detects rain via Weather API. Bot Posts: "Radar shows hail in Leander. Can anyone confirm? @User_NorthSide?"`}
               tech="Open-Meteo + Push"
               color="blue"
@@ -312,8 +307,8 @@ export default function BotLabPage() {
 
             <FeatureCard
               emoji="👻"
-              title="The 'Ghost' User"
-              description="Treat the Bot as a user in the DB. It earns XP. It gets badges. Users can 'Out-Vibe' the bot. It creates a rival, not a tool."
+              title="The &quot;Ghost&quot; User"
+              description="Treat the Bot as a user in the DB. It earns XP. It gets badges. Users can &apos;Out-Vibe&apos; the bot. It creates a rival, not a tool."
               tech="Gamification Logic"
               color="purple"
             />
@@ -323,7 +318,7 @@ export default function BotLabPage() {
         {/* Section 3: Implementation Stack */}
         <section className="bg-slate-900/70 backdrop-blur-sm p-6 rounded-xl border border-slate-800">
           <h3 className="text-xl font-bold text-white mb-4">
-            Implementation: The "Realism" Stack
+            Implementation: The &quot;Realism&quot; Stack
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
             <div className="space-y-2">
@@ -385,9 +380,9 @@ export default function BotLabPage() {
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-0.5">✓</span>
                   <span>
-                    <strong>System Prompt:</strong> "You are a cynical but
-                    helpful local. You know the roads are bad. You don't speak
-                    like a robot."
+                    <strong>System Prompt:</strong> &quot;You are a cynical but
+                    helpful local. You know the roads are bad. You don&apos;t speak
+                    like a robot.&quot;
                   </span>
                 </li>
                 <li className="flex items-start gap-2">

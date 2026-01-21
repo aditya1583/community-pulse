@@ -48,17 +48,17 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 function getExpirationHours(tag: string): number {
   const tagLower = tag.toLowerCase();
 
-  // Weather changes constantly - expire in 3 hours
-  if (tagLower === "weather") return 3;
+  // Weather alerts are critical but can get stale - 4 hours
+  if (tagLower === "weather") return 4;
 
-  // Traffic conditions change throughout the day - expire in 2 hours
+  // Traffic conditions change rapidly - 2 hours
   if (tagLower === "traffic") return 2;
 
-  // Events are date-specific but info stays relevant longer
-  if (tagLower === "events") return 12;
+  // Events are time-sensitive - 15 hours
+  if (tagLower === "events") return 15;
 
-  // General content, polls, engagement - 24 hours
-  return 24;
+  // General content, polls, engagement - 18 hours (keeps feed fresh for next day)
+  return 18;
 }
 
 interface RequestBody {
@@ -175,13 +175,14 @@ export async function POST(request: NextRequest) {
       // DEDUPLICATION: Semantic content signature prevents redundant posts
       // Old approach: 50-char prefix matching (BROKEN - missed duplicates)
       // New approach: Extract semantic signature based on content type
-      const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+      // Window increased to 12h to ensure content variety throughout the day
+      const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
       const { data: recentPosts } = await supabase
         .from("pulses")
         .select("message, tag, poll_options")
         .eq("city", body.city)
         .eq("is_bot", true)
-        .gte("created_at", fourHoursAgo);
+        .gte("created_at", twelveHoursAgo);
 
       // Extract semantic signature from a post for deduplication
       // This identifies the CORE CONTENT, not just the first 50 chars
@@ -210,28 +211,57 @@ export async function POST(request: NextRequest) {
         }
 
         // Farmers market: detect by market-specific patterns
-        // Posts say things like "Farmers Grass & Nursery is OPEN NOW!" not "Farmers Market"
-        // Key patterns: "is OPEN", "MARKET DAY", "Fresh produce", "local vendors", "→ Tap for directions"
+        // Posts say things like "🥬 MARKET DAY! Farmers Grass & Nursery is open right now"
+        // Key patterns: "is open", "MARKET DAY", "See on Markets", "Get Directions"
         const isMarketPost =
           msgLower.includes("farmers market") ||
           msgLower.includes("market day") ||
-          (msgLower.includes("is open") && (msgLower.includes("fresh produce") || msgLower.includes("local vendors") || msgLower.includes("tap for directions"))) ||
-          (msgLower.includes("market run") && msgLower.includes("📍"));
+          (msgLower.includes("is open") && (msgLower.includes("see on markets") || msgLower.includes("get directions"))) ||
+          (msgLower.includes("market run") && msgLower.includes("📍")) ||
+          (message.includes("market_scout_bot") || message.includes("Market Scout"));
 
         if (isMarketPost) {
-          // Extract market name: "🥬 Farmers Grass & Nursery is OPEN NOW!" → "farmers grass nursery"
-          // Or "Leander Farmers Market" → "leander"
-          const marketMatch = message.match(/(?:🥬|🍅|🌽|🥕|🍯)\s*([A-Z][A-Za-z\s&']+?)(?:\s+is\s+OPEN|\s+Farmers\s+Market)/i);
-          const marketName = marketMatch
-            ? marketMatch[1].trim().toLowerCase().replace(/[^a-z0-9]/g, '')
-            : msgLower.substring(0, 40).replace(/[^a-z0-9]/g, '');
+          // Extract market name from various formats:
+          // Format 1: "🥬 MARKET DAY! Farmers Grass & Nursery is open right now" → "farmers grass nursery"
+          // Format 2: "🥬 Leander Farmers Market is OPEN NOW!" → "leander"
+          // Format 3: Direct venue name after emoji
+          let marketName = "";
+
+          // Try "MARKET DAY! [Name] is open" format first (most common from bot)
+          const marketDayMatch = message.match(/MARKET\s+DAY!?\s*([A-Z][A-Za-z\s&']+?)\s+is\s+open/i);
+          if (marketDayMatch) {
+            marketName = marketDayMatch[1].trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+          }
+
+          // Fallback: emoji prefix → name → "is OPEN" or "Farmers Market"
+          if (!marketName) {
+            const emojiMatch = message.match(/(?:🥬|🍅|🌽|🥕|🍯)\s*([A-Z][A-Za-z\s&']+?)(?:\s+is\s+OPEN|\s+Farmers\s+Market)/i);
+            if (emojiMatch) {
+              marketName = emojiMatch[1].trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+            }
+          }
+
+          // Last resort: use first 40 chars
+          if (!marketName) {
+            marketName = msgLower.substring(0, 40).replace(/[^a-z0-9]/g, '');
+          }
+
           return `${tag}:farmers_market:${marketName}`;
+        }
+
+        // Route Pulse (Traffic + Retail)
+        if (msgLower.includes("commute_buddy_bot") || (msgLower.includes("planning a run to") && msgLower.includes("traffic on"))) {
+          const landmarkMatch = msgLower.match(/planning a run to ([^?]+)\?/i);
+          const landmarkVal = landmarkMatch ? landmarkMatch[1].trim().replace(/[^a-z0-9]/g, '') : 'generic';
+          const roadMatch = msgLower.match(/traffic on ([^ ]+) is/i);
+          const roadVal = roadMatch ? roadMatch[1].trim().replace(/[^a-z0-9]/g, '') : 'any';
+          return `${tag}:route_pulse:${landmarkVal}:${roadVal}`;
         }
 
         // Landmark food: signature is landmark + time category
         if (msgLower.includes("near heb") || msgLower.includes("near target") ||
-            msgLower.includes("coffee") || msgLower.includes("lunch") ||
-            msgLower.includes("dinner") || msgLower.includes("breakfast")) {
+          msgLower.includes("coffee") || msgLower.includes("lunch") ||
+          msgLower.includes("dinner") || msgLower.includes("breakfast")) {
           const landmarkMatch = message.match(/near\s+([A-Za-z\s]+?)(?:\?|\.|\!|$)/i);
           const landmark = landmarkMatch ? landmarkMatch[1].trim().toLowerCase() : 'generic';
           const hour = new Date().getHours();

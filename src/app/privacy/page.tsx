@@ -132,49 +132,33 @@ export default function PrivacyPage() {
       {/* Data Processors */}
       <h2 className="text-xl font-semibold mt-8 mb-2">10. Data Processors</h2>
       <p className="mb-3">
-        We use the following third-party services to operate Voxlo. Each maintains GDPR-compliant
-        data processing agreements:
+        We use the following third-party services to operate Voxlo. Each maintains strict
+        data processing or usage agreements:
       </p>
       <ul className="list-disc list-inside mb-4 space-y-2 text-slate-300">
         <li>
-          <strong>Supabase</strong> (Database) &ndash;{" "}
-          <a
-            href="https://supabase.com/privacy"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-emerald-400 hover:underline"
-          >
-            Privacy Policy
-          </a>{" "}
-          |{" "}
-          <a
-            href="https://supabase.com/docs/company/terms#data-processing-agreement"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-emerald-400 hover:underline"
-          >
-            DPA
-          </a>
+          <strong>Supabase</strong> (Database & Auth) &ndash;{" "}
+          <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">Privacy Policy</a>
         </li>
         <li>
-          <strong>Vercel</strong> (Hosting) &ndash;{" "}
-          <a
-            href="https://vercel.com/legal/privacy-policy"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-emerald-400 hover:underline"
-          >
-            Privacy Policy
-          </a>{" "}
-          |{" "}
-          <a
-            href="https://vercel.com/legal/dpa"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-emerald-400 hover:underline"
-          >
-            DPA
-          </a>
+          <strong>Vercel</strong> (Hosting & Analytics) &ndash;{" "}
+          <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">Privacy Policy</a>
+        </li>
+        <li>
+          <strong>TOMTOM</strong> (Traffic & Geolocation) &ndash;{" "}
+          <a href="https://www.tomtom.com/privacy/" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">Privacy Policy</a>
+        </li>
+        <li>
+          <strong>Foursquare</strong> (Local Business Data) &ndash;{" "}
+          <a href="https://foursquare.com/legal/privacy" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">Privacy Policy</a>
+        </li>
+        <li>
+          <strong>OpenAI & Anthropic</strong> (AI Analysis) &ndash;{" "}
+          <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">OpenAI Privacy</a> | <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">Anthropic Privacy</a>
+        </li>
+        <li>
+          <strong>Google Perspective</strong> (Content Safety) &ndash;{" "}
+          <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">Google Privacy</a>
         </li>
       </ul>
 

@@ -88,9 +88,16 @@ export default function TrafficContent({
   onSubmit,
   onSignInClick,
 }: TrafficContentProps) {
+  // Stable now state for purity and reactive updates
+  const [now, setNow] = React.useState(() => Date.now());
+
+  React.useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60000); // Update every minute
+    return () => clearInterval(timer);
+  }, []);
+
   // Calculate traffic intelligence from user pulses
   const intelligence = useMemo((): TrafficIntelligence => {
-    const now = Date.now();
     const oneHourAgo = now - 60 * 60 * 1000;
 
     // Filter pulses from the last hour
@@ -210,10 +217,11 @@ export default function TrafficContent({
     const closure = trafficIncidents.find((i) => i.type === "closure");
     if (closure || hasRoadClosure) {
       const road = closure?.roadName || "road";
+      const desc = closure?.description || "Closure reported";
       return {
         icon: "🚧",
         type: "CLOSURE",
-        message: closure?.description || `Road closure reported on ${road}`,
+        message: closure?.roadName ? `${closure.roadName}: ${desc}` : desc,
         severity: "high" as const,
       };
     }
@@ -223,10 +231,11 @@ export default function TrafficContent({
       (i) => i.type === "accident" && i.severity >= 3
     );
     if (accident) {
+      const road = accident.roadName ? `${accident.roadName}: ` : "";
       return {
         icon: "🚨",
         type: "ACCIDENT",
-        message: accident.description || `Accident reported${accident.roadName ? ` on ${accident.roadName}` : ""}`,
+        message: `${road}${accident.description || "Accident reported"}`,
         severity: "high" as const,
       };
     }
@@ -234,10 +243,11 @@ export default function TrafficContent({
     // Priority 3: Heavy traffic
     if (trafficLevel === "Heavy") {
       const congestion = trafficIncidents.find((i) => i.type === "congestion");
+      const road = congestion?.roadName ? `${congestion.roadName}: ` : "";
       return {
         icon: "🔴",
         type: "HEAVY TRAFFIC",
-        message: congestion?.description || "Major delays expected. Consider alternate routes.",
+        message: `${road}${congestion?.description || "Major delays expected."}`,
         severity: "medium" as const,
       };
     }
@@ -245,10 +255,11 @@ export default function TrafficContent({
     // Priority 4: Other significant incidents
     const significant = trafficIncidents.find((i) => i.severity >= 3);
     if (significant) {
+      const road = significant.roadName ? `${significant.roadName}: ` : "";
       return {
         icon: "⚠️",
         type: "ALERT",
-        message: significant.description,
+        message: `${road}${significant.description}`,
         severity: "medium" as const,
       };
     }
@@ -279,8 +290,8 @@ export default function TrafficContent({
               </div>
               <span
                 className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-black ${flashNewsContent.severity === "high"
-                    ? "bg-red-500 shadow-[0_0_10px_#ef4444]"
-                    : "bg-amber-500 shadow-[0_0_10px_#f59e0b]"
+                  ? "bg-red-500 shadow-[0_0_10px_#ef4444]"
+                  : "bg-amber-500 shadow-[0_0_10px_#f59e0b]"
                   } animate-ping`}
               />
             </div>
@@ -289,8 +300,8 @@ export default function TrafficContent({
               <div className="flex items-center gap-2 mb-1">
                 <span
                   className={`text-[9px] font-black uppercase tracking-[0.2em] px-2 py-0.5 rounded-md ${flashNewsContent.severity === "high"
-                      ? "bg-red-500/20 text-red-400"
-                      : "bg-amber-500/20 text-amber-400"
+                    ? "bg-red-500/20 text-red-400"
+                    : "bg-amber-500/20 text-amber-400"
                     }`}
                 >
                   {flashNewsContent.type}
@@ -301,8 +312,8 @@ export default function TrafficContent({
               </div>
               <p
                 className={`text-[15px] font-bold leading-tight ${flashNewsContent.severity === "high"
-                    ? "text-red-100"
-                    : "text-amber-100"
+                  ? "text-red-100"
+                  : "text-amber-100"
                   }`}
               >
                 {flashNewsContent.message}
@@ -432,10 +443,10 @@ export default function TrafficContent({
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-1">Commuter Mood</p>
               <p
                 className={`text-xs font-bold tracking-tight ${intelligence.sentimentLabel === "Good"
-                    ? "text-emerald-400"
-                    : intelligence.sentimentLabel === "Rough"
-                      ? "text-red-400"
-                      : "text-amber-400"
+                  ? "text-emerald-400"
+                  : intelligence.sentimentLabel === "Rough"
+                    ? "text-red-400"
+                    : "text-amber-400"
                   }`}
               >
                 {intelligence.sentimentLabel} Profile

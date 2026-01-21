@@ -236,7 +236,7 @@ export default function VenueVibeCheck({
               {submittedVibeCount > 1
                 ? `You + ${submittedVibeCount - 1} ${submittedVibeCount === 2 ? 'other' : 'others'}`
                 : 'You'
-              } say it's {submittedVibeInfo.label}!
+              } say it&apos;s {submittedVibeInfo.label}!
             </span>
           </span>
         )}
@@ -276,11 +276,10 @@ export default function VenueVibeCheck({
               setIsOpen(true);
             }}
             disabled={submitSuccess}
-            className={`group inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full transition-all duration-300 active:scale-95 ${
-              submitSuccess
-                ? "bg-emerald-500/30 text-emerald-300 border border-emerald-400/50 shadow-[0_0_16px_rgba(16,185,129,0.4)] cursor-default animate-success-pop"
-                : "bg-gradient-to-r from-violet-600/80 to-fuchsia-600/80 text-white hover:from-violet-500 hover:to-fuchsia-500 hover:scale-105 shadow-[0_0_16px_rgba(139,92,246,0.4)] hover:shadow-[0_0_24px_rgba(139,92,246,0.6)] border border-violet-400/30 animate-subtle-pulse"
-            }`}
+            className={`group inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full transition-all duration-300 active:scale-95 ${submitSuccess
+              ? "bg-emerald-500/30 text-emerald-300 border border-emerald-400/50 shadow-[0_0_16px_rgba(16,185,129,0.4)] cursor-default animate-success-pop"
+              : "bg-gradient-to-r from-violet-600/80 to-fuchsia-600/80 text-white hover:from-violet-500 hover:to-fuchsia-500 hover:scale-105 shadow-[0_0_16px_rgba(139,92,246,0.4)] hover:shadow-[0_0_24px_rgba(139,92,246,0.6)] border border-violet-400/30 animate-subtle-pulse"
+              }`}
           >
             {submitSuccess ? (
               <>
@@ -443,11 +442,10 @@ export default function VenueVibeCheck({
       {/* Vibe check button */}
       <button
         onClick={() => setIsOpen(true)}
-        className={`w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition ${
-          submitSuccess
-            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-            : "bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 border border-violet-500/20 hover:border-violet-500/30"
-        }`}
+        className={`w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition ${submitSuccess
+          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+          : "bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 border border-violet-500/20 hover:border-violet-500/30"
+          }`}
       >
         {submitSuccess ? (
           <>
@@ -468,7 +466,7 @@ export default function VenueVibeCheck({
           </>
         ) : (
           <>
-            <span>What's the vibe?</span>
+            <span>What&apos;s the vibe?</span>
           </>
         )}
       </button>
@@ -536,7 +534,7 @@ function VibePicker({
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-lg font-semibold text-white">
-              What's the vibe?
+              What&apos;s the vibe?
             </h3>
             <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[250px]">
               at {venueName}
@@ -693,11 +691,10 @@ function VibeButton({
     <button
       onClick={onSelect}
       disabled={disabled}
-      className={`group flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 active:scale-95 ${
-        count > 0
-          ? "bg-violet-500/20 text-violet-200 border border-violet-500/30 hover:bg-violet-500/30 hover:shadow-[0_0_12px_rgba(139,92,246,0.2)]"
-          : "bg-slate-800 text-slate-300 border border-slate-700/50 hover:bg-slate-700/50 hover:border-slate-500 hover:text-white"
-      } disabled:opacity-50 disabled:cursor-not-allowed`}
+      className={`group flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 active:scale-95 ${count > 0
+        ? "bg-violet-500/20 text-violet-200 border border-violet-500/30 hover:bg-violet-500/30 hover:shadow-[0_0_12px_rgba(139,92,246,0.2)]"
+        : "bg-slate-800 text-slate-300 border border-slate-700/50 hover:bg-slate-700/50 hover:border-slate-500 hover:text-white"
+        } disabled:opacity-50 disabled:cursor-not-allowed`}
     >
       <span className="group-hover:scale-110 transition-transform">{vibe.emoji}</span>
       <span>{vibe.label}</span>
@@ -735,9 +732,12 @@ function VerifyPanel({
   // Filter out user's own vibes
   const verifiableVibes = vibes.filter((v) => v.userId !== currentUserId);
 
+  // Stable now for purity
+  const now = React.useMemo(() => Date.now(), []);
+
   // Format time ago
   const timeAgo = (dateStr: string) => {
-    const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
+    const mins = Math.floor((now - new Date(dateStr).getTime()) / 60000);
     if (mins < 1) return "just now";
     if (mins < 60) return `${mins}m ago`;
     const hours = Math.floor(mins / 60);
@@ -814,13 +814,12 @@ function VerifyPanel({
               return (
                 <div
                   key={vibe.id}
-                  className={`bg-slate-800/50 border rounded-xl p-3 transition-all ${
-                    userConfirmed
-                      ? userConfirmed === "confirm"
-                        ? "border-emerald-500/50 bg-emerald-500/5"
-                        : "border-red-500/50 bg-red-500/5"
-                      : "border-slate-700/50"
-                  }`}
+                  className={`bg-slate-800/50 border rounded-xl p-3 transition-all ${userConfirmed
+                    ? userConfirmed === "confirm"
+                      ? "border-emerald-500/50 bg-emerald-500/5"
+                      : "border-red-500/50 bg-red-500/5"
+                    : "border-slate-700/50"
+                    }`}
                 >
                   {/* Vibe header */}
                   <div className="flex items-start justify-between mb-2">
@@ -844,13 +843,12 @@ function VerifyPanel({
 
                     {/* Trust indicator */}
                     {(vibe.confirmCount > 0 || vibe.contradictCount > 0) && (
-                      <div className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                        netTrust > 0
-                          ? "bg-emerald-500/20 text-emerald-400"
-                          : netTrust < 0
+                      <div className={`text-[10px] px-1.5 py-0.5 rounded-full ${netTrust > 0
+                        ? "bg-emerald-500/20 text-emerald-400"
+                        : netTrust < 0
                           ? "bg-red-500/20 text-red-400"
                           : "bg-slate-700 text-slate-400"
-                      }`}>
+                        }`}>
                         {vibe.confirmCount > 0 && `${vibe.confirmCount} ✓`}
                         {vibe.contradictCount > 0 && ` ${vibe.contradictCount} ✗`}
                       </div>
@@ -859,11 +857,10 @@ function VerifyPanel({
 
                   {/* Action buttons or confirmed state */}
                   {userConfirmed ? (
-                    <div className={`flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-lg ${
-                      userConfirmed === "confirm"
-                        ? "bg-emerald-500/20 text-emerald-400"
-                        : "bg-red-500/20 text-red-400"
-                    } animate-fade-in`}>
+                    <div className={`flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-lg ${userConfirmed === "confirm"
+                      ? "bg-emerald-500/20 text-emerald-400"
+                      : "bg-red-500/20 text-red-400"
+                      } animate-fade-in`}>
                       {userConfirmed === "confirm" ? (
                         <>
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -881,40 +878,40 @@ function VerifyPanel({
                       )}
                     </div>
                   ) : (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => onConfirm(vibe.id, "confirm")}
-                      disabled={isConfirming}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/20 hover:border-emerald-400/50 hover:shadow-[0_0_12px_rgba(16,185,129,0.3)] active:scale-95 transition-all duration-200 disabled:opacity-50 group/confirm"
-                    >
-                      {isConfirming ? (
-                        <span className="w-3 h-3 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <>
-                          <svg className="w-3.5 h-3.5 group-hover/confirm:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                          <span>Confirm</span>
-                        </>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => onConfirm(vibe.id, "contradict")}
-                      disabled={isConfirming}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-slate-700/50 text-slate-400 border border-slate-600/50 rounded-lg hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 active:scale-95 transition-all duration-200 disabled:opacity-50 group/contradict"
-                    >
-                      {isConfirming ? (
-                        <span className="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <>
-                          <svg className="w-3.5 h-3.5 group-hover/contradict:rotate-90 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                          <span>That's changed</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => onConfirm(vibe.id, "confirm")}
+                        disabled={isConfirming}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/20 hover:border-emerald-400/50 hover:shadow-[0_0_12px_rgba(16,185,129,0.3)] active:scale-95 transition-all duration-200 disabled:opacity-50 group/confirm"
+                      >
+                        {isConfirming ? (
+                          <span className="w-3 h-3 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <>
+                            <svg className="w-3.5 h-3.5 group-hover/confirm:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span>Confirm</span>
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => onConfirm(vibe.id, "contradict")}
+                        disabled={isConfirming}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-slate-700/50 text-slate-400 border border-slate-600/50 rounded-lg hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 active:scale-95 transition-all duration-200 disabled:opacity-50 group/contradict"
+                      >
+                        {isConfirming ? (
+                          <span className="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <>
+                            <svg className="w-3.5 h-3.5 group-hover/contradict:rotate-90 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            <span>That's changed</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   )}
                 </div>
               );

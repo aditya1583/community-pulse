@@ -86,9 +86,9 @@ export async function POST(req: Request) {
           .map((e) => {
             const dateStr = e.date
               ? new Date(e.date).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })
+                month: "short",
+                day: "numeric",
+              })
               : "";
             return `- ${e.name} at ${e.venue}${dateStr ? ` (${dateStr})` : ""}`;
           })
@@ -125,28 +125,27 @@ export async function POST(req: Request) {
       }
 
       prompt = `
-You are summarizing ONLY the data provided below for ${displayCity}. Write like you're giving a quick heads-up to a neighbor.
+You are a well-connected neighborhood insider for ${displayCity}. Summarize the data provided below for a hyperlocal dashboard called "Voxlo". 
 
-CRITICAL RULES - MUST FOLLOW:
-- ONLY mention information explicitly present in the data below
-- NEVER invent facts, statistics, laws, legislation, government actions, or claims
-- NEVER speculate about causes or consequences not mentioned in the data
-- If a topic isn't in the data, don't mention it at all
-- Use phrases like "residents report" or "some neighbors say" when summarizing community posts
+CRITICAL RULES:
+- ONLY mention information explicitly present in the data below.
+- NEVER invent facts, laws, politics, or statistics.
+- If a section is empty, skip it.
+- Use a conversational, "punchy" tone. Think "Morning Brew" meets a friendly neighbors' group chat.
+- Add exactly 1 appropriate emoji per sentence to make it feel alive.
 
-Here's the ACTUAL data:
-
+Here's the data for ${displayCity}:
 ${sections.join("\n\n")}
 
 Task:
-1. In 2-3 short sentences, summarize ONLY what's in the data above.
-2. Lead with the most interesting or useful info (events, community reports, conditions).
-3. Sound like a helpful neighbor, not a news anchor. Use casual phrasing.
-4. Skip formalities - get straight to the useful info. No emojis.
+1. Write 2-3 fast-paced sentences synthesizing this info.
+2. Lead with the "headline" - the most useful or interesting thing happening right now.
+3. Use phrases like "Neighbors are reporting," "Local word is," or "Heads up for those near..."
+4. Keep it focused on the 10-mile neighborhood vibe.
 
-Example tone: "Heads up, a few neighbors are reporting traffic building near downtown. There's a show at the arena tonight. Weather's looking good."
+Example: "🚦 Heads up neighbors, traffic is slowing down near the old oak district. 🎵 On the bright side, the jazz fest kicks off at the park tonight! ☀️ Weather's perfect for it, so grab a blanket."
 
-Return ONLY the summary text, nothing else.
+Return ONLY the summary text.
       `.trim();
     } else if (context === "pulse") {
       // Pulse-specific summary
@@ -166,25 +165,20 @@ Return ONLY the summary text, nothing else.
         .join("\n");
 
       prompt = `
-You are summarizing short, real-time status updates for a city board called "Voxlo".
+You are the neighborhood "vibe checker" for ${city}. Summarize these community updates for a local dashboard.
 
-City: ${city}
+CRITICAL RULES:
+- ONLY summarize the pulses below.
+- NEVER invent facts, laws, or statistics.
+- Use a punchy, conversational tone with 1-2 emojis.
+- Focus on the *mood* and *common threads* of what people are saying.
 
-CRITICAL RULES - MUST FOLLOW:
-- ONLY summarize what's actually in the pulses below
-- NEVER invent facts, claims about laws, government actions, or statistics
-- NEVER speculate beyond what people actually said
-- Use "some neighbors report" or "residents are saying" language
-
-Here are recent pulses:
+The Neighborhood Pulse:
 ${pulseLines}
 
-Task:
-1. In 1-2 sentences, summarize ONLY what's in the pulses above.
-2. Mention traffic / weather / events only if they explicitly appear in the pulses.
-3. Keep it neutral, informative, and concise. No emojis.
+Example: "✨ The neighborhood is feeling high-energy today! 🌮 Lots of love for the new taco spot on 4th, though some are reporting delays near the intersection."
 
-Return ONLY the summary text, nothing else.
+Return ONLY the summary text.
       `.trim();
     } else if (context === "events") {
       // Events-specific summary
@@ -200,40 +194,42 @@ Return ONLY the summary text, nothing else.
         .map((e) => {
           const dateStr = e.date
             ? new Date(e.date).toLocaleDateString("en-US", {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-              })
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+            })
             : "";
           return `- ${e.name} at ${e.venue}${dateStr ? ` (${dateStr})` : ""}`;
         })
         .join("\n");
 
       prompt = `
-Summarize the upcoming events in ${displayCity}:
+You are the local social scout for ${displayCity}. Summarize these upcoming events.
 
+Rules:
+- 1-2 punchy sentences.
+- Add some "local excitement" flair.
+- Include 1-2 emojis.
+
+The Scene:
 ${eventLines}
 
-Task:
-1. In 1-2 sentences, highlight the most notable upcoming events.
-2. Mention the total count and variety of events.
-3. Keep it informative and concise. No emojis.
+Example: "🎟️ The weekend is looking packed with ${events.length} events! 🎸 Don't miss the local band showcase and the farmers market on Saturday."
 
-Return ONLY the summary text, nothing else.
+Return ONLY the summary text.
       `.trim();
     } else if (context === "traffic") {
       const level = trafficLevel || "Unknown";
       return new Response(
         JSON.stringify({
-          summary: `Current traffic in ${displayCity}: ${level}. ${
-            level === "Light"
+          summary: `Current traffic in ${displayCity}: ${level}. ${level === "Light"
               ? "Roads are clear. Great time to travel."
               : level === "Moderate"
                 ? "Some congestion in busy areas. Allow extra time."
                 : level === "Heavy"
                   ? "Significant delays expected. Consider alternate routes."
                   : "Traffic data is being gathered."
-          }`,
+            }`,
         }),
         { status: 200, headers: { "Content-Type": "application/json" } }
       );
@@ -252,15 +248,17 @@ Return ONLY the summary text, nothing else.
         .join("\n");
 
       prompt = `
-Summarize the top local news for ${displayCity}:
+You are a hyperlocal news aggregator for ${displayCity}. Summarize the top headlines.
 
+Rules:
+- 1-2 short, professional but conversational sentences.
+- No speculation.
+- Use 1 emoji.
+
+The Headlines:
 ${newsLines}
 
-Task:
-1. In 1-2 sentences, highlight the key themes or stories.
-2. Keep it neutral and informative. No emojis.
-
-Return ONLY the summary text, nothing else.
+Return ONLY the summary text.
       `.trim();
     }
 

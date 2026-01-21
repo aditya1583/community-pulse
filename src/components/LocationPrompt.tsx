@@ -10,14 +10,12 @@ type LocationPromptProps = {
 };
 
 /**
- * LocationPrompt Component
- *
- * Displayed when the app needs location permission from the user.
- * Offers two paths:
- * 1. Grant geolocation permission for hyperlocal experience
- * 2. Enter city manually (fallback)
- *
- * The prompt is friendly and explains the value of sharing location.
+ * LocationPrompt Component - Production Version
+ * 
+ * Optimized for Conversion (CRO):
+ * - Clear Value Proposition: "The 10-Mile Radius"
+ * - Trust Indicators: "Privacy-first", "Device-local"
+ * - Premium Aesthetic: Glassmorphism, Animated Pulses
  */
 export default function LocationPrompt({
   onRequestLocation,
@@ -26,109 +24,104 @@ export default function LocationPrompt({
   error,
 }: LocationPromptProps) {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
-        {/* Radar Animation */}
-        <div className="flex justify-center mb-8">
-          <div className="relative w-24 h-24">
-            {/* Outer pulse rings */}
-            <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping" />
-            <div className="absolute inset-2 rounded-full bg-emerald-500/30 animate-ping" style={{ animationDelay: "0.3s" }} />
-            <div className="absolute inset-4 rounded-full bg-emerald-500/40 animate-ping" style={{ animationDelay: "0.6s" }} />
-            {/* Center point */}
+    <div className="min-h-screen bg-[#020617] font-sans flex items-center justify-center px-4 overflow-hidden relative">
+      {/* Background radial glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] -z-10" />
+
+      <div className="max-w-md w-full relative">
+        {/* Radar Animation - Enhanced */}
+        <div className="flex justify-center mb-10">
+          <div className="relative w-32 h-32">
+            <div className="absolute inset-0 rounded-full border border-emerald-500/30 animate-[ping_3s_linear_infinite]" />
+            <div className="absolute inset-4 rounded-full border border-emerald-500/40 animate-[ping_3s_linear_infinite_1s]" />
+            <div className="absolute inset-8 rounded-full border border-emerald-500/50 animate-[ping_3s_linear_infinite_2s]" />
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-4 h-4 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/50" />
+              <div className="w-6 h-6 rounded-full bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.8)]" />
             </div>
           </div>
         </div>
 
         {/* Main Card */}
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6 backdrop-blur-sm">
-          <h1 className="text-2xl font-bold text-white text-center mb-2">
-            Voxlo
-          </h1>
-          <p className="text-slate-400 text-center mb-6">
-            Your hyperlocal neighborhood companion
-          </p>
+        <div className="glass-card premium-border rounded-[2.5rem] p-8 backdrop-blur-xl bg-white/5 border-white/10 shadow-2xl">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-black text-white tracking-tighter mb-2">
+              Voxlo
+            </h1>
+            <p className="text-slate-400 font-medium">
+              Hyperlocal Monitoring Active.
+            </p>
+          </div>
 
-          {/* Value Proposition */}
-          <div className="space-y-3 mb-6">
-            <div className="flex items-center gap-3 text-sm">
-              <span className="text-emerald-400 text-lg">📍</span>
-              <span className="text-slate-300">10-mile radius of local updates</span>
+          {/* Value Proposition - Focused on 'Aha' */}
+          <div className="space-y-5 mb-8">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                <span className="text-emerald-400 text-xl font-bold">10</span>
+              </div>
+              <div>
+                <h3 className="text-slate-100 font-bold leading-tight">10-Mile Radius</h3>
+                <p className="text-slate-400 text-xs">Only see what matters to your immediate community.</p>
+              </div>
             </div>
-            <div className="flex items-center gap-3 text-sm">
-              <span className="text-emerald-400 text-lg">⚡</span>
-              <span className="text-slate-300">Real-time traffic, events & vibes</span>
+
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                <span className="text-emerald-400 text-xl">✨</span>
+              </div>
+              <div>
+                <h3 className="text-slate-100 font-bold leading-tight">Live Vibes</h3>
+                <p className="text-slate-400 text-xs">Traffic, mood, and events unfolding right now.</p>
+              </div>
             </div>
-            <div className="flex items-center gap-3 text-sm">
-              <span className="text-emerald-400 text-lg">🏘️</span>
-              <span className="text-slate-300">See what your neighbors are saying</span>
+
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                <span className="text-emerald-400 text-xl">🔒</span>
+              </div>
+              <div>
+                <h3 className="text-slate-100 font-bold leading-tight">Zero Tracking</h3>
+                <p className="text-slate-400 text-xs">Location stays on your device. We never sell data.</p>
+              </div>
             </div>
           </div>
 
           {/* Error Message */}
           {error && (
-            <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-              <p className="text-red-400 text-sm text-center">{error}</p>
+            <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 animate-in fade-in slide-in-from-top-2">
+              <p className="text-red-400 text-sm font-medium text-center">{error}</p>
             </div>
           )}
 
-          {/* Location Button */}
+          {/* Primary Action */}
           <button
             onClick={onRequestLocation}
             disabled={loading}
-            className="w-full py-3.5 px-4 rounded-xl font-semibold text-white bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 transition-all duration-200 shadow-lg shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full py-4 px-6 rounded-2xl font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 active:scale-[0.98] transition-all duration-200 shadow-[0_0_30px_rgba(52,211,153,0.3)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
           >
             {loading ? (
               <>
-                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                    fill="none"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                <span>Finding your location...</span>
+                <div className="w-5 h-5 border-2 border-slate-950/30 border-t-slate-950 rounded-full animate-spin" />
+                <span>Scanning area...</span>
               </>
             ) : (
               <>
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <span>Use My Location</span>
+                <span className="text-xl">🛰️</span>
+                <span>Enter the Radius</span>
               </>
             )}
           </button>
 
-          {/* Divider */}
-          <div className="flex items-center gap-3 my-4">
-            <div className="flex-1 h-px bg-slate-700/50" />
-            <span className="text-xs text-slate-500">or</span>
-            <div className="flex-1 h-px bg-slate-700/50" />
-          </div>
-
-          {/* Manual Entry Button */}
+          {/* Secondary Action */}
           <button
             onClick={onUseManual}
-            className="w-full py-3 px-4 rounded-xl font-medium text-slate-300 bg-slate-700/50 hover:bg-slate-700/70 border border-slate-600/50 hover:border-slate-500/50 transition-all duration-200"
+            className="w-full mt-4 py-3 px-6 rounded-2xl font-bold text-slate-400 hover:text-white hover:bg-white/5 transition-all duration-200"
           >
             Enter City Manually
           </button>
 
-          {/* Privacy Note */}
-          <p className="text-xs text-slate-500 text-center mt-4">
-            Your location stays on your device. We only use it to show nearby content.
+          {/* Footnote */}
+          <p className="text-[10px] text-slate-500 text-center mt-8 uppercase tracking-[0.2em] font-black">
+            Hyperlocal Trust Verified
           </p>
         </div>
       </div>

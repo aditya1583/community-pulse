@@ -269,7 +269,7 @@ export function isPulseVisible(
  * UPDATE: Now enforces STRICT implicit expiry based on tag to prevent stale
  * Traffic/Weather updates from persisting even if database expiry is missing.
  */
-export function filterVisiblePulses<T extends { expiresAt?: string | null; tag: string; createdAt: string }>(
+export function filterVisiblePulses<T extends { expiresAt?: string | null; tag: string; createdAt: string; is_bot?: boolean }>(
   pulses: T[],
   now: Date = new Date()
 ): T[] {
@@ -289,17 +289,21 @@ export function filterVisiblePulses<T extends { expiresAt?: string | null; tag: 
     if (ageInHours < -0.16) return true;
 
     // STRICT RULES:
-    // Traffic: Gone after 1.5 hours (no matter what)
+    // 1. Bot posts always expire faster to prevent clutter (18 hours)
+    if (pulse.is_bot && ageInHours > 18) return false;
+
+    // 2. Traffic: Gone after 1.5 hours (no matter what)
     if (pulse.tag === "Traffic" && ageInHours > 1.5) return false;
 
-    // Weather: Gone after 3 hours
+    // 3. Weather: Gone after 3 hours
+    if (pulse.tag === "Weather" && ageInHours > 48) return true; // Keep alerts visible longer if tagged correctly
     if (pulse.tag === "Weather" && ageInHours > 3) return false;
 
-    // Events: Gone after 24 hours
+    // 4. Events: Gone after 24 hours
     if (pulse.tag === "Events" && ageInHours > 24) return false;
 
-    // General: Gone after 48 hours (allow conversation to linger)
-    if ((pulse.tag === "General" || !pulse.tag) && ageInHours > 48) return false;
+    // 5. General: Gone after 24 hours (was 48h - reduced to keep feed fresh)
+    if ((pulse.tag === "General" || !pulse.tag) && ageInHours > 24) return false;
 
     return true;
   });

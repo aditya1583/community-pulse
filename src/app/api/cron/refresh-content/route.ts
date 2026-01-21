@@ -39,10 +39,18 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
  */
 function getExpirationHours(tag: string): number {
   const tagLower = tag.toLowerCase();
-  if (tagLower === "weather") return 3;
+
+  // Weather alerts are critical but can get stale - 4 hours
+  if (tagLower === "weather") return 4;
+
+  // Traffic conditions change rapidly - 2 hours
   if (tagLower === "traffic") return 2;
-  if (tagLower === "events") return 12;
-  return 24;
+
+  // Events are time-sensitive - 15 hours
+  if (tagLower === "events") return 15;
+
+  // General content, polls, engagement - 18 hours (keeps feed fresh for next day)
+  return 18;
 }
 
 // PERMANENT SEEDING: Always generate posts, regardless of existing count
@@ -236,8 +244,8 @@ export async function GET(request: NextRequest) {
       const hasConfig = cityConfig !== null;
 
       // Priority: city config coords > database pulse coords
-      let cityLat: number | null = cityConfig?.coords.lat ?? cityInfo.lat;
-      let cityLon: number | null = cityConfig?.coords.lon ?? cityInfo.lon;
+      const cityLat: number | null = cityConfig?.coords.lat ?? cityInfo.lat;
+      const cityLon: number | null = cityConfig?.coords.lon ?? cityInfo.lon;
       const hasCoords = cityLat !== null && cityLon !== null;
 
       console.log(`[Cron Refresh] ${cityName}: Using coords from ${cityConfig ? 'config' : 'database'} (${cityLat}, ${cityLon})`);
@@ -260,13 +268,14 @@ export async function GET(request: NextRequest) {
             if (result.posted && result.post) {
               // DEDUPLICATION: semantic signature check to prevent redundant content
               // This identifies the CORE CONTENT, not just the exact message
-              const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+              // Increase window to 12 hours to prevent "morning-to-morning" or "morning-to-evening" redundancy
+              const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
               const { data: recentPosts } = await supabase
                 .from("pulses")
                 .select("message, tag, poll_options")
                 .eq("city", cityInfo.city)
                 .eq("is_bot", true)
-                .gte("created_at", fourHoursAgo);
+                .gte("created_at", twelveHoursAgo);
 
               // Extract semantic signature from a post
               const getSig = (tag: string, msg: string, opts?: string[] | null): string => {
@@ -280,10 +289,27 @@ export async function GET(request: NextRequest) {
                   return `${tag}:poll:${questionPart}`;
                 }
 
-                // Farmers market
-                if (m.includes("farmers market") || m.includes("market day") || m.includes("fresh produce")) {
-                  const match = msg.match(/(?:🥬|🍅|🌽|🥕|🍯)\s*([A-Z][A-Za-z\s&']+?)(?:\s+is\s+OPEN|\s+Farmers\s+Market)/i);
-                  return `${tag}:market:${match ? match[1].trim().toLowerCase().replace(/[^a-z0-9]/g, '') : 'generic'}`;
+                // Farmers market - improved detection
+                const isMarketPost = m.includes("farmers market") || m.includes("market day") ||
+                  m.includes("see on markets") || m.includes("market_scout") || m.includes("market scout");
+                if (isMarketPost) {
+                  // Try "MARKET DAY! [Name] is open" format first
+                  const marketDayMatch = msg.match(/MARKET\s+DAY!?\s*([A-Z][A-Za-z\s&']+?)\s+is\s+open/i);
+                  if (marketDayMatch) {
+                    return `${tag}:market:${marketDayMatch[1].trim().toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+                  }
+                  // Fallback: emoji prefix
+                  const emojiMatch = msg.match(/(?:🥬|🍅|🌽|🥕|🍯)\s*([A-Z][A-Za-z\s&']+?)(?:\s+is\s+OPEN|\s+Farmers\s+Market)/i);
+                  return `${tag}:market:${emojiMatch ? emojiMatch[1].trim().toLowerCase().replace(/[^a-z0-9]/g, '') : 'generic'}`;
+                }
+
+                // Route Pulse (Traffic + Retail)
+                if (m.includes("commute_buddy_bot") || (m.includes("planning a run to") && m.includes("traffic on"))) {
+                  const landmarkMatch = m.match(/planning a run to ([^?]+)\?/i);
+                  const landmarkVal = landmarkMatch ? landmarkMatch[1].trim().replace(/[^a-z0-9]/g, '') : 'generic';
+                  const roadMatch = m.match(/traffic on ([^ ]+) is/i);
+                  const roadVal = roadMatch ? roadMatch[1].trim().replace(/[^a-z0-9]/g, '') : 'any';
+                  return `${tag}:route_pulse:${landmarkVal}:${roadVal}`;
                 }
 
                 // Events
@@ -298,7 +324,7 @@ export async function GET(request: NextRequest) {
                 return `${tag}:${msg.substring(0, 40).toLowerCase().replace(/[^a-z0-9]/g, '')}`;
               };
 
-              const newSig = getSig(result.post.tag, result.post.message, (result.post as any).options);
+              const newSig = getSig(result.post.tag, result.post.message, (result.post as { options?: string[] }).options);
               const isDuplicate = (recentPosts || []).some(p => getSig(p.tag, p.message, p.poll_options) === newSig);
 
               if (isDuplicate) {

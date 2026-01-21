@@ -47,6 +47,8 @@ import { useGeolocation } from "@/hooks/useGeolocation";
 import LocationPrompt from "@/components/LocationPrompt";
 import { calculateDistanceMiles } from "@/lib/geo/distance";
 import { RADIUS_CONFIG } from "@/lib/constants/radius";
+import OnboardingChecklist from "@/components/OnboardingChecklist";
+import InstallPrompt from "@/components/InstallPrompt";
 
 // Real-time Live Updates
 type DBPulse = {
@@ -267,6 +269,7 @@ export default function Home() {
   const [moodValidationError, setMoodValidationError] = useState<string | null>(null);
   const [tagValidationError, setTagValidationError] = useState<string | null>(null);
   const [showValidationErrors, setShowValidationErrors] = useState(false);
+  const [checklistDismissed, setChecklistDismissed] = useState(false);
 
   // Auth form state
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -751,10 +754,19 @@ export default function Home() {
         if (data.stations && data.stations.length > 0) {
           const station = data.stations[0];
           console.log("[GasStation] Found station:", station.name, "at", station.distanceMiles, "mi");
-          setNearestStation({
-            name: station.name,
-            distanceMiles: station.distanceMiles,
-          });
+
+          // CRITICAL: If the found station is > 3 miles away but we have a verified local fallback
+          // (like HEB Plus) that is closer, prioritize the fallback for a better "hyperlocal" feel.
+          const fallback = FALLBACK_GAS_STATIONS[cityName];
+          if (station.distanceMiles > 3 && fallback && (fallback.distanceMiles ?? 0) < station.distanceMiles) {
+            console.log("[GasStation] Dynamic station too far, using verified fallback:", fallback.name);
+            setNearestStation(fallback);
+          } else {
+            setNearestStation({
+              name: station.name,
+              distanceMiles: station.distanceMiles,
+            });
+          }
         } else {
           console.log("[GasStation] No stations from API, trying fallback");
           // Use fallback if API returns empty
@@ -3554,6 +3566,48 @@ export default function Home() {
             }}
           />
 
+          {/* Onboarding Checklist for new users */}
+          {sessionUser && !onboardingCompleted && !checklistDismissed && (
+            <OnboardingChecklist
+              onboardingCompleted={onboardingCompleted}
+              onDismiss={() => setChecklistDismissed(true)}
+              steps={[
+                {
+                  id: "location",
+                  label: "Setup Location",
+                  description: "Hyperlocal content depends on it.",
+                  completed: !!selectedCity,
+                  actionLabel: "Set Location",
+                  action: () => cityInputRef.current?.focus(),
+                },
+                {
+                  id: "profile",
+                  label: "Craft your Identity",
+                  description: "Describe your vibe for a custom name.",
+                  completed: !!profile?.name_locked,
+                  actionLabel: "Edit Name",
+                  action: () => setShowUsernameEditor(true),
+                },
+                {
+                  id: "pulse",
+                  label: "Post your first Pulse",
+                  description: "Let the community know what's up.",
+                  completed: userPulseCount > 0,
+                  actionLabel: "Post Pulse",
+                  action: () => setShowPulseModal(true),
+                },
+                {
+                  id: "bookmark",
+                  label: "Bookmark a Vibe",
+                  description: "Keep track of interesting updates.",
+                  completed: favoritePulseIds.length > 0,
+                  actionLabel: "Browse",
+                  action: () => setActiveTab("pulse"),
+                }
+              ]}
+            />
+          )}
+
           {/* Tab Navigation */}
           <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} secondaryOnly />
 
@@ -3913,52 +3967,44 @@ export default function Home() {
 
           {/* Attribution Footer */}
           <footer className="py-6 pb-32 text-center border-t border-slate-800 mt-6">
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              Weather by{" "}
-              <a
-                href="https://open-meteo.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-slate-400 hover:text-emerald-400 transition"
-              >
-                Open-Meteo
-              </a>
-              {" | "}
-              Events via{" "}
-              <a
-                href="https://www.ticketmaster.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-slate-400 hover:text-emerald-400 transition"
-              >
-                Ticketmaster
-              </a>
-              {" | "}
-              AI by{" "}
-              <a
-                href="https://www.anthropic.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-slate-400 hover:text-emerald-400 transition"
-              >
-                Anthropic Claude
-              </a>
-            </p>
-            <p className="text-[11px] text-slate-600 mt-2">
-              <a
-                href="/terms"
-                className="text-slate-500 hover:text-emerald-400 transition"
-              >
-                Terms of Service
-              </a>
-              {" | "}
-              <a
-                href="/privacy"
-                className="text-slate-500 hover:text-emerald-400 transition"
-              >
-                Privacy Policy
-              </a>
-            </p>
+            <div className="space-y-3">
+              <p className="text-[10px] text-slate-500 leading-relaxed max-w-md mx-auto">
+                Voxlo aggregates real-time data from multiple sources to provide a hyperlocal experience.
+              </p>
+              <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
+                <span>Weather by <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">Open-Meteo</a></span>
+                <span>•</span>
+                <span>Traffic by <a href="https://www.tomtom.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">TomTom</a></span>
+                <span>•</span>
+                <span>Maps & Geocoding by <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">OpenStreetMap</a></span>
+              </div>
+              <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
+                <span>Events via <a href="https://www.ticketmaster.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">Ticketmaster</a></span>
+                <span>•</span>
+                <span>Places by <a href="https://foursquare.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">Foursquare</a></span>
+                <span>•</span>
+                <span>Gas info by <a href="https://www.eia.gov/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">EIA</a></span>
+              </div>
+              <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
+                <span>AI by <a href="https://openai.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">OpenAI</a> & <a href="https://www.anthropic.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">Anthropic</a></span>
+                <span>•</span>
+                <span>Trust & Safety by <a href="https://perspectiveapi.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">Google Perspective</a></span>
+              </div>
+              <p className="text-[11px] text-slate-600 mt-4 flex justify-center gap-4">
+                <a
+                  href="/terms"
+                  className="text-slate-500 hover:text-emerald-400 transition"
+                >
+                  Terms of Service
+                </a>
+                <a
+                  href="/privacy"
+                  className="text-slate-500 hover:text-emerald-400 transition"
+                >
+                  Privacy Policy
+                </a>
+              </p>
+            </div>
           </footer>
         </div>
       </main>
@@ -3975,6 +4021,9 @@ export default function Home() {
           }
         }}
       />
+
+      {/* PWA Install Prompt for mobile users */}
+      <InstallPrompt />
     </div>
   );
 }

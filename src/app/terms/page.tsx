@@ -40,7 +40,7 @@ export default function TermsPage() {
               1. Data Sources Disclosure
             </h2>
             <p className="mb-3">
-              Voxlo aggregates data from multiple third-party sources:
+              Voxlo aggregates data from multiple third-party sources to provide real-time hyperlocal information:
             </p>
             <ul className="list-disc list-inside space-y-1 text-slate-400 ml-4">
               <li>
@@ -48,12 +48,20 @@ export default function TermsPage() {
                 by Open-Meteo API
               </li>
               <li>
+                <strong className="text-slate-300">Traffic & Road Conditions</strong>{" "}
+                sourced from TomTom API
+              </li>
+              <li>
+                <strong className="text-slate-300">Maps & Geocoding</strong> data
+                provided by OpenStreetMap and Nominatim
+              </li>
+              <li>
                 <strong className="text-slate-300">Event information</strong>{" "}
                 sourced from Ticketmaster API
               </li>
               <li>
-                <strong className="text-slate-300">News articles</strong> via
-                GNews API
+                <strong className="text-slate-300">Local Places & POIs</strong>{" "}
+                via Foursquare Places API
               </li>
               <li>
                 <strong className="text-slate-300">Gas prices</strong> from
@@ -65,12 +73,17 @@ export default function TermsPage() {
               </li>
               <li>
                 <strong className="text-slate-300">AI-powered features</strong>{" "}
-                powered by Anthropic Claude
+                powered by OpenAI and Anthropic
+              </li>
+              <li>
+                <strong className="text-slate-300">Trust & Safety</strong> signal
+                analysis via Google Perspective API
               </li>
             </ul>
             <p className="mt-3 text-sm text-slate-500">
               We are not responsible for the accuracy or availability of
-              third-party data.
+              third-party data. These services are used in accordance with their
+              respective Terms of Service.
             </p>
           </section>
 

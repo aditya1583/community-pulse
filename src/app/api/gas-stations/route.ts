@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const lat = searchParams.get("lat");
   const lon = searchParams.get("lon");
-  const radius = searchParams.get("radius") || "5000"; // meters, default 5km (~3 miles)
+  const radius = searchParams.get("radius") || "10000"; // meters, default 10km (~6.2 miles)
   const limit = parseInt(searchParams.get("limit") || "10");
 
   if (!lat || !lon) {
@@ -65,12 +65,16 @@ export async function GET(req: NextRequest) {
 
   try {
     // Overpass API query for fuel stations
-    // Query both nodes and ways (some stations are mapped as areas)
+    // Uses 'nwr' (node, way, relation) for a more comprehensive search
+    // We also explicitly search for H-E-B to ensure our primary local anchor isn't missed
     const overpassQuery = `
-      [out:json][timeout:10];
+      [out:json][timeout:15];
       (
-        node["amenity"="fuel"](around:${searchRadius},${latitude},${longitude});
-        way["amenity"="fuel"](around:${searchRadius},${latitude},${longitude});
+        nwr["amenity"="fuel"](around:${searchRadius},${latitude},${longitude});
+        nwr["brand"~"H-E-B",i](around:${searchRadius},${latitude},${longitude});
+        nwr["name"~"H-E-B",i](around:${searchRadius},${latitude},${longitude});
+        nwr["brand"~"HEB",i](around:${searchRadius},${latitude},${longitude});
+        nwr["name"~"HEB",i](around:${searchRadius},${latitude},${longitude});
       );
       out center body;
     `;
@@ -133,8 +137,8 @@ export async function GET(req: NextRequest) {
 
         return {
           id: `osm-${element.id}`,
-          name: tags.name || tags.brand || "Gas Station",
-          brand: tags.brand || null,
+          name: tags.name || tags.brand || tags.operator || "Gas Station",
+          brand: tags.brand || tags.operator || null,
           address: addressParts.length > 0 ? addressParts.join(" ") : null,
           distance: calculateDistance(latitude, longitude, stationLat, stationLon),
           lat: stationLat,

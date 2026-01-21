@@ -60,9 +60,9 @@ function MiniMap({
       Math.log(
         Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)
       ) /
-        Math.PI) /
+      Math.PI) /
       2) *
-      Math.pow(2, zoom)
+    Math.pow(2, zoom)
   );
 
   const tileUrl = `https://tile.openstreetmap.org/${zoom}/${tileX}/${tileY}.png`;
@@ -148,10 +148,9 @@ function DistanceIndicator({
     <span
       className={`
         inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-full
-        ${
-          isWithinRadius
-            ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-            : "bg-slate-600/50 text-slate-300"
+        ${isWithinRadius
+          ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+          : "bg-slate-600/50 text-slate-300"
         }
       `}
     >
@@ -175,9 +174,8 @@ function SpotsIndicator({ spotsRemaining, maxClaims }: { spotsRemaining: number;
     <div className="flex items-center gap-2">
       <div className="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
         <div
-          className={`h-full transition-all duration-300 ${
-            isLow ? "bg-red-500" : "bg-emerald-500"
-          }`}
+          className={`h-full transition-all duration-300 ${isLow ? "bg-red-500" : "bg-emerald-500"
+            }`}
           style={{ width: `${percentage}%` }}
         />
       </div>
@@ -246,9 +244,8 @@ function TrailProgress({
         {Array.from({ length: totalStops }).map((_, i) => (
           <div
             key={i}
-            className={`flex-1 h-1.5 rounded-full ${
-              i < currentStop ? "bg-emerald-500" : "bg-slate-700"
-            }`}
+            className={`flex-1 h-1.5 rounded-full ${i < currentStop ? "bg-emerald-500" : "bg-slate-700"
+              }`}
           />
         ))}
       </div>
@@ -285,15 +282,15 @@ export default function ChallengeCard({
       ? challenge.expiresAt
       : new Date(challenge.expiresAt);
 
-  // Check if expired
-  const isExpired = expiresAt.getTime() < Date.now();
+  // Check if expired (calculate in useMemo to avoid impure render warning)
+  const isExpired = React.useMemo(() => expiresAt.getTime() < Date.now(), [expiresAt]);
 
   // Calculate distance from user
   const distanceMiles = userLocation
     ? calculateDistanceMiles(
-        { lat: userLocation.lat, lon: userLocation.lng },
-        { lat: challenge.targetLat, lon: challenge.targetLng }
-      )
+      { lat: userLocation.lat, lon: userLocation.lng },
+      { lat: challenge.targetLat, lon: challenge.targetLng }
+    )
     : null;
 
   // Check if user is within claim radius (convert meters to miles)

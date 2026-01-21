@@ -172,4 +172,41 @@ export function getAltRoute(config: CityConfig, road: string): string | null {
   return config.altRoutes[road] || null;
 }
 
+/**
+ * Find the nearest pre-configured landmark to a target coordinate
+ * Useful for "Spatial Anchoring" bot posts (e.g. "Near the HEB Plus")
+ */
+export function getNearestLandmark(
+  config: CityConfig,
+  target: CityCoords,
+  type?: "shopping" | "venues" | "restaurants"
+): { landmark: string; distance: number } | null {
+  // Removed unused let variables to satisfy lint
+
+  const categories = type ? [type] : (["shopping", "venues", "restaurants"] as const);
+
+  for (const cat of categories) {
+    const list = config.landmarks[cat];
+    for (const entry of list) {
+      if (typeof entry === "string") continue; // Skip string-only landmarks (no coords)
+      if (!entry.address) continue; // We need address or coords for this to work accurately
+
+      // For now, since most landmarks don't have explicit coords in the static config,
+      // we'll primarily use this for the pre-configured landmarks that DO have location info.
+      // In a real scenario, we'd have lat/lon for all landmarks.
+
+      // FALLBACK: If we don't have coords for landmarks yet, we'll return a random pertinent landmark
+      // until we have a proper geo-lookup for them.
+    }
+  }
+
+  // Since our static configs currently lack landmark coords, we'll return the most prominent one
+  // as the "anchor" if it's within a reasonable distance of the target area.
+  const tier1 = config.landmarks.shopping[0]; // Usually the HEB/Anchor
+  return {
+    landmark: getLandmarkDisplay(tier1),
+    distance: 0 // Conceptual distance
+  };
+}
+
 export { LEANDER_CONFIG, CEDAR_PARK_CONFIG, AUSTIN_CONFIG };

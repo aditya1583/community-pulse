@@ -21,6 +21,7 @@
 
 import type { CityConfig, SituationContext, PostType, GeneratedPost, PredictionMetadata, PredictionCategory, PredictionDataSource, LandmarkEntry, ForecastDay } from "./types";
 import { getLandmarkName, getLandmarkDisplay } from "./types";
+import { getRandomLandmark, getNearestLandmark, getRandomRoad } from "./city-configs";
 import { ExtendedPostType } from "./template-engine";
 
 // ============================================================================
@@ -47,7 +48,8 @@ export type EngagementType =
   | "prediction"             // XP-staked predictions about local outcomes
   | "civic_alert"            // Civic meeting alerts and predictions (50 XP)
   | "landmark_food"          // Food/coffee spots anchored to local landmarks
-  | "weather_alert";         // Proactive weather alerts for forecast outliers (snow, storms, extreme temps)
+  | "weather_alert"          // Proactive weather alerts
+  | "route_pulse";           // FACTUAL: Retail + landmark + traffic intent posts
 
 /**
  * Action metadata for actionable posts (e.g., farmers market posts with directions)
@@ -55,7 +57,7 @@ export type EngagementType =
  */
 export interface PostActionData {
   /** Type of action - navigation to tab or external link */
-  type: "navigate_tab" | "directions" | "website";
+  type: "navigate_tab" | "directions" | "website" | "traffic_check";
   /** Target for navigation (e.g., "local/markets") or URL for external */
   target: string;
   /** Display label for the action button */
@@ -1094,13 +1096,13 @@ const FARMERS_MARKET_TEMPLATES = {
   // When market is OPEN TODAY - FOMO/urgency with full actionable details
   openToday: [
     `🥬 {marketName} is OPEN NOW!
-📍 {address}{distanceText}
+📍 {address} ({landmarkAnchor})
 🕐 {schedule}
 Fresh produce, local vendors & more!
 → Tap for directions`,
 
     `🍅 MARKET DAY! {marketName} is open right now
-📍 {address}{distanceText}
+📍 {address} ({landmarkAnchor})
 🕐 {schedule}
 Get there before the good stuff sells out!
 → See on Markets tab`,
@@ -2548,9 +2550,15 @@ export async function generatePredictionPost(
     dataSource: selected.dataSource,
   };
 
+  // Determine the most appropriate tag for this prediction
+  let tag: PostType = "General";
+  if (selected.category === "weather") tag = "Weather";
+  else if (selected.category === "traffic") tag = "Traffic";
+  else if (selected.category === "events") tag = "Events";
+
   return {
     message,
-    tag: "General",
+    tag,
     mood: "🔮",
     author: `${city.name} oracle_bot 🎱`,
     is_bot: true,
@@ -2652,7 +2660,7 @@ export async function generateCivicAlertPost(
 
     return {
       message: fullMessage,
-      tag: "General",
+      tag: "General" as PostType,
       mood: "🏛️",
       author: `${city.name} civic_oracle_bot 🔮`,
       is_bot: true,
@@ -2666,7 +2674,7 @@ export async function generateCivicAlertPost(
   // Regular awareness poll (no XP stakes)
   return {
     message,
-    tag: "General",
+    tag: "General" as PostType,
     mood: "🏛️",
     author: `${city.name} civic_pulse_bot 🏛️`,
     is_bot: true,
@@ -2848,6 +2856,10 @@ export async function generateFarmersMarketPost(
     ? ` (${market.distance.toFixed(1)} mi)`
     : "";
 
+  // SPATIAL ANCHORING: Find a nearby landmark to build trust
+  const nearest = getNearestLandmark(city, { lat: market.lat || city.coords.lat, lon: market.lon || city.coords.lon });
+  const landmarkAnchor = nearest ? `near ${nearest.landmark}` : `in ${city.name}`;
+
   // Clean up address - provide a better fallback if specific address is missing
   const address = market.address && market.address !== "Address not available"
     ? market.address
@@ -2856,6 +2868,7 @@ export async function generateFarmersMarketPost(
   const extendedVars: Record<string, string> = {
     marketName: market.name,
     address: address,
+    landmarkAnchor: landmarkAnchor,
     distanceText: distanceText,
     schedule: market.schedule || "Hours vary",
     products: productsStr,
@@ -2885,7 +2898,7 @@ export async function generateFarmersMarketPost(
 
   return {
     message,
-    tag: "General",
+    tag: "Events",
     mood: "🥬",
     author: `${city.name} market_scout_bot 🥕`,
     is_bot: true,
@@ -3025,6 +3038,76 @@ export async function generateLandmarkFoodPost(
 }
 
 // ============================================================================
+// ROUTE PULSE - Intent-Based Traffic + Retail
+// ============================================================================
+
+const ROUTE_PULSE_TEMPLATES = [
+  "Planning a run to {landmark}? Traffic on {road} is {status} right now. Perfect time to beat the rush! 🚗",
+  "Heading toward {landmark}? {road} is {status}. Might be a good window to grab that {item} you've been wanting. 🛒",
+  "Retail check: Thinking about {landmark}? {road} is flows {status}. Should be an easy trip! ✨",
+  "Quick update for {landmark} regulars: {road} is currently {status}. {tip}! 🎯",
+];
+
+const ROUTE_STATUS_MAP = {
+  clear: "flowing smoothly",
+  moderate: "seeing some moderate activity",
+  heavy: "currently heavy",
+  jam: "jammed - maybe wait 30 mins?",
+};
+
+const RETAIL_ITEMS = ["grocery run", "coffee fix", "supply run", "quick errand", "treat"];
+
+/**
+ * Generate a Route Pulse Post
+ * 
+ * FACTUAL + INTENT: Combines a specific retail destination with real traffic data.
+ * This builds massive trust because it's both actionable and spatially familiar.
+ */
+export async function generateRoutePulsePost(
+  ctx: SituationContext
+): Promise<EngagementPost | null> {
+  const { city, traffic } = ctx;
+
+  // Need traffic data to make this factual
+  if (!traffic) return null;
+
+  const congestion = traffic.congestionLevel * 100;
+  const status = congestion >= 80 ? "jam" :
+    congestion >= 50 ? "heavy" :
+      congestion >= 20 ? "moderate" : "clear";
+
+  const landmark = getRandomLandmark(city, "shopping");
+  const template = pickRandom(ROUTE_PULSE_TEMPLATES);
+
+  // Pick a road that's likely affected
+  const road = getRandomRoad(city);
+  const item = pickRandom(RETAIL_ITEMS);
+  const tip = status === "clear" ? "Now's the time" : "Patience recommended";
+
+  const message = template
+    .replace(/{landmark}/g, landmark)
+    .replace(/{road}/g, road)
+    .replace(/{status}/g, ROUTE_STATUS_MAP[status])
+    .replace(/{item}/g, item)
+    .replace(/{tip}/g, tip);
+
+  return {
+    message,
+    tag: "Traffic",
+    mood: status === "clear" ? "✅" : "🚥",
+    author: `${city.name} commute_buddy_bot 🛰️`,
+    is_bot: true,
+    hidden: false,
+    engagementType: "route_pulse",
+    action: {
+      type: "traffic_check",
+      target: "traffic",
+      label: "Check Traffic Map"
+    }
+  };
+}
+
+// ============================================================================
 // HIGH-LEVEL ENGAGEMENT GENERATOR
 // ============================================================================
 
@@ -3091,6 +3174,19 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
           reason: "Heads-up: farmers market tomorrow",
         };
       }
+    }
+  }
+
+  // ========== TIER 0.2: ROUTE PULSE (Actionable Traffic/Retail) ==========
+  // If we have notable traffic and it's a shopping window (midday/afternoon)
+  if (ctx.traffic && (hour >= 10 && hour <= 18)) {
+    if (Math.random() < 0.4) {
+      console.log("[AnalyzeEngagement] ROUTE PULSE: Notable traffic + shopping window");
+      return {
+        shouldPost: true,
+        engagementType: "route_pulse",
+        reason: "Active shopping window + traffic data available",
+      };
     }
   }
 
@@ -3462,6 +3558,8 @@ export async function generateEngagementPost(
     case "weather_alert":
       return generateWeatherAlertPost(ctx);
 
+    case "route_pulse":
+      return generateRoutePulsePost(ctx);
     default:
       return null;
   }

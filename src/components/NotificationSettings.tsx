@@ -248,14 +248,12 @@ export default function NotificationSettings({
         <button
           onClick={handleToggleNotifications}
           disabled={isLoading}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-            isSubscribed ? "bg-cyan-500" : "bg-gray-700"
-          } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isSubscribed ? "bg-cyan-500" : "bg-gray-700"
+            } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
         >
           <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-              isSubscribed ? "translate-x-6" : "translate-x-1"
-            }`}
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isSubscribed ? "translate-x-6" : "translate-x-1"
+              }`}
           />
         </button>
       </div>
@@ -280,14 +278,12 @@ export default function NotificationSettings({
               setTimeout(savePreferences, 0);
             }}
             disabled={!isSubscribed}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-              spikeAlertsEnabled && isSubscribed ? "bg-cyan-500" : "bg-gray-700"
-            } ${!isSubscribed ? "opacity-50 cursor-not-allowed" : ""}`}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${spikeAlertsEnabled && isSubscribed ? "bg-cyan-500" : "bg-gray-700"
+              } ${!isSubscribed ? "opacity-50 cursor-not-allowed" : ""}`}
           >
             <span
-              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                spikeAlertsEnabled ? "translate-x-5" : "translate-x-1"
-              }`}
+              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${spikeAlertsEnabled ? "translate-x-5" : "translate-x-1"
+                }`}
             />
           </button>
         </div>
@@ -306,14 +302,12 @@ export default function NotificationSettings({
               setTimeout(savePreferences, 0);
             }}
             disabled={!isSubscribed}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-              vibeShiftsEnabled && isSubscribed ? "bg-cyan-500" : "bg-gray-700"
-            } ${!isSubscribed ? "opacity-50 cursor-not-allowed" : ""}`}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${vibeShiftsEnabled && isSubscribed ? "bg-cyan-500" : "bg-gray-700"
+              } ${!isSubscribed ? "opacity-50 cursor-not-allowed" : ""}`}
           >
             <span
-              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                vibeShiftsEnabled ? "translate-x-5" : "translate-x-1"
-              }`}
+              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${vibeShiftsEnabled ? "translate-x-5" : "translate-x-1"
+                }`}
             />
           </button>
         </div>
@@ -332,14 +326,12 @@ export default function NotificationSettings({
               setTimeout(savePreferences, 0);
             }}
             disabled={!isSubscribed}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-              keywordAlertsEnabled && isSubscribed ? "bg-cyan-500" : "bg-gray-700"
-            } ${!isSubscribed ? "opacity-50 cursor-not-allowed" : ""}`}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${keywordAlertsEnabled && isSubscribed ? "bg-cyan-500" : "bg-gray-700"
+              } ${!isSubscribed ? "opacity-50 cursor-not-allowed" : ""}`}
           >
             <span
-              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                keywordAlertsEnabled ? "translate-x-5" : "translate-x-1"
-              }`}
+              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${keywordAlertsEnabled ? "translate-x-5" : "translate-x-1"
+                }`}
             />
           </button>
         </div>
@@ -401,7 +393,7 @@ export default function NotificationSettings({
             <div>
               <p className="text-white text-sm font-medium">Quiet Hours</p>
               <p className="text-gray-500 text-xs">
-                Don't send notifications during these times
+                Don&apos;t send notifications during these times
               </p>
             </div>
             <button
@@ -409,14 +401,12 @@ export default function NotificationSettings({
                 setQuietHoursEnabled(!quietHoursEnabled);
                 setTimeout(savePreferences, 0);
               }}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                quietHoursEnabled ? "bg-cyan-500" : "bg-gray-700"
-              }`}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${quietHoursEnabled ? "bg-cyan-500" : "bg-gray-700"
+                }`}
             >
               <span
-                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                  quietHoursEnabled ? "translate-x-5" : "translate-x-1"
-                }`}
+                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${quietHoursEnabled ? "translate-x-5" : "translate-x-1"
+                  }`}
               />
             </button>
           </div>

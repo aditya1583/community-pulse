@@ -1,0 +1,380 @@
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\app\api\admin\reports\route.ts
+  100:26  warning  'count' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\app\api\auto-seed\route.ts
+  119:42  warning  'day' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\app\api\cron\refresh-content\route.ts
+   29:3   warning  'hasIntelligentBotConfig' is defined but never used  @typescript-eslint/no-unused-vars
+  172:11  warning  'now' is assigned a value but never used             @typescript-eslint/no-unused-vars
+  247:11  error    'cityLat' is never reassigned. Use 'const' instead   prefer-const
+  248:11  error    'cityLon' is never reassigned. Use 'const' instead   prefer-const
+  327:91  error    Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\app\api\farmers-markets\route.ts
+  455:9  warning  'state' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\app\api\gas-prices\route.ts
+  114:15  warning  'seriesIds' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\app\api\gas-stations\route.ts
+  104:5   warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+  106:22  error    Unexpected any. Specify a different type                                                               @typescript-eslint/no-explicit-any
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\app\api\heatmap\route.ts
+  231:20  warning  'anchor' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\app\api\intelligent-seed\route.ts
+  497:13  error  'eventName' is never reassigned. Use 'const' instead  prefer-const
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\app\api\osm\places\route.ts
+  182:20  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  183:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\app\api\pulses\[id]\resolution-vote\route.ts
+  175:11  warning  'resolutionEndsAt' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\app\api\pulses\__tests__\route.test.ts
+  30:5  warning  'lastClientType' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\app\api\traffic-live\route.ts
+  103:10  warning  'mapIncidentType' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\app\api\weather\__tests__\route.test.ts
+  329:13  warning  'data' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\app\bot-lab\page.tsx
+    3:20  warning  'useEffect' is defined but never used                            @typescript-eslint/no-unused-vars
+   81:41  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   81:50  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   81:55  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   81:67  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  109:37  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  109:54  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  123:21  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  123:30  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  165:26  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  264:26  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  264:33  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  286:15  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  286:31  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  326:33  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  326:41  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  344:65  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  344:78  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  374:21  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  374:42  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  374:51  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  374:65  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  388:53  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  389:71  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  390:34  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\app\page.tsx
+    18:3   warning  'isPulseVisible' is defined but never used                                                                                                                                                      @typescript-eslint/no-unused-vars
+    39:8   warning  'FAB' is defined but never used                                                                                                                                                                 @typescript-eslint/no-unused-vars
+   191:9   warning  The 'setActiveTab' function makes the dependencies of useCallback Hook (at line 2960) change on every render. To fix this, wrap the definition of 'setActiveTab' in its own useCallback() Hook  react-hooks/exhaustive-deps
+   253:10  warning  'favoritesLoading' is assigned a value but never used                                                                                                                                           @typescript-eslint/no-unused-vars
+   292:10  warning  'events' is assigned a value but never used                                                                                                                                                     @typescript-eslint/no-unused-vars
+   293:10  warning  'eventsLoading' is assigned a value but never used                                                                                                                                              @typescript-eslint/no-unused-vars
+   294:10  warning  'eventsError' is assigned a value but never used                                                                                                                                                @typescript-eslint/no-unused-vars
+   299:10  warning  'creatingEvent' is assigned a value but never used                                                                                                                                              @typescript-eslint/no-unused-vars
+   300:10  warning  'eventCreateError' is assigned a value but never used                                                                                                                                           @typescript-eslint/no-unused-vars
+   335:10  warning  'weatherError' is assigned a value but never used                                                                                                                                               @typescript-eslint/no-unused-vars
+   340:10  warning  'cityMoodError' is assigned a value but never used                                                                                                                                              @typescript-eslint/no-unused-vars
+  1876:18  warning  'handleCreateEvent' is defined but never used                                                                                                                                                   @typescript-eslint/no-unused-vars
+  2720:9   warning  'currentStreak' is assigned a value but never used                                                                                                                                              @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\app\reset-password\page.tsx
+  40:6  warning  React Hook useEffect has an unnecessary dependency: 'supabase.auth'. Either exclude it or remove the dependency array. Outer scope values like 'supabase.auth' aren't valid dependencies because mutating them doesn't re-render the component  react-hooks/exhaustive-deps
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\app\venue\[id]\page.tsx
+  19:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  22:50  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\ChallengeCard.tsx
+   76:7   warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element                                                                                                                                                                                                                                                                                                                                                                                                                              @next/next/no-img-element
+  289:43  error    Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\ChallengeCard.tsx:289:43
+  287 |
+  288 |   // Check if expired
+> 289 |   const isExpired = expiresAt.getTime() < Date.now();
+      |                                           ^^^^^^^^^^ Cannot call impure function
+  290 |
+  291 |   // Calculate distance from user
+  292 |   const distanceMiles = userLocation  react-hooks/purity
+  306:9   warning  'canClaim' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\EventCard.tsx
+  133:38  error  Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. This value was memoized in source but not in compilation output.
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\EventCard.tsx:133:38
+  131 |   };
+  132 |
+> 133 |   const handleCalendar = useCallback((e: React.MouseEvent) => {
+      |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 134 |     e.stopPropagation();
+      | ^^^^^^^^^^^^^^^^^^^^^^^^
+> 135 |     downloadICS(event);
+      | ^^^^^^^^^^^^^^^^^^^^^^^^
+> 136 |   }, [event]);
+      | ^^^^ Could not preserve existing memoization
+  137 |
+  138 |   const handleDirections = useCallback((e: React.MouseEvent) => {
+  139 |     e.stopPropagation();  react-hooks/preserve-manual-memoization
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\GasPricesCard.tsx
+  24:48  warning  'cityName' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\InstallPrompt.tsx
+  21:20  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\InstallPrompt.tsx:21:20
+  19 |         const isAndroid = /Android/.test(navigator.userAgent);
+  20 |
+> 21 |         if (isIOS) setPlatform("ios");
+     |                    ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  22 |         else if (isAndroid) setPlatform("android");
+  23 |
+  24 |         const hasSeen = localStorage.getItem("voxlo-install-prompt-seen");  react-hooks/set-state-in-effect
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\LiveVibes.tsx
+  116:20  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\LocalDealsSection.tsx
+    5:10  warning  'VENUE_VIBE_TYPES' is defined but never used                                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+   92:3   warning  'state' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  166:64  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  406:27  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  412:27  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\LocalTab.tsx
+  62:3  warning  'userId' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\NotificationSettings.tsx
+  404:20  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\OnboardingChecklist.tsx
+  103:28  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\PollVoting.tsx
+  201:31  warning  'index' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\PredictionCard.tsx
+  135:9  warning  The 'resolvesAt' conditional could make the dependencies of useEffect Hook (at line 173) change on every render. Move it inside the useEffect callback. Alternatively, wrap the initialization of 'resolvesAt' in its own useMemo() Hook                          react-hooks/exhaustive-deps
+  141:9  warning  The 'resolutionVotingEndsAt' conditional could make the dependencies of useEffect Hook (at line 173) change on every render. Move it inside the useEffect callback. Alternatively, wrap the initialization of 'resolutionVotingEndsAt' in its own useMemo() Hook  react-hooks/exhaustive-deps
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\PulseCard.tsx
+  9:31  warning  'PredictionData' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\PulseComments.tsx
+  69:10  warning  'reportReason' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\PulseModal.tsx
+  76:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\PulseModal.tsx:76:7
+  74 |   useEffect(() => {
+  75 |     if (isOpen) {
+> 76 |       setPlaceholder(getStablePulsePrompt(selectedCategory));
+     |       ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  77 |     }
+  78 |   }, [selectedCategory, isOpen]);
+  79 |  react-hooks/set-state-in-effect
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\PulseReactions.tsx
+  71:6  warning  React Hook useEffect has a missing dependency: 'reactions'. Either include it or remove the dependency array. If 'setLocalReactions' needs the current value of 'reactions', you can also switch to useReducer instead of useState and read 'reactions' in the reducer                  react-hooks/exhaustive-deps
+  75:6  warning  React Hook useEffect has a missing dependency: 'userReactions'. Either include it or remove the dependency array. If 'setLocalUserReactions' needs the current value of 'userReactions', you can also switch to useReducer instead of useState and read 'userReactions' in the reducer  react-hooks/exhaustive-deps
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\QuickStats.tsx
+  239:92   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  239:112  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\StatusRing.tsx
+  4:25  warning  'TIERS' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\TabPulseInput.tsx
+  58:7  warning  'displayName' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\TrafficContent.tsx
+   93:17  error    Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\TrafficContent.tsx:93:17
+  91 |   // Calculate traffic intelligence from user pulses
+  92 |   const intelligence = useMemo((): TrafficIntelligence => {
+> 93 |     const now = Date.now();
+     |                 ^^^^^^^^^^ Cannot call impure function
+  94 |     const oneHourAgo = now - 60 * 60 * 1000;
+  95 |
+  96 |     // Filter pulses from the last hour  react-hooks/purity
+  212:13  warning  'road' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\VenueDetailPage.tsx
+   59:10  warning  'vibes' is assigned a value but never used                       @typescript-eslint/no-unused-vars
+  170:9   warning  'formatRelativeTime' is assigned a value but never used          @typescript-eslint/no-unused-vars
+  294:84  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  510:19  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\VenueVibeCheck.tsx
+    5:95  warning  'getTrustBadge' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-unused-vars
+  239:23  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              react/no-unescaped-entities
+  471:23  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              react/no-unescaped-entities
+  539:19  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              react/no-unescaped-entities
+  740:30  error    Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\VenueVibeCheck.tsx:740:30
+  738 |   // Format time ago
+  739 |   const timeAgo = (dateStr: string) => {
+> 740 |     const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
+      |                              ^^^^^^^^^^ Cannot call impure function
+  741 |     if (mins < 1) return "just now";
+  742 |     if (mins < 60) return `${mins}m ago`;
+  743 |     const hours = Math.floor(mins / 60);  react-hooks/purity
+  913:37  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              react/no-unescaped-entities
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\components\XPProgressBadge.tsx
+  4:47  warning  'TierInfo' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\hooks\useExpiryCountdown.ts
+   74:10  warning  'now' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               @typescript-eslint/no-unused-vars
+  116:5   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\hooks\useExpiryCountdown.ts:116:5
+  114 |     const currentNow = new Date();
+  115 |     const currentInfo = calculateInfo(currentNow);
+> 116 |     setInfo(currentInfo);
+      |     ^^^^^^^ Avoid calling setState() directly within an effect
+  117 |     setNow(currentNow);
+  118 |
+  119 |     // If already expired, no need to update  react-hooks/set-state-in-effect
+  165:7   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\hooks\useExpiryCountdown.ts:165:7
+  163 |     // If urgency changed, recalculate interval
+  164 |     if (wasUrgent !== isNowUrgent) {
+> 165 |       setInfo(currentInfo);
+      |       ^^^^^^^ Avoid calling setState() directly within an effect
+  166 |     }
+  167 |   }, [info, expiresAt, disabled, calculateInfo]);
+  168 |            react-hooks/set-state-in-effect
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\hooks\useGamification.ts
+  101:10  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\hooks\useGamification.ts:101:10
+   99 |
+  100 |   useEffect(() => {
+> 101 |     void loadStats();
+      |          ^^^^^^^^^ Avoid calling setState() directly within an effect
+  102 |   }, [loadStats]);
+  103 |
+  104 |   return {                    react-hooks/set-state-in-effect
+  188:10  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\hooks\useGamification.ts:188:10
+  186 |
+  187 |   useEffect(() => {
+> 188 |     void loadLeaderboard();
+      |          ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  189 |   }, [loadLeaderboard]);
+  190 |
+  191 |   return {  react-hooks/set-state-in-effect
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\hooks\useGeolocation.ts
+  119:6   warning  React Hook useEffect has a missing dependency: 'requestLocationInternal'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  167:20  warning  'geoError' is defined but never used                                                                                        @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\lib\__tests__\intelligentBots.test.ts
+    1:32  warning  'beforeEach' is defined but never used        @typescript-eslint/no-unused-vars
+   18:3   warning  'SituationContext' is defined but never used  @typescript-eslint/no-unused-vars
+   19:3   warning  'PostDecision' is defined but never used      @typescript-eslint/no-unused-vars
+  353:64  warning  'expectedTemplate' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\lib\batSignal.ts
+  205:13  warning  'intensity' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\lib\intelligent-bots\city-configs\index.ts
+  184:7  error    'nearest' is never reassigned. Use 'const' instead      prefer-const
+  184:7  warning  'nearest' is assigned a value but never used            @typescript-eslint/no-unused-vars
+  185:7  error    'minDistance' is never reassigned. Use 'const' instead  prefer-const
+  185:7  warning  'minDistance' is assigned a value but never used        @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\lib\intelligent-bots\civic-templates.ts
+  120:41  warning  '_index' is defined but never used      @typescript-eslint/no-unused-vars
+  159:10  warning  'isToday' is defined but never used     @typescript-eslint/no-unused-vars
+  167:10  warning  'isTomorrow' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\lib\intelligent-bots\data-fetchers.ts
+  457:7   warning  'DAY_ABBREVS' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  459:10  warning  'getTodayDayName' is defined but never used       @typescript-eslint/no-unused-vars
+  463:10  warning  'getTomorrowDayName' is defined but never used    @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\lib\intelligent-bots\engagement-posts.ts
+    25:10  warning  'ExtendedPostType' is defined but never used             @typescript-eslint/no-unused-vars
+  1053:7   warning  '_CIVIC_PREDICTIONS' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  1349:3   warning  'options' is assigned a value but never used             @typescript-eslint/no-unused-vars
+  1554:17  warning  'time' is assigned a value but never used                @typescript-eslint/no-unused-vars
+  1554:23  warning  'weather' is assigned a value but never used             @typescript-eslint/no-unused-vars
+  2635:17  warning  'time' is assigned a value but never used                @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\lib\intelligent-bots\situation-analyzer.ts
+  17:3  warning  'PostType' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\lib\intelligent-bots\template-engine.ts
+  374:10  warning  'getBotPersona' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\lib\moderation.ts
+  173:7  warning  'SUBSTITUTION_MAP' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\adity\Downloads\App5156\community-pulse\src\lib\pushNotifications.ts
+  24:3  warning  'isInQuietHours' is defined but never used  @typescript-eslint/no-unused-vars
+
+Γ£û 132 problems (57 errors, 75 warnings)
+  5 errors and 1 warning potentially fixable with the `--fix` option.
+
