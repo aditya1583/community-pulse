@@ -61,13 +61,15 @@ jobs:
             exit 1
           fi
 
-          # Decode from base64 (write to file first to handle any encoding issues)
-          echo "$P12_BASE64" | base64 --decode > $CERTIFICATE_PATH
-          echo "$PROVISION_PROFILE_BASE64" | base64 --decode > $PROVISION_PATH
+          # Decode from base64 - clean input first (remove any whitespace/newlines)
+          # Use -D for macOS base64 compatibility
+          echo "$P12_BASE64" | tr -d '[:space:]' | base64 -D > $CERTIFICATE_PATH
+          echo "$PROVISION_PROFILE_BASE64" | tr -d '[:space:]' | base64 -D > $PROVISION_PATH
 
           # Verify files were created
           if [ ! -s "$CERTIFICATE_PATH" ]; then
             echo "Error: Failed to decode certificate - file is empty"
+            echo "First 50 chars of base64 input: ${P12_BASE64:0:50}..."
             exit 1
           fi
           echo "Certificate decoded successfully ($(wc -c < $CERTIFICATE_PATH) bytes)"
