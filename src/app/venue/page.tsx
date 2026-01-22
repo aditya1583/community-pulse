@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/../lib/supabaseClient";
 import VenueDetailPage from "@/components/VenueDetailPage";
 import type { User } from "@supabase/supabase-js";
 
@@ -18,10 +18,7 @@ interface Venue {
     description?: string;
 }
 
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// Supabase client imported from shared module
 
 function VenuePageContent() {
     const router = useRouter();

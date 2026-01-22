@@ -1,17 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/../lib/supabaseClient";
 import type { TicketmasterEvent, EventsFallback } from "@/hooks/useEvents";
 import type { FarmersMarket } from "./types";
 import { RADIUS_CONFIG } from "@/lib/constants/radius";
 import TabPulseInput from "./TabPulseInput";
 
-// Supabase client for fetching vibe counts
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// Supabase client imported from shared module
 
 /**
  * Generate an ICS calendar file for an event

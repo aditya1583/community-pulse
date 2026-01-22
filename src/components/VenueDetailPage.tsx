@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/../lib/supabaseClient";
 import { createPortal } from "react-dom";
 import {
   VENUE_VIBE_TYPES,
@@ -10,10 +10,7 @@ import {
   VenueVibeAggregate,
 } from "./types";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// Supabase client imported from shared module
 
 type Venue = {
   id: string;
@@ -359,8 +356,8 @@ export default function VenueDetailPage({
                   onClick={() => handleLogVibe(vibe!.id as VenueVibeType)}
                   disabled={loggingVibe}
                   className={`flex flex-col items-center gap-1 py-3 px-2 rounded-xl border transition-all active:scale-95 ${isActive
-                      ? "bg-violet-500/15 border-violet-500/30 hover:bg-violet-500/25"
-                      : "bg-slate-800/60 border-slate-700/50 hover:bg-slate-800 hover:border-slate-600"
+                    ? "bg-violet-500/15 border-violet-500/30 hover:bg-violet-500/25"
+                    : "bg-slate-800/60 border-slate-700/50 hover:bg-slate-800 hover:border-slate-600"
                     } disabled:opacity-50`}
                 >
                   <span className="text-2xl">{vibe!.emoji}</span>
@@ -634,8 +631,8 @@ function VibeOptionButton({
       onClick={onSelect}
       disabled={disabled}
       className={`group flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-xl transition-all duration-200 active:scale-95 ${count > 0
-          ? "bg-violet-500/20 text-violet-200 border border-violet-500/30 hover:bg-violet-500/30 hover:shadow-[0_0_12px_rgba(139,92,246,0.2)]"
-          : "bg-slate-800 text-slate-300 border border-slate-700/50 hover:bg-slate-700/50 hover:border-slate-500 hover:text-white"
+        ? "bg-violet-500/20 text-violet-200 border border-violet-500/30 hover:bg-violet-500/30 hover:shadow-[0_0_12px_rgba(139,92,246,0.2)]"
+        : "bg-slate-800 text-slate-300 border border-slate-700/50 hover:bg-slate-700/50 hover:border-slate-500 hover:text-white"
         } disabled:opacity-50 disabled:cursor-not-allowed`}
     >
       <span className="group-hover:scale-110 transition-transform">{vibe.emoji}</span>
