@@ -25,7 +25,9 @@ jobs:
         run: npm ci
 
       - name: Build Next.js App
-        run: npm run build
+        run: |
+          rm -rf src/app/api
+          npm run build
         env:
           NEXT_PUBLIC_EXPORT_MODE: 'true'
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
