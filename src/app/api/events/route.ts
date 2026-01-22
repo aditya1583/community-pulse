@@ -1,7 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "../../../../lib/supabaseClient"; // ✅ path: app/api/events/route -> ../../../lib
+import { createClient } from "@supabase/supabase-js";
 
-// GET /api/events?city=Austin
+// Create user client with token for auth verification
+function getUserClient(token: string) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  });
+}
+
+// GET /api/events?city=Austin - Public read access
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const city = searchParams.get("city");
@@ -14,6 +28,15 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.json({ error: "Server configuration error", events: [] }, { status: 500 });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
     const { data, error } = await supabase
       .from("events")
       .select("id, title, description, location, category, starts_at, ends_at")
@@ -33,9 +56,30 @@ export async function GET(req: NextRequest) {
 }
 
 
-// POST /api/events
+// POST /api/events - Requires authentication
 export async function POST(req: NextRequest) {
   try {
+    // Authentication required
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.slice(7);
+    const supabase = getUserClient(token);
+
+    // Verify user is authenticated
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData.user) {
+      return NextResponse.json(
+        { error: "Invalid or expired session" },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json().catch(() => null);
 
     if (!body) {
@@ -63,7 +107,8 @@ export async function POST(req: NextRequest) {
           description,
           location,
           category,
-          starts_at, // datetime-local string is fine for timestamptz
+          starts_at,
+          user_id: authData.user.id, // Track who created the event
         },
       ])
       .select()

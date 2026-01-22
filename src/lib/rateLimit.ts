@@ -41,10 +41,9 @@ export type RateLimitConfig = {
  * Predefined rate limit configurations
  */
 export const RATE_LIMITS = {
-  // Pulse creation: relaxed for testing
-  // TODO: GA - Reduce back to 5 per hour before production launch
+  // Pulse creation: 5 per hour per user (production limit)
   PULSE_CREATE: {
-    limit: 50,
+    limit: 5,
     windowSeconds: 3600, // 1 hour
     keyPrefix: "pulse",
   },
