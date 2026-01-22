@@ -3142,6 +3142,7 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
   // When we have REAL local data (farmers markets open TODAY), this beats everything
   // This is time-sensitive hyperlocal content that MUST be shown when relevant
 
+  /*
   if (ctx.farmersMarkets && ctx.farmersMarkets.length > 0) {
     const hasOpenMarket = ctx.farmersMarkets.some(m => m.isOpenToday);
     const hasMarketTomorrow = ctx.farmersMarkets.some(m => m.isOpenTomorrow);
@@ -3178,6 +3179,7 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
       }
     }
   }
+  */
 
   // ========== TIER 0.2: ROUTE PULSE (Actionable Traffic/Retail) ==========
   // If we have notable traffic and it's a shopping window (midday/afternoon)

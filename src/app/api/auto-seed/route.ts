@@ -380,7 +380,8 @@ function generatePosts(data: AutoSeedRequest): Array<{ message: string; mood: st
     }
   }
 
-  // 2. Farmers market post (if markets available)
+  // 2. Farmers market post - DISABLED (shown in Local tab instead)
+  /*
   if (data.farmersMarkets && data.farmersMarkets.length > 0) {
     const market = data.farmersMarkets[0];
     const template = getRandomItem(MARKET_TEMPLATES);
@@ -390,6 +391,7 @@ function generatePosts(data: AutoSeedRequest): Array<{ message: string; mood: st
       tag: "Events",
     });
   }
+  */
 
   // 3. Weather post - only if we have VALID weather data
   if (data.weather && data.weather.temp !== undefined) {
@@ -499,13 +501,16 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      console.log(`[Auto-Seed] Intelligent Bot: Active (Existing: ${existingPulses?.length || 0})`);
-
       // Use intelligent bot system with coords for universal support
-      // Generate 5 varied posts
+      // TOP-UP LOGIC: Only generate enough to reach the 5-post threshold
+      const existingCount = existingPulses?.length || 0;
+      const countToGenerate = Math.max(1, 5 - existingCount);
+
+      console.log(`[Auto-Seed] Intelligent Bot: Active (Existing: ${existingCount}, Top-up: ${countToGenerate})`);
+
       const coords = hasCoords ? { lat: body.lat!, lon: body.lon! } : undefined;
       const result = await generateColdStartPosts(cityName, {
-        count: 5,
+        count: countToGenerate,
         force: true,
         coords,
       });
