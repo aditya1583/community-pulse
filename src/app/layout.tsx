@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Outfit } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { CapacitorProvider } from "@/components/CapacitorProvider";
 
 // Premium modern font
 const outfit = Outfit({
@@ -55,36 +56,38 @@ export default function RootLayout({
       <body
         className={`${outfit.variable} font-sans antialiased bg-slate-950 text-slate-50`}
       >
-        <ServiceWorkerRegister />
-        <div className="flex min-h-screen flex-col bg-background text-foreground">
-          <main className="flex-1">{children}</main>
+        <CapacitorProvider>
+          <ServiceWorkerRegister />
+          <div className="flex min-h-screen flex-col bg-background text-foreground">
+            <main className="flex-1">{children}</main>
 
-          <footer className="border-t border-white/5 bg-white/5 backdrop-blur-md text-sm text-slate-400">
-            <div className="mx-auto flex max-w-5xl flex-col gap-2 px-4 py-6 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-col gap-1 items-center sm:items-start">
-                <span className="text-xs opacity-60">
-                  Built for the 10-mile radius. Trust your neighbors.
-                </span>
-              </div>
+            <footer className="border-t border-white/5 bg-white/5 backdrop-blur-md text-sm text-slate-400">
+              <div className="mx-auto flex max-w-5xl flex-col gap-2 px-4 py-6 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-1 items-center sm:items-start">
+                  <span className="text-xs opacity-60">
+                    Built for the 10-mile radius. Trust your neighbors.
+                  </span>
+                </div>
 
-              <div className="flex justify-center gap-6 text-slate-400 sm:justify-end">
-                <a
-                  href="/privacy"
-                  className="transition hover:text-emerald-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
-                >
-                  Privacy
-                </a>
-                <a
-                  href="/terms"
-                  className="transition hover:text-emerald-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
-                >
-                  Terms
-                </a>
-                <span className="opacity-30">v1.0.0</span>
+                <div className="flex justify-center gap-6 text-slate-400 sm:justify-end">
+                  <a
+                    href="/privacy"
+                    className="transition hover:text-emerald-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
+                  >
+                    Privacy
+                  </a>
+                  <a
+                    href="/terms"
+                    className="transition hover:text-emerald-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
+                  >
+                    Terms
+                  </a>
+                  <span className="opacity-30">v1.0.0</span>
+                </div>
               </div>
-            </div>
-          </footer>
-        </div>
+            </footer>
+          </div>
+        </CapacitorProvider>
       </body>
     </html>
   );
