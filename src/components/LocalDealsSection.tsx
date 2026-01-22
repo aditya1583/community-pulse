@@ -278,6 +278,7 @@ export default function LocalDealsSection({
 
     // Pass venue data via URL params for venues not in DB
     const params = new URLSearchParams({
+      id: slug,
       name: place.name,
       category: place.category || "",
       address: place.address || "",
@@ -285,7 +286,7 @@ export default function LocalDealsSection({
       lon: place.lon?.toString() || "",
     });
 
-    router.push(`/venue/${slug}?${params.toString()}`);
+    router.push(`/venue/?${params.toString()}`);
   };
 
   const formatDistance = (meters: number | null) => {
