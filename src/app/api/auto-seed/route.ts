@@ -479,13 +479,14 @@ export async function POST(req: NextRequest) {
       console.log(`[Auto-Seed] Using intelligent bot system (${mode}) for "${cityName}"`);
 
       // Check for recent posts first (fetch messages for deduplication)
-      const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+      // Use 24-hour window to catch duplicates from previous day
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const { data: existingPulses } = await supabase
         .from("pulses")
         .select("id, message")
         .eq("city", body.city)
-        .gte("created_at", fourHoursAgo)
-        .limit(10); // increased limit to check more context
+        .gte("created_at", twentyFourHoursAgo)
+        .limit(30); // Check up to 30 recent posts for duplicates
 
       // Skip ONLY if we have enough pulses (>= 5) AND we're not forcing
       if (existingPulses && existingPulses.length >= 5 && !body.force) {
