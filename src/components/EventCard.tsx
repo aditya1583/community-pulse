@@ -203,7 +203,7 @@ function FeaturedEventCard({ event, vibeCount }: { event: TicketmasterEvent; vib
           </div>
 
           <div className="space-y-1.5">
-            <p className="text-sm font-bold text-slate-400 flex items-center gap-2">
+            <div className="text-sm font-bold text-slate-400 flex items-center gap-2">
               <div className="w-4 h-4 rounded-full bg-slate-800 flex items-center justify-center">
                 <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -214,7 +214,7 @@ function FeaturedEventCard({ event, vibeCount }: { event: TicketmasterEvent; vib
                 {event.venue}
                 {event.venueCity && <span className="text-slate-500 font-medium"> · {event.venueCity}</span>}
               </span>
-            </p>
+            </div>
 
             {event.distanceMiles !== null && event.distanceMiles > RADIUS_CONFIG.PRIMARY_RADIUS_MILES && (
               <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-black uppercase tracking-wider text-amber-300">

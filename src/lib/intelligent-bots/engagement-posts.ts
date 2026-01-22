@@ -2826,8 +2826,10 @@ export async function generateFarmersMarketPost(
     return null;
   }
 
-  // Pick the closest/first market (they should be sorted by distance)
-  const market = farmersMarkets[0];
+  // Pick a random market from the top 3 closest to prevent repetition
+  // Default to first if only one available
+  const marketPool = farmersMarkets.slice(0, 3);
+  const market = marketPool[Math.floor(Math.random() * marketPool.length)];
 
   // Determine which template category to use based on context
   let templateCategory: keyof typeof FARMERS_MARKET_TEMPLATES;

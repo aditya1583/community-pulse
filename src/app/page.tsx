@@ -1474,7 +1474,8 @@ export default function Home() {
       const validPulses = filterVisiblePulses(pulses);
 
       // Determine if this is a cold start (empty) or stale content situation
-      const isEmpty = validPulses.length === 0;
+      // UPDATED: Treat < 5 pulses as "empty" to trigger auto-seed top-up
+      const isEmpty = validPulses.length < 5;
       const isStale = !isEmpty && (
         validPulses.length < STALE_PULSE_THRESHOLD ||
         (validPulses.length > 0 && isContentStale(validPulses))
@@ -3630,6 +3631,33 @@ export default function Home() {
             vibeEmoji={cityMood?.dominantMood ?? undefined}
             temperature={weather?.temp}
           />
+
+          {/* Traffic Flash Alert Banner - Shows for closures or heavy traffic */}
+          {(hasRoadClosure || (trafficIncidents && trafficIncidents.some(i => i.severity >= 3))) && (
+            <div
+              onClick={() => setActiveTab("traffic")}
+              className="mb-4 glass-card border border-red-500/30 bg-red-500/10 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:bg-red-500/20 transition-all stagger-reveal delay-100"
+            >
+              <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0 relative overflow-hidden">
+                <div className="absolute inset-0 bg-red-500/20 animate-pulse" />
+                <span className="text-xl relative z-10">🚨</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="inline-block w-2 H-2 rounded-full bg-red-500 animate-ping" />
+                  <h4 className="text-xs font-black text-red-400 uppercase tracking-wider">Traffic Alert</h4>
+                </div>
+                <p className="text-sm font-bold text-white truncate">
+                  {hasRoadClosure ? "Road closures reported nearby" : "Major traffic incidents detected"}
+                </p>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
+                <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </div>
+          )}
 
           {/* Live Vibes - Real-time crowd-sourced venue sentiment */}
           <LiveVibes city={city} onNavigateToLocal={() => {

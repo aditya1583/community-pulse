@@ -478,16 +478,17 @@ export async function POST(req: NextRequest) {
       const mode = hasPreconfiguredCity ? "hyperlocal" : "universal";
       console.log(`[Auto-Seed] Using intelligent bot system (${mode}) for "${cityName}"`);
 
-      // Check for recent posts first
+      // Check for recent posts first (fetch messages for deduplication)
       const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
       const { data: existingPulses } = await supabase
         .from("pulses")
-        .select("id")
+        .select("id, message")
         .eq("city", body.city)
         .gte("created_at", fourHoursAgo)
-        .limit(1);
+        .limit(10); // increased limit to check more context
 
-      if (existingPulses && existingPulses.length > 0 && !body.force) {
+      // Skip ONLY if we have enough pulses (>= 5) AND we're not forcing
+      if (existingPulses && existingPulses.length >= 5 && !body.force) {
         return NextResponse.json({
           success: true,
           message: "City already has recent pulses, skipping seed",
@@ -497,8 +498,10 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      console.log(`[Auto-Seed] Intelligent Bot: Active (Existing: ${existingPulses?.length || 0})`);
+
       // Use intelligent bot system with coords for universal support
-      // Generate 4 varied posts (Traffic, Weather, Events, Engagement)
+      // Generate 5 varied posts
       const coords = hasCoords ? { lat: body.lat!, lon: body.lon! } : undefined;
       const result = await generateColdStartPosts(cityName, {
         count: 5,
@@ -510,6 +513,43 @@ export async function POST(req: NextRequest) {
         console.log(`[Auto-Seed] Intelligent bots returned no posts: ${result.reason}`);
         // Fall through to generic system below
       } else {
+        // FILTER DUPLICATES: Check against existing messages
+        const existingMessages = new Set((existingPulses || []).map(p => p.message?.toLowerCase() || ""));
+
+        const uniquePosts = result.posts.filter(post => {
+          const postMsg = post.message.toLowerCase();
+
+          // Check for exact match or significant overlap
+          let isDuplicate = Array.from(existingMessages).some(existing =>
+            existing.includes(postMsg) || postMsg.includes(existing) ||
+            (existing.length > 20 && postMsg.length > 20 && (existing.includes(postMsg.slice(0, 20)) || postMsg.includes(existing.slice(0, 20))))
+          );
+
+          // VENUE-BASED DEDUPLICATION (for intelligent posts with actions)
+          // Prevents "Farmers Grass" appearing 3 times with different templates
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const actionVenue = (post as any).action?.venue?.name?.toLowerCase();
+          if (!isDuplicate && actionVenue) {
+            isDuplicate = Array.from(existingMessages).some(existing => existing.includes(actionVenue));
+            if (isDuplicate) console.log(`[Auto-Seed] Skipped duplicate venue: "${actionVenue}"`);
+          }
+
+          if (isDuplicate && !actionVenue) {
+            console.log(`[Auto-Seed] Skipped duplicate post: "${post.message.slice(0, 30)}..."`);
+          }
+          return !isDuplicate;
+        });
+
+        if (uniquePosts.length === 0) {
+          console.log(`[Auto-Seed] All generated posts were duplicates. Skipping.`);
+          return NextResponse.json({
+            success: true,
+            message: "No new unique posts generated (all duplicates)",
+            created: 0,
+            pulses: [],
+          });
+        }
+
         // Insert intelligent bot posts with natural timing variation
         // Real users don't post at exact intervals - add organic randomness
         const now = Date.now();
@@ -520,7 +560,7 @@ export async function POST(req: NextRequest) {
           ? { lat: body.lat!, lon: body.lon! }
           : getCityCoordinates(body.city);
 
-        const records = result.posts.map((post, index) => {
+        const records = uniquePosts.map((post, index) => {
           // First post is "now", subsequent posts are staggered backwards in time
           // Each post is 3-7 minutes apart (varies per post) to feel organic
           if (index > 0) {
@@ -575,14 +615,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Check if city already has ANY pulses in the last 4 hours (user or bot)
+    // Check if city already has ANY pulses in the last 4 hours (Generic fallback)
     const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
     const { data: existingPulses, error: checkError } = await supabase
       .from("pulses")
-      .select("id, is_bot, created_at")
+      .select("id, is_bot, created_at, message") // Added message
       .eq("city", body.city)
       .gte("created_at", fourHoursAgo)
-      .limit(5);
+      .limit(10);
 
     if (checkError) {
       console.error("[Auto-Seed] Error checking existing pulses:", checkError);
@@ -590,15 +630,20 @@ export async function POST(req: NextRequest) {
 
     console.log(`[Auto-Seed] Found ${existingPulses?.length || 0} existing pulses in last 4 hours`);
 
-    if (existingPulses && existingPulses.length > 0 && !body.force) {
-      console.log(`[Auto-Seed] Skipping - city has recent activity (use force=true to override)`);
+    if (existingPulses && existingPulses.length >= 5 && !body.force) {
+      console.log(`[Auto-Seed] Skipping - city has sufficient activity (${existingPulses.length} pulses)`);
       return NextResponse.json({
         success: true,
-        message: "City already has recent pulses, skipping seed",
+        message: "City has sufficient recent pulses, skipping seed",
         created: 0,
         existingCount: existingPulses.length,
         pulses: [],
       });
+    }
+
+    // If we have some pulses but fewer than 5, we'll top up
+    if (existingPulses && existingPulses.length > 0) {
+      console.log(`[Auto-Seed] Top-up mode: City has ${existingPulses.length} pulses, adding more to reach critical mass`);
     }
 
     if (body.force) {
