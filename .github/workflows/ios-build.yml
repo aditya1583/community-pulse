@@ -51,9 +51,26 @@ jobs:
           PROVISION_PATH=$RUNNER_TEMP/build_pp.mobileprovision
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
 
-          # Decode from base64
-          echo -n "$P12_BASE64" | base64 --decode -o $CERTIFICATE_PATH
-          echo -n "$PROVISION_PROFILE_BASE64" | base64 --decode -o $PROVISION_PATH
+          # Validate secrets are not empty
+          if [ -z "$P12_BASE64" ]; then
+            echo "Error: IOS_P12_BASE64 secret is empty"
+            exit 1
+          fi
+          if [ -z "$PROVISION_PROFILE_BASE64" ]; then
+            echo "Error: IOS_PROVISION_PROFILE_BASE64 secret is empty"
+            exit 1
+          fi
+
+          # Decode from base64 (write to file first to handle any encoding issues)
+          echo "$P12_BASE64" | base64 --decode > $CERTIFICATE_PATH
+          echo "$PROVISION_PROFILE_BASE64" | base64 --decode > $PROVISION_PATH
+
+          # Verify files were created
+          if [ ! -s "$CERTIFICATE_PATH" ]; then
+            echo "Error: Failed to decode certificate - file is empty"
+            exit 1
+          fi
+          echo "Certificate decoded successfully ($(wc -c < $CERTIFICATE_PATH) bytes)"
 
           # Create temporary keychain
           security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
