@@ -3630,17 +3630,21 @@ export async function generateEngagementSeedPosts(
   // ALWAYS inserted at position 1 (after first prediction) to guarantee inclusion
   priorities.splice(1, 0, "landmark_food");
 
-  // Farmers market posts - ALWAYS INCLUDE if we have ANY market data
-  // Users want to know about nearby markets regardless of whether they're open today
-  // This provides useful info and fills the feed with hyperlocal content
-  const hasMarketData = ctx.farmersMarkets && ctx.farmersMarkets.length > 0;
-
-  if (hasMarketData) {
-    // ALWAYS include farmers market post if we have data - it's informative content
-    // Insert at position 1 (Top priority after prediction) to ensure visibility even with low post counts
-    priorities.splice(1, 0, "farmers_market");
-    console.log(`[SeedPosts] Including farmers_market - found ${ctx.farmersMarkets.length} markets, closest: ${ctx.farmersMarkets[0]?.name}`);
-  }
+  // Farmers market posts - DISABLED
+  // These were causing persistent duplicate issues because:
+  // 1. The same venue gets posted with different templates
+  // 2. Deduplication is hard when venue names appear in varied formats
+  // 3. The Local Markets tab already shows this data properly
+  // 4. Users can post organically about markets if they want
+  // 
+  // The farmersMarkets data is still fetched and used in the Local tab UI.
+  // We're just not auto-posting about it in the main feed anymore.
+  // 
+  // const hasMarketData = ctx.farmersMarkets && ctx.farmersMarkets.length > 0;
+  // if (hasMarketData) {
+  //   priorities.splice(1, 0, "farmers_market");
+  //   console.log(`[SeedPosts] Including farmers_market - found ${ctx.farmersMarkets.length} markets`);
+  // }
 
   // ========== HIGH-ENGAGEMENT (Always include for viral potential) ==========
 
