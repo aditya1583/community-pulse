@@ -1,0 +1,45 @@
+name: Build iOS App
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    name: Build iOS App (No Signing)
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Next.js App
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+      - name: Setup Capacitor
+        run: npx cap sync ios
+
+      # We can't compile the final .ipa without signing certs (which require the paid account).
+      # But we CAN verify the Xcode project architecture is correct.
+      - name: Verify Xcode Project
+        run: xcodebuild -project ios/App/App.xcodeproj -scheme App -destination 'generic/platform=iOS' clean build CODE_SIGNING_ALLOWED=NO
+
+      - name: Artifact Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-source
+          path: ios/
