@@ -109,7 +109,7 @@ jobs:
           # Method 4: Extract XML using Python (reliable binary handling)
           else
             echo "Trying Python XML extraction..."
-            echo 'import sys,os,re; d=open(os.environ["PROVISION_PATH"],"rb").read(); m=re.search(rb"<\?xml.*?</plist>",d,re.DOTALL); open(os.environ["RUNNER_TEMP"]+"/profile.plist","wb").write(m.group(0)) if m else sys.exit(1); print(f"Extracted {len(m.group(0))} bytes")' | python3
+            python3 -c "import sys,re; d=open(sys.argv[1],'rb').read(); m=re.search(rb'<\?xml.*?</plist>',d,re.DOTALL); open(sys.argv[2],'wb').write(m.group(0)) if m else sys.exit(1); print(f'Extracted {len(m.group(0))} bytes')" "$PROVISION_PATH" "$DECODED_PLIST"
           fi
 
           # Verify we got valid XML
