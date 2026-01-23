@@ -48,120 +48,79 @@ jobs:
           PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
           KEYCHAIN_PASSWORD: ${{ github.run_id }}
         run: |
-          # Create variables
+          set -euo pipefail
+
           CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
           PROVISION_PATH=$RUNNER_TEMP/build_pp.mobileprovision
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
 
-          # Validate secrets are not empty
+          # Validate secrets
           if [ -z "$P12_BASE64" ]; then
-            echo "Error: IOS_P12_BASE64 secret is empty"
+            echo "::error::IOS_P12_BASE64 secret is empty"
             exit 1
           fi
           if [ -z "$PROVISION_PROFILE_BASE64" ]; then
-            echo "Error: IOS_PROVISION_PROFILE_BASE64 secret is empty"
+            echo "::error::IOS_PROVISION_PROFILE_BASE64 secret is empty"
             exit 1
           fi
 
-          # Function to clean and decode base64 (handles RTF if present)
-          decode_secret() {
-            local input="$1"
-            local output="$2"
-            local name="$3"
-            
-            # Check if it's RTF
-            if [[ "$input" == *"{\\rtf"* ]]; then
-              echo "Warning: $name secret contains RTF formatting. Attempting to extract clean base64..."
-              # Extract everything between \cf0 (or similar) and the trailing \
-              # This is a bit risky but let's try to find the long MII... string
-              input=$(echo "$input" | grep -o "MII[A-Za-z0-9+/= \r\n\\]*" | tr -d '[:space:]\\')
-            fi
-            
-            echo "$input" | tr -d '[:space:]' | base64 -D > "$output"
-            
-            if [ ! -s "$output" ]; then
-              echo "Error: Failed to decode $name - file is empty"
-              exit 1
-            fi
-          }
+          # Decode base64 secrets
+          echo "$P12_BASE64" | tr -d '[:space:]' | base64 -D > "$CERTIFICATE_PATH"
+          echo "$PROVISION_PROFILE_BASE64" | tr -d '[:space:]' | base64 -D > "$PROVISION_PATH"
 
-          decode_secret "$P12_BASE64" "$CERTIFICATE_PATH" "Certificate"
-          decode_secret "$PROVISION_PROFILE_BASE64" "$PROVISION_PATH" "Provisioning Profile"
+          # Verify decoded files
+          CERT_SIZE=$(wc -c < "$CERTIFICATE_PATH" | tr -d ' ')
+          PROV_SIZE=$(wc -c < "$PROVISION_PATH" | tr -d ' ')
+          echo "Certificate: $CERT_SIZE bytes"
+          echo "Provisioning Profile: $PROV_SIZE bytes"
 
-          # Verify files
-          echo "Certificate decoded successfully ($(wc -c < $CERTIFICATE_PATH) bytes)"
-          echo "Provisioning Profile decoded successfully ($(wc -c < $PROVISION_PATH) bytes)"
+          if [ "$CERT_SIZE" -lt 100 ]; then
+            echo "::error::Certificate file too small ($CERT_SIZE bytes)"
+            exit 1
+          fi
+          if [ "$PROV_SIZE" -lt 100 ]; then
+            echo "::error::Provisioning profile file too small ($PROV_SIZE bytes)"
+            exit 1
+          fi
 
-          # Create temporary keychain
-          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          # Create and configure keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-          # Import certificate to keychain
-          security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security list-keychain -d user -s $KEYCHAIN_PATH
+          # Import certificate (suppress verbose output)
+          security import "$CERTIFICATE_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH" 2>&1 | grep -v "^    " || true
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" 2>/dev/null
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          echo "Certificate imported successfully"
 
-          # 1. Decode secrets
-          decode_secret "$P12_BASE64" "$CERTIFICATE_PATH" "Certificate"
-          decode_secret "$PROVISION_PROFILE_BASE64" "$PROVISION_PATH" "Provisioning Profile"
+          # Extract UUID using security cms to decode the PKCS#7 envelope
+          DECODED_PLIST="$RUNNER_TEMP/profile.plist"
+          if ! security cms -D -i "$PROVISION_PATH" -o "$DECODED_PLIST" 2>/dev/null; then
+            echo "::error::Failed to decode provisioning profile with security cms"
+            echo "Debug: First 64 bytes of profile:"
+            xxd -l 64 "$PROVISION_PATH"
+            exit 1
+          fi
 
-          # 2. Create extraction script
-          cat << 'EOF' > $RUNNER_TEMP/extract_uuid.py
-          import plistlib
-          import sys
-          import re
-          import os
+          # Extract UUID from decoded plist using PlistBuddy (native macOS tool)
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$DECODED_PLIST")
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$DECODED_PLIST")
 
-          def extract_from_content(content):
-              # Find the XML plist portion
-              match = re.search(rb'<plist.*?</plist>', content, re.DOTALL)
-              if match:
-                  try:
-                      plist_data = plistlib.loads(match.group(0))
-                      return plist_data.get('UUID'), plist_data.get('Name')
-                  except Exception as e:
-                      print(f"Plist load error: {e}", file=sys.stderr)
-              
-              # Fallback to regex
-              uuid_match = re.search(rb'[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}', content)
-              uuid = uuid_match.group(0).decode('utf-8') if uuid_match else None
-              return uuid, 'Voxlo App Store'
+          if [ -z "$PROFILE_UUID" ]; then
+            echo "::error::UUID not found in provisioning profile"
+            exit 1
+          fi
 
-          path = os.environ['PROVISION_PATH']
-          with open(path, 'rb') as f:
-              content = f.read()
-              uuid, name = extract_from_content(content)
-              if uuid:
-                  with open(os.environ['GITHUB_ENV'], 'a') as env_file:
-                      env_file.write(f"PROFILE_UUID={uuid}\n")
-                      env_file.write(f"PROFILE_NAME={name}\n")
-                  print(f"UUID: {uuid}")
-                  print(f"Name: {name}")
-                  sys.exit(0)
-              else:
-                  print("Error: UUID not found in profile", file=sys.stderr)
-                  sys.exit(1)
-          EOF
+          echo "UUID: $PROFILE_UUID"
+          echo "Name: $PROFILE_NAME"
+          echo "PROFILE_UUID=$PROFILE_UUID" >> $GITHUB_ENV
+          echo "PROFILE_NAME=$PROFILE_NAME" >> $GITHUB_ENV
 
-          # 3. Setup Keychain
-          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security list-keychain -d user -s $KEYCHAIN_PATH
-
-          # 4. Run extraction script
-          export PROVISION_PATH=$PROVISION_PATH
-          echo "Debug: Inspecting file header (first 200 bytes hex):"
-          xxd -l 200 "$PROVISION_PATH"
-          python3 $RUNNER_TEMP/extract_uuid.py
-          
-          # 5. Move profile to the right place
+          # Install profile
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp $PROVISION_PATH ~/Library/MobileDevice/Provisioning\ Profiles/${PROFILE_UUID}.mobileprovision
-          echo "Profile installed for UUID: ${PROFILE_UUID}"
+          cp "$PROVISION_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/${PROFILE_UUID}.mobileprovision
+          echo "Profile installed: ${PROFILE_UUID} (${PROFILE_NAME})"
 
       - name: Build iOS App
         run: |
