@@ -106,17 +106,17 @@ jobs:
           echo "Attempting to extract UUID..."
           
           # Method 1: Plist parsing via security cms (Official but picky)
-          PROFILE_UUID=$(security cms -D -i $PROVISION_PATH 2>/dev/null | grep -A1 "<key>UUID</key>" | grep -oE "[-A-F0-9]{36}" || true)
+          PROFILE_UUID=$(security cms -D -i $PROVISION_PATH 2>/dev/null | grep -A1 "<key>UUID</key>" | grep -oE "[-a-fA-F0-9]{36}" || true)
           
-          # Method 2: Raw grep (Fastest)
+          # Method 2: Raw grep (supporting both cases)
           if [ -z "$PROFILE_UUID" ]; then
-            PROFILE_UUID=$(grep -a -oE '[-A-F0-9]{36}' $PROVISION_PATH | head -n 1)
+            PROFILE_UUID=$(grep -aoE '[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}' $PROVISION_PATH | head -n 1)
           fi
           
           if [ -z "$PROFILE_UUID" ]; then
             echo "Error: Could not extract UUID from provisioning profile."
-            echo "First 100 bytes of decoded file (hex):"
-            head -c 100 $PROVISION_PATH | xxd
+            echo "First 500 bytes of decoded file (as strings):"
+            strings $PROVISION_PATH | head -n 20
             exit 1
           fi
           
