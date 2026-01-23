@@ -106,22 +106,42 @@ jobs:
           # Method 3: security cms
           elif security cms -D -i "$PROVISION_PATH" -o "$DECODED_PLIST" 2>/dev/null; then
             echo "Decoded profile using security cms"
-          # Method 4: Extract XML directly using perl (handles binary safely)
-          elif perl -0777 -pe 's/.*?(<\?xml.*?<\/plist>).*/$1/s' "$PROVISION_PATH" > "$DECODED_PLIST" 2>/dev/null && [ -s "$DECODED_PLIST" ]; then
-            echo "Extracted plist using perl regex"
+          # Method 4: Extract XML directly by finding start/end markers
           else
-            echo "::error::All methods to decode provisioning profile failed"
-            echo "Debug: First 64 bytes:"
+            echo "Trying direct XML extraction..."
+            # Find byte offset of <?xml and </plist>, extract that range
+            START=$(grep -abo '<?xml' "$PROVISION_PATH" | head -1 | cut -d: -f1)
+            END=$(grep -abo '</plist>' "$PROVISION_PATH" | tail -1 | cut -d: -f1)
+            if [ -n "$START" ] && [ -n "$END" ]; then
+              # Add 8 for </plist> length
+              LEN=$((END - START + 8))
+              dd if="$PROVISION_PATH" bs=1 skip="$START" count="$LEN" of="$DECODED_PLIST" 2>/dev/null
+              echo "Extracted plist using dd (offset $START, length $LEN)"
+            fi
+          fi
+
+          # Final fallback: if still no valid file, try strings + sed
+          if [ ! -s "$DECODED_PLIST" ] || ! head -c 5 "$DECODED_PLIST" | grep -q '<?xml'; then
+            echo "Trying strings extraction..."
+            strings "$PROVISION_PATH" | sed -n '/<?xml/,/<\/plist>/p' > "$DECODED_PLIST"
+            echo "Extracted plist using strings"
+          fi
+
+          # Verify we got valid XML
+          if [ ! -s "$DECODED_PLIST" ]; then
+            echo "::error::All extraction methods failed - no output file"
             xxd -l 64 "$PROVISION_PATH"
             exit 1
           fi
 
-          # Verify we got valid XML
-          if ! head -1 "$DECODED_PLIST" | grep -q '<?xml'; then
+          if ! head -c 10 "$DECODED_PLIST" | grep -q '<?xml'; then
             echo "::error::Decoded file is not valid XML plist"
-            echo "First line: $(head -1 "$DECODED_PLIST")"
+            echo "First 100 bytes of decoded file:"
+            xxd -l 100 "$DECODED_PLIST"
             exit 1
           fi
+
+          echo "Plist extraction successful"
 
           # Extract UUID from decoded plist using PlistBuddy
           PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$DECODED_PLIST")
