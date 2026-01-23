@@ -159,12 +159,10 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM=5TPBNT392A \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE="${{ env.PROFILE_UUID }}" \
-            PROVISIONING_PROFILE_SPECIFIER="" \
+            PROVISIONING_PROFILE_SPECIFIER="${{ env.PROFILE_NAME }}" \
             PRODUCT_BUNDLE_IDENTIFIER="app.voxlo" \
-            AD_HOC_CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=YES \
-            CODE_SIGNING_ALLOWED=YES
+            'CODE_SIGN_STYLE[sdk=macosx*]=Automatic' \
+            'PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]='
 
       - name: Export IPA
         run: |
