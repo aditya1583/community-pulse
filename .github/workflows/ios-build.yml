@@ -105,18 +105,20 @@ jobs:
           # Extract UUID - Try multiple methods
           echo "Attempting to extract UUID..."
           
-          # Method 1: Plist parsing via security cms (Official but picky)
-          PROFILE_UUID=$(security cms -D -i $PROVISION_PATH 2>/dev/null | grep -A1 "<key>UUID</key>" | grep -oE "[-a-fA-F0-9]{36}" || true)
+          # Method 1: Try to extract XML and then use grep
+          # This is the most reliable way on macOS
+          XML_CONTENT=$(security cms -D -i "$PROVISION_PATH" 2>/dev/null || cat "$PROVISION_PATH")
+          PROFILE_UUID=$(echo "$XML_CONTENT" | grep -A1 "<key>UUID</key>" | grep -oE "[-a-fA-F0-9]{36}" | head -n 1)
           
-          # Method 2: Raw grep (supporting both cases)
+          # Method 2: Raw search for any UUID-like string if Method 1 failed
           if [ -z "$PROFILE_UUID" ]; then
-            PROFILE_UUID=$(grep -aoE '[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}' $PROVISION_PATH | head -n 1)
+            PROFILE_UUID=$(grep -aoE '[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}' "$PROVISION_PATH" | head -n 1)
           fi
           
           if [ -z "$PROFILE_UUID" ]; then
             echo "Error: Could not extract UUID from provisioning profile."
-            echo "First 500 bytes of decoded file (as strings):"
-            strings $PROVISION_PATH | head -n 20
+            echo "Raw file strings (first 100 lines):"
+            strings "$PROVISION_PATH" | head -n 100
             exit 1
           fi
           
