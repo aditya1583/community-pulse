@@ -39,7 +39,14 @@ jobs:
         run: |
           npx cap sync ios
           # Force Manual signing in the project file
-          sed -i '' 's/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g' ios/App/App.xcodeproj/project.pbxproj
+          cd ios/App
+          sed -i '' 's/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g' App.xcodeproj/project.pbxproj
+          sed -i '' 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' App.xcodeproj/project.pbxproj
+          # Add provisioning profile specifier for the App target
+          sed -i '' 's/"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = "iPhone Developer";/"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";/g' App.xcodeproj/project.pbxproj
+          # Verify changes
+          grep -c "ProvisioningStyle = Manual" App.xcodeproj/project.pbxproj || echo "Warning: No Manual provisioning found"
+          cd ../..
 
       - name: Install Apple Certificate
         env:
