@@ -84,8 +84,16 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
 
-          # Extract provisioning profile UUID and copy to correct location
-          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' /dev/stdin <<< $(security cms -D -i $PROVISION_PATH))
+          # Extract provisioning profile UUID using grep (more reliable than security cms)
+          # The UUID is a 36-character string in the format 8-4-4-4-12
+          PROFILE_UUID=$(grep -a -A1 '<key>UUID</key>' $PROVISION_PATH | grep '<string>' | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
+          
+          if [ -z "$PROFILE_UUID" ]; then
+            echo "Error: Could not extract UUID from provisioning profile"
+            echo "Trying alternate method..."
+            PROFILE_UUID=$(strings $PROVISION_PATH | grep -E '^[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}$' | head -1)
+          fi
+          
           echo "Provisioning Profile UUID: $PROFILE_UUID"
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp $PROVISION_PATH ~/Library/MobileDevice/Provisioning\ Profiles/${PROFILE_UUID}.mobileprovision
