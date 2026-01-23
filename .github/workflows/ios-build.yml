@@ -38,6 +38,8 @@ jobs:
       - name: Setup Capacitor
         run: |
           npx cap sync ios
+          # Force Manual signing in the project file
+          sed -i '' 's/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g' ios/App/App.xcodeproj/project.pbxproj
 
       - name: Install Apple Certificate
         env:
@@ -99,6 +101,7 @@ jobs:
           cp $PROVISION_PATH ~/Library/MobileDevice/Provisioning\ Profiles/${PROFILE_UUID}.mobileprovision
           
           # Export UUID for use in build step
+          echo "Extracted UUID: $PROFILE_UUID"
           echo "PROFILE_UUID=$PROFILE_UUID" >> $GITHUB_ENV
 
       - name: Build iOS App
@@ -113,7 +116,12 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM=5TPBNT392A \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE="${{ env.PROFILE_UUID }}"
+            PROVISIONING_PROFILE="${{ env.PROFILE_UUID }}" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            PRODUCT_BUNDLE_IDENTIFIER="app.voxlo" \
+            AD_HOC_CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=YES \
+            CODE_SIGNING_ALLOWED=YES
 
       - name: Export IPA
         run: |
@@ -132,7 +140,7 @@ jobs:
             <key>provisioningProfiles</key>
             <dict>
               <key>app.voxlo</key>
-              <string>Voxlo App Store</string>
+              <string>${{ env.PROFILE_UUID }}</string>
             </dict>
           </dict>
           </plist>
