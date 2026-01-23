@@ -84,9 +84,14 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
 
-          # Copy provisioning profile
+          # Extract provisioning profile UUID and copy to correct location
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' /dev/stdin <<< $(security cms -D -i $PROVISION_PATH))
+          echo "Provisioning Profile UUID: $PROFILE_UUID"
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp $PROVISION_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
+          cp $PROVISION_PATH ~/Library/MobileDevice/Provisioning\ Profiles/${PROFILE_UUID}.mobileprovision
+          
+          # Export UUID for use in build step
+          echo "PROFILE_UUID=$PROFILE_UUID" >> $GITHUB_ENV
 
       - name: Build iOS App
         run: |
@@ -100,7 +105,7 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM=5TPBNT392A \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="Voxlo App Store"
+            PROVISIONING_PROFILE="${{ env.PROFILE_UUID }}"
 
       - name: Export IPA
         run: |
