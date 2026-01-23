@@ -34,8 +34,18 @@ else:
         idx = data.index(b'<?xml')
         print(f"Found <?xml at offset {idx}")
         sample = data[idx:idx+100]
-        print(f"Sample: {sample[:50]}...")
+        print(f"Start sample: {sample}")
+    else:
+        print("NO <?xml found in data!")
+
     if b'</plist>' in data:
-        idx = data.index(b'</plist>')
+        idx = data.rindex(b'</plist>')  # Find LAST occurrence
         print(f"Found </plist> at offset {idx}")
+    else:
+        print("NO </plist> found in data!")
+        # Show last 200 bytes to see what's there
+        print(f"Last 200 bytes: {data[-200:]}")
+
+    # Also show file size breakdown
+    print(f"Total file size: {len(data)} bytes")
     sys.exit(1)
