@@ -107,42 +107,42 @@ jobs:
           decode_secret "$PROVISION_PROFILE_BASE64" "$PROVISION_PATH" "Provisioning Profile"
 
           # 2. Create extraction script
-          cat > $RUNNER_TEMP/extract_uuid.py << 'EOF'
-import plistlib
-import sys
-import re
-import os
+          cat << 'EOF' > $RUNNER_TEMP/extract_uuid.py
+          import plistlib
+          import sys
+          import re
+          import os
 
-def extract_from_content(content):
-    # Find the XML plist portion
-    match = re.search(rb'<plist.*?</plist>', content, re.DOTALL)
-    if match:
-        try:
-            plist_data = plistlib.loads(match.group(0))
-            return plist_data.get('UUID'), plist_data.get('Name')
-        except Exception as e:
-            print(f"Plist load error: {e}", file=sys.stderr)
-    
-    # Fallback to regex
-    uuid_match = re.search(rb'[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}', content)
-    uuid = uuid_match.group(0).decode('utf-8') if uuid_match else None
-    return uuid, 'Voxlo App Store'
+          def extract_from_content(content):
+              # Find the XML plist portion
+              match = re.search(rb'<plist.*?</plist>', content, re.DOTALL)
+              if match:
+                  try:
+                      plist_data = plistlib.loads(match.group(0))
+                      return plist_data.get('UUID'), plist_data.get('Name')
+                  except Exception as e:
+                      print(f"Plist load error: {e}", file=sys.stderr)
+              
+              # Fallback to regex
+              uuid_match = re.search(rb'[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}', content)
+              uuid = uuid_match.group(0).decode('utf-8') if uuid_match else None
+              return uuid, 'Voxlo App Store'
 
-path = os.environ['PROVISION_PATH']
-with open(path, 'rb') as f:
-    content = f.read()
-    uuid, name = extract_from_content(content)
-    if uuid:
-        with open(os.environ['GITHUB_ENV'], 'a') as env_file:
-            env_file.write(f"PROFILE_UUID={uuid}\n")
-            env_file.write(f"PROFILE_NAME={name}\n")
-        print(f"UUID: {uuid}")
-        print(f"Name: {name}")
-        sys.exit(0)
-    else:
-        print("Error: UUID not found in profile", file=sys.stderr)
-        sys.exit(1)
-EOF
+          path = os.environ['PROVISION_PATH']
+          with open(path, 'rb') as f:
+              content = f.read()
+              uuid, name = extract_from_content(content)
+              if uuid:
+                  with open(os.environ['GITHUB_ENV'], 'a') as env_file:
+                      env_file.write(f"PROFILE_UUID={uuid}\n")
+                      env_file.write(f"PROFILE_NAME={name}\n")
+                  print(f"UUID: {uuid}")
+                  print(f"Name: {name}")
+                  sys.exit(0)
+              else:
+                  print("Error: UUID not found in profile", file=sys.stderr)
+                  sys.exit(1)
+          EOF
 
           # 3. Setup Keychain
           security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
@@ -154,6 +154,8 @@ EOF
 
           # 4. Run extraction script
           export PROVISION_PATH=$PROVISION_PATH
+          echo "Debug: Inspecting file header (first 200 bytes hex):"
+          xxd -l 200 "$PROVISION_PATH"
           python3 $RUNNER_TEMP/extract_uuid.py
           
           # 5. Move profile to the right place
