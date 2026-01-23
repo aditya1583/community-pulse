@@ -16,7 +16,8 @@ with open(input_file, 'rb') as f:
 print(f"Read {len(data)} bytes from {input_file}")
 
 # Find XML plist embedded in binary PKCS#7 data
-pattern = rb'<\?xml[^>]*\?>.*?</plist>'
+# Simple pattern: from <?xml to </plist> (greedy to get last </plist>)
+pattern = rb'<\?xml.*</plist>'
 match = re.search(pattern, data, re.DOTALL)
 
 if match:
