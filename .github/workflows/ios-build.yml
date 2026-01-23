@@ -94,16 +94,36 @@ jobs:
           security list-keychain -d user -s "$KEYCHAIN_PATH"
           echo "Certificate imported successfully"
 
-          # Extract UUID using security cms to decode the PKCS#7 envelope
+          # Extract plist from PKCS#7 envelope using openssl (more reliable than security cms)
           DECODED_PLIST="$RUNNER_TEMP/profile.plist"
-          if ! security cms -D -i "$PROVISION_PATH" -o "$DECODED_PLIST" 2>/dev/null; then
-            echo "::error::Failed to decode provisioning profile with security cms"
-            echo "Debug: First 64 bytes of profile:"
+
+          # Method 1: openssl smime
+          if openssl smime -inform der -verify -noverify -in "$PROVISION_PATH" -out "$DECODED_PLIST" 2>/dev/null; then
+            echo "Decoded profile using openssl smime"
+          # Method 2: openssl cms
+          elif openssl cms -inform der -verify -noverify -in "$PROVISION_PATH" -out "$DECODED_PLIST" 2>/dev/null; then
+            echo "Decoded profile using openssl cms"
+          # Method 3: security cms
+          elif security cms -D -i "$PROVISION_PATH" -o "$DECODED_PLIST" 2>/dev/null; then
+            echo "Decoded profile using security cms"
+          # Method 4: Extract XML directly using perl (handles binary safely)
+          elif perl -0777 -pe 's/.*?(<\?xml.*?<\/plist>).*/$1/s' "$PROVISION_PATH" > "$DECODED_PLIST" 2>/dev/null && [ -s "$DECODED_PLIST" ]; then
+            echo "Extracted plist using perl regex"
+          else
+            echo "::error::All methods to decode provisioning profile failed"
+            echo "Debug: First 64 bytes:"
             xxd -l 64 "$PROVISION_PATH"
             exit 1
           fi
 
-          # Extract UUID from decoded plist using PlistBuddy (native macOS tool)
+          # Verify we got valid XML
+          if ! head -1 "$DECODED_PLIST" | grep -q '<?xml'; then
+            echo "::error::Decoded file is not valid XML plist"
+            echo "First line: $(head -1 "$DECODED_PLIST")"
+            exit 1
+          fi
+
+          # Extract UUID from decoded plist using PlistBuddy
           PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$DECODED_PLIST")
           PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$DECODED_PLIST")
 
