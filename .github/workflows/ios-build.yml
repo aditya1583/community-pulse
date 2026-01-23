@@ -102,48 +102,64 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
 
-          # Extract UUID and Name using Python (much more reliable for binary/XML hybrid files)
-          echo "Attempting to extract UUID and Name using Python..."
-          python3 - <<EOF
-          import plistlib
-          import sys
-          import re
-          import os
+          # 1. Decode secrets
+          decode_secret "$P12_BASE64" "$CERTIFICATE_PATH" "Certificate"
+          decode_secret "$PROVISION_PROFILE_BASE64" "$PROVISION_PATH" "Provisioning Profile"
 
-          def extract_from_content(content):
-              # Find the XML plist portion
-              match = re.search(rb'<plist.*?</plist>', content, re.DOTALL)
-              if match:
-                  try:
-                      plist_data = plistlib.loads(match.group(0))
-                      return plist_data.get('UUID'), plist_data.get('Name')
-                  except Exception as e:
-                      print(f"Plist load error: {e}", file=sys.stderr)
-              
-              # Fallback to regex if plist loading fails
-              uuid_match = re.search(rb'[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}', content)
-              uuid = uuid_match.group(0).decode('utf-8') if uuid_match else None
-              return uuid, 'Voxlo App Store'
+          # 2. Create extraction script
+          cat > $RUNNER_TEMP/extract_uuid.py << 'EOF'
+import plistlib
+import sys
+import re
+import os
 
-          filename = os.path.expandvars('$PROVISION_PATH')
-          with open(filename, 'rb') as f:
-              content = f.read()
-              uuid, name = extract_from_content(content)
-              if uuid:
-                  with open(os.environ['GITHUB_ENV'], 'a') as env_file:
-                      env_file.write(f"PROFILE_UUID={uuid}\n")
-                      env_file.write(f"PROFILE_NAME={name}\n")
-                  print(f"Successfully extracted UUID: {uuid}")
-                  print(f"Successfully extracted Name: {name}")
-                  sys.exit(0)
-              else:
-                  print("Error: Could not find UUID in profile content.", file=sys.stderr)
-                  sys.exit(1)
-          EOF
+def extract_from_content(content):
+    # Find the XML plist portion
+    match = re.search(rb'<plist.*?</plist>', content, re.DOTALL)
+    if match:
+        try:
+            plist_data = plistlib.loads(match.group(0))
+            return plist_data.get('UUID'), plist_data.get('Name')
+        except Exception as e:
+            print(f"Plist load error: {e}", file=sys.stderr)
+    
+    # Fallback to regex
+    uuid_match = re.search(rb'[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}', content)
+    uuid = uuid_match.group(0).decode('utf-8') if uuid_match else None
+    return uuid, 'Voxlo App Store'
+
+path = os.environ['PROVISION_PATH']
+with open(path, 'rb') as f:
+    content = f.read()
+    uuid, name = extract_from_content(content)
+    if uuid:
+        with open(os.environ['GITHUB_ENV'], 'a') as env_file:
+            env_file.write(f"PROFILE_UUID={uuid}\n")
+            env_file.write(f"PROFILE_NAME={name}\n")
+        print(f"UUID: {uuid}")
+        print(f"Name: {name}")
+        sys.exit(0)
+    else:
+        print("Error: UUID not found in profile", file=sys.stderr)
+        sys.exit(1)
+EOF
+
+          # 3. Setup Keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+          # 4. Run extraction script
+          export PROVISION_PATH=$PROVISION_PATH
+          python3 $RUNNER_TEMP/extract_uuid.py
           
-          echo "Extracted UUID: $PROFILE_UUID"
+          # 5. Move profile to the right place
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp $PROVISION_PATH ~/Library/MobileDevice/Provisioning\ Profiles/${PROFILE_UUID}.mobileprovision
+          echo "Profile installed for UUID: ${PROFILE_UUID}"
 
       - name: Build iOS App
         run: |
