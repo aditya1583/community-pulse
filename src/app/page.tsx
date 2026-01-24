@@ -438,18 +438,25 @@ export default function Home() {
           ? `${weather.description}, ${Math.round(weather.temp)}F`
           : undefined;
 
+        // Create an AbortController for the summary fetch timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+
         const res = await fetch("/api/summary", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            city,
+            city: city.split(',')[0].trim(),
             context: "all",
             pulses,
             events: eventsForSummary,
             trafficLevel,
             weatherCondition,
           }),
+          signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
 
         const data = await res.json();
 
@@ -3329,65 +3336,56 @@ export default function Home() {
         weather={weather}
       />
 
-      <main className="flex-1 flex justify-center px-4 py-4 pt-[max(1rem,env(safe-area-inset-top))]">
-        <div className="w-full max-w-lg space-y-4 stagger-reveal">
-          {/* Auth/User bar */}
-          {!sessionUser ? (
-            <div className="flex justify-end">
-              <button
-                onClick={() => setShowAuthModal(true)}
-                className="text-sm px-4 py-2 rounded-lg bg-gradient-to-r from-emerald-400 to-emerald-600 text-slate-950 font-medium shadow-lg shadow-emerald-500/30 hover:from-emerald-300 hover:to-emerald-500 transition"
-              >
-                Sign in
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center justify-end text-sm text-slate-400 gap-2">
-              <div className="flex flex-col items-end gap-0.5">
-                <div className="flex items-center gap-2">
-                  {/* XP Progress Badge - tap to view Status tab */}
-                  {!gamificationLoading && userLevel > 0 && (
-                    <XPProgressBadge
-                      level={userLevel}
-                      xp={userXp}
-                      weeklyRank={userRank}
-                      onClick={() => setActiveTab("status")}
-                    />
-                  )}
-                  <span className="text-cyan-400">{displayName}</span>
+      <main className="flex-1 flex justify-center px-4 py-6 pt-[max(2rem,env(safe-area-inset-top))]">
+        <div className="w-full max-w-lg space-y-6 stagger-reveal">
+          {/* Top Bar: Header + Auth Action */}
+          <div className="flex items-start justify-between">
+            <Header cityName={city} isLive={!loading} />
 
-                  {!profile?.name_locked ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowUsernameEditor((prev) => !prev)}
-                      className="text-[11px] px-2 py-0.5 rounded-full bg-slate-800/60 border border-slate-700/50 text-slate-300 hover:border-emerald-500/50 hover:text-emerald-300 transition"
-                    >
-                      Edit vibe name
-                    </button>
-                  ) : (
-                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 flex items-center gap-1">
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
-                    </span>
-                  )}
-                </div>
-
+            <div className="pt-2">
+              {!sessionUser ? (
                 <button
-                  onClick={async () => {
-                    await supabase.auth.signOut();
-                    setSessionUser(null);
-                    setProfile(null);
-                    setAuthStatus("signed_out");
-                    setProfileLoading(false);
-                  }}
-                  className="text-[11px] text-slate-500 hover:text-emerald-300 underline-offset-2 hover:underline"
+                  onClick={() => setShowAuthModal(true)}
+                  className="text-[10px] px-3 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 hover:scale-105 transition-all"
                 >
-                  Log out
+                  Sign in
                 </button>
-              </div>
+              ) : (
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex items-center gap-2">
+                    {/* XP Progress Badge - tap to view Status tab */}
+                    {!gamificationLoading && userLevel > 0 && (
+                      <XPProgressBadge
+                        level={userLevel}
+                        xp={userXp}
+                        weeklyRank={userRank}
+                        onClick={() => setActiveTab("status")}
+                      />
+                    )}
+                    <button
+                      onClick={() => setActiveTab("status")}
+                      className="text-[10px] font-black uppercase tracking-widest text-emerald-400/80 hover:text-emerald-400 transition-colors"
+                    >
+                      {displayName}
+                    </button>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      await supabase.auth.signOut();
+                      setSessionUser(null);
+                      setProfile(null);
+                      setAuthStatus("signed_out");
+                      setProfileLoading(false);
+                    }}
+                    className="text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-red-400 transition-colors"
+                  >
+                    Log out
+                  </button>
+                </div>
+              )}
             </div>
-          )}
+          </div>
+
 
           {/* Username editor */}
           {sessionUser && showUsernameEditor && !profile?.name_locked && (
@@ -3461,7 +3459,7 @@ export default function Home() {
                 className="w-full rounded-lg bg-slate-800/60 border border-slate-700/50 px-3 py-2 pr-10 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:border-transparent"
                 placeholder="Search any city (e.g., Austin, TX)"
               />
-              {citySuggestionsLoading && (
+              {citySuggestionsLoading && cityInput.trim().length >= 3 && (
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-500">
                   Searching...
                 </span>
@@ -3528,8 +3526,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Header */}
-          <Header cityName={city} isLive={!loading} />
 
           {/* Current Vibe Card */}
           <CurrentVibeCard
@@ -3558,12 +3554,11 @@ export default function Home() {
             onTrafficClick={() => setActiveTab("traffic")}
             onEventsClick={() => setActiveTab("events")}
             onMoodClick={() => {
-              setActiveTab("pulse");
-              window.setTimeout(() => {
-                document
-                  .getElementById("mood-selector")
-                  ?.scrollIntoView({ behavior: "smooth", block: "center" });
-              }, 100);
+              if (!sessionUser) {
+                setShowAuthModal(true);
+              } else {
+                setShowPulseModal(true);
+              }
             }}
           />
 

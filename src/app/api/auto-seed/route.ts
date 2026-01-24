@@ -524,12 +524,39 @@ export async function POST(req: NextRequest) {
 
         const uniquePosts = result.posts.filter(post => {
           const postMsg = post.message.toLowerCase();
+          const postTag = post.tag;
 
           // Check for exact match or significant overlap
-          let isDuplicate = Array.from(existingMessages).some(existing =>
-            existing.includes(postMsg) || postMsg.includes(existing) ||
-            (existing.length > 20 && postMsg.length > 20 && (existing.includes(postMsg.slice(0, 20)) || postMsg.includes(existing.slice(0, 20))))
-          );
+          let isDuplicate = Array.from(existingMessages).some(existing => {
+            const existingLower = existing.toLowerCase();
+            // 1. Strict containment or overlap
+            if (existingLower.includes(postMsg) || postMsg.includes(existingLower)) return true;
+
+            // 2. Significant prefix/suffix match (20 chars)
+            if (existingLower.length > 20 && postMsg.length > 20) {
+              if (existingLower.slice(0, 20) === postMsg.slice(0, 20)) return true;
+            }
+
+            // 3. SPECIAL CASE: Weather alerts (prevent multiple alerts for same condition)
+            if (postTag === "Weather") {
+              const keywords = ["snow", "freeze", "heat", "storm", "rain", "ice"];
+              for (const kw of keywords) {
+                if (postMsg.includes(kw) && existingLower.includes(kw)) {
+                  console.log(`[Auto-Seed] Skipping redundant weather alert for "${kw}"`);
+                  return true;
+                }
+              }
+            }
+
+            // 4. SPECIAL CASE: Events (prevent multiple alerts for same event name)
+            if (postTag === "Events") {
+              // Extract potential event names (words over 4 chars starting with capital)
+              // Or just check if significant part of the message matches
+              if (existingLower.includes(postMsg.slice(0, 15))) return true;
+            }
+
+            return false;
+          });
 
           // VENUE-BASED DEDUPLICATION (for intelligent posts with actions)
           // Prevents "Farmers Grass" appearing 3 times with different templates

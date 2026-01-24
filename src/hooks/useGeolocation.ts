@@ -312,38 +312,26 @@ export function useGeolocation(): GeolocationState & GeolocationActions {
 
 /**
  * Reverse geocode coordinates to city/state
- * Uses OpenStreetMap Nominatim (free, no API key)
+ * Uses our internal OpenWeather-powered reverse geocoding API (fast & reliable)
  */
 async function reverseGeocode(lat: number, lon: number): Promise<{ city: string; state: string }> {
-  const response = await fetch(
-    `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`,
-    {
-      headers: {
-        "User-Agent": "CommunityPulse/1.0",
-      },
+  try {
+    const response = await fetch(`/api/geocode/reverse?lat=${lat}&lon=${lon}`);
+
+    if (!response.ok) {
+      throw new Error("Geocoding failed");
     }
-  );
 
-  if (!response.ok) {
-    throw new Error("Geocoding failed");
+    const data = await response.json();
+    return {
+      city: data.name || "Unknown",
+      state: data.state || ""
+    };
+  } catch (error) {
+    console.error("[Geolocation] Reverse geocode error:", error);
+    // Fallback to coordinates as display name if geocoding fails
+    return { city: "Current Location", state: "" };
   }
-
-  const data = await response.json();
-  const address = data.address || {};
-
-  // Extract city (try multiple fields)
-  const city =
-    address.city ||
-    address.town ||
-    address.village ||
-    address.municipality ||
-    address.county ||
-    "Unknown";
-
-  // Extract state code
-  const stateCode = address["ISO3166-2-lvl4"]?.split("-")[1] || address.state || "";
-
-  return { city, state: stateCode };
 }
 
 export default useGeolocation;

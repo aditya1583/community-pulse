@@ -418,10 +418,10 @@ function normalizeEvent(
 // --- API Route Handler ---
 
 export async function GET(req: NextRequest) {
-  const apiKey = process.env.TICKETMASTER_API_KEY;
+  const apiKey = process.env.TICKETMASTER_API_KEY || process.env.NEXT_PUBLIC_TICKETMASTER_API_KEY || process.env.NEWS_API_KEY;
 
   if (!apiKey) {
-    console.error("TICKETMASTER_API_KEY not configured");
+    console.error("Ticketmaster API key not configured (checked TICKETMASTER_API_KEY, NEXT_PUBLIC_TICKETMASTER_API_KEY, NEWS_API_KEY)");
     return NextResponse.json(
       {
         error: "Events service not configured",

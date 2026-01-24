@@ -308,8 +308,10 @@ export default function CurrentVibeCard({
               </span>
               {/* Live Scan indicator */}
               <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400">Scanning</span>
+                <span className={`w-1 h-1 rounded-full bg-emerald-400 ${isLoading ? "animate-pulse" : ""}`} />
+                <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400">
+                  {isLoading ? "Scanning" : "Active"}
+                </span>
               </div>
             </div>
 
