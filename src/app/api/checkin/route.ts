@@ -9,18 +9,7 @@
  * - Manual check-in from venue detail page
  */
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-// Service role client for writes
-const supabase = createClient(supabaseUrl, serviceRoleKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
-});
+import { getSupabaseService } from "../../../lib/supabaseServer";
 
 type CheckInRequest = {
   venue_name: string;
@@ -52,7 +41,7 @@ export async function POST(request: NextRequest) {
     // Check for existing check-in today using checkin_date field
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
-    const { data: existingCheckin } = await supabase
+    const { data: existingCheckin } = await getSupabaseService()
       .from("venue_checkins")
       .select("id")
       .eq("user_id", body.user_id)
@@ -68,7 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create check-in (checkin_date defaults to CURRENT_DATE in DB)
-    const { data, error } = await supabase
+    const { data, error } = await getSupabaseService()
       .from("venue_checkins")
       .insert({
         user_id: body.user_id,
@@ -140,7 +129,7 @@ export async function GET(request: NextRequest) {
   const today = now.toISOString().split('T')[0];
 
   try {
-    let query = supabase
+    let query = getSupabaseService()
       .from("venue_checkins")
       .select("id, created_at, checkin_date", { count: "exact" })
       .eq("venue_name", venueName)
@@ -181,3 +170,5 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+

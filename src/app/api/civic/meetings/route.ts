@@ -12,32 +12,13 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAnon, getSupabaseService } from "../../../../lib/supabaseServer";
 import type {
   CivicMeeting,
   CivicTopic,
   CivicEntityType,
   CivicMeetingType,
 } from "@/lib/intelligent-bots/types";
-
-// ============================================================================
-// SUPABASE CLIENTS
-// ============================================================================
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-// Public client for reads
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-// Service client for writes (only if key available)
-const getServiceClient = () => {
-  if (!supabaseServiceKey) {
-    throw new Error("SUPABASE_SERVICE_ROLE_KEY not configured");
-  }
-  return createClient(supabaseUrl, supabaseServiceKey);
-};
 
 // ============================================================================
 // TYPES
@@ -173,7 +154,7 @@ export async function GET(request: NextRequest) {
   try {
     if (includeToday) {
       // Use the today's meetings function
-      const { data, error } = await supabase.rpc("get_todays_civic_meetings", {
+      const { data, error } = await getSupabaseAnon().rpc("get_todays_civic_meetings", {
         p_city: city,
       });
 
@@ -198,7 +179,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Use the upcoming meetings function
-    const { data, error } = await supabase.rpc("get_upcoming_civic_meetings", {
+    const { data, error } = await getSupabaseAnon().rpc("get_upcoming_civic_meetings", {
       p_city: city,
       p_days_ahead: days,
     });
@@ -253,7 +234,7 @@ export async function POST(request: NextRequest) {
     // Get service client for writes
     let serviceClient;
     try {
-      serviceClient = getServiceClient();
+      serviceClient = getSupabaseService();
     } catch {
       return NextResponse.json(
         { error: "Server not configured for write operations" },
@@ -324,3 +305,4 @@ function transformRow(row: CivicMeetingRow): CivicMeeting {
     location: row.location || undefined,
   };
 }
+
