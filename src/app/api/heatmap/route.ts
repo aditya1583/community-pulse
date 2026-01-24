@@ -14,12 +14,7 @@
  * Cost: $0 (uses existing Supabase free tier)
  */
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { getSupabaseAnon } from "../../../../lib/supabaseServer";
 
 // Grid cell size in degrees (roughly 1km at mid-latitudes)
 const GRID_SIZE = 0.01;
@@ -109,7 +104,7 @@ export async function GET(request: NextRequest) {
     const maxLon = lon + lonDelta;
 
     // Query venue_vibes within bounding box and time window
-    let query = supabase
+    let query = getSupabaseAnon()
       .from("venue_vibes")
       .select("venue_lat, venue_lon, vibe_type, created_at")
       .gte("venue_lat", minLat)
