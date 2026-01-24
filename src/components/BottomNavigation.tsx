@@ -147,30 +147,35 @@ function NavButton({
   return (
     <button
       onClick={onClick}
-      className={`relative flex flex-col items-center justify-center gap-1 min-w-[64px] py-1.5 transition-all duration-300 focus-visible:outline-none group`}
+      onTouchEnd={(e) => {
+        // iOS Safari sometimes needs explicit touch handling
+        e.preventDefault();
+        onClick();
+      }}
+      className={`relative flex flex-col items-center justify-center gap-1 min-w-[64px] py-1.5 transition-all duration-300 focus-visible:outline-none group touch-manipulation`}
       aria-current={isActive ? "page" : undefined}
     >
       <div className={`
-        absolute inset-x-2 inset-y-1 rounded-xl transition-all duration-300 -z-10
+        absolute inset-x-2 inset-y-1 rounded-xl transition-all duration-300 -z-10 pointer-events-none
         ${isActive ? "bg-emerald-500/10" : "bg-transparent group-hover:bg-white/5"}
       `} />
 
       <span className={`
-        transition-all duration-500 
+        transition-all duration-500 pointer-events-none
         ${isActive ? "text-emerald-400 scale-110 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]" : "text-slate-500 group-hover:text-slate-300"}
       `}>
         {item.icon}
       </span>
 
       <span className={`
-        text-[9px] font-black uppercase tracking-[0.1em] transition-all duration-300
+        text-[9px] font-black uppercase tracking-[0.1em] transition-all duration-300 pointer-events-none
         ${isActive ? "text-emerald-400 opacity-100" : "text-slate-500 opacity-60 group-hover:opacity-100"}
       `}>
         {item.label}
       </span>
 
       {isActive && (
-        <div className="absolute -bottom-1 w-1 h-1 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+        <div className="absolute -bottom-1 w-1 h-1 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] pointer-events-none" />
       )}
     </button>
   );

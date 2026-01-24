@@ -112,13 +112,18 @@ export default function BentoStatCard({
       <button
         type="button"
         onClick={handleClick}
+        onTouchEnd={(e) => {
+          // iOS Safari sometimes needs explicit touch handling
+          e.preventDefault();
+          handleClick();
+        }}
         disabled={!isClickable}
         aria-label={ariaLabel ?? `${label}: ${value}`}
         aria-expanded={isExpanded}
         className={[
           "group relative flex flex-col items-center justify-center gap-2 p-4",
           "glass-card premium-border rounded-2xl overflow-hidden",
-          "transition-all duration-500 motion-reduce:transition-none",
+          "transition-all duration-500 motion-reduce:transition-none touch-manipulation",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70",
           isClickable
             ? `cursor-pointer hover:scale-[1.02] hover:shadow-xl`
@@ -130,17 +135,17 @@ export default function BentoStatCard({
         }}
       >
         {/* Hover Gradient Overlay */}
-        <div className={`absolute inset-0 bg-gradient-to-br from-transparent to-${accentColor}-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
+        <div className={`absolute inset-0 bg-gradient-to-br from-transparent to-${accentColor}-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`} />
 
-        <div className={`${colors.accent} transition-all duration-500 group-hover:scale-110 group-hover:drop-shadow-[0_0_10px_currentColor]`}>{icon}</div>
-        <div className="text-white font-black text-lg tracking-tight z-10">{value}</div>
-        <div className="text-slate-400 text-[9px] uppercase tracking-[0.2em] font-black z-10 opacity-70 group-hover:opacity-100 transition-opacity">
+        <div className={`${colors.accent} transition-all duration-500 group-hover:scale-110 group-hover:drop-shadow-[0_0_10px_currentColor] pointer-events-none`}>{icon}</div>
+        <div className="text-white font-black text-lg tracking-tight z-10 pointer-events-none">{value}</div>
+        <div className="text-slate-400 text-[9px] uppercase tracking-[0.2em] font-black z-10 opacity-70 group-hover:opacity-100 transition-opacity pointer-events-none">
           {label}
         </div>
 
         {/* Expansion indicator */}
         {expandedContent && isClickable && (
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-1 -translate-y-1 group-hover:translate-x-0 group-hover:translate-y-0">
+          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-1 -translate-y-1 group-hover:translate-x-0 group-hover:translate-y-0 pointer-events-none">
             <svg
               className="w-3 h-3 text-slate-500"
               fill="none"
