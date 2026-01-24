@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { GeocodeApiResponse, GeocodedCity } from "@/lib/geocoding";
+import { getApiUrl } from "@/lib/api-config";
 
 type Options = {
   minLength?: number;
@@ -52,7 +53,7 @@ export function useGeocodingAutocomplete(options: Options = {}) {
       setError(null);
       try {
         const res = await fetch(
-          `/api/geocode?query=${encodeURIComponent(trimmed)}&limit=${limit}`,
+          getApiUrl(`/api/geocode?query=${encodeURIComponent(trimmed)}&limit=${limit}`),
           { signal: controller.signal }
         );
 

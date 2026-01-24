@@ -50,6 +50,7 @@ import { RADIUS_CONFIG } from "@/lib/constants/radius";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
 import InstallPrompt from "@/components/InstallPrompt";
 import PullToRefresh from "@/components/PullToRefresh";
+import { getApiUrl } from "@/lib/api-config";
 
 // Real-time Live Updates
 type DBPulse = {
@@ -446,7 +447,7 @@ export default function Home() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
 
-        const res = await fetch("/api/summary", {
+        const res = await fetch(getApiUrl("/api/summary"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -581,7 +582,7 @@ export default function Home() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        const res = await fetch(`/api/city-mood?${params.toString()}`, {
+        const res = await fetch(getApiUrl(`/api/city-mood?${params.toString()}`), {
           signal: controller.signal,
         });
 
@@ -666,7 +667,7 @@ export default function Home() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        const res = await fetch("/api/weather", {
+        const res = await fetch(getApiUrl("/api/weather"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -723,7 +724,7 @@ export default function Home() {
 
     const fetchGasPrice = async () => {
       try {
-        const res = await fetch(`/api/gas-prices?state=${encodeURIComponent(stateCode)}`);
+        const res = await fetch(getApiUrl(`/api/gas-prices?state=${encodeURIComponent(stateCode)}`));
         const data = await res.json();
 
         if (cancelled) return;
@@ -768,7 +769,7 @@ export default function Home() {
     const fetchNearestStation = async () => {
       console.log(`[GasStation] Fetching nearest station for coords: ${lat}, ${lon} (city: ${cityName})`);
       try {
-        const res = await fetch(`/api/gas-stations?lat=${lat}&lon=${lon}&limit=1`);
+        const res = await fetch(getApiUrl(`/api/gas-stations?lat=${lat}&lon=${lon}&limit=1`);
         const data = await res.json();
 
         console.log("[GasStation] API response:", data);
@@ -1113,7 +1114,7 @@ export default function Home() {
         setEventsLoading(true);
         setEventsError(null);
 
-        const res = await fetch(`/api/events?city=${encodeURIComponent(city)}`);
+        const res = await fetch(getApiUrl(`/api/events?city=${encodeURIComponent(city)}`);
 
         type EventsResponse = { events?: EventItem[]; error?: string };
         let data: EventsResponse | null = null;
@@ -1850,10 +1851,10 @@ export default function Home() {
 
         // Fetch both AI-based traffic level AND live TomTom incidents in parallel
         // MOBILE FIX: Add aggressive 6-second timeout for mobile reliability
-        const trafficUrl = `/api/traffic?city=${encodeURIComponent(city)}`;
+        const trafficUrl = getApiUrl(`/api/traffic?city=${encodeURIComponent(city)}`);
         const liveUrl = selectedCity?.lat && selectedCity?.lon
-          ? `/api/traffic-live?lat=${selectedCity.lat}&lon=${selectedCity.lon}`
-          : `/api/traffic-live?city=${encodeURIComponent(city)}`;
+          ? getApiUrl(`/api/traffic-live?lat=${selectedCity.lat}&lon=${selectedCity.lon}`)
+          : getApiUrl(`/api/traffic-live?city=${encodeURIComponent(city)}`);
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 6000);
@@ -1923,7 +1924,7 @@ export default function Home() {
       setCreatingEvent(true);
       setEventCreateError(null);
 
-      const res = await fetch("/api/events", {
+      const res = await fetch(getApiUrl("/api/events"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2365,7 +2366,7 @@ export default function Home() {
       setUsernameGenerating(true);
       setUsernameErrorMsg(null);
 
-      const res = await fetch("/api/username", {
+      const res = await fetch(getApiUrl("/api/username"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),
@@ -2642,7 +2643,7 @@ export default function Home() {
         return;
       }
 
-      const res = await fetch("/api/pulses", {
+      const res = await fetch(getApiUrl("/api/pulses", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -2837,7 +2838,7 @@ export default function Home() {
 
       setLoading(true);
 
-      const res = await fetch("/api/pulses", {
+      const res = await fetch(getApiUrl("/api/pulses", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -19,6 +19,7 @@ import type {
   LeaderboardEntry,
 } from "@/lib/gamification";
 import { getTierFromRank, TIERS } from "@/lib/gamification";
+import { getApiUrl } from "@/lib/api-config";
 
 type GamificationState = {
   userId: string | null;
@@ -76,7 +77,7 @@ export function useGamification(userId: string | null) {
     }
 
     try {
-      const res = await fetch(`/api/gamification/stats?userId=${userId}`);
+      const res = await fetch(getApiUrl(`/api/gamification/stats?userId=${userId}`));
 
       if (!res.ok) {
         const data = await res.json();
@@ -187,7 +188,7 @@ export function useLeaderboard(
       if (city) params.set("city", city);
       if (userId) params.set("userId", userId);
 
-      const res = await fetch(`/api/gamification/leaderboard?${params}`);
+      const res = await fetch(getApiUrl(`/api/gamification/leaderboard?${params}`));
 
       if (!res.ok) {
         const data = await res.json();
@@ -275,7 +276,7 @@ export function useUserRank(userId: string | null) {
       if (isMounted.current) setLoading(true);
 
       try {
-        const res = await fetch(`/api/gamification/stats?userId=${userId}`);
+        const res = await fetch(getApiUrl(`/api/gamification/stats?userId=${userId}`));
         if (res.ok) {
           const data = await res.json();
           const fetchedRank = data.weeklyRank ?? null;

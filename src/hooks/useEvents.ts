@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { TicketmasterEvent } from "@/app/api/events/ticketmaster/route";
 import { RADIUS_CONFIG } from "@/lib/constants/radius";
+import { getApiUrl } from "@/lib/api-config";
 
 // ============================================================================
 // useEvents Hook
@@ -91,7 +92,7 @@ export function useEvents(
       const timeoutId = setTimeout(() => controller.abort(), 8000);
 
       const response = await fetch(
-        `/api/events/ticketmaster?${params.toString()}`,
+        getApiUrl(`/api/events/ticketmaster?${params.toString()}`),
         { signal: controller.signal }
       );
 

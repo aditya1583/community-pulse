@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Capacitor } from "@capacitor/core";
 import { Geolocation } from "@capacitor/geolocation";
+import { getApiUrl } from "@/lib/api-config";
 
 export type GeolocationState = {
   /** User's latitude */
@@ -316,7 +317,7 @@ export function useGeolocation(): GeolocationState & GeolocationActions {
  */
 async function reverseGeocode(lat: number, lon: number): Promise<{ city: string; state: string }> {
   try {
-    const response = await fetch(`/api/geocode/reverse?lat=${lat}&lon=${lon}`);
+    const response = await fetch(getApiUrl(`/api/geocode/reverse?lat=${lat}&lon=${lon}`));
 
     if (!response.ok) {
       throw new Error("Geocoding failed");
