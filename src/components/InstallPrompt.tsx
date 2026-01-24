@@ -25,7 +25,8 @@ export default function InstallPrompt() {
 
         // Show after 30 seconds of first visit
         const timer = setTimeout(() => {
-            if (!hasSeen && window.matchMedia('(display-mode: browser)').matches) {
+            const isCapacitor = typeof window !== 'undefined' && ((window as any).Capacitor !== undefined);
+            if (!hasSeen && !isCapacitor && window.matchMedia('(display-mode: browser)').matches) {
                 setShow(true);
             }
         }, 30000);

@@ -3329,7 +3329,7 @@ export default function Home() {
         weather={weather}
       />
 
-      <main className="flex-1 flex justify-center px-4 py-4">
+      <main className="flex-1 flex justify-center px-4 py-4 pt-[max(1rem,env(safe-area-inset-top))]">
         <div className="w-full max-w-lg space-y-4 stagger-reveal">
           {/* Auth/User bar */}
           {!sessionUser ? (
