@@ -47,3 +47,7 @@ nul
 
 # Claude temp files
 tmpclaude-*
+
+# Claude skills submodule (local only)
+Claude skills/
+antigravity-awesome-skills/
