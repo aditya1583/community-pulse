@@ -1,5 +1,6 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
 
@@ -10,7 +11,6 @@ const nextConfig = {
   images: {
     unoptimized: process.env.NEXT_PUBLIC_EXPORT_MODE === 'true' ? true : false,
   },
-
 
   typescript: {
     // !! WARN !!

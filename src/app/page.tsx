@@ -769,7 +769,7 @@ export default function Home() {
     const fetchNearestStation = async () => {
       console.log(`[GasStation] Fetching nearest station for coords: ${lat}, ${lon} (city: ${cityName})`);
       try {
-        const res = await fetch(getApiUrl(`/api/gas-stations?lat=${lat}&lon=${lon}&limit=1`);
+        const res = await fetch(getApiUrl(`/api/gas-stations?lat=${lat}&lon=${lon}&limit=1`));
         const data = await res.json();
 
         console.log("[GasStation] API response:", data);
@@ -1114,7 +1114,7 @@ export default function Home() {
         setEventsLoading(true);
         setEventsError(null);
 
-        const res = await fetch(getApiUrl(`/api/events?city=${encodeURIComponent(city)}`);
+        const res = await fetch(getApiUrl(`/api/events?city=${encodeURIComponent(city)}`));
 
         type EventsResponse = { events?: EventItem[]; error?: string };
         let data: EventsResponse | null = null;
@@ -2643,7 +2643,7 @@ export default function Home() {
         return;
       }
 
-      const res = await fetch(getApiUrl("/api/pulses", {
+      const res = await fetch(getApiUrl("/api/pulses"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -2838,7 +2838,7 @@ export default function Home() {
 
       setLoading(true);
 
-      const res = await fetch(getApiUrl("/api/pulses", {
+      const res = await fetch(getApiUrl("/api/pulses"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
