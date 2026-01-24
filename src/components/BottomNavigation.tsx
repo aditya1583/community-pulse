@@ -87,10 +87,16 @@ export default function BottomNavigation({
           ))}
 
           {/* Center FAB - Post Pulse */}
-          <div className="relative group">
+          {/* iOS Touch Fix: Explicit dimensions on parent to capture touch events */}
+          <div className="relative group -mt-6 touch-manipulation">
             <button
               onClick={onPostPulse}
-              className="w-14 h-14 -mt-6 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/40 flex items-center justify-center transition-all duration-500 group-hover:scale-110 group-hover:shadow-emerald-500/60 group-hover:-rotate-3 group-active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50"
+              onTouchEnd={(e) => {
+                // iOS Safari sometimes needs explicit touch handling
+                e.preventDefault();
+                onPostPulse();
+              }}
+              className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/40 flex items-center justify-center transition-all duration-500 group-hover:scale-110 group-hover:shadow-emerald-500/60 group-hover:-rotate-3 group-active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 touch-manipulation"
               aria-label="Post a pulse"
             >
               <svg
@@ -108,8 +114,8 @@ export default function BottomNavigation({
               </svg>
             </button>
             {/* FAB Glow */}
-            <div className="absolute -inset-1 bg-emerald-500 blur-xl opacity-0 group-hover:opacity-20 transition-opacity duration-500 -z-10" />
-            <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-emerald-400 font-black uppercase tracking-[0.15em] opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">
+            <div className="absolute -inset-1 bg-emerald-500 blur-xl opacity-0 group-hover:opacity-20 transition-opacity duration-500 -z-10 pointer-events-none" />
+            <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-emerald-400 font-black uppercase tracking-[0.15em] opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0 pointer-events-none">
               Post
             </span>
           </div>
