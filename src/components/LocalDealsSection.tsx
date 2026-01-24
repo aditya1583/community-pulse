@@ -105,11 +105,13 @@ export default function LocalDealsSection({
 
   const fetchPlaces = useCallback(async (category: CategoryId) => {
     if (!lat || !lon) {
-      setError("Location required");
+      console.log("[LocalDeals] No coordinates available, lat:", lat, "lon:", lon);
+      setError("Location required - please enable location services");
       setLoading(false);
       return;
     }
 
+    console.log(`[LocalDeals] Fetching places for category: ${category}, coords: ${lat},${lon}`);
     setLoading(true);
     setError(null);
     setDataSource(null);
@@ -118,7 +120,10 @@ export default function LocalDealsSection({
 
     const categoryConfig = DEAL_CATEGORIES.find(c => c.id === category);
 
-    // Try Foursquare first
+    // Try Foursquare first with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     try {
       const query = categoryConfig?.query || "";
       const params = new URLSearchParams({
@@ -131,11 +136,16 @@ export default function LocalDealsSection({
         params.set("query", query);
       }
 
-      const response = await fetch(`/api/foursquare/places?${params.toString()}`);
+      console.log("[LocalDeals] Trying Foursquare API...");
+      const response = await fetch(`/api/foursquare/places?${params.toString()}`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
       const data = await response.json();
 
       // If Foursquare works and has places, use it
       if (!data.error && data.places?.length > 0) {
+        console.log(`[LocalDeals] Foursquare returned ${data.places.length} places`);
         setPlaces(data.places);
         setDataSource("foursquare");
         setLoading(false);
@@ -145,10 +155,14 @@ export default function LocalDealsSection({
       // Foursquare failed or returned empty - try OSM fallback
       console.log("[LocalDeals] Foursquare failed or empty, trying OSM fallback");
     } catch (err) {
+      clearTimeout(timeoutId);
       console.log("[LocalDeals] Foursquare error, trying OSM fallback:", err);
     }
 
-    // Fallback to OpenStreetMap
+    // Fallback to OpenStreetMap with timeout
+    const osmController = new AbortController();
+    const osmTimeoutId = setTimeout(() => osmController.abort(), 8000);
+
     try {
       const osmParams = new URLSearchParams({
         lat: lat.toString(),
@@ -158,10 +172,15 @@ export default function LocalDealsSection({
         radius: "5000", // 5km radius
       });
 
-      const osmResponse = await fetch(`/api/osm/places?${osmParams.toString()}`);
+      console.log("[LocalDeals] Trying OSM API...");
+      const osmResponse = await fetch(`/api/osm/places?${osmParams.toString()}`, {
+        signal: osmController.signal,
+      });
+      clearTimeout(osmTimeoutId);
       const osmData = await osmResponse.json();
 
       if (osmData.places?.length > 0) {
+        console.log(`[LocalDeals] OSM returned ${osmData.places.length} places`);
         interface OSMPlace {
           id: string;
           name: string;
@@ -193,8 +212,14 @@ export default function LocalDealsSection({
         setPlaces([]);
       }
     } catch (osmErr) {
+      clearTimeout(osmTimeoutId);
       console.error("[LocalDeals] OSM fallback also failed:", osmErr);
-      setError("Unable to load places");
+      // Provide a more helpful error message
+      if (osmErr instanceof Error && osmErr.name === "AbortError") {
+        setError("Request timed out - please check your connection");
+      } else {
+        setError("Unable to load places - please try again");
+      }
       setPlaces([]);
     } finally {
       setLoading(false);

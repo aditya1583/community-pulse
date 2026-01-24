@@ -1,9 +1,16 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
 type AccentColor = "emerald" | "purple" | "amber";
+
+// Touch tracking for distinguishing taps from scrolls
+type TouchState = {
+  startX: number;
+  startY: number;
+  startTime: number;
+};
 
 export type BentoStatCardProps = {
   icon: React.ReactNode;
@@ -42,6 +49,11 @@ export default function BentoStatCard({
 }: BentoStatCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+
+  // Track touch state to distinguish taps from scrolls
+  const touchStateRef = useRef<TouchState | null>(null);
+  const TAP_THRESHOLD_PX = 10; // Max movement for a tap
+  const TAP_THRESHOLD_MS = 300; // Max duration for a tap
 
   const colorClasses: Record<AccentColor, { hover: string; glow: string; accent: string }> = {
     emerald: {
@@ -112,10 +124,42 @@ export default function BentoStatCard({
       <button
         type="button"
         onClick={handleClick}
+        onTouchStart={(e) => {
+          // Track touch start for scroll detection
+          const touch = e.touches[0];
+          if (touch) {
+            touchStateRef.current = {
+              startX: touch.clientX,
+              startY: touch.clientY,
+              startTime: Date.now(),
+            };
+          }
+        }}
+        onTouchMove={() => {
+          // Clear touch state on significant movement (user is scrolling)
+          // The actual check happens in onTouchEnd
+        }}
         onTouchEnd={(e) => {
-          // iOS Safari sometimes needs explicit touch handling
-          e.preventDefault();
-          handleClick();
+          // Only trigger if this was a tap, not a scroll
+          const touchState = touchStateRef.current;
+          if (!touchState) return;
+
+          const touch = e.changedTouches[0];
+          if (!touch) return;
+
+          const deltaX = Math.abs(touch.clientX - touchState.startX);
+          const deltaY = Math.abs(touch.clientY - touchState.startY);
+          const deltaTime = Date.now() - touchState.startTime;
+
+          // Clear touch state
+          touchStateRef.current = null;
+
+          // Check if this was a tap (minimal movement and quick)
+          if (deltaX < TAP_THRESHOLD_PX && deltaY < TAP_THRESHOLD_PX && deltaTime < TAP_THRESHOLD_MS) {
+            e.preventDefault();
+            handleClick();
+          }
+          // Otherwise, let the scroll continue naturally (don't preventDefault)
         }}
         disabled={!isClickable}
         aria-label={ariaLabel ?? `${label}: ${value}`}

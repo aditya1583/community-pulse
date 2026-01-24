@@ -49,6 +49,7 @@ import { calculateDistanceMiles } from "@/lib/geo/distance";
 import { RADIUS_CONFIG } from "@/lib/constants/radius";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
 import InstallPrompt from "@/components/InstallPrompt";
+import PullToRefresh from "@/components/PullToRefresh";
 
 // Real-time Live Updates
 type DBPulse = {
@@ -283,6 +284,9 @@ export default function Home() {
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Pull-to-refresh trigger
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Pagination state
   const [hasMorePulses, setHasMorePulses] = useState(false);
@@ -1460,7 +1464,15 @@ export default function Home() {
 
       return () => clearInterval(refreshInterval);
     }
-  }, [city]);
+  }, [city, refreshTrigger]);
+
+  // ========= PULL-TO-REFRESH HANDLER =========
+  const handlePullToRefresh = useCallback(async () => {
+    console.log("[PullToRefresh] Triggered manual refresh");
+    setRefreshTrigger(prev => prev + 1);
+    // Small delay to allow the effect to run
+    await new Promise(resolve => setTimeout(resolve, 800));
+  }, []);
 
   // ========= AUTO-SEED AND REFRESH STALE CITIES =========
   // When a city has no pulses OR content is stale, automatically generate fresh bot posts
@@ -3336,11 +3348,12 @@ export default function Home() {
         weather={weather}
       />
 
-      <main className="flex-1 flex justify-center px-4 py-6 pt-[max(2rem,env(safe-area-inset-top))]">
-        <div className="w-full max-w-lg space-y-6 stagger-reveal">
-          {/* Top Bar: Header + Auth Action */}
-          <div className="flex items-start justify-between">
-            <Header cityName={city} isLive={!loading} />
+      <PullToRefresh onRefresh={handlePullToRefresh} disabled={loading}>
+        <main className="flex-1 flex justify-center px-4 py-6 pt-[max(2rem,env(safe-area-inset-top))]">
+          <div className="w-full max-w-lg space-y-6 stagger-reveal">
+            {/* Top Bar: Header + Auth Action */}
+            <div className="flex items-start justify-between">
+              <Header cityName={city} isLive={!loading} />
 
             <div className="pt-2">
               {!sessionUser ? (
@@ -4028,9 +4041,10 @@ export default function Home() {
                 </a>
               </p>
             </div>
-          </footer>
-        </div>
-      </main>
+            </footer>
+          </div>
+        </main>
+      </PullToRefresh>
 
       {/* Bottom Navigation - Primary navigation with 44px touch targets */}
       <BottomNavigation
