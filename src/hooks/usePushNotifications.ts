@@ -16,6 +16,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
+import { getApiUrl } from "@/lib/api-config";
 
 export type PushPermission = "default" | "granted" | "denied";
 
@@ -174,7 +175,7 @@ export function usePushNotifications(
         }
 
         // Send subscription to server
-        const response = await fetch("/api/notifications/subscribe", {
+        const response = await fetch(getApiUrl("/api/notifications/subscribe"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

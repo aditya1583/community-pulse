@@ -5,6 +5,7 @@ import Leaderboard from "./Leaderboard";
 import UserProfileCard from "./UserProfileCard";
 import { BadgeShowcase } from "./BadgeDisplay";
 import { useGamification } from "@/hooks/useGamification";
+import { getApiUrl } from "@/lib/api-config";
 import type { BadgeDefinition } from "@/lib/gamification";
 
 type StatusTabProps = {
@@ -45,7 +46,7 @@ export default function StatusTab({ userId, city, className = "" }: StatusTabPro
 
     setBadgesLoading(true);
     try {
-      const res = await fetch("/api/gamification/badges");
+      const res = await fetch(getApiUrl("/api/gamification/badges"));
       if (res.ok) {
         const data = await res.json();
         setAllBadges(data.badges || []);

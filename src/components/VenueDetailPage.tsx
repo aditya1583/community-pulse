@@ -9,6 +9,7 @@ import {
   VenueVibeType,
   VenueVibeAggregate,
 } from "./types";
+import { getApiUrl } from "@/lib/api-config";
 
 // Supabase client imported from shared module
 
@@ -113,7 +114,7 @@ export default function VenueDetailPage({
     setVibeError(null); // Clear previous errors
 
     try {
-      const response = await fetch("/api/venue-vibe", {
+      const response = await fetch(getApiUrl("/api/venue-vibe"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

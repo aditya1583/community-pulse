@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { VENUE_VIBE_TYPES, getVibeTypeInfo, VenueVibeType, VenueVibeAggregate, VibeWithTrust, getTrustBadge, getTrustBadgeInfo } from "./types";
+import { getApiUrl } from "@/lib/api-config";
 
 type VenueVibeCheckProps = {
   venueId: string;
@@ -117,7 +118,7 @@ export default function VenueVibeCheck({
     setVerifyError(null);
 
     try {
-      const res = await fetch("/api/vibe-confirm", {
+      const res = await fetch(getApiUrl("/api/vibe-confirm"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -155,7 +156,7 @@ export default function VenueVibeCheck({
     setSubmitError(null);
 
     try {
-      const res = await fetch("/api/venue-vibe", {
+      const res = await fetch(getApiUrl("/api/venue-vibe"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

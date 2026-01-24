@@ -13,6 +13,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { usePushNotifications, type NotificationPreferences } from "@/hooks/usePushNotifications";
+import { getApiUrl } from "@/lib/api-config";
 
 type NotificationSettingsProps = {
   city: string;
@@ -102,7 +103,7 @@ export default function NotificationSettings({
     };
 
     try {
-      await fetch("/api/notifications/preferences", {
+      await fetch(getApiUrl("/api/notifications/preferences"), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

@@ -12,11 +12,9 @@ type HeaderProps = {
 /**
  * Header component with neon theme styling
  *
- * Left: City name + Animated radar visualization showing active scanning
- * Right: LIVE badge with pulsing green dot
- *
- * The radar animation replaces the static "5-MILE RADIUS ACTIVE" text,
- * providing visual proof that the app is actively monitoring the area.
+ * Compact layout: Radar + City name with integrated LIVE indicator
+ * The LIVE badge is now a subtle dot next to the city name, not a separate element
+ * This prevents awkward proximity with the Sign In button in the parent layout
  */
 export default function Header({ cityName, isLive = true, radiusMiles = 10 }: HeaderProps) {
   // Show full "City, ST" format to avoid Springfield trap
@@ -27,9 +25,9 @@ export default function Header({ cityName, isLive = true, radiusMiles = 10 }: He
     : cityName;                    // Already "Austin, TX" or just "Austin"
 
   return (
-    <header className="flex items-center gap-4">
+    <header className="flex items-center gap-3">
       {/* Animated radar replacing static icon */}
-      <div className="relative">
+      <div className="relative flex-shrink-0">
         <RadarPulse
           radiusMiles={radiusMiles}
           isScanning={isLive}
@@ -39,27 +37,24 @@ export default function Header({ cityName, isLive = true, radiusMiles = 10 }: He
         <div className="absolute inset-0 bg-emerald-500/20 blur-xl -z-10" />
       </div>
 
-      <div className="flex flex-col flex-1">
-        <h1 className="text-2xl font-black text-white tracking-tighter leading-none">
-          {displayCity}
-        </h1>
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mt-1">
-          Local Monitoring Active
+      <div className="flex flex-col min-w-0">
+        {/* City name with integrated LIVE indicator */}
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-black text-white tracking-tighter leading-none truncate">
+            {displayCity}
+          </h1>
+          {/* Subtle LIVE dot - integrated with city name */}
+          {isLive && (
+            <span className="relative flex h-2 w-2 flex-shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+          )}
+        </div>
+        <p className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-500 mt-0.5">
+          {radiusMiles}-Mile Radius Active
         </p>
       </div>
-
-      {/* LIVE badge - moved inside header to stay with city info */}
-      {isLive && (
-        <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-          <span className="relative flex h-1 w-1">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-1 w-1 bg-emerald-500" />
-          </span>
-          <span className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.1em]">
-            Live
-          </span>
-        </div>
-      )}
     </header>
   );
 }
