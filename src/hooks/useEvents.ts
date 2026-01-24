@@ -86,10 +86,16 @@ export function useEvents(
         params.set("city", city);
       }
 
+      // MOBILE FIX: Add aggressive timeout for unreliable mobile networks
+      // Create a timeout that will abort the fetch after 8 seconds
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
       const response = await fetch(
         `/api/events/ticketmaster?${params.toString()}`,
         { signal: controller.signal }
       );
+
+      clearTimeout(timeoutId);
 
       // Check if this request is still the current one
       if (requestId !== lastRequestId.current) return;

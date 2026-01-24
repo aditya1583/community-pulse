@@ -485,7 +485,8 @@ export async function GET(req: NextRequest) {
       try {
         const response = await fetch(apiUrl, {
           headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(8000),
+          // MOBILE FIX: Reduced timeout for mobile reliability (5s)
+          signal: AbortSignal.timeout(5000),
         });
 
         if (response.ok) {
@@ -497,7 +498,8 @@ export async function GET(req: NextRequest) {
               try {
                 const detailsUrl = `https://search.ams.usda.gov/farmersmarkets/v1/data.svc/mktDetail?id=${market.id}`;
                 const detailsResponse = await fetch(detailsUrl, {
-                  signal: AbortSignal.timeout(5000),
+                  // MOBILE FIX: Reduced timeout (3s)
+                  signal: AbortSignal.timeout(3000),
                 });
                 const detailsData = await detailsResponse.json();
                 const details = detailsData.marketdetails || {};

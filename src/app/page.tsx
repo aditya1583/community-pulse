@@ -577,7 +577,16 @@ export default function Home() {
           params.set("weatherCondition", `${weather.description}, ${Math.round(weather.temp)}F`);
         }
 
-        const res = await fetch(`/api/city-mood?${params.toString()}`);
+        // MOBILE FIX: Add aggressive 5-second timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+        const res = await fetch(`/api/city-mood?${params.toString()}`, {
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
         if (!res.ok) {
           throw new Error("Failed to fetch city mood");
         }
@@ -653,6 +662,10 @@ export default function Home() {
         setWeatherLoading(true);
         setWeatherError(null);
 
+        // MOBILE FIX: Add aggressive 5-second timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
         const res = await fetch("/api/weather", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -663,7 +676,10 @@ export default function Home() {
             country: selectedCity?.country,
             state: selectedCity?.state,
           }),
+          signal: controller.signal,
         });
+
+        clearTimeout(timeoutId);
 
         const data = await res.json();
 
@@ -1833,15 +1849,21 @@ export default function Home() {
         setTrafficError(null);
 
         // Fetch both AI-based traffic level AND live TomTom incidents in parallel
+        // MOBILE FIX: Add aggressive 6-second timeout for mobile reliability
         const trafficUrl = `/api/traffic?city=${encodeURIComponent(city)}`;
         const liveUrl = selectedCity?.lat && selectedCity?.lon
           ? `/api/traffic-live?lat=${selectedCity.lat}&lon=${selectedCity.lon}`
           : `/api/traffic-live?city=${encodeURIComponent(city)}`;
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+
         const [trafficRes, liveRes] = await Promise.allSettled([
-          fetch(trafficUrl),
-          fetch(liveUrl),
+          fetch(trafficUrl, { signal: controller.signal }),
+          fetch(liveUrl, { signal: controller.signal }),
         ]);
+
+        clearTimeout(timeoutId);
 
         // Process AI-based traffic level
         if (trafficRes.status === "fulfilled" && trafficRes.value.ok) {
@@ -3349,581 +3371,612 @@ export default function Home() {
       />
 
       <PullToRefresh onRefresh={handlePullToRefresh} disabled={loading}>
-        <main className="flex-1 flex justify-center px-4 py-6 pt-[max(2rem,env(safe-area-inset-top))]">
+        {/* MOBILE FIX: Use larger top padding (3rem = 48px) plus safe-area for notch */}
+        <main className="flex-1 flex justify-center px-4 py-6 pt-[max(3rem,calc(env(safe-area-inset-top)+1rem))]">
           <div className="w-full max-w-lg space-y-6 stagger-reveal">
             {/* Top Bar: Header + Auth Action */}
             <div className="flex items-start justify-between">
               <Header cityName={city} isLive={!loading} />
 
-            <div className="pt-2">
-              {!sessionUser ? (
-                <button
-                  onClick={() => setShowAuthModal(true)}
-                  className="text-[10px] px-3 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 hover:scale-105 transition-all"
-                >
-                  Sign in
-                </button>
-              ) : (
-                <div className="flex flex-col items-end gap-2">
-                  <div className="flex items-center gap-2">
-                    {/* XP Progress Badge - tap to view Status tab */}
-                    {!gamificationLoading && userLevel > 0 && (
-                      <XPProgressBadge
-                        level={userLevel}
-                        xp={userXp}
-                        weeklyRank={userRank}
-                        onClick={() => setActiveTab("status")}
-                      />
-                    )}
-                    <button
-                      onClick={() => setActiveTab("status")}
-                      className="text-[10px] font-black uppercase tracking-widest text-emerald-400/80 hover:text-emerald-400 transition-colors"
-                    >
-                      {displayName}
-                    </button>
-                  </div>
+              <div className="pt-2">
+                {!sessionUser ? (
                   <button
-                    onClick={async () => {
-                      await supabase.auth.signOut();
-                      setSessionUser(null);
-                      setProfile(null);
-                      setAuthStatus("signed_out");
-                      setProfileLoading(false);
-                    }}
-                    className="text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-red-400 transition-colors"
+                    onClick={() => setShowAuthModal(true)}
+                    className="text-[10px] px-3 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 hover:scale-105 transition-all"
                   >
-                    Log out
+                    Sign in
                   </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-
-          {/* Username editor */}
-          {sessionUser && showUsernameEditor && !profile?.name_locked && (
-            <div className="rounded-xl bg-slate-800/60 border border-slate-700/50 px-4 py-3 text-xs text-slate-200">
-              <p className="text-[11px] text-slate-300 mb-2">
-                Describe your vibe in <span className="font-semibold">3+ words</span>, and we&apos;ll craft a fun anonymous name for you.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                <input
-                  value={usernamePrompt}
-                  onChange={(e) => setUsernamePrompt(e.target.value)}
-                  placeholder="e.g. sleepy sarcastic overcaffeinated"
-                  className="flex-1 rounded-lg bg-slate-900/70 border border-slate-700/50 px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:border-transparent"
-                />
-                <div className="flex gap-2 items-center">
-                  <button
-                    type="button"
-                    onClick={handleGenerateUsername}
-                    disabled={
-                      usernameGenerating ||
-                      profile?.name_locked ||
-                      usernamePrompt.trim().split(/\s+/).filter(Boolean).length < 3
-                    }
-                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-emerald-400 to-emerald-600 text-slate-950 font-medium text-[11px] rounded-lg shadow-lg shadow-emerald-500/30 hover:from-emerald-300 hover:to-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                  >
-                    <span>{usernameGenerating ? "Rolling..." : "Roll"}</span>
-                  </button>
-                  {lastAnonName && lastAnonName !== displayName && !profile?.name_locked && (
-                    <button
-                      type="button"
-                      onClick={handleRevertUsername}
-                      className="text-[11px] text-slate-400 hover:text-slate-200 underline-offset-2 hover:underline"
-                    >
-                      Undo
-                    </button>
-                  )}
-                  {!profile?.name_locked && (
-                    <button
-                      type="button"
-                      onClick={handleLockUsername}
-                      className="text-[11px] px-2 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/60 text-emerald-200 hover:bg-emerald-500/25 transition"
-                    >
-                      Lock this name
-                    </button>
-                  )}
-                </div>
-              </div>
-              {usernameErrorMsg && (
-                <p className="mt-1 text-[11px] text-red-400">{usernameErrorMsg}</p>
-              )}
-              <p className="mt-1 text-[11px] text-slate-400">
-                Current name: <span className="text-cyan-400">{displayName}</span>
-              </p>
-            </div>
-          )}
-
-          {/* City selector */}
-          <div className="relative z-50">
-            <label className="text-xs text-slate-400 uppercase tracking-wide mb-1 block">
-              City
-            </label>
-            <div className="relative">
-              <input
-                ref={cityInputRef}
-                value={cityInput}
-                onChange={handleCityInputChange}
-                onKeyDown={handleCityInputKeyDown}
-                onFocus={() =>
-                  cityInput.trim().length >= 3 && setShowCitySuggestions(true)
-                }
-                className="w-full rounded-lg bg-slate-800/60 border border-slate-700/50 px-3 py-2 pr-10 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:border-transparent"
-                placeholder="Search any city (e.g., Austin, TX)"
-              />
-              {citySuggestionsLoading && cityInput.trim().length >= 3 && (
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-500">
-                  Searching...
-                </span>
-              )}
-
-              {renderCitySuggestionsMenu && (
-                <>
-                  {/* Backdrop: click-outside-to-close + ensures correct z-index stacking */}
-                  <div
-                    aria-hidden="true"
-                    className={`fixed inset-0 z-40 transition-opacity duration-150 ${cityDropdownOpen
-                      ? "opacity-100 pointer-events-auto"
-                      : "opacity-0 pointer-events-none"
-                      }`}
-                    onClick={() => {
-                      setShowCitySuggestions(false);
-                      clearSuggestions();
-                    }}
-                  />
-
-                  <div
-                    ref={cityDropdownRef}
-                    className={`absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 bg-slate-900 border border-slate-700/50 rounded-lg shadow-xl max-h-64 overflow-y-auto transform transition duration-150 origin-top motion-reduce:transition-none ${cityDropdownOpen
-                      ? "opacity-100 translate-y-0 scale-100 pointer-events-auto"
-                      : "opacity-0 -translate-y-1 scale-[0.98] pointer-events-none"
-                      }`}
-                    role="listbox"
-                    aria-label="City suggestions"
-                    aria-hidden={!cityDropdownOpen}
-                  >
-                    {citySuggestions.map((suggestion, idx) => (
+                ) : (
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="flex items-center gap-2">
+                      {/* XP Progress Badge - tap to view Status tab */}
+                      {!gamificationLoading && userLevel > 0 && (
+                        <XPProgressBadge
+                          level={userLevel}
+                          xp={userXp}
+                          weeklyRank={userRank}
+                          onClick={() => setActiveTab("status")}
+                        />
+                      )}
                       <button
-                        key={suggestion.id}
-                        type="button"
-                        tabIndex={cityDropdownOpen ? 0 : -1}
-                        onMouseEnter={() => setHighlightedIndex(idx)}
-                        onClick={() => handleCitySelect(suggestion)}
-                        className={`w-full px-4 py-3 text-left text-sm transition flex items-center justify-between border-b border-slate-800 last:border-b-0 ${highlightedIndex === idx
-                          ? "bg-slate-800 text-emerald-200"
-                          : "hover:bg-slate-800 text-slate-100"
-                          }`}
-                        role="option"
-                        aria-selected={highlightedIndex === idx}
+                        onClick={() => setActiveTab("status")}
+                        className="text-[10px] font-black uppercase tracking-widest text-emerald-400/80 hover:text-emerald-400 transition-colors"
                       >
-                        <span className="truncate">{suggestion.displayName}</span>
-                        <span className="text-[10px] text-slate-400">
-                          {suggestion.country || ""}
-                        </span>
+                        {displayName}
                       </button>
-                    ))}
+                    </div>
+                    <button
+                      onClick={async () => {
+                        await supabase.auth.signOut();
+                        setSessionUser(null);
+                        setProfile(null);
+                        setAuthStatus("signed_out");
+                        setProfileLoading(false);
+                      }}
+                      className="text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-red-400 transition-colors"
+                    >
+                      Log out
+                    </button>
                   </div>
-                </>
-              )}
-              {citySuggestionsNotFound && !citySuggestionsLoading && (
-                <p className="mt-1 text-[11px] text-amber-300">
-                  We couldn&apos;t find that city. Try &quot;City, Country&quot; format.
-                </p>
-              )}
-              {citySuggestionsError && (
-                <p className="mt-1 text-[11px] text-red-400">
-                  {citySuggestionsError} Keeping {lastValidCity.displayName}.
-                </p>
-              )}
-            </div>
-          </div>
-
-
-          {/* Current Vibe Card */}
-          <CurrentVibeCard
-            weather={weather}
-            weatherLoading={weatherLoading}
-            recentPulseCount={recentPulseCount2h}
-            onDropPulse={handleDropPulseJump}
-            cityMood={cityMood}
-            cityMoodLoading={cityMoodLoading}
-            gasPrice={gasPrice}
-            gasStationName={nearestStation?.name}
-            onGasPriceClick={() => {
-              setLocalSection("gas");
-              setActiveTab("local");
-            }}
-          />
-
-          {/* Quick Stats */}
-          <QuickStats
-            trafficLevel={trafficLevel}
-            trafficLoading={trafficLoading}
-            eventsCount={ticketmasterEvents.length}
-            eventsLoading={ticketmasterLoading}
-            cityMood={cityMood}
-            cityMoodLoading={cityMoodLoading}
-            onTrafficClick={() => setActiveTab("traffic")}
-            onEventsClick={() => setActiveTab("events")}
-            onMoodClick={() => {
-              if (!sessionUser) {
-                setShowAuthModal(true);
-              } else {
-                setShowPulseModal(true);
-              }
-            }}
-          />
-
-          {/* Onboarding Checklist for new users */}
-          {sessionUser && !onboardingCompleted && !checklistDismissed && (
-            <OnboardingChecklist
-              onboardingCompleted={onboardingCompleted}
-              onDismiss={() => setChecklistDismissed(true)}
-              steps={[
-                {
-                  id: "location",
-                  label: "Setup Location",
-                  description: "Hyperlocal content depends on it.",
-                  completed: !!selectedCity,
-                  actionLabel: "Set Location",
-                  action: () => cityInputRef.current?.focus(),
-                },
-                {
-                  id: "profile",
-                  label: "Craft your Identity",
-                  description: "Describe your vibe for a custom name.",
-                  completed: !!profile?.name_locked,
-                  actionLabel: "Edit Name",
-                  action: () => setShowUsernameEditor(true),
-                },
-                {
-                  id: "pulse",
-                  label: "Post your first Pulse",
-                  description: "Let the community know what's up.",
-                  completed: userPulseCount > 0,
-                  actionLabel: "Post Pulse",
-                  action: () => setShowPulseModal(true),
-                },
-                {
-                  id: "bookmark",
-                  label: "Bookmark a Vibe",
-                  description: "Keep track of interesting updates.",
-                  completed: favoritePulseIds.length > 0,
-                  actionLabel: "Browse",
-                  action: () => setActiveTab("pulse"),
-                }
-              ]}
-            />
-          )}
-
-          {/* Tab Navigation */}
-          <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} secondaryOnly />
-
-          {/* AI Summary Stories - Swipeable quick brief */}
-          <AISummaryStories
-            activeTab={activeTab}
-            summary={summary}
-            summaryLoading={summaryLoading}
-            summaryError={summaryError}
-            pulsesCount={visiblePulses.length}
-            cityName={city}
-            events={ticketmasterEvents}
-            eventsLoading={ticketmasterLoading}
-            eventsError={ticketmasterError}
-            trafficLevel={trafficLevel}
-            trafficLoading={trafficLoading}
-            trafficError={trafficError}
-            onNavigateTab={setActiveTab}
-            vibeHeadline={cityMood?.vibeHeadline}
-            vibeEmoji={cityMood?.dominantMood ?? undefined}
-            temperature={weather?.temp}
-          />
-
-          {/* Traffic Flash Alert Banner - Shows for closures or heavy traffic */}
-          {(hasRoadClosure || (trafficIncidents && trafficIncidents.some(i => i.severity >= 3))) && (
-            <div
-              onClick={() => setActiveTab("traffic")}
-              className="mb-4 glass-card border border-red-500/30 bg-red-500/10 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:bg-red-500/20 transition-all stagger-reveal delay-100"
-            >
-              <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0 relative overflow-hidden">
-                <div className="absolute inset-0 bg-red-500/20 animate-pulse" />
-                <span className="text-xl relative z-10">🚨</span>
+                )}
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="inline-block w-2 H-2 rounded-full bg-red-500 animate-ping" />
-                  <h4 className="text-xs font-black text-red-400 uppercase tracking-wider">Traffic Alert</h4>
+            </div>
+
+
+            {/* Username editor */}
+            {sessionUser && showUsernameEditor && !profile?.name_locked && (
+              <div className="rounded-xl bg-slate-800/60 border border-slate-700/50 px-4 py-3 text-xs text-slate-200">
+                <p className="text-[11px] text-slate-300 mb-2">
+                  Describe your vibe in <span className="font-semibold">3+ words</span>, and we&apos;ll craft a fun anonymous name for you.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                  <input
+                    value={usernamePrompt}
+                    onChange={(e) => setUsernamePrompt(e.target.value)}
+                    placeholder="e.g. sleepy sarcastic overcaffeinated"
+                    className="flex-1 rounded-lg bg-slate-900/70 border border-slate-700/50 px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:border-transparent"
+                  />
+                  <div className="flex gap-2 items-center">
+                    <button
+                      type="button"
+                      onClick={handleGenerateUsername}
+                      disabled={
+                        usernameGenerating ||
+                        profile?.name_locked ||
+                        usernamePrompt.trim().split(/\s+/).filter(Boolean).length < 3
+                      }
+                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-emerald-400 to-emerald-600 text-slate-950 font-medium text-[11px] rounded-lg shadow-lg shadow-emerald-500/30 hover:from-emerald-300 hover:to-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    >
+                      <span>{usernameGenerating ? "Rolling..." : "Roll"}</span>
+                    </button>
+                    {lastAnonName && lastAnonName !== displayName && !profile?.name_locked && (
+                      <button
+                        type="button"
+                        onClick={handleRevertUsername}
+                        className="text-[11px] text-slate-400 hover:text-slate-200 underline-offset-2 hover:underline"
+                      >
+                        Undo
+                      </button>
+                    )}
+                    {!profile?.name_locked && (
+                      <button
+                        type="button"
+                        onClick={handleLockUsername}
+                        className="text-[11px] px-2 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/60 text-emerald-200 hover:bg-emerald-500/25 transition"
+                      >
+                        Lock this name
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <p className="text-sm font-bold text-white truncate">
-                  {hasRoadClosure ? "Road closures reported nearby" : "Major traffic incidents detected"}
+                {usernameErrorMsg && (
+                  <p className="mt-1 text-[11px] text-red-400">{usernameErrorMsg}</p>
+                )}
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Current name: <span className="text-cyan-400">{displayName}</span>
                 </p>
               </div>
-              <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
-                <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
+            )}
+
+            {/* City selector */}
+            <div className="relative z-50">
+              <label className="text-xs text-slate-400 uppercase tracking-wide mb-1 block">
+                City
+              </label>
+              <div className="relative">
+                <input
+                  ref={cityInputRef}
+                  value={cityInput}
+                  onChange={handleCityInputChange}
+                  onKeyDown={handleCityInputKeyDown}
+                  onFocus={() =>
+                    cityInput.trim().length >= 3 && setShowCitySuggestions(true)
+                  }
+                  className="w-full rounded-lg bg-slate-800/60 border border-slate-700/50 px-3 py-2 pr-10 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:border-transparent"
+                  placeholder="Search any city (e.g., Austin, TX)"
+                />
+                {citySuggestionsLoading && cityInput.trim().length >= 3 && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-500">
+                    Searching...
+                  </span>
+                )}
+
+                {renderCitySuggestionsMenu && (
+                  <>
+                    {/* Backdrop: click-outside-to-close + ensures correct z-index stacking */}
+                    <div
+                      aria-hidden="true"
+                      className={`fixed inset-0 z-40 transition-opacity duration-150 ${cityDropdownOpen
+                        ? "opacity-100 pointer-events-auto"
+                        : "opacity-0 pointer-events-none"
+                        }`}
+                      onClick={() => {
+                        setShowCitySuggestions(false);
+                        clearSuggestions();
+                      }}
+                    />
+
+                    <div
+                      ref={cityDropdownRef}
+                      className={`absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 bg-slate-900 border border-slate-700/50 rounded-lg shadow-xl max-h-64 overflow-y-auto transform transition duration-150 origin-top motion-reduce:transition-none ${cityDropdownOpen
+                        ? "opacity-100 translate-y-0 scale-100 pointer-events-auto"
+                        : "opacity-0 -translate-y-1 scale-[0.98] pointer-events-none"
+                        }`}
+                      role="listbox"
+                      aria-label="City suggestions"
+                      aria-hidden={!cityDropdownOpen}
+                    >
+                      {citySuggestions.map((suggestion, idx) => (
+                        <button
+                          key={suggestion.id}
+                          type="button"
+                          tabIndex={cityDropdownOpen ? 0 : -1}
+                          onMouseEnter={() => setHighlightedIndex(idx)}
+                          onClick={() => handleCitySelect(suggestion)}
+                          className={`w-full px-4 py-3 text-left text-sm transition flex items-center justify-between border-b border-slate-800 last:border-b-0 ${highlightedIndex === idx
+                            ? "bg-slate-800 text-emerald-200"
+                            : "hover:bg-slate-800 text-slate-100"
+                            }`}
+                          role="option"
+                          aria-selected={highlightedIndex === idx}
+                        >
+                          <span className="truncate">{suggestion.displayName}</span>
+                          <span className="text-[10px] text-slate-400">
+                            {suggestion.country || ""}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {citySuggestionsNotFound && !citySuggestionsLoading && (
+                  <p className="mt-1 text-[11px] text-amber-300">
+                    We couldn&apos;t find that city. Try &quot;City, Country&quot; format.
+                  </p>
+                )}
+                {citySuggestionsError && (
+                  <p className="mt-1 text-[11px] text-red-400">
+                    {citySuggestionsError} Keeping {lastValidCity.displayName}.
+                  </p>
+                )}
               </div>
             </div>
-          )}
 
-          {/* Live Vibes - Real-time crowd-sourced venue sentiment */}
-          <LiveVibes city={city} onNavigateToLocal={() => {
-            setLocalSection("deals");
-            setActiveTab("local");
-          }} />
 
-          {/* Tab Content - Using CSS hiding for pulse tab to prevent remounting */}
-          <div className="space-y-4">
-            {/* Events Tab - conditionally rendered */}
-            {safeActiveTab === "events" && (
-              <EventCard
-                events={ticketmasterEvents}
-                isLoading={ticketmasterLoading}
-                error={ticketmasterError}
-                hasLocation={!!(selectedCity?.lat && selectedCity?.lon)}
-                fallback={ticketmasterFallback}
-                cityName={city}
-                state={selectedCity?.state}
-                lat={selectedCity?.lat}
-                lon={selectedCity?.lon}
-                isSignedIn={!!sessionUser}
-                identityReady={identityReady}
-                displayName={displayName}
-                pulseLoading={loading}
-                pulseMood={eventsMood}
-                pulseMessage={eventsMessage}
-                moodValidationError={tabMoodValidationError}
-                messageValidationError={tabMessageValidationError}
-                showValidationErrors={showTabValidationErrors}
-                onMoodChange={(m) => {
-                  setEventsMood(m);
-                  setTabMoodValidationError(null);
-                }}
-                onMessageChange={(m) => {
-                  setEventsMessage(m);
-                  setTabMessageValidationError(null);
-                }}
-                onSubmit={handleEventsPulseSubmit}
-                onSignInClick={() => setShowAuthModal(true)}
+            {/* Current Vibe Card */}
+            <CurrentVibeCard
+              weather={weather}
+              weatherLoading={weatherLoading}
+              recentPulseCount={recentPulseCount2h}
+              onDropPulse={handleDropPulseJump}
+              cityMood={cityMood}
+              cityMoodLoading={cityMoodLoading}
+              gasPrice={gasPrice}
+              gasStationName={nearestStation?.name}
+              onGasPriceClick={() => {
+                setLocalSection("gas");
+                setActiveTab("local");
+              }}
+            />
+
+            {/* Quick Stats */}
+            <QuickStats
+              trafficLevel={trafficLevel}
+              trafficLoading={trafficLoading}
+              eventsCount={ticketmasterEvents.length}
+              eventsLoading={ticketmasterLoading}
+              cityMood={cityMood}
+              cityMoodLoading={cityMoodLoading}
+              onTrafficClick={() => setActiveTab("traffic")}
+              onEventsClick={() => setActiveTab("events")}
+              onMoodClick={() => {
+                if (!sessionUser) {
+                  setShowAuthModal(true);
+                } else {
+                  setShowPulseModal(true);
+                }
+              }}
+            />
+
+            {/* Onboarding Checklist for new users */}
+            {sessionUser && !onboardingCompleted && !checklistDismissed && (
+              <OnboardingChecklist
+                onboardingCompleted={onboardingCompleted}
+                onDismiss={() => setChecklistDismissed(true)}
+                steps={[
+                  {
+                    id: "location",
+                    label: "Setup Location",
+                    description: "Hyperlocal content depends on it.",
+                    completed: !!selectedCity,
+                    actionLabel: "Set Location",
+                    action: () => cityInputRef.current?.focus(),
+                  },
+                  {
+                    id: "profile",
+                    label: "Craft your Identity",
+                    description: "Describe your vibe for a custom name.",
+                    completed: !!profile?.name_locked,
+                    actionLabel: "Edit Name",
+                    action: () => setShowUsernameEditor(true),
+                  },
+                  {
+                    id: "pulse",
+                    label: "Post your first Pulse",
+                    description: "Let the community know what's up.",
+                    completed: userPulseCount > 0,
+                    actionLabel: "Post Pulse",
+                    action: () => setShowPulseModal(true),
+                  },
+                  {
+                    id: "bookmark",
+                    label: "Bookmark a Vibe",
+                    description: "Keep track of interesting updates.",
+                    completed: favoritePulseIds.length > 0,
+                    actionLabel: "Browse",
+                    action: () => setActiveTab("pulse"),
+                  }
+                ]}
               />
             )}
 
-            {/* Traffic Tab - conditionally rendered */}
-            {safeActiveTab === "traffic" && (
-              <TrafficContent
-                trafficLevel={trafficLevel}
-                trafficLoading={trafficLoading}
-                trafficError={trafficError}
-                trafficPulses={trafficPulses}
-                cityName={city}
-                trafficIncidents={trafficIncidents}
-                hasRoadClosure={hasRoadClosure}
-                isSignedIn={!!sessionUser}
-                identityReady={identityReady}
-                displayName={displayName}
-                pulseLoading={loading}
-                pulseMood={trafficMood}
-                pulseMessage={trafficMessage}
-                moodValidationError={tabMoodValidationError}
-                messageValidationError={tabMessageValidationError}
-                showValidationErrors={showTabValidationErrors}
-                onMoodChange={(m) => {
-                  setTrafficMood(m);
-                  setTabMoodValidationError(null);
-                }}
-                onMessageChange={(m) => {
-                  setTrafficMessage(m);
-                  setTabMessageValidationError(null);
-                }}
-                onSubmit={handleTrafficPulseSubmit}
-                onSignInClick={() => setShowAuthModal(true)}
-              />
+            {/* Tab Navigation */}
+            <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} secondaryOnly />
+
+            {/* AI Summary Stories - Swipeable quick brief */}
+            <AISummaryStories
+              activeTab={activeTab}
+              summary={summary}
+              summaryLoading={summaryLoading}
+              summaryError={summaryError}
+              pulsesCount={visiblePulses.length}
+              cityName={city}
+              events={ticketmasterEvents}
+              eventsLoading={ticketmasterLoading}
+              eventsError={ticketmasterError}
+              trafficLevel={trafficLevel}
+              trafficLoading={trafficLoading}
+              trafficError={trafficError}
+              onNavigateTab={setActiveTab}
+              vibeHeadline={cityMood?.vibeHeadline}
+              vibeEmoji={cityMood?.dominantMood ?? undefined}
+              temperature={weather?.temp}
+            />
+
+            {/* Traffic Flash Alert Banner - Shows for closures or heavy traffic */}
+            {(hasRoadClosure || (trafficIncidents && trafficIncidents.some(i => i.severity >= 3))) && (
+              <div
+                onClick={() => setActiveTab("traffic")}
+                className="mb-4 glass-card border border-red-500/30 bg-red-500/10 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:bg-red-500/20 transition-all stagger-reveal delay-100"
+              >
+                <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-red-500/20 animate-pulse" />
+                  <span className="text-xl relative z-10">🚨</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="inline-block w-2 H-2 rounded-full bg-red-500 animate-ping" />
+                    <h4 className="text-xs font-black text-red-400 uppercase tracking-wider">Traffic Alert</h4>
+                  </div>
+                  <p className="text-sm font-bold text-white truncate">
+                    {hasRoadClosure ? "Road closures reported nearby" : "Major traffic incidents detected"}
+                  </p>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
             )}
 
-            {/* Local Tab - conditionally rendered */}
-            {safeActiveTab === "local" && (
-              <LocalTab
-                cityName={city}
-                state={localState}
-                lat={localLat}
-                lon={localLon}
-                section={localSection}
-                onSectionChange={setLocalSection}
-                userId={sessionUser?.id ?? null}
-                onSignInClick={() => setShowAuthModal(true)}
-                isSignedIn={!!sessionUser}
-                identityReady={identityReady}
-                displayName={displayName}
-                pulseLoading={loading}
-                pulseMood={localMood}
-                pulseMessage={localMessage}
-                moodValidationError={tabMoodValidationError}
-                messageValidationError={tabMessageValidationError}
-                showValidationErrors={showTabValidationErrors}
-                onMoodChange={(m) => {
-                  setLocalMood(m);
-                  setTabMoodValidationError(null);
-                }}
-                onMessageChange={(m) => {
-                  setLocalMessage(m);
-                  setTabMessageValidationError(null);
-                }}
-                onSubmit={handleLocalPulseSubmit}
-              />
-            )}
+            {/* Live Vibes - Real-time crowd-sourced venue sentiment */}
+            <LiveVibes city={city} onNavigateToLocal={() => {
+              setLocalSection("deals");
+              setActiveTab("local");
+            }} />
 
-            {/* Status Tab - conditionally rendered */}
-            {safeActiveTab === "status" && (
-              <StatusTab
-                userId={sessionUser?.id ?? null}
-                city={city}
-              />
-            )}
-
-            {/* Pulse Tab - ALWAYS rendered, hidden with CSS when not active */}
-            {/* This prevents remounting the large pulse list when switching tabs */}
-            <div className={safeActiveTab === "pulse" ? "" : "hidden"}>
-              {/* Pulse Input */}
-              <div id="drop-a-pulse">
-                <PulseInput
-                  ref={pulseTextareaRef}
-                  mood={mood}
-                  tag={tag}
-                  message={message}
-                  displayName={displayName}
+            {/* Tab Content - Using CSS hiding for pulse tab to prevent remounting */}
+            <div className="space-y-4">
+              {/* Events Tab - conditionally rendered */}
+              {safeActiveTab === "events" && (
+                <EventCard
+                  events={ticketmasterEvents}
+                  isLoading={ticketmasterLoading}
+                  error={ticketmasterError}
+                  hasLocation={!!(selectedCity?.lat && selectedCity?.lon)}
+                  fallback={ticketmasterFallback}
+                  cityName={city}
+                  state={selectedCity?.state}
+                  lat={selectedCity?.lat}
+                  lon={selectedCity?.lon}
                   isSignedIn={!!sessionUser}
                   identityReady={identityReady}
-                  loading={loading}
-                  moodValidationError={moodValidationError}
-                  tagValidationError={tagValidationError}
-                  messageValidationError={validationError}
-                  showValidationErrors={showValidationErrors}
+                  displayName={displayName}
+                  pulseLoading={loading}
+                  pulseMood={eventsMood}
+                  pulseMessage={eventsMessage}
+                  moodValidationError={tabMoodValidationError}
+                  messageValidationError={tabMessageValidationError}
+                  showValidationErrors={showTabValidationErrors}
                   onMoodChange={(m) => {
-                    setMood(m);
-                    setMoodValidationError(null);
-                  }}
-                  onTagChange={(t) => {
-                    setTag(t);
-                    setTagValidationError(null);
+                    setEventsMood(m);
+                    setTabMoodValidationError(null);
                   }}
                   onMessageChange={(m) => {
-                    setMessage(m);
-                    setValidationError(null);
+                    setEventsMessage(m);
+                    setTabMessageValidationError(null);
                   }}
-                  onSubmit={handleAddPulse}
+                  onSubmit={handleEventsPulseSubmit}
                   onSignInClick={() => setShowAuthModal(true)}
-                  weather={weather}
                 />
-              </div>
-
-              {errorMsg && (
-                <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/40 rounded-lg px-3 py-2">
-                  {errorMsg}
-                </p>
               )}
 
-              {/* Filter chips */}
-              <div className="flex flex-wrap gap-2.5 pb-2">
-                {TAGS.map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setTagFilter(t)}
-                    className={`px-4 py-2 rounded-full text-xs font-bold tracking-wide transition-all duration-300 border ${tagFilter === t
-                      ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow-[0_0_15px_-3px_rgba(16,185,129,0.5)] scale-105 z-10"
-                      : "bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:text-white hover:border-white/10"
-                      }`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
+              {/* Traffic Tab - conditionally rendered */}
+              {safeActiveTab === "traffic" && (
+                <TrafficContent
+                  trafficLevel={trafficLevel}
+                  trafficLoading={trafficLoading}
+                  trafficError={trafficError}
+                  trafficPulses={trafficPulses}
+                  cityName={city}
+                  trafficIncidents={trafficIncidents}
+                  hasRoadClosure={hasRoadClosure}
+                  isSignedIn={!!sessionUser}
+                  identityReady={identityReady}
+                  displayName={displayName}
+                  pulseLoading={loading}
+                  pulseMood={trafficMood}
+                  pulseMessage={trafficMessage}
+                  moodValidationError={tabMoodValidationError}
+                  messageValidationError={tabMessageValidationError}
+                  showValidationErrors={showTabValidationErrors}
+                  onMoodChange={(m) => {
+                    setTrafficMood(m);
+                    setTabMoodValidationError(null);
+                  }}
+                  onMessageChange={(m) => {
+                    setTrafficMessage(m);
+                    setTabMessageValidationError(null);
+                  }}
+                  onSubmit={handleTrafficPulseSubmit}
+                  onSignInClick={() => setShowAuthModal(true)}
+                />
+              )}
 
-              {/* Pulses list */}
-              {/* "Happening Now" Banner - Pin critical active event/alert */}
-              {happeningNowPulse && tagFilter === "All" && (
-                <div className="mb-6 relative group cursor-default">
-                  <div className={`glass-card rounded-2xl p-4 border-2 transition-all duration-500 hover:shadow-[0_0_30px_-10px_rgba(255,255,255,0.1)] ${happeningNowPulse.tag === "Traffic"
-                    ? "bg-gradient-to-br from-amber-500/10 via-transparent to-orange-500/10 border-amber-500/30"
-                    : happeningNowPulse.tag === "Events"
-                      ? "bg-gradient-to-br from-purple-500/10 via-transparent to-pink-500/10 border-purple-500/30"
-                      : "bg-gradient-to-br from-sky-500/10 via-transparent to-blue-500/10 border-sky-500/30"
-                    }`}>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] px-2.5 py-1 rounded-full animate-pulse ${happeningNowPulse.tag === "Traffic"
-                          ? "bg-amber-500/20 text-amber-300"
-                          : happeningNowPulse.tag === "Events"
-                            ? "bg-purple-500/20 text-purple-300"
-                            : "bg-sky-500/20 text-sky-300"
-                          }`}>
-                          <span className="w-1.5 h-1.5 rounded-full bg-current shadow-[0_0_8px_currentColor]" />
-                          Live Now
-                        </span>
-                      </div>
-                      <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest group-hover:text-white/60 transition-colors">
-                        {happeningNowPulse.tag} Update
-                      </span>
-                    </div>
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-3xl shadow-inner border border-white/5 group-hover:scale-110 transition-transform duration-500">
-                        {happeningNowPulse.mood}
-                      </div>
-                      <div className="flex-1 pt-1">
-                        <p className="text-[15px] font-bold text-white leading-tight mb-1 group-hover:text-emerald-400 transition-colors">
-                          {happeningNowPulse.message.split('\n')[0]}
-                        </p>
-                        <p className="text-xs text-white/50 line-clamp-1 font-medium italic">
-                          Stay updated as it unfolds within the next few hours.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  {/* Subtle outer glow layer */}
-                  <div className={`absolute -inset-1 rounded-[20px] blur-xl opacity-20 -z-10 group-hover:opacity-30 transition-opacity ${happeningNowPulse.tag === "Traffic" ? "bg-amber-500" : happeningNowPulse.tag === "Events" ? "bg-purple-500" : "bg-sky-500"}`} />
+              {/* Local Tab - conditionally rendered */}
+              {safeActiveTab === "local" && (
+                <LocalTab
+                  cityName={city}
+                  state={localState}
+                  lat={localLat}
+                  lon={localLon}
+                  section={localSection}
+                  onSectionChange={setLocalSection}
+                  userId={sessionUser?.id ?? null}
+                  onSignInClick={() => setShowAuthModal(true)}
+                  isSignedIn={!!sessionUser}
+                  identityReady={identityReady}
+                  displayName={displayName}
+                  pulseLoading={loading}
+                  pulseMood={localMood}
+                  pulseMessage={localMessage}
+                  moodValidationError={tabMoodValidationError}
+                  messageValidationError={tabMessageValidationError}
+                  showValidationErrors={showTabValidationErrors}
+                  onMoodChange={(m) => {
+                    setLocalMood(m);
+                    setTabMoodValidationError(null);
+                  }}
+                  onMessageChange={(m) => {
+                    setLocalMessage(m);
+                    setTabMessageValidationError(null);
+                  }}
+                  onSubmit={handleLocalPulseSubmit}
+                />
+              )}
+
+              {/* Status Tab - conditionally rendered */}
+              {safeActiveTab === "status" && (
+                <StatusTab
+                  userId={sessionUser?.id ?? null}
+                  city={city}
+                />
+              )}
+
+              {/* Pulse Tab - ALWAYS rendered, hidden with CSS when not active */}
+              {/* This prevents remounting the large pulse list when switching tabs */}
+              <div className={safeActiveTab === "pulse" ? "" : "hidden"}>
+                {/* Pulse Input */}
+                <div id="drop-a-pulse">
+                  <PulseInput
+                    ref={pulseTextareaRef}
+                    mood={mood}
+                    tag={tag}
+                    message={message}
+                    displayName={displayName}
+                    isSignedIn={!!sessionUser}
+                    identityReady={identityReady}
+                    loading={loading}
+                    moodValidationError={moodValidationError}
+                    tagValidationError={tagValidationError}
+                    messageValidationError={validationError}
+                    showValidationErrors={showValidationErrors}
+                    onMoodChange={(m) => {
+                      setMood(m);
+                      setMoodValidationError(null);
+                    }}
+                    onTagChange={(t) => {
+                      setTag(t);
+                      setTagValidationError(null);
+                    }}
+                    onMessageChange={(m) => {
+                      setMessage(m);
+                      setValidationError(null);
+                    }}
+                    onSubmit={handleAddPulse}
+                    onSignInClick={() => setShowAuthModal(true)}
+                    weather={weather}
+                  />
                 </div>
-              )}
 
-              {/* FIXED: Show loading state until initial fetch completes to prevent
-                          the "No pulses yet" flash that was causing user confusion */}
-              <section className="space-y-3 pb-12">
-                {(loading || !initialPulsesFetched) && pulses.length === 0 ? (
-                  <div className="bg-slate-800/60 border border-dashed border-slate-700/50 rounded-xl px-4 py-10 text-center text-sm text-slate-400">
-                    Loading pulses for{" "}
-                    <span className="font-semibold text-white">
-                      {city}
-                    </span>
-                    ...
-                  </div>
-                ) : filteredPulses.length === 0 ? (
-                  <div className="bg-slate-800/60 border border-dashed border-slate-700/50 rounded-xl px-4 py-10 text-center text-sm text-slate-400">
-                    {tagFilter === "All" ? (
-                      <>
-                        No pulses yet for{" "}
-                        <span className="font-semibold text-white">
-                          {city}
+                {errorMsg && (
+                  <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/40 rounded-lg px-3 py-2">
+                    {errorMsg}
+                  </p>
+                )}
+
+                {/* Filter chips */}
+                <div className="flex flex-wrap gap-2.5 pb-2">
+                  {TAGS.map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setTagFilter(t)}
+                      className={`px-4 py-2 rounded-full text-xs font-bold tracking-wide transition-all duration-300 border ${tagFilter === t
+                        ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow-[0_0_15px_-3px_rgba(16,185,129,0.5)] scale-105 z-10"
+                        : "bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:text-white hover:border-white/10"
+                        }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Pulses list */}
+                {/* "Happening Now" Banner - Pin critical active event/alert */}
+                {happeningNowPulse && tagFilter === "All" && (
+                  <div className="mb-6 relative group cursor-default">
+                    <div className={`glass-card rounded-2xl p-4 border-2 transition-all duration-500 hover:shadow-[0_0_30px_-10px_rgba(255,255,255,0.1)] ${happeningNowPulse.tag === "Traffic"
+                      ? "bg-gradient-to-br from-amber-500/10 via-transparent to-orange-500/10 border-amber-500/30"
+                      : happeningNowPulse.tag === "Events"
+                        ? "bg-gradient-to-br from-purple-500/10 via-transparent to-pink-500/10 border-purple-500/30"
+                        : "bg-gradient-to-br from-sky-500/10 via-transparent to-blue-500/10 border-sky-500/30"
+                      }`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] px-2.5 py-1 rounded-full animate-pulse ${happeningNowPulse.tag === "Traffic"
+                            ? "bg-amber-500/20 text-amber-300"
+                            : happeningNowPulse.tag === "Events"
+                              ? "bg-purple-500/20 text-purple-300"
+                              : "bg-sky-500/20 text-sky-300"
+                            }`}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-current shadow-[0_0_8px_currentColor]" />
+                            Live Now
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest group-hover:text-white/60 transition-colors">
+                          {happeningNowPulse.tag} Update
                         </span>
-                        . Be the first to set the vibe.
-                      </>
-                    ) : (
-                      <>
-                        No <span className="font-semibold text-white">{tagFilter}</span> pulses in{" "}
-                        <span className="font-semibold text-white">{city}</span>.{" "}
-                        <button
-                          onClick={() => setTagFilter("All")}
-                          className="text-emerald-400 hover:text-emerald-300 underline underline-offset-2"
-                        >
-                          Show all
-                        </button>
-                      </>
-                    )}
+                      </div>
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-3xl shadow-inner border border-white/5 group-hover:scale-110 transition-transform duration-500">
+                          {happeningNowPulse.mood}
+                        </div>
+                        <div className="flex-1 pt-1">
+                          <p className="text-[15px] font-bold text-white leading-tight mb-1 group-hover:text-emerald-400 transition-colors">
+                            {happeningNowPulse.message.split('\n')[0]}
+                          </p>
+                          <p className="text-xs text-white/50 line-clamp-1 font-medium italic">
+                            Stay updated as it unfolds within the next few hours.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Subtle outer glow layer */}
+                    <div className={`absolute -inset-1 rounded-[20px] blur-xl opacity-20 -z-10 group-hover:opacity-30 transition-opacity ${happeningNowPulse.tag === "Traffic" ? "bg-amber-500" : happeningNowPulse.tag === "Events" ? "bg-purple-500" : "bg-sky-500"}`} />
                   </div>
-                ) : (
-                  <>
-                    {/* In-radius pulses (within 10 miles) - exclude happeningNow to avoid duplication */}
-                    {inRadiusPulses
-                      .filter((pulse) => !happeningNowPulse || pulse.id !== happeningNowPulse.id)
-                      .map((pulse) => (
+                )}
+
+                {/* FIXED: Show loading state until initial fetch completes to prevent
+                          the "No pulses yet" flash that was causing user confusion */}
+                <section className="space-y-3 pb-12">
+                  {(loading || !initialPulsesFetched) && pulses.length === 0 ? (
+                    <div className="bg-slate-800/60 border border-dashed border-slate-700/50 rounded-xl px-4 py-10 text-center text-sm text-slate-400">
+                      Loading pulses for{" "}
+                      <span className="font-semibold text-white">
+                        {city}
+                      </span>
+                      ...
+                    </div>
+                  ) : filteredPulses.length === 0 ? (
+                    <div className="bg-slate-800/60 border border-dashed border-slate-700/50 rounded-xl px-4 py-10 text-center text-sm text-slate-400">
+                      {tagFilter === "All" ? (
+                        <>
+                          No pulses yet for{" "}
+                          <span className="font-semibold text-white">
+                            {city}
+                          </span>
+                          . Be the first to set the vibe.
+                        </>
+                      ) : (
+                        <>
+                          No <span className="font-semibold text-white">{tagFilter}</span> pulses in{" "}
+                          <span className="font-semibold text-white">{city}</span>.{" "}
+                          <button
+                            onClick={() => setTagFilter("All")}
+                            className="text-emerald-400 hover:text-emerald-300 underline underline-offset-2"
+                          >
+                            Show all
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      {/* In-radius pulses (within 10 miles) - exclude happeningNow to avoid duplication */}
+                      {inRadiusPulses
+                        .filter((pulse) => !happeningNowPulse || pulse.id !== happeningNowPulse.id)
+                        .map((pulse) => (
+                          <PulseCard
+                            key={pulse.id}
+                            pulse={pulse}
+                            isOwnPulse={sessionUser?.id === pulse.user_id}
+                            isFavorite={favoritePulseIds.includes(pulse.id)}
+                            onToggleFavorite={handleToggleFavorite}
+                            onDelete={handleDeletePulse}
+                            reporterId={sessionUser?.id}
+                            userIdentifier={sessionUser ? displayName : undefined}
+                            authorRank={pulse.user_id ? authorStats[pulse.user_id]?.rank : null}
+                            authorLevel={pulse.user_id ? authorStats[pulse.user_id]?.level : undefined}
+                          />
+                        ))}
+
+                      {/* Visual separator for out-of-radius content */}
+                      {outOfRadiusPulses.length > 0 && inRadiusPulses.length > 0 && (
+                        <div className="relative my-6">
+                          <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t border-dashed border-amber-500/30" />
+                          </div>
+                          <div className="relative flex justify-center">
+                            <span className="bg-slate-950 px-4 py-1 text-xs text-amber-400/80 font-medium rounded-full border border-amber-500/30">
+                              Beyond 10-mile radius
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Out-of-radius pulses (beyond 10 miles) */}
+                      {outOfRadiusPulses.map((pulse) => (
                         <PulseCard
                           key={pulse.id}
                           pulse={pulse}
@@ -3938,109 +3991,79 @@ export default function Home() {
                         />
                       ))}
 
-                    {/* Visual separator for out-of-radius content */}
-                    {outOfRadiusPulses.length > 0 && inRadiusPulses.length > 0 && (
-                      <div className="relative my-6">
-                        <div className="absolute inset-0 flex items-center">
-                          <div className="w-full border-t border-dashed border-amber-500/30" />
+                      {/* Load more button */}
+                      {hasMorePulses && tagFilter === "All" && (
+                        <div className="flex justify-center pt-4">
+                          <button
+                            onClick={handleLoadMorePulses}
+                            disabled={loadingMore}
+                            className="px-6 py-2 rounded-lg bg-slate-800/60 border border-slate-700/50 text-sm text-slate-300 hover:bg-slate-700 hover:border-emerald-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                          >
+                            {loadingMore
+                              ? "Loading..."
+                              : "Load more pulses"}
+                          </button>
                         </div>
-                        <div className="relative flex justify-center">
-                          <span className="bg-slate-950 px-4 py-1 text-xs text-amber-400/80 font-medium rounded-full border border-amber-500/30">
-                            Beyond 10-mile radius
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Out-of-radius pulses (beyond 10 miles) */}
-                    {outOfRadiusPulses.map((pulse) => (
-                      <PulseCard
-                        key={pulse.id}
-                        pulse={pulse}
-                        isOwnPulse={sessionUser?.id === pulse.user_id}
-                        isFavorite={favoritePulseIds.includes(pulse.id)}
-                        onToggleFavorite={handleToggleFavorite}
-                        onDelete={handleDeletePulse}
-                        reporterId={sessionUser?.id}
-                        userIdentifier={sessionUser ? displayName : undefined}
-                        authorRank={pulse.user_id ? authorStats[pulse.user_id]?.rank : null}
-                        authorLevel={pulse.user_id ? authorStats[pulse.user_id]?.level : undefined}
-                      />
-                    ))}
-
-                    {/* Load more button */}
-                    {hasMorePulses && tagFilter === "All" && (
-                      <div className="flex justify-center pt-4">
-                        <button
-                          onClick={handleLoadMorePulses}
-                          disabled={loadingMore}
-                          className="px-6 py-2 rounded-lg bg-slate-800/60 border border-slate-700/50 text-sm text-slate-300 hover:bg-slate-700 hover:border-emerald-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                        >
-                          {loadingMore
-                            ? "Loading..."
-                            : "Load more pulses"}
-                        </button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </section>
-            </div>
-          </div>
-
-          {/* Disclaimer */}
-          <div className="mt-8">
-            <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl px-4 py-3 text-center">
-              <p className="text-[11px] text-slate-500 leading-relaxed">
-                <strong>Disclaimer:</strong> Voxlo displays user-submitted
-                content. Posts may be inaccurate, incomplete, or misleading. Do not
-                rely on this information for safety, travel, emergency, or
-                decision-making purposes. All posts reflect the views of individual
-                users, not the app&apos;s creators.
-              </p>
-            </div>
-          </div>
-
-          {/* Attribution Footer */}
-          <footer className="py-6 pb-32 text-center border-t border-slate-800 mt-6">
-            <div className="space-y-3">
-              <p className="text-[10px] text-slate-500 leading-relaxed max-w-md mx-auto">
-                Voxlo aggregates real-time data from multiple sources to provide a hyperlocal experience.
-              </p>
-              <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
-                <span>Weather by <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">Open-Meteo</a></span>
-                <span>•</span>
-                <span>Traffic by <a href="https://www.tomtom.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">TomTom</a></span>
-                <span>•</span>
-                <span>Maps & Geocoding by <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">OpenStreetMap</a></span>
+                      )}
+                    </>
+                  )}
+                </section>
               </div>
-              <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
-                <span>Events via <a href="https://www.ticketmaster.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">Ticketmaster</a></span>
-                <span>•</span>
-                <span>Places by <a href="https://foursquare.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">Foursquare</a></span>
-                <span>•</span>
-                <span>Gas info by <a href="https://www.eia.gov/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">EIA</a></span>
-              </div>
-              <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
-                <span>AI by <a href="https://openai.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">OpenAI</a> & <a href="https://www.anthropic.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">Anthropic</a></span>
-                <span>•</span>
-                <span>Trust & Safety by <a href="https://perspectiveapi.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">Google Perspective</a></span>
-              </div>
-              <p className="text-[11px] text-slate-600 mt-4 flex justify-center gap-4">
-                <a
-                  href="/terms"
-                  className="text-slate-500 hover:text-emerald-400 transition"
-                >
-                  Terms of Service
-                </a>
-                <a
-                  href="/privacy"
-                  className="text-slate-500 hover:text-emerald-400 transition"
-                >
-                  Privacy Policy
-                </a>
-              </p>
             </div>
+
+            {/* Disclaimer */}
+            <div className="mt-8">
+              <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl px-4 py-3 text-center">
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  <strong>Disclaimer:</strong> Voxlo displays user-submitted
+                  content. Posts may be inaccurate, incomplete, or misleading. Do not
+                  rely on this information for safety, travel, emergency, or
+                  decision-making purposes. All posts reflect the views of individual
+                  users, not the app&apos;s creators.
+                </p>
+              </div>
+            </div>
+
+            {/* Attribution Footer */}
+            <footer className="py-6 pb-32 text-center border-t border-slate-800 mt-6">
+              <div className="space-y-3">
+                <p className="text-[10px] text-slate-500 leading-relaxed max-w-md mx-auto">
+                  Voxlo aggregates real-time data from multiple sources to provide a hyperlocal experience.
+                </p>
+                <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
+                  <span>Weather by <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">Open-Meteo</a></span>
+                  <span>•</span>
+                  <span>Traffic by <a href="https://www.tomtom.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">TomTom</a></span>
+                  <span>•</span>
+                  <span>Maps & Geocoding by <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">OpenStreetMap</a></span>
+                </div>
+                <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
+                  <span>Events via <a href="https://www.ticketmaster.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">Ticketmaster</a></span>
+                  <span>•</span>
+                  <span>Places by <a href="https://foursquare.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">Foursquare</a></span>
+                  <span>•</span>
+                  <span>Gas info by <a href="https://www.eia.gov/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">EIA</a></span>
+                </div>
+                <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
+                  <span>AI by <a href="https://openai.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">OpenAI</a> & <a href="https://www.anthropic.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">Anthropic</a></span>
+                  <span>•</span>
+                  <span>Trust & Safety by <a href="https://perspectiveapi.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">Google Perspective</a></span>
+                </div>
+                <p className="text-[11px] text-slate-600 mt-4 flex justify-center gap-4">
+                  <a
+                    href="/terms"
+                    className="text-slate-500 hover:text-emerald-400 transition"
+                  >
+                    Terms of Service
+                  </a>
+                  <a
+                    href="/privacy"
+                    className="text-slate-500 hover:text-emerald-400 transition"
+                  >
+                    Privacy Policy
+                  </a>
+                </p>
+              </div>
             </footer>
           </div>
         </main>

@@ -463,6 +463,8 @@ export async function GET(req: NextRequest) {
         headers: {
           "User-Agent": "CommunityPulse/1.0",
         },
+        // MOBILE FIX: Add 4-second timeout for mobile reliability
+        signal: AbortSignal.timeout(4000),
       });
 
       if (geocodeRes.ok) {
@@ -537,8 +539,8 @@ export async function GET(req: NextRequest) {
       headers: {
         Accept: "application/json",
       },
-      // Set a reasonable timeout
-      signal: AbortSignal.timeout(10000),
+      // MOBILE FIX: Reduced timeout for mobile reliability (was 10s, now 6s)
+      signal: AbortSignal.timeout(6000),
     });
 
     // Handle rate limiting

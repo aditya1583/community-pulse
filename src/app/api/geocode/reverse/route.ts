@@ -25,7 +25,11 @@ export async function GET(req: NextRequest) {
     const url = `https://api.openweathermap.org/geo/1.0/reverse?lat=${lat}&lon=${lon}&limit=1&appid=${GEOCODING_API_KEY}`;
 
     try {
-        const res = await fetch(url, { next: { revalidate: 3600 } });
+        // MOBILE FIX: Add 4-second timeout for mobile reliability
+        const res = await fetch(url, {
+            next: { revalidate: 3600 },
+            signal: AbortSignal.timeout(4000),
+        });
         const data = await res.json();
 
         if (!res.ok || !Array.isArray(data) || data.length === 0) {

@@ -181,9 +181,10 @@ export async function GET(req: NextRequest) {
     // Fetch traffic incidents
     const incidentsUrl = `https://api.tomtom.com/traffic/services/5/incidentDetails?bbox=${bbox}&key=${apiKey}&fields={incidents{type,geometry{type,coordinates},properties{iconCategory,magnitudeOfDelay,events{description,code},startTime,endTime,from,to,length,delay,roadNumbers,aci{probabilityOfOccurrence,numberOfReports,lastReportTime}}}}`;
 
+    // MOBILE FIX: Add aggressive 4-second timeout for mobile reliability
     const [flowResponse, incidentsResponse] = await Promise.allSettled([
-      fetch(flowUrl),
-      fetch(incidentsUrl)
+      fetch(flowUrl, { signal: AbortSignal.timeout(4000) }),
+      fetch(incidentsUrl, { signal: AbortSignal.timeout(4000) })
     ]);
 
     let flowPercent = 75; // Default
