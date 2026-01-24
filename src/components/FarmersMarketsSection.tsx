@@ -23,6 +23,7 @@ export default function FarmersMarketsSection({
   const [dataSource, setDataSource] = useState<"usda" | "foursquare" | "osm" | null>(null);
 
   const fetchMarkets = useCallback(async () => {
+    console.log(`[FarmersMarkets] Fetching markets for ${cityName}, ${state}, coords: ${lat},${lon}`);
     try {
       setLoading(true);
       setError(null);
@@ -33,8 +34,14 @@ export default function FarmersMarketsSection({
       if (state) url += `&state=${encodeURIComponent(state)}`;
       if (lat && lon) url += `&lat=${lat}&lon=${lon}`;
 
-      const response = await fetch(url);
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
       const data = await response.json();
+      console.log("[FarmersMarkets] API response:", data);
 
       if (data.searchUrl) {
         setSearchUrl(data.searchUrl);

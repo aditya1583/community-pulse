@@ -43,6 +43,10 @@ export function useGeocodingAutocomplete(options: Options = {}) {
 
     const requestId = ++lastRequestId.current;
     const controller = new AbortController();
+
+    // Add timeout to prevent hanging
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     const timer = setTimeout(async () => {
       setLoading(true);
       setError(null);
@@ -52,6 +56,7 @@ export function useGeocodingAutocomplete(options: Options = {}) {
           { signal: controller.signal }
         );
 
+        clearTimeout(timeoutId);
         const data = (await res.json()) as GeocodeApiResponse;
 
         if (!res.ok) {
@@ -69,7 +74,12 @@ export function useGeocodingAutocomplete(options: Options = {}) {
         setHighlightedIndex(results.length ? 0 : -1);
         setOpen(true);
       } catch (err) {
-        if (controller.signal.aborted) return;
+        clearTimeout(timeoutId);
+        if (controller.signal.aborted) {
+          // Even on abort, clear loading state to prevent stuck "Searching..."
+          setLoading(false);
+          return;
+        }
         const message =
           err instanceof Error
             ? err.message
@@ -88,6 +98,9 @@ export function useGeocodingAutocomplete(options: Options = {}) {
     return () => {
       controller.abort();
       clearTimeout(timer);
+      clearTimeout(timeoutId);
+      // Clear loading state on cleanup to prevent stuck "Searching..."
+      setLoading(false);
     };
   }, [inputValue, minLength, debounceMs, limit]);
 
@@ -99,6 +112,9 @@ export function useGeocodingAutocomplete(options: Options = {}) {
     setNotFound(false);
     setHighlightedIndex(-1);
     setOpen(false);
+    // Ensure loading state is cleared when a city is selected
+    setLoading(false);
+    setError(null);
   }, []);
 
   const clearSuggestions = () => {
