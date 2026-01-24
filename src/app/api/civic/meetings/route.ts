@@ -12,7 +12,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseAnon, getSupabaseService } from "../../../../lib/supabaseServer";
+import { getSupabaseAnon, getSupabaseService } from "../../../../../lib/supabaseServer";
 import type {
   CivicMeeting,
   CivicTopic,

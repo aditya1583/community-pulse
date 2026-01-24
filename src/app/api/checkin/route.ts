@@ -9,7 +9,7 @@
  * - Manual check-in from venue detail page
  */
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseService } from "../../../lib/supabaseServer";
+import { getSupabaseService } from "../../../../lib/supabaseServer";
 
 type CheckInRequest = {
   venue_name: string;
