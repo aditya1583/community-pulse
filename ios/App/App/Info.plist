@@ -47,5 +47,9 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Voxlo uses your location to show hyperlocal content, traffic, events, and community vibes within your 10-mile radius.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Voxlo uses your location to show hyperlocal content, traffic, events, and community vibes within your 10-mile radius.</string>
 </dict>
 </plist>

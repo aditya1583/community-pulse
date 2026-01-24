@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { Capacitor } from "@capacitor/core";
+import { Geolocation } from "@capacitor/geolocation";
 
 export type GeolocationState = {
   /** User's latitude */
@@ -40,10 +42,18 @@ type StoredLocation = {
 };
 
 /**
+ * Check if running in Capacitor native app
+ */
+function isNativeApp(): boolean {
+  return Capacitor.isNativePlatform();
+}
+
+/**
  * useGeolocation Hook
  *
  * Handles device geolocation with:
- * - Permission request flow
+ * - Capacitor Geolocation plugin for native apps
+ * - Browser navigator.geolocation for web
  * - Reverse geocoding to get city/state
  * - LocalStorage persistence (24h cache)
  * - Graceful fallbacks
@@ -86,150 +96,191 @@ export function useGeolocation(): GeolocationState & GeolocationActions {
       }
     }
 
-    // Check permission status
-    if (!navigator.geolocation) {
-      setState(prev => ({
-        ...prev,
-        loading: false,
-        permissionStatus: "unavailable",
-        error: "Geolocation not supported",
-      }));
-      return;
-    }
+    // Check initial permission status
+    checkPermissionStatus();
+  }, []);
 
-    // Check permissions (Skip on iOS/Capacitor as navigator.permissions is flaky)
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (window as any).Capacitor;
+  // Check permission status without requesting
+  const checkPermissionStatus = useCallback(async () => {
+    if (isNativeApp()) {
+      // Use Capacitor permission check
+      try {
+        const status = await Geolocation.checkPermissions();
+        const permissionState = status.location === "granted" ? "granted"
+          : status.location === "denied" ? "denied"
+            : "prompt";
 
-    if (navigator.permissions && !isIOS) {
-      navigator.permissions.query({ name: "geolocation" }).then((result) => {
         setState(prev => ({
           ...prev,
           loading: false,
-          permissionStatus: result.state as "prompt" | "granted" | "denied",
+          permissionStatus: permissionState,
         }));
 
         // If already granted, get location automatically
-        if (result.state === "granted") {
+        if (permissionState === "granted") {
           requestLocationInternal();
         }
-      }).catch(() => {
+      } catch {
         setState(prev => ({ ...prev, loading: false }));
-      });
+      }
     } else {
-      // On iOS or browsers without permission API, we just assume "prompt" state
-      // and stop loading immediately so the user sees the "Use Location" button.
-      setState(prev => ({ ...prev, loading: false }));
+      // Web: Check navigator.geolocation
+      if (!navigator.geolocation) {
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          permissionStatus: "unavailable",
+          error: "Geolocation not supported",
+        }));
+        return;
+      }
+
+      // Check permissions via Permissions API (if available)
+      if (navigator.permissions) {
+        try {
+          const result = await navigator.permissions.query({ name: "geolocation" });
+          setState(prev => ({
+            ...prev,
+            loading: false,
+            permissionStatus: result.state as "prompt" | "granted" | "denied",
+          }));
+
+          // If already granted, get location automatically
+          if (result.state === "granted") {
+            requestLocationInternal();
+          }
+        } catch {
+          setState(prev => ({ ...prev, loading: false }));
+        }
+      } else {
+        // No Permissions API, assume "prompt" state
+        setState(prev => ({ ...prev, loading: false }));
+      }
     }
   }, []);
 
   // Internal function to get location
   const requestLocationInternal = useCallback(async (): Promise<boolean> => {
-    if (!navigator.geolocation) {
-      setState(prev => ({
-        ...prev,
-        error: "Geolocation not supported by your browser",
-        permissionStatus: "unavailable",
-      }));
-      return false;
-    }
-
     setState(prev => ({ ...prev, loading: true, error: null }));
 
-    return new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
+    try {
+      let latitude: number;
+      let longitude: number;
 
-          // Reverse geocode to get city name
-          try {
-            const geoResult = await reverseGeocode(latitude, longitude);
+      if (isNativeApp()) {
+        // Use Capacitor Geolocation plugin
+        console.log("[Geolocation] Using Capacitor plugin");
 
-            const locationData: StoredLocation = {
-              lat: latitude,
-              lon: longitude,
-              cityName: geoResult.city,
-              stateCode: geoResult.state,
-              displayName: `${geoResult.city}, ${geoResult.state}`,
-              timestamp: Date.now(),
-            };
-
-            // Store in localStorage
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(locationData));
-
-            setState({
-              lat: latitude,
-              lon: longitude,
-              cityName: geoResult.city,
-              stateCode: geoResult.state,
-              displayName: locationData.displayName,
-              loading: false,
-              error: null,
-              permissionStatus: "granted",
-            });
-
-            resolve(true);
-          } catch (geoError) {
-            // Even if reverse geocoding fails, we have coordinates
-            const locationData: StoredLocation = {
-              lat: latitude,
-              lon: longitude,
-              cityName: "Your Area",
-              stateCode: "",
-              displayName: "Near You",
-              timestamp: Date.now(),
-            };
-
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(locationData));
-
-            setState({
-              lat: latitude,
-              lon: longitude,
-              cityName: "Your Area",
-              stateCode: "",
-              displayName: "Near You",
-              loading: false,
-              error: null,
-              permissionStatus: "granted",
-            });
-
-            resolve(true);
-          }
-        },
-        (error) => {
-          let errorMessage = "Unable to get location";
-          let status: GeolocationState["permissionStatus"] = "denied";
-
-          switch (error.code) {
-            case error.PERMISSION_DENIED:
-              errorMessage = "Location permission denied";
-              status = "denied";
-              break;
-            case error.POSITION_UNAVAILABLE:
-              errorMessage = "Location unavailable";
-              status = "unavailable";
-              break;
-            case error.TIMEOUT:
-              errorMessage = "Location request timed out";
-              status = "prompt";
-              break;
-          }
-
+        // Request permission first
+        const permissionStatus = await Geolocation.requestPermissions();
+        if (permissionStatus.location !== "granted") {
           setState(prev => ({
             ...prev,
             loading: false,
-            error: errorMessage,
-            permissionStatus: status,
+            error: "Location permission denied",
+            permissionStatus: "denied",
           }));
+          return false;
+        }
 
-          resolve(false);
-        },
-        {
-          enableHighAccuracy: false, // Don't need GPS precision, cell/wifi is fine
+        // Get current position
+        const position = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: false,
           timeout: 10000,
           maximumAge: 5 * 60 * 1000, // Accept 5-minute old position
+        });
+
+        latitude = position.coords.latitude;
+        longitude = position.coords.longitude;
+      } else {
+        // Use browser navigator.geolocation
+        console.log("[Geolocation] Using browser API");
+
+        if (!navigator.geolocation) {
+          setState(prev => ({
+            ...prev,
+            loading: false,
+            error: "Geolocation not supported by your browser",
+            permissionStatus: "unavailable",
+          }));
+          return false;
         }
-      );
-    });
+
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: false,
+            timeout: 10000,
+            maximumAge: 5 * 60 * 1000,
+          });
+        });
+
+        latitude = position.coords.latitude;
+        longitude = position.coords.longitude;
+      }
+
+      // Reverse geocode to get city name
+      console.log(`[Geolocation] Got coords: ${latitude}, ${longitude}`);
+      const geoResult = await reverseGeocode(latitude, longitude);
+
+      const locationData: StoredLocation = {
+        lat: latitude,
+        lon: longitude,
+        cityName: geoResult.city,
+        stateCode: geoResult.state,
+        displayName: `${geoResult.city}, ${geoResult.state}`,
+        timestamp: Date.now(),
+      };
+
+      // Store in localStorage
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(locationData));
+
+      setState({
+        lat: latitude,
+        lon: longitude,
+        cityName: geoResult.city,
+        stateCode: geoResult.state,
+        displayName: locationData.displayName,
+        loading: false,
+        error: null,
+        permissionStatus: "granted",
+      });
+
+      return true;
+    } catch (error: unknown) {
+      console.error("[Geolocation] Error:", error);
+
+      let errorMessage = "Unable to get location";
+      let status: GeolocationState["permissionStatus"] = "denied";
+
+      if (error instanceof GeolocationPositionError) {
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = "Location permission denied";
+            status = "denied";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = "Location unavailable";
+            status = "unavailable";
+            break;
+          case error.TIMEOUT:
+            errorMessage = "Location request timed out";
+            status = "prompt";
+            break;
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+        // Keep generic denied status for Capacitor errors
+      }
+
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: errorMessage,
+        permissionStatus: status,
+      }));
+
+      return false;
+    }
   }, []);
 
   // Public request function
