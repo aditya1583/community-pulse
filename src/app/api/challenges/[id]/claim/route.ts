@@ -13,16 +13,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+// Helper to get supabase client safely (runtime only)
+const getSupabase = () => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Service role client for writes
-const supabase = createClient(supabaseUrl, serviceRoleKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
-});
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("Missing Supabase credentials");
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+};
 
 // ============================================================================
 // TYPES
@@ -125,7 +131,7 @@ export async function POST(
 
     // Call the database function to claim the challenge
     // This handles all validation, distance checks, and XP awards atomically
-    const { data, error } = await supabase.rpc("claim_challenge", {
+    const { data, error } = await getSupabase().rpc("claim_challenge", {
       p_challenge_id: challengeId,
       p_user_identifier: body.userIdentifier,
       p_user_id: userId,
