@@ -97,8 +97,10 @@ export function useGeolocation(): GeolocationState & GeolocationActions {
       return;
     }
 
-    // Check current permission without prompting
-    if (navigator.permissions) {
+    // Check permissions (Skip on iOS/Capacitor as navigator.permissions is flaky)
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (window as any).Capacitor;
+
+    if (navigator.permissions && !isIOS) {
       navigator.permissions.query({ name: "geolocation" }).then((result) => {
         setState(prev => ({
           ...prev,
@@ -114,6 +116,8 @@ export function useGeolocation(): GeolocationState & GeolocationActions {
         setState(prev => ({ ...prev, loading: false }));
       });
     } else {
+      // On iOS or browsers without permission API, we just assume "prompt" state
+      // and stop loading immediately so the user sees the "Use Location" button.
       setState(prev => ({ ...prev, loading: false }));
     }
   }, []);
