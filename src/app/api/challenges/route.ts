@@ -13,11 +13,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+// Safe getter for Supabase client (runtime only)
+const getSupabase = () => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// Use anon key for read-only operations
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("Missing Supabase environment variables");
+  }
+
+  return createClient(supabaseUrl, supabaseAnonKey);
+};
 
 // ============================================================================
 // TYPES
@@ -84,7 +90,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Call the database function to get active challenges
-    const { data, error } = await supabase.rpc("get_active_challenges", {
+    const { data, error } = await getSupabase().rpc("get_active_challenges", {
       p_city: city,
       p_user_identifier: userIdentifier,
     });

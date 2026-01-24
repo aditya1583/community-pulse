@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { getSupabaseService } from "../../../../lib/supabaseServer";
 
 /**
  * GET /api/live-vibes?city=...
@@ -26,7 +21,7 @@ export async function GET(request: NextRequest) {
   try {
     // Get recent non-expired vibes filtered by city
     // Using .ilike for case-insensitive city matching
-    let query = supabase
+    let query = getSupabaseService()
       .from("venue_vibes")
       .select("id, venue_id, venue_name, vibe_type, created_at, expires_at, city")
       .gt("expires_at", new Date().toISOString())

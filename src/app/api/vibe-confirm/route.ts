@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { checkRateLimit, buildRateLimitHeaders } from "@/lib/rateLimit";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { getSupabaseService } from "../../../../lib/supabaseServer";
 
 const VALID_ACTIONS = ["confirm", "contradict"] as const;
 type ConfirmAction = typeof VALID_ACTIONS[number];
@@ -29,7 +24,7 @@ export async function GET(request: NextRequest) {
   try {
     // If vibeId provided, get stats for specific vibe
     if (vibeId) {
-      const { data, error } = await supabase
+      const { data, error } = await getSupabaseService()
         .from("vibe_confirmations")
         .select("action")
         .eq("vibe_id", vibeId);
@@ -55,14 +50,14 @@ export async function GET(request: NextRequest) {
           confirms > contradicts
             ? "confirm"
             : contradicts > confirms
-            ? "contradict"
-            : "split",
+              ? "contradict"
+              : "split",
       });
     }
 
     // If venueId provided, get all vibes with their confirmation stats
     if (venueId) {
-      const { data: vibes, error: vibesError } = await supabase
+      const { data: vibes, error: vibesError } = await getSupabaseService()
         .from("venue_vibes")
         .select("id, venue_id, venue_name, vibe_type, user_id, created_at, expires_at")
         .eq("venue_id", venueId)
@@ -80,7 +75,7 @@ export async function GET(request: NextRequest) {
       // Get confirmation stats for each vibe
       const vibesWithStats = await Promise.all(
         (vibes || []).map(async (vibe) => {
-          const { data: confirmations } = await supabase
+          const { data: confirmations } = await getSupabaseService()
             .from("vibe_confirmations")
             .select("action")
             .eq("vibe_id", vibe.id);
@@ -92,7 +87,7 @@ export async function GET(request: NextRequest) {
           let authorTrustScore = 50;
           let authorBadge = "newcomer";
           if (vibe.user_id) {
-            const { data: trustData } = await supabase
+            const { data: trustData } = await getSupabaseService()
               .from("user_trust_scores")
               .select("trust_score")
               .eq("user_id", vibe.user_id)
@@ -104,12 +99,12 @@ export async function GET(request: NextRequest) {
                 authorTrustScore >= 90
                   ? "local_hero"
                   : authorTrustScore >= 75
-                  ? "trusted_local"
-                  : authorTrustScore >= 60
-                  ? "regular"
-                  : authorTrustScore >= 40
-                  ? "newcomer"
-                  : "learning";
+                    ? "trusted_local"
+                    : authorTrustScore >= 60
+                      ? "regular"
+                      : authorTrustScore >= 40
+                        ? "newcomer"
+                        : "learning";
             }
           }
 
@@ -193,7 +188,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the original vibe
-    const { data: vibe, error: vibeError } = await supabase
+    const { data: vibe, error: vibeError } = await getSupabaseService()
       .from("venue_vibes")
       .select("*")
       .eq("id", vibeId)
@@ -212,7 +207,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if already confirmed
-    const { data: existingConfirmation } = await supabase
+    const { data: existingConfirmation } = await getSupabaseService()
       .from("vibe_confirmations")
       .select("id, action")
       .eq("vibe_id", vibeId)
@@ -221,7 +216,7 @@ export async function POST(request: NextRequest) {
 
     if (existingConfirmation) {
       // Update existing confirmation
-      const { error: updateError } = await supabase
+      const { error: updateError } = await getSupabaseService()
         .from("vibe_confirmations")
         .update({ action, created_at: new Date().toISOString() })
         .eq("id", existingConfirmation.id);
@@ -236,7 +231,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert new confirmation
-    const { error: insertError } = await supabase.from("vibe_confirmations").insert({
+    const { error: insertError } = await getSupabaseService().from("vibe_confirmations").insert({
       vibe_id: vibeId,
       venue_id: vibe.venue_id,
       original_vibe_type: vibe.vibe_type,
@@ -257,7 +252,7 @@ export async function POST(request: NextRequest) {
 
     // Update trust scores
     // Confirmer gets credit
-    await supabase.from("user_trust_scores").upsert(
+    await getSupabaseService().from("user_trust_scores").upsert(
       {
         user_id: userId,
         city: city || vibe.city || "Unknown",
@@ -274,7 +269,7 @@ export async function POST(request: NextRequest) {
       const updateField = action === "confirm" ? "vibes_confirmed" : "vibes_contradicted";
 
       // Get current stats
-      const { data: authorStats } = await supabase
+      const { data: authorStats } = await getSupabaseService()
         .from("user_trust_scores")
         .select("*")
         .eq("user_id", vibe.user_id)
@@ -294,13 +289,13 @@ export async function POST(request: NextRequest) {
           Math.max(
             0,
             50 +
-              newVibesConfirmed * 2 -
-              newVibesContradicted * 3 +
-              Math.floor(authorStats.total_vibes_submitted / 10)
+            newVibesConfirmed * 2 -
+            newVibesContradicted * 3 +
+            Math.floor(authorStats.total_vibes_submitted / 10)
           )
         );
 
-        await supabase
+        await getSupabaseService()
           .from("user_trust_scores")
           .update({
             [updateField]: authorStats[updateField] + 1,
@@ -311,7 +306,7 @@ export async function POST(request: NextRequest) {
           .eq("city", city || vibe.city || "Unknown");
       } else {
         // Create new
-        await supabase.from("user_trust_scores").insert({
+        await getSupabaseService().from("user_trust_scores").insert({
           user_id: vibe.user_id,
           city: city || vibe.city || "Unknown",
           vibes_confirmed: action === "confirm" ? 1 : 0,
@@ -337,7 +332,7 @@ export async function POST(request: NextRequest) {
  * Get trust leaderboard for a city
  */
 export async function getLeaderboard(city: string, limit: number = 10) {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabaseService()
     .from("user_trust_scores")
     .select("user_id, trust_score, total_vibes_submitted, vibes_confirmed")
     .eq("city", city)
@@ -353,13 +348,14 @@ export async function getLeaderboard(city: string, limit: number = 10) {
       row.trust_score >= 90
         ? "local_hero"
         : row.trust_score >= 75
-        ? "trusted_local"
-        : row.trust_score >= 60
-        ? "regular"
-        : row.trust_score >= 40
-        ? "newcomer"
-        : "learning",
+          ? "trusted_local"
+          : row.trust_score >= 60
+            ? "regular"
+            : row.trust_score >= 40
+              ? "newcomer"
+              : "learning",
     totalVibes: row.total_vibes_submitted,
     confirmations: row.vibes_confirmed,
   }));
 }
+
