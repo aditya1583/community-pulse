@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "../../../../lib/supabaseClient";
+import { getSupabaseAnon } from "../../../../lib/supabaseServer";
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy initialization of OpenAI client (runtime only)
+const getOpenAI = () => {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is not configured");
+  }
+  return new OpenAI({ apiKey });
+};
 
 // ---------- Heuristic fallback (if AI fails) ----------
 
@@ -124,24 +129,24 @@ async function aiTrafficLevel(params: {
     mostRecent.length === 0
       ? "No recent pulses."
       : mostRecent
-          .map(
-            (m, idx) =>
-              `${idx + 1}. [MOST RECENT] ${m.created_at}: ${m.message.replace(
-                /\s+/g,
-                " "
-              )}`
-          )
-          .join("\n");
+        .map(
+          (m, idx) =>
+            `${idx + 1}. [MOST RECENT] ${m.created_at}: ${m.message.replace(
+              /\s+/g,
+              " "
+            )}`
+        )
+        .join("\n");
 
   const allBlock =
     messages.length === 0
       ? "No pulses in the last 60 minutes."
       : messages
-          .map(
-            (m, idx) =>
-              `${idx + 1}. ${m.created_at}: ${m.message.replace(/\s+/g, " ")}`
-          )
-          .join("\n");
+        .map(
+          (m, idx) =>
+            `${idx + 1}. ${m.created_at}: ${m.message.replace(/\s+/g, " ")}`
+        )
+        .join("\n");
 
   const userContent = `
 You are classifying CITY TRAFFIC LEVEL.
@@ -168,7 +173,7 @@ Return ONLY a JSON object like:
 {"level":"Light"}
 `;
 
-  const completion = await openai.chat.completions.create({
+  const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4o-mini",
     response_format: { type: "json_object" },
     messages: [
@@ -216,7 +221,7 @@ export async function GET(req: NextRequest) {
       now.getTime() - 60 * 60 * 1000
     ).toISOString();
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabaseAnon()
       .from("pulses")
       .select("message, created_at")
       .eq("city", city)

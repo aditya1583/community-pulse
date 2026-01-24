@@ -1,12 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseService } from "../../../../lib/supabaseServer";
 import { checkRateLimit, RATE_LIMITS, buildRateLimitHeaders } from "@/lib/rateLimit";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-// Server-side Supabase client with service role
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Valid vibe types
 const VALID_VIBE_TYPES = [
@@ -41,7 +35,7 @@ export async function GET(request: NextRequest) {
   try {
     // Query by venue_name (canonical) since place IDs from Foursquare/OSM
     // don't match what's stored when users submit vibes
-    let query = supabase
+    let query = getSupabaseService()
       .from("venue_vibes")
       .select("vibe_type, created_at")
       .gt("expires_at", new Date().toISOString());
@@ -163,7 +157,7 @@ export async function POST(request: NextRequest) {
     if (deviceFingerprint) {
       const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
-      const { data: recentVibes } = await supabase
+      const { data: recentVibes } = await getSupabaseService()
         .from("venue_vibes")
         .select("id")
         .eq("venue_id", venueId)
@@ -180,7 +174,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert the vibe
-    const { data, error } = await supabase
+    const { data, error } = await getSupabaseService()
       .from("venue_vibes")
       .insert({
         venue_id: venueId,
@@ -226,3 +220,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
