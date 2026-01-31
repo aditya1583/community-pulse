@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { mapOpenWeatherResult } from "@/lib/geocoding";
 
+export const dynamic = "force-dynamic";
+
 const GEOCODING_API_KEY =
     process.env.NEXT_PUBLIC_GEOCODING_API_KEY ||
     process.env.OPENWEATHER_API_KEY ||

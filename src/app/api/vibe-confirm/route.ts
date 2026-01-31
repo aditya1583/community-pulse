@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, buildRateLimitHeaders } from "@/lib/rateLimit";
 import { getSupabaseService } from "../../../../lib/supabaseServer";
 
+export const dynamic = "force-dynamic";
+
 const VALID_ACTIONS = ["confirm", "contradict"] as const;
 type ConfirmAction = typeof VALID_ACTIONS[number];
 

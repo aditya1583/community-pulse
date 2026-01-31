@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 type PulseInput = {
   mood: string;
   tag: string;

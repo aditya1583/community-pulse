@@ -4,6 +4,8 @@ import { hasIntelligentBotConfig, generateColdStartPosts, getCityConfig } from "
 import { RADIUS_CONFIG } from "@/lib/constants/radius";
 import { formatDistance } from "@/lib/geo/distance";
 
+export const dynamic = "force-dynamic";
+
 // City coordinates for distance-based filtering
 // Used when bot posts are created to enable distance sorting
 const CITY_COORDINATES: Record<string, { lat: number; lon: number }> = {

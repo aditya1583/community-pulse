@@ -9,7 +9,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
-
 // Valid reaction types
 const VALID_REACTION_TYPES = ["fire", "eyes", "check"] as const;
 type ReactionType = (typeof VALID_REACTION_TYPES)[number];

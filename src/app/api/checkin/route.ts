@@ -11,6 +11,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseService } from "../../../../lib/supabaseServer";
 
+export const dynamic = "force-dynamic";
+
 type CheckInRequest = {
   venue_name: string;
   venue_id?: string;

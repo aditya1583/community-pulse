@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseService } from "../../../../lib/supabaseServer";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/live-vibes?city=...
  * Fetches recent venue vibes for display on the home screen

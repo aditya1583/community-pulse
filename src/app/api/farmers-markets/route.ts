@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { RADIUS_CONFIG } from "@/lib/constants/radius";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Farmers Markets API Route
  *

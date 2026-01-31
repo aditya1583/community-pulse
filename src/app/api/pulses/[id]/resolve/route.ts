@@ -21,7 +21,6 @@ import { createClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
-
 // Service role client for database writes
 function getServiceRoleClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

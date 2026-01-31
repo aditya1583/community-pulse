@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAnon } from "../../../../lib/supabaseServer";
 import OpenAI from "openai";
 
+export const dynamic = "force-dynamic";
+
 // Lazy initialization of OpenAI client (runtime only)
 const getOpenAI = () => {
   const apiKey = process.env.OPENAI_API_KEY;

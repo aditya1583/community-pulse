@@ -4,6 +4,7 @@
 @source "../../src/**/*.{js,ts,jsx,tsx}";
 @source "../../src/components/**/*.{js,ts,jsx,tsx}";
 @source not "../../antigravity-awesome-skills/**/*";
+@source not "../../.claude/skills/**/*";
 
 :root {
   /*

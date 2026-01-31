@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseService } from "../../../../lib/supabaseServer";
 import { checkRateLimit, RATE_LIMITS, buildRateLimitHeaders } from "@/lib/rateLimit";
 
+export const dynamic = "force-dynamic";
+
 // Valid vibe types
 const VALID_VIBE_TYPES = [
   "busy", "quiet", "moderate",

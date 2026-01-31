@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 /**
  * Weather API - Using Open-Meteo (100% free, no API key, no attribution required)
  * https://open-meteo.com/

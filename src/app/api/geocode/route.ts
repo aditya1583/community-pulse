@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GeocodedCity, mapOpenWeatherResult } from "@/lib/geocoding";
 
+export const dynamic = "force-dynamic";
+
 // US state abbreviation to full name mapping
 const US_STATE_ABBREVIATIONS: Record<string, string> = {
   AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California",

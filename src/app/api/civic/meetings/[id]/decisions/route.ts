@@ -19,6 +19,7 @@ import type {
   CivicDecisionOutcome,
 } from "@/lib/intelligent-bots/types";
 
+export const dynamic = "force-dynamic";
 // ============================================================================
 // TYPES
 // ============================================================================

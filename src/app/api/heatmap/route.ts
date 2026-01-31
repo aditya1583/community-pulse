@@ -16,6 +16,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAnon } from "../../../../lib/supabaseServer";
 
+export const dynamic = "force-dynamic";
+
 // Grid cell size in degrees (roughly 1km at mid-latitudes)
 const GRID_SIZE = 0.01;
 
