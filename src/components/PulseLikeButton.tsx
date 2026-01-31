@@ -26,10 +26,10 @@ export default function PulseLikeButton({
 
   const load = useCallback(async () => {
     try {
-      const url = new URL(getApiUrl(`/api/pulses/${pulseId}/react`));
-      if (userIdentifier) url.searchParams.set("userIdentifier", userIdentifier);
+      const params = userIdentifier ? `?userIdentifier=${encodeURIComponent(userIdentifier)}` : '';
+      const apiPath = getApiUrl(`/api/pulses/${pulseId}/react${params}`);
 
-      const res = await fetch(url.toString());
+      const res = await fetch(apiPath);
       if (!res.ok) return;
       const data = (await res.json()) as ReactionResponse;
       setCount(data.check ?? 0);

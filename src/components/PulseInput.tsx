@@ -93,27 +93,17 @@ const PulseInput = forwardRef<HTMLTextAreaElement, PulseInputProps>(
     // Not signed in state
     if (!isSignedIn) {
       return (
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-6 text-center">
-          <p className="text-sm text-slate-300 mb-4">
-            Sign in to drop pulses and join the conversation
+        <div className="bg-slate-800/40 border border-slate-700/30 rounded-xl p-4 flex items-center justify-between gap-3">
+          <p className="text-xs text-slate-400">
+            Sign in to drop pulses
           </p>
           <button
             onClick={onSignInClick}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-400 to-emerald-600 text-slate-950 font-medium text-sm rounded-lg shadow-lg shadow-emerald-500/30 hover:from-emerald-300 hover:to-emerald-500 transition"
+            className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-500 text-slate-950 font-bold text-xs rounded-lg shadow-lg shadow-emerald-500/20 active:scale-95 transition"
           >
-            <span>Sign in to post</span>
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M13 7l5 5m0 0l-5 5m5-5H6"
-              />
+            Sign in
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>
           </button>
         </div>

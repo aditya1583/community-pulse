@@ -176,13 +176,13 @@ export default function PredictionCard({
   // Fetch initial vote counts
   const fetchVotes = useCallback(async () => {
     try {
-      const url = new URL(getApiUrl(`/api/pulses/${pulseId}/vote`));
+      const apiPath = getApiUrl(`/api/pulses/${pulseId}/vote`);
       const headers: HeadersInit = {};
       if (userIdentifier) {
         headers["x-user-identifier"] = userIdentifier;
       }
 
-      const res = await fetch(url.toString(), { headers });
+      const res = await fetch(apiPath, { headers });
       if (!res.ok) {
         setError("Failed to load votes");
         return;
