@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { getApiUrl } from "@/lib/api-config";
 
 interface PollVotingProps {
   pulseId: number;
@@ -59,7 +60,7 @@ export default function PollVoting({
   // Fetch initial vote counts
   const fetchVotes = useCallback(async () => {
     try {
-      const url = new URL(`/api/pulses/${pulseId}/vote`, window.location.origin);
+      const url = new URL(getApiUrl(`/api/pulses/${pulseId}/vote`));
 
       const headers: HeadersInit = {};
       if (userIdentifier) {
@@ -142,7 +143,7 @@ export default function PollVoting({
       setIsLoading(true);
 
       try {
-        const res = await fetch(`/api/pulses/${pulseId}/vote`, {
+        const res = await fetch(getApiUrl(`/api/pulses/${pulseId}/vote`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

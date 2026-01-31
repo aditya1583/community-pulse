@@ -313,26 +313,49 @@ export function useGeolocation(): GeolocationState & GeolocationActions {
 
 /**
  * Reverse geocode coordinates to city/state
- * Uses our internal OpenWeather-powered reverse geocoding API (fast & reliable)
+ * Primary: internal OpenWeather-powered API
+ * Fallback: Nominatim (free, no API key required)
  */
 async function reverseGeocode(lat: number, lon: number): Promise<{ city: string; state: string }> {
+  // Try our internal API first
   try {
     const response = await fetch(getApiUrl(`/api/geocode/reverse?lat=${lat}&lon=${lon}`));
-
-    if (!response.ok) {
-      throw new Error("Geocoding failed");
+    if (response.ok) {
+      const data = await response.json();
+      if (data.name && data.name !== "Unknown") {
+        return { city: data.name, state: data.state || "" };
+      }
     }
-
-    const data = await response.json();
-    return {
-      city: data.name || "Unknown",
-      state: data.state || ""
-    };
   } catch (error) {
-    console.error("[Geolocation] Reverse geocode error:", error);
-    // Fallback to coordinates as display name if geocoding fails
-    return { city: "Current Location", state: "" };
+    console.warn("[Geolocation] Primary reverse geocode failed:", error);
   }
+
+  // Fallback: Nominatim (free, works without API key)
+  try {
+    console.log("[Geolocation] Trying Nominatim fallback...");
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10`,
+      { headers: { "Accept": "application/json" } }
+    );
+    if (response.ok) {
+      const data = await response.json();
+      const addr = data.address || {};
+      const city = addr.city || addr.town || addr.village || addr.municipality || addr.county || "";
+      const state = addr.state || "";
+      // Extract state code (e.g., "Texas" -> "TX") or use first 2 chars
+      const stateCode = addr["ISO3166-2-lvl4"]?.split("-")[1] || state.substring(0, 2).toUpperCase();
+      if (city) {
+        return { city, state: stateCode };
+      }
+    }
+  } catch (error) {
+    console.warn("[Geolocation] Nominatim fallback failed:", error);
+  }
+
+  // Last resort: use coordinate-based display instead of misleading "Current Location"
+  const latDir = lat >= 0 ? "N" : "S";
+  const lonDir = lon >= 0 ? "E" : "W";
+  return { city: `${Math.abs(lat).toFixed(1)}°${latDir}, ${Math.abs(lon).toFixed(1)}°${lonDir}`, state: "" };
 }
 
 export default useGeolocation;

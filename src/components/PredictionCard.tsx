@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { getApiUrl } from "@/lib/api-config";
 
 /**
  * Prediction metadata from the pulse
@@ -175,7 +176,7 @@ export default function PredictionCard({
   // Fetch initial vote counts
   const fetchVotes = useCallback(async () => {
     try {
-      const url = new URL(`/api/pulses/${pulseId}/vote`, window.location.origin);
+      const url = new URL(getApiUrl(`/api/pulses/${pulseId}/vote`));
       const headers: HeadersInit = {};
       if (userIdentifier) {
         headers["x-user-identifier"] = userIdentifier;
@@ -248,7 +249,7 @@ export default function PredictionCard({
       setIsLoading(true);
 
       try {
-        const res = await fetch(`/api/pulses/${pulseId}/vote`, {
+        const res = await fetch(getApiUrl(`/api/pulses/${pulseId}/vote`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userIdentifier, optionIndex }),
@@ -298,7 +299,7 @@ export default function PredictionCard({
       setError(null);
 
       try {
-        const res = await fetch(`/api/pulses/${pulseId}/resolution-vote`, {
+        const res = await fetch(getApiUrl(`/api/pulses/${pulseId}/resolution-vote`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ votedOutcome, userIdentifier }),

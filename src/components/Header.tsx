@@ -40,7 +40,7 @@ export default function Header({ cityName, isLive = true, radiusMiles = 10 }: He
       <div className="flex flex-col min-w-0">
         {/* City name with integrated LIVE indicator */}
         <div className="flex items-center gap-2">
-          <h1 className="text-xl font-black text-white tracking-tighter leading-none truncate">
+          <h1 className="text-lg sm:text-xl font-black text-white tracking-tighter leading-none truncate">
             {displayCity}
           </h1>
           {/* Subtle LIVE dot - integrated with city name */}

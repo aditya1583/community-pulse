@@ -3372,12 +3372,14 @@ export default function Home() {
       />
 
       <PullToRefresh onRefresh={handlePullToRefresh} disabled={loading}>
-        {/* MOBILE FIX: Use larger top padding (3rem = 48px) plus safe-area for notch */}
-        <main className="flex-1 flex justify-center px-4 py-6 pt-[max(3rem,calc(env(safe-area-inset-top)+1rem))]">
+        {/* iOS safe area: viewport-fit=cover exposes env(safe-area-inset-top) for notch/Dynamic Island */}
+        <main className="flex-1 flex justify-center px-4 py-6 pt-[max(3.5rem,calc(env(safe-area-inset-top)+0.75rem))]">
           <div className="w-full max-w-lg space-y-6 stagger-reveal">
             {/* Top Bar: Header + Auth Action */}
-            <div className="flex items-start justify-between">
-              <Header cityName={city} isLive={!loading} />
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <Header cityName={city} isLive={!loading} />
+              </div>
 
               <div className="pt-2">
                 {!sessionUser ? (

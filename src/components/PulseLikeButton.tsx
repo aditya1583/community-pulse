@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
+import { getApiUrl } from "@/lib/api-config";
 
 type PulseLikeButtonProps = {
   pulseId: number;
@@ -25,7 +26,7 @@ export default function PulseLikeButton({
 
   const load = useCallback(async () => {
     try {
-      const url = new URL(`/api/pulses/${pulseId}/react`, window.location.origin);
+      const url = new URL(getApiUrl(`/api/pulses/${pulseId}/react`));
       if (userIdentifier) url.searchParams.set("userIdentifier", userIdentifier);
 
       const res = await fetch(url.toString());
@@ -83,7 +84,7 @@ export default function PulseLikeButton({
 
     setLoading(true);
     try {
-      const res = await fetch(`/api/pulses/${pulseId}/react`, {
+      const res = await fetch(getApiUrl(`/api/pulses/${pulseId}/react`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reactionType: "check", userIdentifier }),
