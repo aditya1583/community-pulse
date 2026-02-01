@@ -11,9 +11,10 @@ const config: CapacitorConfig = {
     preferredContentMode: 'mobile',
   },
   server: {
-    // Live reload during development - use Mac's IP for physical devices
-    // Comment out url for production builds (TestFlight/App Store)
-    url: 'http://192.168.50.4:3000',
+    // For local dev with hot reload, uncomment the line below and comment out the Vercel URL:
+    // url: 'http://192.168.50.4:3000',
+    // For TestFlight/production builds, use the Vercel deployment:
+    url: 'https://voxlo-theta.vercel.app',
     cleartext: true,
   },
   plugins: {
