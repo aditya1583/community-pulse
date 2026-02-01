@@ -91,11 +91,6 @@ export default function BottomNavigation({
           <div className="relative group -mt-6 touch-manipulation">
             <button
               onClick={onPostPulse}
-              onTouchEnd={(e) => {
-                // iOS Safari sometimes needs explicit touch handling
-                e.preventDefault();
-                onPostPulse();
-              }}
               className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/40 flex items-center justify-center transition-all duration-500 group-hover:scale-110 group-hover:shadow-emerald-500/60 group-hover:-rotate-3 group-active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 touch-manipulation"
               aria-label="Post a pulse"
             >

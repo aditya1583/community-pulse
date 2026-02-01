@@ -847,11 +847,15 @@ export default function Home() {
       setAuthStatus("signed_in");
       setProfileLoading(true);
       try {
-        const { data: profileData } = await supabase
+        const { data: profileData, error: profileError } = await supabase
           .from("profiles")
           .select("*")
           .eq("id", user.id)
           .single();
+
+        if (profileError) {
+          console.error("[Voxlo] Profile fetch error:", profileError);
+        }
 
         if (profileData) {
           setProfile({
@@ -872,6 +876,8 @@ export default function Home() {
             name_locked: false,
           });
         }
+      } catch (err) {
+        console.error("[Voxlo] Profile load failed:", err);
       } finally {
         setProfileLoading(false);
       }
@@ -883,9 +889,38 @@ export default function Home() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === "TOKEN_REFRESHED" || event === "SIGNED_IN") {
-          setSessionUser(session?.user ?? null);
-          if (session?.user) {
+          const user = session?.user ?? null;
+          setSessionUser(user);
+          if (user) {
             setAuthStatus("signed_in");
+            // Ensure profile is loaded (critical for Capacitor WKWebView
+            // where the initial loadUser() profile fetch may race or fail)
+            try {
+              setProfileLoading(true);
+              const { data: profileData } = await supabase
+                .from("profiles")
+                .select("*")
+                .eq("id", user.id)
+                .single();
+              if (profileData) {
+                setProfile({
+                  anon_name: profileData.anon_name,
+                  name_locked: profileData.name_locked ?? false,
+                });
+              } else {
+                const anon = await generateUniqueUsername(supabase);
+                await supabase.from("profiles").insert({
+                  id: user.id,
+                  anon_name: anon,
+                  name_locked: false,
+                });
+                setProfile({ anon_name: anon, name_locked: false });
+              }
+            } catch (err) {
+              console.error("[Voxlo] Profile load in onAuthStateChange failed:", err);
+            } finally {
+              setProfileLoading(false);
+            }
           }
         } else if (event === "SIGNED_OUT") {
           setSessionUser(null);
@@ -1867,19 +1902,18 @@ export default function Home() {
         clearTimeout(timeoutId);
 
         // Process AI-based traffic level
+        let hasAiLevel = false;
         if (trafficRes.status === "fulfilled" && trafficRes.value.ok) {
           try {
             const data = await trafficRes.value.json();
             if (data?.level) {
               setTrafficLevel(data.level);
               setTrafficError(null);
+              hasAiLevel = true;
             }
           } catch {
             // ignore JSON parse error
           }
-        } else {
-          setTrafficError("Unable to load traffic right now.");
-          setTrafficLevel(null);
         }
 
         // Process live TomTom incidents
@@ -1892,16 +1926,20 @@ export default function Home() {
             if (liveData?.hasRoadClosure !== undefined) {
               setHasRoadClosure(liveData.hasRoadClosure);
             }
-            // If we have TomTom level but not AI level, use TomTom
-            if (!trafficRes || trafficRes.status !== "fulfilled") {
-              if (liveData?.level) {
-                setTrafficLevel(liveData.level);
-                setTrafficError(null);
-              }
+            // Use TomTom level when AI-based level is unavailable
+            if (!hasAiLevel && liveData?.level) {
+              setTrafficLevel(liveData.level);
+              setTrafficError(null);
             }
           } catch {
             // ignore JSON parse error for live data
           }
+        }
+
+        // If neither source provided a level, show error
+        if (!hasAiLevel && trafficRes.status !== "fulfilled") {
+          setTrafficError("Unable to load traffic right now.");
+          setTrafficLevel(null);
         }
       } catch (err: unknown) {
         console.error("Error fetching traffic:", err);
@@ -2633,9 +2671,21 @@ export default function Home() {
     const authorName = profile.anon_name || username || "Anonymous";
 
     try {
-      const { data: sessionData, error: sessionError } =
+      let { data: sessionData, error: sessionError } =
         await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
+      let accessToken = sessionData.session?.access_token;
+
+      // If session is stale (common in Capacitor WKWebView), try refreshing
+      if (!accessToken) {
+        const { data: refreshed, error: refreshErr } =
+          await supabase.auth.refreshSession();
+        if (refreshed?.session?.access_token) {
+          accessToken = refreshed.session.access_token;
+          sessionError = null;
+        } else {
+          sessionError = refreshErr || sessionError;
+        }
+      }
 
       if (sessionError || !accessToken) {
         setErrorMsg("Sign in to post.");
@@ -2826,9 +2876,21 @@ export default function Home() {
     const authorName = profile?.anon_name || username || "Anonymous";
 
     try {
-      const { data: sessionData, error: sessionError } =
+      let { data: sessionData, error: sessionError } =
         await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
+      let accessToken = sessionData.session?.access_token;
+
+      // If session is stale (common in Capacitor WKWebView), try refreshing
+      if (!accessToken) {
+        const { data: refreshed, error: refreshErr } =
+          await supabase.auth.refreshSession();
+        if (refreshed?.session?.access_token) {
+          accessToken = refreshed.session.access_token;
+          sessionError = null;
+        } else {
+          sessionError = refreshErr || sessionError;
+        }
+      }
 
       if (sessionError || !accessToken) {
         setErrorMsg("Sign in to post.");

@@ -7,7 +7,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // Match the web app's dark background so safe area blends seamlessly
+        if let window = self.window {
+            window.backgroundColor = UIColor(red: 9/255, green: 9/255, blue: 11/255, alpha: 1) // #09090b
+        }
         return true
     }
 
