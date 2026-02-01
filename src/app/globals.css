@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@utility scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* Explicitly specify source paths to prevent scanning Python files */
 @source "../../src/**/*.{js,ts,jsx,tsx}";
 @source "../../src/components/**/*.{js,ts,jsx,tsx}";

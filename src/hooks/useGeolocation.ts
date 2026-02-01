@@ -79,7 +79,11 @@ export function useGeolocation(): GeolocationState & GeolocationActions {
         const parsed: StoredLocation = JSON.parse(stored);
         // Check if cache is still valid (24 hours)
         const isValid = Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000;
-        if (isValid) {
+        // Invalidate cache if cityName is a known bad value from previous bugs
+        const hasBadCity = !parsed.cityName
+          || parsed.cityName === "Current Location"
+          || parsed.cityName === "Unknown";
+        if (isValid && !hasBadCity) {
           setState({
             lat: parsed.lat,
             lon: parsed.lon,
@@ -91,6 +95,10 @@ export function useGeolocation(): GeolocationState & GeolocationActions {
             permissionStatus: "granted",
           });
           return;
+        }
+        // Bad cache - clear it and re-geocode
+        if (hasBadCity) {
+          localStorage.removeItem(STORAGE_KEY);
         }
       } catch {
         localStorage.removeItem(STORAGE_KEY);

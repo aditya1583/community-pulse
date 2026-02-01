@@ -3849,14 +3849,14 @@ export default function Home() {
                   </p>
                 )}
 
-                {/* Filter chips */}
-                <div className="flex flex-wrap gap-2.5 pb-2">
+                {/* Filter chips - horizontal scroll on mobile */}
+                <div className="flex gap-2 pb-2 overflow-x-auto scrollbar-hide -mx-1 px-1">
                   {TAGS.map((t) => (
                     <button
                       key={t}
                       onClick={() => setTagFilter(t)}
-                      className={`px-4 py-2 rounded-full text-xs font-bold tracking-wide transition-all duration-300 border ${tagFilter === t
-                        ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow-[0_0_15px_-3px_rgba(16,185,129,0.5)] scale-105 z-10"
+                      className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold tracking-wide transition-all duration-300 border ${tagFilter === t
+                        ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow-[0_0_15px_-3px_rgba(16,185,129,0.5)]"
                         : "bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:text-white hover:border-white/10"
                         }`}
                     >
