@@ -33,38 +33,36 @@ export default function XPProgressBadge({
   const isRanked = tier.name !== "none";
 
   return (
-    <button
-      type="button"
+    <div
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
-      className={`group flex items-center gap-1.5 px-2 py-1 rounded-lg transition-all ${
-        isRanked
-          ? `bg-gradient-to-r ${tier.ringColor} hover:shadow-md ${tier.glowColor}`
-          : "bg-slate-800/80 border border-slate-700/50 hover:border-emerald-500/50"
-      } ${className}`}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); } : undefined}
+      className={`group flex items-center gap-1.5 px-2 py-1 rounded-lg transition-all ${isRanked
+        ? `bg-gradient-to-r ${tier.ringColor} hover:shadow-md ${tier.glowColor}`
+        : "bg-slate-800/80 border border-slate-700/50 hover:border-emerald-500/50"
+        } ${onClick ? 'cursor-pointer' : ''} ${className}`}
       title={`Level ${level} • ${Math.round(progress)}% to next level • Tap for status`}
     >
       {/* Level badge */}
       <span
-        className={`text-[11px] font-bold ${
-          isRanked ? "text-slate-900" : "text-slate-300"
-        }`}
+        className={`text-[11px] font-bold ${isRanked ? "text-slate-900" : "text-slate-300"
+          }`}
       >
         Lv.{level}
       </span>
 
       {/* Progress bar container */}
       <div
-        className={`w-10 h-1.5 rounded-full overflow-hidden ${
-          isRanked ? "bg-slate-900/30" : "bg-slate-700/50"
-        }`}
+        className={`w-10 h-1.5 rounded-full overflow-hidden ${isRanked ? "bg-slate-900/30" : "bg-slate-700/50"
+          }`}
       >
         {/* Progress fill */}
         <div
-          className={`h-full rounded-full transition-all ${
-            isRanked
-              ? "bg-slate-900/70"
-              : "bg-gradient-to-r from-emerald-500 to-emerald-400"
-          }`}
+          className={`h-full rounded-full transition-all ${isRanked
+            ? "bg-slate-900/70"
+            : "bg-gradient-to-r from-emerald-500 to-emerald-400"
+            }`}
           style={{ width: `${progress}%` }}
         />
       </div>
@@ -75,6 +73,6 @@ export default function XPProgressBadge({
           {tier.label}
         </span>
       )}
-    </button>
+    </div>
   );
 }
