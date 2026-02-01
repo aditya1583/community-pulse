@@ -12,6 +12,7 @@ type StatusTabProps = {
   userId: string | null;
   city?: string;
   className?: string;
+  onSignOut?: () => void;
 };
 
 /**
@@ -22,7 +23,7 @@ type StatusTabProps = {
  * - Weekly leaderboard for the current city
  * - Badge showcase
  */
-export default function StatusTab({ userId, city, className = "" }: StatusTabProps) {
+export default function StatusTab({ userId, city, className = "", onSignOut }: StatusTabProps) {
   const {
     username,
     level,
@@ -175,6 +176,16 @@ export default function StatusTab({ userId, city, className = "" }: StatusTabPro
         pulsesThisWeek={stats?.pulsesThisWeek ?? 0}
         currentStreak={stats?.currentStreakDays ?? 0}
       />
+
+      {/* Sign Out */}
+      {onSignOut && (
+        <button
+          onClick={onSignOut}
+          className="w-full py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-red-400 transition-colors"
+        >
+          Sign out
+        </button>
+      )}
     </div>
   );
 }

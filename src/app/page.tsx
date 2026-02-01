@@ -3381,46 +3381,31 @@ export default function Home() {
                 <Header cityName={city} isLive={!loading} />
               </div>
 
-              <div className="pt-2">
+              <div className="flex-shrink-0 pt-1">
                 {!sessionUser ? (
                   <button
                     onClick={() => setShowAuthModal(true)}
-                    className="text-[10px] px-3 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 hover:scale-105 transition-all"
+                    className="text-[10px] px-3 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
                   >
                     Sign in
                   </button>
                 ) : (
-                  <div className="flex flex-col items-end gap-2">
-                    <div className="flex items-center gap-2">
-                      {/* XP Progress Badge - tap to view Status tab */}
-                      {!gamificationLoading && userLevel > 0 && (
-                        <XPProgressBadge
-                          level={userLevel}
-                          xp={userXp}
-                          weeklyRank={userRank}
-                          onClick={() => setActiveTab("status")}
-                        />
-                      )}
-                      <button
+                  <button
+                    onClick={() => setActiveTab("status")}
+                    className="flex items-center gap-1.5 active:scale-95 transition-all"
+                  >
+                    {!gamificationLoading && userLevel > 0 && (
+                      <XPProgressBadge
+                        level={userLevel}
+                        xp={userXp}
+                        weeklyRank={userRank}
                         onClick={() => setActiveTab("status")}
-                        className="text-[10px] font-black uppercase tracking-widest text-emerald-400/80 hover:text-emerald-400 transition-colors"
-                      >
-                        {displayName}
-                      </button>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        await supabase.auth.signOut();
-                        setSessionUser(null);
-                        setProfile(null);
-                        setAuthStatus("signed_out");
-                        setProfileLoading(false);
-                      }}
-                      className="text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-red-400 transition-colors"
-                    >
-                      Log out
-                    </button>
-                  </div>
+                      />
+                    )}
+                    <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400/70 max-w-[80px] truncate">
+                      {displayName}
+                    </span>
+                  </button>
                 )}
               </div>
             </div>
@@ -3804,6 +3789,13 @@ export default function Home() {
                 <StatusTab
                   userId={sessionUser?.id ?? null}
                   city={city}
+                  onSignOut={async () => {
+                    await supabase.auth.signOut();
+                    setSessionUser(null);
+                    setProfile(null);
+                    setAuthStatus("signed_out");
+                    setProfileLoading(false);
+                  }}
                 />
               )}
 
