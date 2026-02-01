@@ -2673,20 +2673,20 @@ export default function Home() {
     const authorName = profile.anon_name || username || "Anonymous";
 
     try {
-      let { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession();
-      let accessToken = sessionData.session?.access_token;
+      // Always refresh session to get a fresh access token.
+      // getSession() can return expired tokens that the server will reject as 401,
+      // which causes the login modal to appear even for logged-in users.
+      const { data: refreshed, error: refreshErr } =
+        await supabase.auth.refreshSession();
+      let accessToken = refreshed.session?.access_token;
+      let sessionError = refreshErr;
 
-      // If session is stale (common in Capacitor WKWebView), try refreshing
+      // Fallback: if refresh fails, try getSession (might still have valid token)
       if (!accessToken) {
-        const { data: refreshed, error: refreshErr } =
-          await supabase.auth.refreshSession();
-        if (refreshed?.session?.access_token) {
-          accessToken = refreshed.session.access_token;
-          sessionError = null;
-        } else {
-          sessionError = refreshErr || sessionError;
-        }
+        const { data: sessionData, error: sessErr } =
+          await supabase.auth.getSession();
+        accessToken = sessionData.session?.access_token;
+        sessionError = sessErr || refreshErr;
       }
 
       if (sessionError || !accessToken) {
@@ -2878,20 +2878,20 @@ export default function Home() {
     const authorName = profile?.anon_name || username || "Anonymous";
 
     try {
-      let { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession();
-      let accessToken = sessionData.session?.access_token;
+      // Always refresh session to get a fresh access token.
+      // getSession() can return expired tokens that the server will reject as 401,
+      // which causes the login modal to appear even for logged-in users.
+      const { data: refreshed, error: refreshErr } =
+        await supabase.auth.refreshSession();
+      let accessToken = refreshed.session?.access_token;
+      let sessionError = refreshErr;
 
-      // If session is stale (common in Capacitor WKWebView), try refreshing
+      // Fallback: if refresh fails, try getSession (might still have valid token)
       if (!accessToken) {
-        const { data: refreshed, error: refreshErr } =
-          await supabase.auth.refreshSession();
-        if (refreshed?.session?.access_token) {
-          accessToken = refreshed.session.access_token;
-          sessionError = null;
-        } else {
-          sessionError = refreshErr || sessionError;
-        }
+        const { data: sessionData, error: sessErr } =
+          await supabase.auth.getSession();
+        accessToken = sessionData.session?.access_token;
+        sessionError = sessErr || refreshErr;
       }
 
       if (sessionError || !accessToken) {

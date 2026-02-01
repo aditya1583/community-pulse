@@ -42,8 +42,8 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 function getExpirationHours(tag: string): number {
   const tagLower = tag.toLowerCase();
 
-  // Weather alerts are critical but can get stale - 4 hours
-  if (tagLower === "weather") return 4;
+  // Weather changes rapidly - 2 hours to avoid showing stale temps
+  if (tagLower === "weather") return 2;
 
   // Traffic conditions change rapidly - 2 hours
   if (tagLower === "traffic") return 2;

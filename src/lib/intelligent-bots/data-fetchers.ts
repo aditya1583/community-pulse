@@ -32,7 +32,7 @@ export async function fetchTrafficData(coords: CityCoords): Promise<TrafficData>
     const { lat, lon } = coords;
     const url = `https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json?point=${lat},${lon}&key=${TOMTOM_API_KEY}`;
 
-    const response = await fetch(url, { next: { revalidate: 300 } }); // 5 min cache
+    const response = await fetch(url, { cache: 'no-store' }); // Always fetch fresh traffic data
 
     if (!response.ok) {
       console.error(`[IntelligentBots] TomTom API error: ${response.status}`);
@@ -116,7 +116,7 @@ export async function fetchWeatherData(coords: CityCoords): Promise<WeatherData>
     // Include daily forecast data for 3 days
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum&forecast_days=3&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=mm`;
 
-    const response = await fetch(url, { next: { revalidate: 600 } }); // 10 min cache
+    const response = await fetch(url, { cache: 'no-store' }); // Always fetch fresh weather data
 
     if (!response.ok) {
       console.error(`[IntelligentBots] Open-Meteo API error: ${response.status}`);
