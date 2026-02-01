@@ -7,7 +7,9 @@ const nextConfig: NextConfig = {
   // Capacitor requires static export
   // We only turn this on when building for the app
   output: process.env.NEXT_PUBLIC_EXPORT_MODE === 'true' ? 'export' : undefined,
-  trailingSlash: true,
+  // Only enable trailing slashes for static export (Capacitor local files need it)
+  // In Vercel production mode, this causes 308 redirects on API routes that break Capacitor fetch
+  trailingSlash: process.env.NEXT_PUBLIC_EXPORT_MODE === 'true',
   images: {
     unoptimized: process.env.NEXT_PUBLIC_EXPORT_MODE === 'true' ? true : false,
   },
