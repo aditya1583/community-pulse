@@ -35,7 +35,7 @@ export default function OnboardingChecklist({
     const progressPercent = Math.round((completedCount / steps.length) * 100);
 
     return (
-        <div className="mx-4 mb-8 glass-card premium-border rounded-3xl p-6 backdrop-blur-xl bg-white/5 shadow-xl relative overflow-hidden group">
+        <div className="mb-4 glass-card premium-border rounded-3xl p-6 backdrop-blur-xl bg-white/5 shadow-xl relative overflow-hidden group">
             {/* Progress background glow */}
             <div
                 className="absolute top-0 left-0 h-1 bg-emerald-500 transition-all duration-1000 ease-out shadow-[0_0_10px_#10b981]"

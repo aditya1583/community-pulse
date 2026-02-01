@@ -289,8 +289,8 @@ export function filterVisiblePulses<T extends { expiresAt?: string | null; tag: 
     if (ageInHours < -0.16) return true;
 
     // STRICT RULES:
-    // 1. Bot posts always expire faster to prevent clutter (18 hours)
-    if (pulse.is_bot && ageInHours > 18) return false;
+    // 1. Bot posts always expire faster to prevent clutter (48 hours)
+    if (pulse.is_bot && ageInHours > 48) return false;
 
     // 2. Traffic: Gone after 1.5 hours (no matter what)
     if (pulse.tag === "Traffic" && ageInHours > 1.5) return false;
@@ -302,8 +302,8 @@ export function filterVisiblePulses<T extends { expiresAt?: string | null; tag: 
     // 4. Events: Gone after 24 hours
     if (pulse.tag === "Events" && ageInHours > 24) return false;
 
-    // 5. General: Gone after 24 hours (was 48h - reduced to keep feed fresh)
-    if ((pulse.tag === "General" || !pulse.tag) && ageInHours > 24) return false;
+    // 5. General: Lasts 72 hours to ensure feed isn't empty in quiet towns
+    if ((pulse.tag === "General" || !pulse.tag) && ageInHours > 72) return false;
 
     return true;
   });

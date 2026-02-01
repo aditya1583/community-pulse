@@ -5,13 +5,16 @@ const config: CapacitorConfig = {
   appName: 'Voxlo',
   webDir: 'out',
   ios: {
-    contentInset: 'automatic',
+    contentInset: 'always',
     backgroundColor: '#09090b',
+    allowsLinkPreview: false,
+    preferredContentMode: 'mobile',
   },
   server: {
-    // Injected into window.Capacitor.config at runtime
-    // Used by CapacitorProvider to route API calls
-    url: undefined, // Set to a URL for live reload during development
+    // Live reload during development - use Mac's IP for physical devices
+    // Comment out url for production builds (TestFlight/App Store)
+    url: 'http://192.168.50.4:3000',
+    cleartext: true,
   },
   plugins: {
     CapacitorHttp: {

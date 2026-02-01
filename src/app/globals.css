@@ -3,6 +3,7 @@
 @utility scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
+
   &::-webkit-scrollbar {
     display: none;
   }
@@ -50,8 +51,15 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html,
 body {
   background: var(--background);
+  min-height: 100%;
+  min-height: 100dvh;
+  /* Dynamic viewport height for iOS */
+}
+
+body {
   color: var(--foreground);
   font-family: var(--font-geist-sans);
 }
