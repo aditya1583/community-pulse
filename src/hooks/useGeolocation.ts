@@ -80,9 +80,11 @@ export function useGeolocation(): GeolocationState & GeolocationActions {
         // Check if cache is still valid (24 hours)
         const isValid = Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000;
         // Invalidate cache if cityName is a known bad value from previous bugs
+        // Also invalidate coordinate-format strings (e.g. "37.8°N, 122.4°W") from geocode failures
         const hasBadCity = !parsed.cityName
           || parsed.cityName === "Current Location"
-          || parsed.cityName === "Unknown";
+          || parsed.cityName === "Unknown"
+          || /\d+\.\d°[NSEW]/.test(parsed.cityName);
         if (isValid && !hasBadCity) {
           setState({
             lat: parsed.lat,
