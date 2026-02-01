@@ -13,7 +13,11 @@ export function getApiUrl(path: string): string {
     }
 
     // Non-API paths: use base URL if available
-    if (process.env.NEXT_PUBLIC_BASE_URL) {
+    // But in local dev, always stay relative to avoid CORS and port issues
+    const isLocal = typeof window !== 'undefined' &&
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+    if (process.env.NEXT_PUBLIC_BASE_URL && !isLocal) {
         return `${process.env.NEXT_PUBLIC_BASE_URL}${cleanPath}`;
     }
 

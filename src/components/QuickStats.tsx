@@ -355,7 +355,7 @@ export default function QuickStats({
             level={trafficLevel}
             onViewDetails={() => {
               closeModal();
-              onTrafficClick();
+              setTimeout(onTrafficClick, 300);
             }}
           />
         )}
@@ -388,7 +388,7 @@ export default function QuickStats({
             count={eventsCount}
             onExplore={() => {
               closeModal();
-              onEventsClick();
+              setTimeout(onEventsClick, 300);
             }}
           />
         )}
@@ -425,7 +425,7 @@ export default function QuickStats({
             mood={cityMood}
             onSetVibe={() => {
               closeModal();
-              onMoodClick();
+              setTimeout(onMoodClick, 300);
             }}
           />
         )}

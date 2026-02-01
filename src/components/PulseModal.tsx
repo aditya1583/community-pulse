@@ -298,13 +298,13 @@ export default function PulseModal({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!isPostEnabled}
+            disabled={!identityReady || loading}
             className={`group inline-flex items-center gap-3 px-8 py-4 font-black text-[12px] uppercase tracking-[0.2em] rounded-2xl shadow-2xl transition-all duration-500 ${isPostEnabled
               ? "bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 text-slate-950 shadow-emerald-500/20 hover:scale-[1.02] active:scale-95"
               : "bg-slate-800 text-slate-600 cursor-not-allowed opacity-50 grayscale"
               }`}
           >
-            <span>{identityReady ? "Launch Pulse" : "Syncing..."}</span>
+            <span>{identityReady ? (isPostEnabled ? "Launch Pulse" : "Complete Pulse") : "Syncing..."}</span>
             <svg
               className={`w-4 h-4 transition-transform duration-500 ${isPostEnabled ? "group-hover:translate-x-1" : ""}`}
               fill="none"

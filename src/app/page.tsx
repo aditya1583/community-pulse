@@ -164,7 +164,7 @@ export default function Home() {
   const [username, setUsername] = useState<string>("");
   const [validationError, setValidationError] = useState<string | null>(null);
   const [mood, setMood] = useState("");
-  const [tag, setTag] = useState("");
+  const [tag, setTag] = useState("General");
   const [message, setMessage] = useState("");
 
   // Tab-specific pulse input state (Traffic, Events, Local tabs each have their own input)
@@ -194,6 +194,7 @@ export default function Home() {
     setActiveTabState(tab);
     try {
       sessionStorage.setItem("cp-active-tab", tab);
+      window.scrollTo({ top: 0, behavior: "instant" });
     } catch {
       // Ignore storage errors
     }
@@ -1425,7 +1426,8 @@ export default function Home() {
       setHasMorePulses(false);
 
       const now = new Date();
-      const start = startOfRecentWindow(now, 7);
+      // Expanded window to 30 days to ensure content visibility during testing
+      const start = startOfRecentWindow(now, 30);
       const end = startOfNextLocalDay(now);
 
       // Explicitly select only needed fields for privacy
@@ -3037,7 +3039,6 @@ export default function Home() {
     }, 0);
   }, [pulses]);
 
-  const safeActiveTab: TabId = isTabId(activeTab) ? activeTab : "pulse";
   const localState = selectedCity?.state ?? lastValidCity.state ?? "";
   const localLat = selectedCity?.lat ?? lastValidCity.lat;
   const localLon = selectedCity?.lon ?? lastValidCity.lon;
@@ -3437,319 +3438,257 @@ export default function Home() {
         {/* iOS safe area: viewport-fit=cover exposes env(safe-area-inset-top) for notch/Dynamic Island */}
         <main className="flex-1 flex justify-center px-4 py-6 pt-[max(3.5rem,calc(env(safe-area-inset-top)+0.75rem))]">
           <div className="w-full max-w-lg space-y-6 stagger-reveal">
-            {/* Top Bar: Header + Auth Action */}
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <Header cityName={city} isLive={!loading} />
-              </div>
+            {/* Dashboard Widgets - Only visible on Home/Pulse tab */}
+            {activeTab === "pulse" ? (
+              <div className="space-y-6">
+                {/* Top Bar: Header + Auth Action */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <Header cityName={city} isLive={!loading} />
+                  </div>
 
-              <div className="flex-shrink-0 pt-1">
-                {!sessionUser ? (
-                  <button
-                    onClick={() => setShowAuthModal(true)}
-                    className="text-[10px] px-3 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
-                  >
-                    Sign in
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setActiveTab("status")}
-                    className="flex items-center gap-1.5 active:scale-95 transition-all"
-                  >
-                    {!gamificationLoading && userLevel > 0 && (
-                      <XPProgressBadge
-                        level={userLevel}
-                        xp={userXp}
-                        weeklyRank={userRank}
+                  <div className="flex-shrink-0 pt-1">
+                    {!sessionUser ? (
+                      <button
+                        onClick={() => setShowAuthModal(true)}
+                        className="text-[10px] px-3 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+                      >
+                        Sign in
+                      </button>
+                    ) : (
+                      <button
                         onClick={() => setActiveTab("status")}
-                      />
-                    )}
-                    <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400/70 max-w-[80px] truncate">
-                      {displayName}
-                    </span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-
-            {/* Username editor */}
-            {sessionUser && showUsernameEditor && !profile?.name_locked && (
-              <div className="rounded-xl bg-slate-800/60 border border-slate-700/50 px-4 py-3 text-xs text-slate-200">
-                <p className="text-[11px] text-slate-300 mb-2">
-                  Describe your vibe in <span className="font-semibold">3+ words</span>, and we&apos;ll craft a fun anonymous name for you.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                  <input
-                    value={usernamePrompt}
-                    onChange={(e) => setUsernamePrompt(e.target.value)}
-                    placeholder="e.g. sleepy sarcastic overcaffeinated"
-                    className="flex-1 rounded-lg bg-slate-900/70 border border-slate-700/50 px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:border-transparent"
-                  />
-                  <div className="flex gap-2 items-center">
-                    <button
-                      type="button"
-                      onClick={handleGenerateUsername}
-                      disabled={
-                        usernameGenerating ||
-                        profile?.name_locked ||
-                        usernamePrompt.trim().split(/\s+/).filter(Boolean).length < 3
-                      }
-                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-emerald-400 to-emerald-600 text-slate-950 font-medium text-[11px] rounded-lg shadow-lg shadow-emerald-500/30 hover:from-emerald-300 hover:to-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                    >
-                      <span>{usernameGenerating ? "Rolling..." : "Roll"}</span>
-                    </button>
-                    {lastAnonName && lastAnonName !== displayName && !profile?.name_locked && (
-                      <button
-                        type="button"
-                        onClick={handleRevertUsername}
-                        className="text-[11px] text-slate-400 hover:text-slate-200 underline-offset-2 hover:underline"
+                        className="flex items-center gap-1.5 active:scale-95 transition-all"
                       >
-                        Undo
-                      </button>
-                    )}
-                    {!profile?.name_locked && (
-                      <button
-                        type="button"
-                        onClick={handleLockUsername}
-                        className="text-[11px] px-2 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/60 text-emerald-200 hover:bg-emerald-500/25 transition"
-                      >
-                        Lock this name
+                        <XPProgressBadge
+                          level={userLevel}
+                          xp={userXp}
+                          weeklyRank={userRank}
+                          onClick={() => setActiveTab("status")}
+                        />
+                        <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400/70 max-w-[80px] truncate">
+                          {displayName}
+                        </span>
                       </button>
                     )}
                   </div>
                 </div>
-                {usernameErrorMsg && (
-                  <p className="mt-1 text-[11px] text-red-400">{usernameErrorMsg}</p>
-                )}
-                <p className="mt-1 text-[11px] text-slate-400">
-                  Current name: <span className="text-cyan-400">{displayName}</span>
-                </p>
-              </div>
-            )}
 
-            {/* City selector */}
-            <div className="relative z-50">
-              <label className="text-xs text-slate-400 uppercase tracking-wide mb-1 block">
-                City
-              </label>
-              <div className="relative">
-                <input
-                  ref={cityInputRef}
-                  value={cityInput}
-                  onChange={handleCityInputChange}
-                  onKeyDown={handleCityInputKeyDown}
-                  onFocus={() =>
-                    cityInput.trim().length >= 3 && setShowCitySuggestions(true)
-                  }
-                  className="w-full rounded-lg bg-slate-800/60 border border-slate-700/50 px-3 py-2 pr-10 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:border-transparent"
-                  placeholder="Search any city (e.g., Austin, TX)"
-                />
-                {citySuggestionsLoading && cityInput.trim().length >= 3 && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-500">
-                    Searching...
-                  </span>
-                )}
-
-                {renderCitySuggestionsMenu && (
-                  <>
-                    {/* Backdrop: click-outside-to-close + ensures correct z-index stacking */}
-                    <div
-                      aria-hidden="true"
-                      className={`fixed inset-0 z-40 transition-opacity duration-150 ${cityDropdownOpen
-                        ? "opacity-100 pointer-events-auto"
-                        : "opacity-0 pointer-events-none"
-                        }`}
-                      onClick={() => {
-                        setShowCitySuggestions(false);
-                        clearSuggestions();
-                      }}
-                    />
-
-                    <div
-                      ref={cityDropdownRef}
-                      className={`absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 bg-slate-900 border border-slate-700/50 rounded-lg shadow-xl max-h-64 overflow-y-auto transform transition duration-150 origin-top motion-reduce:transition-none ${cityDropdownOpen
-                        ? "opacity-100 translate-y-0 scale-100 pointer-events-auto"
-                        : "opacity-0 -translate-y-1 scale-[0.98] pointer-events-none"
-                        }`}
-                      role="listbox"
-                      aria-label="City suggestions"
-                      aria-hidden={!cityDropdownOpen}
-                    >
-                      {citySuggestions.map((suggestion, idx) => (
-                        <button
-                          key={suggestion.id}
-                          type="button"
-                          tabIndex={cityDropdownOpen ? 0 : -1}
-                          onMouseEnter={() => setHighlightedIndex(idx)}
-                          onClick={() => handleCitySelect(suggestion)}
-                          className={`w-full px-4 py-3 text-left text-sm transition flex items-center justify-between border-b border-slate-800 last:border-b-0 ${highlightedIndex === idx
-                            ? "bg-slate-800 text-emerald-200"
-                            : "hover:bg-slate-800 text-slate-100"
-                            }`}
-                          role="option"
-                          aria-selected={highlightedIndex === idx}
-                        >
-                          <span className="truncate">{suggestion.displayName}</span>
-                          <span className="text-[10px] text-slate-400">
-                            {suggestion.country || ""}
-                          </span>
-                        </button>
-                      ))}
+                {/* City selector */}
+                <div className="relative z-50">
+                  <div className="group relative">
+                    <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                      <svg
+                        className="w-4 h-4 text-slate-500 group-focus-within:text-emerald-500 transition-colors"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                        />
+                      </svg>
                     </div>
-                  </>
-                )}
-                {citySuggestionsNotFound && !citySuggestionsLoading && (
-                  <p className="mt-1 text-[11px] text-amber-300">
-                    We couldn&apos;t find that city. Try &quot;City, Country&quot; format.
-                  </p>
-                )}
-                {citySuggestionsError && (
-                  <p className="mt-1 text-[11px] text-red-400">
-                    {citySuggestionsError} Keeping {lastValidCity.displayName}.
-                  </p>
-                )}
-              </div>
-            </div>
+                    <input
+                      ref={cityInputRef}
+                      type="text"
+                      className="w-full h-14 bg-slate-900/80 backdrop-blur-xl border border-white/5 rounded-2xl pl-12 pr-4 text-sm font-bold text-white placeholder:text-slate-600 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500/30 transition-all"
+                      placeholder="Switch city or neighborhood..."
+                      value={cityInput}
+                      onChange={handleCityInputChange}
+                      onKeyDown={handleCityInputKeyDown}
+                    />
+                    {citySuggestionsLoading && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-500">
+                        Searching...
+                      </span>
+                    )}
 
+                    {renderCitySuggestionsMenu && (
+                      <>
+                        <div
+                          aria-hidden="true"
+                          className={`fixed inset-0 z-40 transition-opacity duration-150 ${cityDropdownOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+                            }`}
+                          onClick={() => {
+                            setShowCitySuggestions(false);
+                            clearSuggestions();
+                          }}
+                        />
 
-            {/* Current Vibe Card */}
-            <CurrentVibeCard
-              weather={weather}
-              weatherLoading={weatherLoading}
-              recentPulseCount={recentPulseCount2h}
-              onDropPulse={handleDropPulseJump}
-              cityMood={cityMood}
-              cityMoodLoading={cityMoodLoading}
-              gasPrice={gasPrice}
-              gasStationName={nearestStation?.name}
-              onGasPriceClick={() => {
-                setLocalSection("gas");
-                setActiveTab("local");
-              }}
-            />
-
-            {/* Quick Stats */}
-            <QuickStats
-              trafficLevel={trafficLevel}
-              trafficLoading={trafficLoading}
-              eventsCount={ticketmasterEvents.length}
-              eventsLoading={ticketmasterLoading}
-              cityMood={cityMood}
-              cityMoodLoading={cityMoodLoading}
-              onTrafficClick={() => setActiveTab("traffic")}
-              onEventsClick={() => setActiveTab("events")}
-              onMoodClick={() => {
-                if (!sessionUser) {
-                  setShowAuthModal(true);
-                } else {
-                  setShowPulseModal(true);
-                }
-              }}
-            />
-
-            {/* Onboarding Checklist for new users */}
-            {sessionUser && !onboardingCompleted && !checklistDismissed && (
-              <OnboardingChecklist
-                onboardingCompleted={onboardingCompleted}
-                onDismiss={() => setChecklistDismissed(true)}
-                steps={[
-                  {
-                    id: "location",
-                    label: "Setup Location",
-                    description: "Hyperlocal content depends on it.",
-                    completed: !!selectedCity,
-                    actionLabel: "Set Location",
-                    action: () => cityInputRef.current?.focus(),
-                  },
-                  {
-                    id: "profile",
-                    label: "Craft your Identity",
-                    description: "Describe your vibe for a custom name.",
-                    completed: !!profile?.name_locked,
-                    actionLabel: "Edit Name",
-                    action: () => setShowUsernameEditor(true),
-                  },
-                  {
-                    id: "pulse",
-                    label: "Post your first Pulse",
-                    description: "Let the community know what's up.",
-                    completed: userPulseCount > 0,
-                    actionLabel: "Post Pulse",
-                    action: () => setShowPulseModal(true),
-                  },
-                  {
-                    id: "bookmark",
-                    label: "Bookmark a Vibe",
-                    description: "Keep track of interesting updates.",
-                    completed: favoritePulseIds.length > 0,
-                    actionLabel: "Browse",
-                    action: () => setActiveTab("pulse"),
-                  }
-                ]}
-              />
-            )}
-
-            {/* Tab Navigation */}
-            <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} secondaryOnly />
-
-            {/* AI Summary Stories - Swipeable quick brief */}
-            <AISummaryStories
-              activeTab={activeTab}
-              summary={summary}
-              summaryLoading={summaryLoading}
-              summaryError={summaryError}
-              pulsesCount={visiblePulses.length}
-              cityName={city}
-              events={ticketmasterEvents}
-              eventsLoading={ticketmasterLoading}
-              eventsError={ticketmasterError}
-              trafficLevel={trafficLevel}
-              trafficLoading={trafficLoading}
-              trafficError={trafficError}
-              onNavigateTab={setActiveTab}
-              vibeHeadline={cityMood?.vibeHeadline}
-              vibeEmoji={cityMood?.dominantMood ?? undefined}
-              temperature={weather?.temp}
-            />
-
-            {/* Traffic Flash Alert Banner - Shows for closures or heavy traffic */}
-            {(hasRoadClosure || (trafficIncidents && trafficIncidents.some(i => i.severity >= 3))) && (
-              <div
-                onClick={() => setActiveTab("traffic")}
-                className="mb-4 glass-card border border-red-500/30 bg-red-500/10 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:bg-red-500/20 transition-all stagger-reveal delay-100"
-              >
-                <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0 relative overflow-hidden">
-                  <div className="absolute inset-0 bg-red-500/20 animate-pulse" />
-                  <span className="text-xl relative z-10">🚨</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="inline-block w-2 H-2 rounded-full bg-red-500 animate-ping" />
-                    <h4 className="text-xs font-black text-red-400 uppercase tracking-wider">Traffic Alert</h4>
+                        <div
+                          ref={cityDropdownRef}
+                          className={`absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 bg-slate-900 border border-slate-700/50 rounded-lg shadow-xl max-h-64 overflow-y-auto transform transition duration-150 origin-top ${cityDropdownOpen ? "opacity-100 translate-y-0 scale-100" : "opacity-0 -translate-y-1 scale-[0.98] pointer-events-none"
+                            }`}
+                        >
+                          {citySuggestions.map((suggestion, idx) => (
+                            <button
+                              key={suggestion.id}
+                              type="button"
+                              onClick={() => handleCitySelect(suggestion)}
+                              className={`w-full px-4 py-3 text-left text-sm transition border-b border-slate-800 last:border-b-0 ${highlightedIndex === idx ? "bg-slate-800 text-emerald-200" : "text-slate-100"
+                                }`}
+                            >
+                              {suggestion.displayName}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
-                  <p className="text-sm font-bold text-white truncate">
-                    {hasRoadClosure ? "Road closures reported nearby" : "Major traffic incidents detected"}
-                  </p>
                 </div>
-                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
-                  <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+
+                {/* Current Vibe Card */}
+                <CurrentVibeCard
+                  weather={weather}
+                  weatherLoading={weatherLoading}
+                  recentPulseCount={recentPulseCount2h}
+                  onDropPulse={handleDropPulseJump}
+                  cityMood={cityMood}
+                  cityMoodLoading={cityMoodLoading}
+                  gasPrice={gasPrice}
+                  gasStationName={nearestStation?.name}
+                  onGasPriceClick={() => {
+                    setLocalSection("gas");
+                    setActiveTab("local");
+                  }}
+                />
+
+                {/* Quick Stats */}
+                <QuickStats
+                  trafficLevel={trafficLevel}
+                  trafficLoading={trafficLoading}
+                  eventsCount={ticketmasterEvents.length}
+                  eventsLoading={ticketmasterLoading}
+                  cityMood={cityMood}
+                  cityMoodLoading={cityMoodLoading}
+                  onTrafficClick={() => setActiveTab("traffic")}
+                  onEventsClick={() => setActiveTab("events")}
+                  onMoodClick={() => {
+                    if (!sessionUser) {
+                      setShowAuthModal(true);
+                    } else {
+                      setShowPulseModal(true);
+                    }
+                  }}
+                />
+
+                {/* Onboarding Checklist for new users */}
+                {sessionUser && !onboardingCompleted && !checklistDismissed && (
+                  <OnboardingChecklist
+                    onboardingCompleted={onboardingCompleted}
+                    onDismiss={() => setChecklistDismissed(true)}
+                    steps={[
+                      {
+                        id: "location",
+                        label: "Setup Location",
+                        description: "Hyperlocal content depends on it.",
+                        completed: !!selectedCity,
+                        actionLabel: "Set Location",
+                        action: () => cityInputRef.current?.focus(),
+                      },
+                      {
+                        id: "profile",
+                        label: "Craft your Identity",
+                        description: "Describe your vibe for a custom name.",
+                        completed: !!profile?.name_locked,
+                        actionLabel: "Edit Name",
+                        action: () => setShowUsernameEditor(true),
+                      },
+                      {
+                        id: "pulse",
+                        label: "Post your first Pulse",
+                        description: "Let the community know what's up.",
+                        completed: userPulseCount > 0,
+                        actionLabel: "Post Pulse",
+                        action: () => setShowPulseModal(true),
+                      },
+                      {
+                        id: "bookmark",
+                        label: "Bookmark a Vibe",
+                        description: "Keep track of interesting updates.",
+                        completed: favoritePulseIds.length > 0,
+                        actionLabel: "Browse",
+                        action: () => setActiveTab("pulse"),
+                      }
+                    ]}
+                  />
+                )}
+
+                {/* Tab Navigation */}
+                <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} secondaryOnly />
+
+                {/* AI Summary Stories */}
+                <AISummaryStories
+                  activeTab={activeTab}
+                  summary={summary}
+                  summaryLoading={summaryLoading}
+                  summaryError={summaryError}
+                  pulsesCount={visiblePulses.length}
+                  cityName={city}
+                  events={ticketmasterEvents}
+                  eventsLoading={ticketmasterLoading}
+                  eventsError={ticketmasterError}
+                  trafficLevel={trafficLevel}
+                  trafficLoading={trafficLoading}
+                  trafficError={trafficError}
+                  onNavigateTab={setActiveTab}
+                  vibeHeadline={cityMood?.vibeHeadline}
+                  vibeEmoji={cityMood?.dominantMood ?? undefined}
+                  temperature={weather?.temp}
+                />
+
+                {/* Traffic Flash Alert Banner */}
+                {(hasRoadClosure || (trafficIncidents && trafficIncidents.some(i => i.severity >= 3))) && (
+                  <div
+                    onClick={() => setActiveTab("traffic")}
+                    className="mb-4 glass-card border border-red-500/30 bg-red-500/10 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:bg-red-500/20 transition-all"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      <span className="text-xl">🚨</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-xs font-black text-red-400 uppercase tracking-wider">Traffic Alert</h4>
+                      <p className="text-sm font-bold text-white truncate">
+                        {hasRoadClosure ? "Road closures nearby" : "Major incidents detected"}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Live Vibes */}
+                <LiveVibes city={city} onNavigateToLocal={() => {
+                  setLocalSection("deals");
+                  setActiveTab("local");
+                }} />
+              </div>
+            ) : (
+              <div className="flex items-center justify-between px-2 pb-2">
+                <div>
+                  <h2 className="text-xl font-black text-white tracking-tighter leading-none">
+                    {city} <span className="text-emerald-500 uppercase text-[10px] tracking-[0.2em] ml-1">{activeTab}</span>
+                  </h2>
+                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-1">Hyperlocal intelligence active</p>
+                </div>
+                <button
+                  onClick={() => setActiveTab("pulse")}
+                  className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-slate-400 hover:text-white"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
-                </div>
+                </button>
               </div>
             )}
-
-            {/* Live Vibes - Real-time crowd-sourced venue sentiment */}
-            <LiveVibes city={city} onNavigateToLocal={() => {
-              setLocalSection("deals");
-              setActiveTab("local");
-            }} />
 
             {/* Tab Content - Using CSS hiding for pulse tab to prevent remounting */}
-            <div className="space-y-4">
+            <div className="space-y-4 min-h-[50vh] pb-32">
+
               {/* Events Tab - conditionally rendered */}
-              {safeActiveTab === "events" && (
+              {activeTab === "events" && (
                 <EventCard
                   events={ticketmasterEvents}
                   isLoading={ticketmasterLoading}
@@ -3783,7 +3722,7 @@ export default function Home() {
               )}
 
               {/* Traffic Tab - conditionally rendered */}
-              {safeActiveTab === "traffic" && (
+              {activeTab === "traffic" && (
                 <TrafficContent
                   trafficLevel={trafficLevel}
                   trafficLoading={trafficLoading}
@@ -3815,7 +3754,7 @@ export default function Home() {
               )}
 
               {/* Local Tab - conditionally rendered */}
-              {safeActiveTab === "local" && (
+              {activeTab === "local" && (
                 <LocalTab
                   cityName={city}
                   state={localState}
@@ -3847,7 +3786,7 @@ export default function Home() {
               )}
 
               {/* Status Tab - conditionally rendered */}
-              {safeActiveTab === "status" && (
+              {activeTab === "status" && (
                 <StatusTab
                   userId={sessionUser?.id ?? null}
                   city={city}
@@ -3863,7 +3802,7 @@ export default function Home() {
 
               {/* Pulse Tab - ALWAYS rendered, hidden with CSS when not active */}
               {/* This prevents remounting the large pulse list when switching tabs */}
-              <div className={safeActiveTab === "pulse" ? "" : "hidden"}>
+              <div className={activeTab === "pulse" ? "" : "hidden"}>
                 {/* Pulse Input */}
                 <div id="drop-a-pulse">
                   <PulseInput
