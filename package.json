@@ -1,6 +1,6 @@
 {
   "name": "community-pulse",
-  "version": "1.0.18",
+  "version": "1.0.19",
   "private": true,
   "scripts": {
     "dev": "next dev",

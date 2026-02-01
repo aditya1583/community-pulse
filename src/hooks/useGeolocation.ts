@@ -327,7 +327,10 @@ export function useGeolocation(): GeolocationState & GeolocationActions {
  * Fallback: Nominatim (free, no API key required)
  */
 async function reverseGeocode(lat: number, lon: number): Promise<{ city: string; state: string }> {
-  // Try our internal API first
+  // Backend URL for direct API calls (bypasses fetch interceptor issues in Capacitor)
+  const BACKEND = "https://voxlo-theta.vercel.app";
+
+  // Try 1: Internal API via relative URL
   try {
     const response = await fetch(getApiUrl(`/api/geocode/reverse?lat=${lat}&lon=${lon}`));
     if (response.ok) {
@@ -337,10 +340,24 @@ async function reverseGeocode(lat: number, lon: number): Promise<{ city: string;
       }
     }
   } catch (error) {
-    console.warn("[Geolocation] Primary reverse geocode failed:", error);
+    console.warn("[Geolocation] Relative URL geocode failed:", error);
   }
 
-  // Fallback: Nominatim (free, works without API key)
+  // Try 2: Direct absolute URL to Vercel backend (bypasses any fetch interceptor issues)
+  try {
+    console.log("[Geolocation] Trying direct backend URL...");
+    const response = await fetch(`${BACKEND}/api/geocode/reverse?lat=${lat}&lon=${lon}`);
+    if (response.ok) {
+      const data = await response.json();
+      if (data.name && data.name !== "Unknown") {
+        return { city: data.name, state: data.state || "" };
+      }
+    }
+  } catch (error) {
+    console.warn("[Geolocation] Direct backend geocode failed:", error);
+  }
+
+  // Try 3: Nominatim (free, works without API key)
   try {
     console.log("[Geolocation] Trying Nominatim fallback...");
     const response = await fetch(
@@ -352,7 +369,6 @@ async function reverseGeocode(lat: number, lon: number): Promise<{ city: string;
       const addr = data.address || {};
       const city = addr.city || addr.town || addr.village || addr.municipality || addr.county || "";
       const state = addr.state || "";
-      // Extract state code (e.g., "Texas" -> "TX") or use first 2 chars
       const stateCode = addr["ISO3166-2-lvl4"]?.split("-")[1] || state.substring(0, 2).toUpperCase();
       if (city) {
         return { city, state: stateCode };
@@ -362,7 +378,7 @@ async function reverseGeocode(lat: number, lon: number): Promise<{ city: string;
     console.warn("[Geolocation] Nominatim fallback failed:", error);
   }
 
-  // Last resort: use coordinate-based display instead of misleading "Current Location"
+  // Last resort: use coordinate-based display
   const latDir = lat >= 0 ? "N" : "S";
   const lonDir = lon >= 0 ? "E" : "W";
   return { city: `${Math.abs(lat).toFixed(1)}°${latDir}, ${Math.abs(lon).toFixed(1)}°${lonDir}`, state: "" };
