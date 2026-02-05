@@ -13,6 +13,16 @@ import type {
   PostType,
 } from "./types";
 import { getRandomRoad, getRandomLandmark, getRandomSchool, getAltRoute } from "./city-configs";
+import {
+  generateSpicyTrafficPost,
+  generateSpicyWeatherPost,
+  generateSpicyEventPost,
+  generateSpicyMarketPost,
+  SPICY_HOT_TAKES,
+  SPICY_OBSERVATIONS,
+  getRandomTemplate,
+  fillTemplate,
+} from "./spicy-templates";
 import { RADIUS_CONFIG } from "@/lib/constants/radius";
 import { formatDistance } from "@/lib/geo/distance";
 import {
@@ -633,7 +643,7 @@ function buildVariables(ctx: SituationContext, eventIndex: number = 0): Template
   };
 }
 
-function fillTemplate(template: string, variables: TemplateVariables): string {
+function fillTemplateStandard(template: string, variables: TemplateVariables): string {
   let result = template;
 
   for (const [key, value] of Object.entries(variables)) {
@@ -643,34 +653,113 @@ function fillTemplate(template: string, variables: TemplateVariables): string {
   return result;
 }
 
+/**
+ * Generate a spicy (personality-driven) post based on context
+ */
+function generateSpicyPost(
+  ctx: SituationContext,
+  decision: PostDecision,
+  variables: TemplateVariables
+): { message: string; mood: string } | null {
+  const { postType } = decision;
+
+  switch (postType) {
+    case "Traffic": {
+      const roadName = variables.road || "183";
+      return generateSpicyTrafficPost(ctx.traffic, roadName, variables.altRoute);
+    }
+    case "Weather": {
+      return generateSpicyWeatherPost(ctx.weather);
+    }
+    case "Events": {
+      if (ctx.events.length > 0) {
+        const isLocal = !ctx.events[0].distanceMiles || ctx.events[0].distanceMiles <= 10;
+        return generateSpicyEventPost(ctx.events[0], isLocal);
+      }
+      return null;
+    }
+    case "General": {
+      // Mix of hot takes and observations for general posts
+      if (Math.random() < 0.3) {
+        // Hot take
+        const template = getRandomTemplate(SPICY_HOT_TAKES);
+        const message = fillTemplate(template, {
+          restaurant: variables.restaurant,
+          road: variables.road,
+          road2: variables.altRoute,
+          neighborhood: ctx.city.name,
+          chain: "Chick-fil-A",
+          food: "tacos",
+          local_place: variables.landmark,
+        });
+        return { message, mood: "🌶️" };
+      } else {
+        // Observation
+        const template = getRandomTemplate(SPICY_OBSERVATIONS);
+        const message = fillTemplate(template, {
+          neighborhood: ctx.city.name,
+          street: variables.road,
+          city: ctx.city.name,
+        });
+        return { message, mood: "👀" };
+      }
+    }
+    default:
+      return null;
+  }
+}
+
 // ============================================================================
 // MAIN GENERATOR
 // ============================================================================
 
 /**
  * Generate a post based on the situation analysis
- * Now supports AI-generated fun facts!
+ * Now supports AI-generated fun facts and spicy templates!
  */
 export async function generatePost(
   ctx: SituationContext,
   decision: PostDecision,
-  options: { injectFunFact?: boolean; useAIFacts?: boolean } = {}
+  options: { injectFunFact?: boolean; useAIFacts?: boolean; useSpicyTemplates?: boolean } = {}
 ): Promise<GeneratedPost | null> {
   if (!decision.shouldPost || !decision.postType) {
     return null;
   }
 
-  // Get templates for this category
-  const templates = getTemplates(decision.postType, decision.templateCategory);
-  if (templates.length === 0) {
-    console.warn(`[TemplateEngine] No templates for ${decision.postType}/${decision.templateCategory}`);
-    return null;
-  }
-
-  // Select and fill template
-  const template = selectTemplate(templates);
   const variables = buildVariables(ctx);
-  let message = fillTemplate(template, variables);
+  let message: string;
+  let mood: string;
+
+  // Use spicy templates for more engaging content (default: true for 60% of posts)
+  const useSpicy = options.useSpicyTemplates ?? Math.random() < 0.6;
+
+  if (useSpicy) {
+    const spicyResult = generateSpicyPost(ctx, decision, variables);
+    if (spicyResult) {
+      message = spicyResult.message;
+      mood = spicyResult.mood;
+    } else {
+      // Fall back to standard templates
+      const templates = getTemplates(decision.postType, decision.templateCategory);
+      if (templates.length === 0) {
+        console.warn(`[TemplateEngine] No templates for ${decision.postType}/${decision.templateCategory}`);
+        return null;
+      }
+      const template = selectTemplate(templates);
+      message = fillTemplateStandard(template, variables);
+      mood = getMood(decision.templateCategory);
+    }
+  } else {
+    // Get standard templates for this category
+    const templates = getTemplates(decision.postType, decision.templateCategory);
+    if (templates.length === 0) {
+      console.warn(`[TemplateEngine] No templates for ${decision.postType}/${decision.templateCategory}`);
+      return null;
+    }
+    const template = selectTemplate(templates);
+    message = fillTemplateStandard(template, variables);
+    mood = getMood(decision.templateCategory);
+  }
 
   // Should we add a fun fact?
   const shouldInjectFact = options.injectFunFact || Math.random() < FUN_FACT_INJECTION_RATE;
@@ -697,7 +786,7 @@ export async function generatePost(
   return {
     message,
     tag: decision.postType,
-    mood: getMood(decision.templateCategory),
+    mood,
     author: getBotName(decision.postType, ctx.city.name),
     is_bot: true,
     hidden: false,
@@ -740,12 +829,12 @@ async function getAIFunFact(
 /**
  * Generate multiple posts for cold-start seeding
  * Uses different categories to provide variety
- * Now with AI-powered fun facts!
+ * Now with AI-powered fun facts and spicy templates!
  */
 export async function generateSeedPosts(
   ctx: SituationContext,
   count: number = 3,
-  options: { useAIFacts?: boolean } = {}
+  options: { useAIFacts?: boolean; useSpicyTemplates?: boolean } = {}
 ): Promise<GeneratedPost[]> {
   const posts: GeneratedPost[] = [];
   const usedCategories = new Set<string>();
@@ -794,7 +883,25 @@ export async function generateSeedPosts(
     const template = selectTemplate(templates);
     // Pass eventIndex to buildVariables so each event post uses the correct event
     const variables = buildVariables(ctx, option.eventIndex ?? 0);
-    let message = fillTemplate(template, variables);
+    
+    // Use spicy templates 60% of the time for more engaging content
+    let message: string;
+    let postMood: string;
+    const useSpicy = options.useSpicyTemplates ?? Math.random() < 0.6;
+    
+    if (useSpicy) {
+      const spicyResult = generateSpicyPost(ctx, { shouldPost: true, postType: option.type, templateCategory: option.category, reason: "", priority: 5 }, variables);
+      if (spicyResult) {
+        message = spicyResult.message;
+        postMood = spicyResult.mood;
+      } else {
+        message = fillTemplateStandard(template, variables);
+        postMood = getMood(option.category);
+      }
+    } else {
+      message = fillTemplateStandard(template, variables);
+      postMood = getMood(option.category);
+    }
 
     // Inject fun facts into seed posts more frequently (~40% for variety)
     if (Math.random() < 0.4) {
@@ -816,7 +923,7 @@ export async function generateSeedPosts(
     posts.push({
       message,
       tag: option.type,
-      mood: getMood(option.category),
+      mood: postMood,
       author: getBotName(option.type, ctx.city.name),
       is_bot: true,
       hidden: false,
