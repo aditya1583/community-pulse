@@ -24,6 +24,10 @@
     {
       "path": "/api/cron/refresh-content",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/seed-cities",
+      "schedule": "0 */2 * * *"
     }
   ]
 }
