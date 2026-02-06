@@ -42,17 +42,17 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 function getExpirationHours(tag: string): number {
   const tagLower = tag.toLowerCase();
 
-  // Weather changes rapidly - 2 hours to avoid showing stale temps
+  // Weather changes rapidly - 2 hours
   if (tagLower === "weather") return 2;
 
   // Traffic conditions change rapidly - 2 hours
   if (tagLower === "traffic") return 2;
 
-  // Events are time-sensitive - 15 hours
-  if (tagLower === "events") return 15;
+  // Events are time-sensitive - 12 hours
+  if (tagLower === "events") return 12;
 
-  // General content, polls, engagement - 18 hours (keeps feed fresh for next day)
-  return 18;
+  // General content, polls, engagement - 8 hours (keeps feed fresh without spam)
+  return 8;
 }
 
 // PERMANENT SEEDING: Always generate posts, regardless of existing count
