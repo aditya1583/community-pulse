@@ -61,8 +61,11 @@ function getExpirationHours(tag: string): number {
 // Maximum cities to process per cron run (prevent timeout)
 const MAX_CITIES_PER_RUN = 10;
 
-// Posts to generate per city per cron run (2-3 keeps it fresh without spam)
+// Posts to generate per city per cron run
 const POSTS_PER_CITY_PER_RUN = 2;
+
+// Maximum bot posts to keep per city (delete oldest beyond this)
+const MAX_BOT_POSTS_PER_CITY = 7;
 
 /**
  * Time-of-day content categories
@@ -126,6 +129,55 @@ function getBotName(tag: string, citySlug: string): string {
   const persona = BOT_PERSONAS[tag] || BOT_PERSONAS.General;
   const baseName = persona.names[Math.floor(Math.random() * persona.names.length)];
   return `${baseName}_${citySlug}`;
+}
+
+/**
+ * Clean up old bot posts beyond MAX_BOT_POSTS_PER_CITY limit.
+ * Keeps the newest bot posts, deletes the rest.
+ * User posts are never touched.
+ */
+async function cleanupOldBotPosts(
+  supabase: ReturnType<typeof createClient>,
+  city: string
+): Promise<{ deleted: number; error?: string }> {
+  try {
+    // Get all bot posts for this city, ordered by created_at desc
+    const { data: botPosts, error: fetchError } = await supabase
+      .from("pulses")
+      .select("id, created_at")
+      .eq("city", city)
+      .eq("is_bot", true)
+      .order("created_at", { ascending: false });
+
+    if (fetchError) {
+      console.error(`[Cron Cleanup] Error fetching bot posts for ${city}:`, fetchError);
+      return { deleted: 0, error: fetchError.message };
+    }
+
+    if (!botPosts || botPosts.length <= MAX_BOT_POSTS_PER_CITY) {
+      return { deleted: 0 };
+    }
+
+    // Get IDs of posts to delete (all beyond the limit)
+    const postsToDelete = botPosts.slice(MAX_BOT_POSTS_PER_CITY);
+    const idsToDelete = postsToDelete.map((p) => p.id);
+
+    const { error: deleteError } = await supabase
+      .from("pulses")
+      .delete()
+      .in("id", idsToDelete);
+
+    if (deleteError) {
+      console.error(`[Cron Cleanup] Error deleting old bot posts for ${city}:`, deleteError);
+      return { deleted: 0, error: deleteError.message };
+    }
+
+    console.log(`[Cron Cleanup] Deleted ${idsToDelete.length} old bot posts from ${city}`);
+    return { deleted: idsToDelete.length };
+  } catch (error) {
+    console.error(`[Cron Cleanup] Unexpected error for ${city}:`, error);
+    return { deleted: 0, error: error instanceof Error ? error.message : "Unknown error" };
+  }
 }
 
 interface ActiveCity {
@@ -367,6 +419,12 @@ export async function GET(request: NextRequest) {
 
           results.push({ city: cityInfo.city, postsCreated: postsCreatedForCity });
           console.log(`[Cron Refresh] Created ${postsCreatedForCity} intelligent posts for ${cityInfo.city}`);
+          
+          // Clean up old bot posts beyond limit
+          const cleanupResult = await cleanupOldBotPosts(supabase, cityInfo.city);
+          if (cleanupResult.deleted > 0) {
+            console.log(`[Cron Refresh] Cleaned up ${cleanupResult.deleted} old bot posts from ${cityInfo.city}`);
+          }
           continue;
         } catch (err) {
           console.warn(`[Cron Refresh] Intelligent bot failed for ${cityInfo.city}:`, err);
@@ -412,6 +470,12 @@ export async function GET(request: NextRequest) {
         results.push({ city: cityInfo.city, postsCreated: count });
         totalPostsCreated += count;
         console.log(`[Cron Refresh] Created ${count} time-based posts for ${cityInfo.city}`);
+      }
+
+      // Clean up old bot posts beyond limit
+      const cleanupResult = await cleanupOldBotPosts(supabase, cityInfo.city);
+      if (cleanupResult.deleted > 0) {
+        console.log(`[Cron Refresh] Cleaned up ${cleanupResult.deleted} old bot posts from ${cityInfo.city}`);
       }
     }
 
