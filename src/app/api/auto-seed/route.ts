@@ -703,7 +703,10 @@ export async function POST(req: NextRequest) {
     let cumulativeOffset = 0;
 
     // Get city coordinates for distance-based filtering
-    const cityCoords = getCityCoordinates(body.city);
+    // Prefer user-provided coordinates over hardcoded lookup
+    const cityCoords = hasCoords
+      ? { lat: body.lat!, lon: body.lon! }
+      : getCityCoordinates(body.city);
 
     const records = posts.map((post, index) => {
       // Stagger posts backwards in time with natural variation

@@ -1440,28 +1440,76 @@ export default function Home() {
       // Include lat/lon for distance-based filtering
       // Filter out expired posts at DB level for efficiency (1hr grace period)
       const expiryGracePeriod = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
-      const queryWithPolls = await supabase
-        .from("pulses")
-        .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, poll_options, lat, lon")
-        .eq("city", city)
-        .gte("created_at", start.toISOString())
-        .lt("created_at", end.toISOString())
-        .or(`expires_at.is.null,expires_at.gt.${expiryGracePeriod}`)
-        .order("created_at", { ascending: false })
-        .limit(PULSES_PAGE_SIZE + 1);
 
-      // Fallback: If poll_options column doesn't exist, retry without it
-      if (queryWithPolls.error?.message?.includes("poll_options")) {
-        console.warn("[Pulses] poll_options column missing, fetching without it");
-        const fallbackQuery = await supabase
+      // COORDINATE-BASED QUERY: Use 10-mile bounding box when coordinates are available
+      // This ensures users see all nearby content regardless of city name differences
+      // 10 miles ≈ 0.145° latitude, ~0.17° longitude at 30° lat
+      const userLat = selectedCity?.lat;
+      const userLon = selectedCity?.lon;
+      const useCoordinateQuery = userLat != null && userLon != null;
+
+      // Bounding box: ~12 miles to ensure we capture content at edges
+      const latDelta = 0.175;  // ~12 miles
+      const lonDelta = 0.21;   // ~12 miles at ~30° latitude
+
+      let queryWithPolls;
+      if (useCoordinateQuery) {
+        // Query by bounding box - catches all nearby content regardless of city name
+        console.log(`[Pulses] Using coordinate query: ${userLat}, ${userLon} (±${latDelta}°)`);
+        queryWithPolls = await supabase
           .from("pulses")
-          .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, lat, lon")
+          .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, poll_options, lat, lon")
+          .gte("lat", userLat - latDelta)
+          .lte("lat", userLat + latDelta)
+          .gte("lon", userLon - lonDelta)
+          .lte("lon", userLon + lonDelta)
+          .gte("created_at", start.toISOString())
+          .lt("created_at", end.toISOString())
+          .or(`expires_at.is.null,expires_at.gt.${expiryGracePeriod}`)
+          .order("created_at", { ascending: false })
+          .limit(PULSES_PAGE_SIZE + 1);
+      } else {
+        // Fallback to city name match if no coordinates
+        console.log(`[Pulses] Using city name query: "${city}"`);
+        queryWithPolls = await supabase
+          .from("pulses")
+          .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, poll_options, lat, lon")
           .eq("city", city)
           .gte("created_at", start.toISOString())
           .lt("created_at", end.toISOString())
           .or(`expires_at.is.null,expires_at.gt.${expiryGracePeriod}`)
           .order("created_at", { ascending: false })
           .limit(PULSES_PAGE_SIZE + 1);
+      }
+
+      // Fallback: If poll_options column doesn't exist, retry without it
+      if (queryWithPolls.error?.message?.includes("poll_options")) {
+        console.warn("[Pulses] poll_options column missing, fetching without it");
+        let fallbackQuery;
+        if (useCoordinateQuery) {
+          fallbackQuery = await supabase
+            .from("pulses")
+            .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, lat, lon")
+            .gte("lat", userLat - latDelta)
+            .lte("lat", userLat + latDelta)
+            .gte("lon", userLon - lonDelta)
+            .lte("lon", userLon + lonDelta)
+            .gte("created_at", start.toISOString())
+            .lt("created_at", end.toISOString())
+            .or(`expires_at.is.null,expires_at.gt.${expiryGracePeriod}`)
+            .order("created_at", { ascending: false })
+            .limit(PULSES_PAGE_SIZE + 1);
+        } else {
+          fallbackQuery = await supabase
+            .from("pulses")
+            .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, lat, lon")
+            .eq("city", city)
+            .gte("created_at", start.toISOString())
+            .lt("created_at", end.toISOString())
+            .or(`expires_at.is.null,expires_at.gt.${expiryGracePeriod}`)
+            .order("created_at", { ascending: false })
+            .limit(PULSES_PAGE_SIZE + 1);
+        }
         data = (fallbackQuery.data as DBPulse[]) ?? null;
         error = fallbackQuery.error;
       } else {
@@ -1518,7 +1566,7 @@ export default function Home() {
 
       return () => clearInterval(refreshInterval);
     }
-  }, [city, refreshTrigger]);
+  }, [city, refreshTrigger, selectedCity?.lat, selectedCity?.lon]);
 
   // ========= PULL-TO-REFRESH HANDLER =========
   const handlePullToRefresh = useCallback(async () => {
@@ -1709,53 +1757,8 @@ export default function Home() {
           console.log(`[Content Refresh] Skipped - ${data.message || "city may already have recent pulses"}`);
         } else if (postsCreated > 0) {
           console.log(`[Content Refresh] SUCCESS! Created ${postsCreated} posts for ${city} (${refreshType})`);
-          // Refetch pulses to show the new posts
-          const refetchNow = new Date();
-          const start = startOfRecentWindow(refetchNow, 7);
-          const end = startOfNextLocalDay(refetchNow);
-          const refetchExpiryGrace = new Date(refetchNow.getTime() - 60 * 60 * 1000).toISOString();
-
-          // Use same column selection as initial fetch (with poll_options and lat/lon)
-          let refetchData: DBPulse[] | null = null;
-          const refetchWithPolls = await supabase
-            .from("pulses")
-            .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, poll_options, lat, lon")
-            .eq("city", city)
-            .gte("created_at", start.toISOString())
-            .lt("created_at", end.toISOString())
-            .or(`expires_at.is.null,expires_at.gt.${refetchExpiryGrace}`)
-            .order("created_at", { ascending: false })
-            .limit(PULSES_PAGE_SIZE);
-
-          if (refetchWithPolls.error?.message?.includes("poll_options")) {
-            console.warn("[Content Refresh] poll_options missing, retrying without it");
-            const refetchWithoutPolls = await supabase
-              .from("pulses")
-              .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, lat, lon")
-              .eq("city", city)
-              .gte("created_at", start.toISOString())
-              .lt("created_at", end.toISOString())
-              .or(`expires_at.is.null,expires_at.gt.${refetchExpiryGrace}`)
-              .order("created_at", { ascending: false })
-              .limit(PULSES_PAGE_SIZE);
-            refetchData = (refetchWithoutPolls.data as DBPulse[]) ?? null;
-            if (refetchWithoutPolls.error) {
-              console.error("[Content Refresh] Refetch Error:", refetchWithoutPolls.error.message);
-            }
-          } else if (refetchWithPolls.error) {
-            console.error("[Content Refresh] Refetch Error:", refetchWithPolls.error.message);
-          } else {
-            refetchData = (refetchWithPolls.data as DBPulse[]) ?? null;
-          }
-
-          if (refetchData) {
-            console.log(`[Content Refresh] Got ${refetchData.length} pulses after ${refreshType}`);
-            const mapped: Pulse[] = refetchData.map((row) => ({
-              ...mapDBPulseToPulse(row),
-              author: row.author || "Anonymous",
-            }));
-            setPulses(mapped);
-          }
+          // Trigger main refresh to pick up new posts (uses coordinate-based query)
+          setRefreshTrigger(prev => prev + 1);
         }
       } catch (err) {
         console.error("[Content Refresh] Error:", err);
