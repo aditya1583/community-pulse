@@ -92,8 +92,40 @@ export async function POST(request: NextRequest) {
       results.citiesProcessed = uniqueCities.length;
     }
 
-    // 3. Normalize duplicate city names (optional - merge similar names)
-    // For now, just report them
+    // 3. Normalize duplicate city names - keep only canonical forms
+    // Delete bot posts with non-canonical city names
+    const canonicalCities: Record<string, string> = {
+      "Leander, Texas, US": "Leander, Texas",
+      "Leander, TX": "Leander, Texas",
+      "Austin, TX, US": "Austin, Texas",
+      "Austin, TX": "Austin, Texas",
+      "Austin, Texas, US": "Austin, Texas",
+      "Cedar Park, TX": "Cedar Park, Texas",
+    };
+
+    let normalizedDeleted = 0;
+    for (const [variant, canonical] of Object.entries(canonicalCities)) {
+      if (variant === canonical) continue;
+      
+      const { data: variantPosts } = await supabase
+        .from("pulses")
+        .select("id")
+        .eq("city", variant)
+        .eq("is_bot", true);
+      
+      if (variantPosts && variantPosts.length > 0) {
+        const ids = variantPosts.map(p => p.id);
+        const { error } = await supabase
+          .from("pulses")
+          .delete()
+          .in("id", ids);
+        
+        if (!error) normalizedDeleted += ids.length;
+      }
+    }
+    results.normalizedDeleted = normalizedDeleted;
+
+    // Report remaining cities
     const { data: allCities } = await supabase
       .from("pulses")
       .select("city")
