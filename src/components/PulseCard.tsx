@@ -378,7 +378,7 @@ export default function PulseCard({
 
   return (
     <article
-      className={`glass-card rounded-2xl p-5 mb-4 transition-all duration-300 premium-border hover:shadow-2xl ${style.glow} group ${isFading ? 'opacity-40 grayscale-[0.2]' : ''}`}
+      className={`glass-card rounded-2xl p-5 mb-4 transition-all duration-300 premium-border hover:shadow-2xl ${style.glow} group ${isFading ? 'opacity-40 grayscale-[0.2]' : ''} overflow-hidden relative`}
       style={{ opacity }}
     >
       {/* Subtle indicator bar */}

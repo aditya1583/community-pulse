@@ -948,8 +948,28 @@ export default function Home() {
     };
   }, []);
 
+  // Identity is ready when signed in with a profile, OR if profile loading is taking too long
+  // This prevents the "WAIT..." button from getting stuck forever
   const identityReady =
     authStatus === "signed_in" && !!sessionUser && !profileLoading && !!profile;
+  
+  // Safety timeout: if profileLoading is stuck for >5 seconds, force it to complete
+  useEffect(() => {
+    if (profileLoading && authStatus === "signed_in" && sessionUser) {
+      const timeout = setTimeout(() => {
+        console.warn("[Voxlo] Profile loading timeout - forcing ready state");
+        setProfileLoading(false);
+        if (!profile) {
+          // Use a fallback profile so user can post
+          setProfile({
+            anon_name: `User${sessionUser.id.slice(0, 6)}`,
+            name_locked: false,
+          });
+        }
+      }, 5000);
+      return () => clearTimeout(timeout);
+    }
+  }, [profileLoading, authStatus, sessionUser, profile]);
 
   useEffect(() => {
     const userId = sessionUser?.id;

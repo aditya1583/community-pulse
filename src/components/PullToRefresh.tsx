@@ -88,12 +88,18 @@ export default function PullToRefresh({
       setPullDistance(PULL_THRESHOLD / 2); // Keep spinner visible
 
       try {
-        await onRefresh();
+        // Add timeout safety - don't let refresh get stuck forever
+        const timeoutPromise = new Promise<void>((_, reject) => 
+          setTimeout(() => reject(new Error("Refresh timeout")), 10000)
+        );
+        await Promise.race([onRefresh(), timeoutPromise]);
       } catch (error) {
         console.error("[PullToRefresh] Refresh error:", error);
       } finally {
         setIsRefreshing(false);
         setPullDistance(0);
+        // Force scroll to top after refresh completes
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     } else {
       // Snap back
