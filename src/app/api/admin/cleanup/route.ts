@@ -8,7 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
-const MAX_BOT_POSTS_PER_CITY = 7;
+const MAX_BOT_POSTS_PER_CITY = 5;
 
 export async function POST(request: NextRequest) {
   // Verify secret
@@ -30,11 +30,11 @@ export async function POST(request: NextRequest) {
   const results: Record<string, unknown> = {};
 
   try {
-    // 1. Delete pulses with coordinate-based city names (contain °)
+    // 1. Delete pulses with junk city names (coordinates or "Current Location")
     const { data: coordPulses, error: coordFetchError } = await supabase
       .from("pulses")
       .select("id, city")
-      .like("city", "%°%");
+      .or("city.like.%°%,city.like.Current Location%");
 
     if (coordFetchError) {
       results.coordError = coordFetchError.message;

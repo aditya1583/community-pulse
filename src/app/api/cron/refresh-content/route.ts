@@ -65,7 +65,7 @@ const MAX_CITIES_PER_RUN = 10;
 const POSTS_PER_CITY_PER_RUN = 2;
 
 // Maximum bot posts to keep per city (delete oldest beyond this)
-const MAX_BOT_POSTS_PER_CITY = 7;
+const MAX_BOT_POSTS_PER_CITY = 5;
 
 /**
  * Time-of-day content categories
