@@ -357,12 +357,12 @@ async function reverseGeocode(lat: number, lon: number): Promise<{ city: string;
     console.warn("[Geolocation] Direct backend geocode failed:", error);
   }
 
-  // Try 3: Nominatim (free, works without API key)
+  // Try 3: Nominatim (free, works without API key - requires User-Agent)
   try {
     console.log("[Geolocation] Trying Nominatim fallback...");
     const response = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10`,
-      { headers: { "Accept": "application/json" } }
+      { headers: { "Accept": "application/json", "User-Agent": "Voxlo/1.0 (https://voxlo.app)" } }
     );
     if (response.ok) {
       const data = await response.json();
