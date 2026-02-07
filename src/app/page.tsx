@@ -288,7 +288,7 @@ export default function Home() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Pull-to-refresh trigger
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  // refreshTrigger removed — pull-to-refresh now directly awaits fetchPulses
 
   // Pagination state
   const [hasMorePulses, setHasMorePulses] = useState(false);
@@ -1431,20 +1431,16 @@ export default function Home() {
   }
 
   // ========= PULSES FETCH =========
-  // FIXED: Added initialPulsesFetched flag to prevent "No pulses" flash on initial load.
-  // The issue was that setPulses([]) was called before fetch completed, causing a
-  // momentary display of "No pulses yet" even when pulses existed in the database.
-  useEffect(() => {
-    // Reset the flag when city changes to indicate we need to fetch again
-    setInitialPulsesFetched(false);
+  // FIXED: Extracted fetchPulses to component level so pull-to-refresh can await it directly.
+  // Previously it was defined inside useEffect, causing a hang when Supabase took >800ms.
+  const fetchPulses = useCallback(async () => {
+    setLoading(true);
+    setErrorMsg(null);
+    // IMPORTANT: Don't clear pulses here - let the loading state show instead
+    // This prevents the "No pulses" flash before data arrives
+    setHasMorePulses(false);
 
-    const fetchPulses = async () => {
-      setLoading(true);
-      setErrorMsg(null);
-      // IMPORTANT: Don't clear pulses here - let the loading state show instead
-      // This prevents the "No pulses" flash before data arrives
-      setHasMorePulses(false);
-
+    try {
       const now = new Date();
       // Expanded window to 30 days to ensure content visibility during testing
       const start = startOfRecentWindow(now, 30);
@@ -1569,10 +1565,16 @@ export default function Home() {
         // Explicit empty case
         setPulses([]);
       }
-
+    } finally {
       setLoading(false);
       setInitialPulsesFetched(true);
-    };
+    }
+  }, [city, selectedCity?.lat, selectedCity?.lon, supabase]);
+
+  // Initial load + auto-refresh interval
+  useEffect(() => {
+    // Reset the flag when city changes to indicate we need to fetch again
+    setInitialPulsesFetched(false);
 
     if (city) {
       fetchPulses();
@@ -1586,15 +1588,13 @@ export default function Home() {
 
       return () => clearInterval(refreshInterval);
     }
-  }, [city, refreshTrigger, selectedCity?.lat, selectedCity?.lon]);
+  }, [city, fetchPulses]);
 
   // ========= PULL-TO-REFRESH HANDLER =========
   const handlePullToRefresh = useCallback(async () => {
     console.log("[PullToRefresh] Triggered manual refresh");
-    setRefreshTrigger(prev => prev + 1);
-    // Small delay to allow the effect to run
-    await new Promise(resolve => setTimeout(resolve, 800));
-  }, []);
+    await fetchPulses();
+  }, [fetchPulses]);
 
   // ========= AUTO-SEED AND REFRESH STALE CITIES =========
   // When a city has no pulses OR content is stale, automatically generate fresh bot posts
