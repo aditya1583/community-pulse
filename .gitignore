@@ -51,3 +51,5 @@ tmpclaude-*
 # Claude skills submodule (local only)
 Claude skills/
 antigravity-awesome-skills/
+iOS Secrets/
+*.cer
