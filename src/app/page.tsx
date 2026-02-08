@@ -1443,11 +1443,14 @@ export default function Home() {
     // This prevents the "No pulses" flash before data arrives
     setHasMorePulses(false);
 
+    console.log("[Pulses] fetchPulses called for city:", city);
+
     try {
       const now = new Date();
       // Expanded window to 30 days to ensure content visibility during testing
       const start = startOfRecentWindow(now, 30);
       const end = startOfNextLocalDay(now);
+      console.log("[Pulses] Query window:", start.toISOString(), "to", end.toISOString());
 
       // Explicitly select only needed fields for privacy
       // user_id is included for ownership check (is this my pulse?) - it's a UUID, not PII
@@ -1471,11 +1474,19 @@ export default function Home() {
       const latDelta = 0.175;  // ~12 miles
       const lonDelta = 0.21;   // ~12 miles at ~30° latitude
 
+      // Helper: wrap query with 15s timeout to prevent infinite hang
+      const withTimeout = <T,>(promise: Promise<T>, ms = 15000): Promise<T> =>
+        Promise.race([
+          promise,
+          new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`Query timed out after ${ms}ms`)), ms)),
+        ]);
+
       let queryWithPolls;
       if (useCoordinateQuery) {
         // Query by bounding box - catches all nearby content regardless of city name
         console.log(`[Pulses] Using coordinate query: ${userLat}, ${userLon} (±${latDelta}°)`);
-        queryWithPolls = await supabase
+        const qStart = Date.now();
+        queryWithPolls = await withTimeout(supabase
           .from("pulses")
           .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, poll_options, lat, lon")
           .gte("lat", userLat - latDelta)
@@ -1486,7 +1497,8 @@ export default function Home() {
           .lt("created_at", end.toISOString())
           .or(`expires_at.is.null,expires_at.gt.${expiryGracePeriod}`)
           .order("created_at", { ascending: false })
-          .limit(PULSES_PAGE_SIZE + 1);
+          .limit(PULSES_PAGE_SIZE + 1));
+        console.log(`[Pulses] Coordinate query completed in ${Date.now() - qStart}ms, rows: ${queryWithPolls.data?.length ?? 'null'}, error: ${queryWithPolls.error?.message ?? 'none'}`);
       } else {
         // Fallback to city name match if no coordinates
         // Use ilike with city base name to handle suffix variations
@@ -1572,6 +1584,10 @@ export default function Home() {
         // Explicit empty case
         setPulses([]);
       }
+    } catch (fetchErr) {
+      console.error("[Pulses] fetchPulses CAUGHT ERROR:", fetchErr);
+      setErrorMsg(fetchErr instanceof Error ? fetchErr.message : "Unknown fetch error");
+      setPulses([]);
     } finally {
       setLoading(false);
       setInitialPulsesFetched(true);
@@ -3769,9 +3785,9 @@ export default function Home() {
 
                       {/* DEBUG: Remove after fixing feed issue */}
                       <div className="bg-red-900/30 border border-red-500/50 rounded-xl p-3 text-xs text-red-300 mb-2">
-                        <p>DEBUG: city=&quot;{city}&quot; | lat={selectedCity?.lat ?? "null"} | lon={selectedCity?.lon ?? "null"}</p>
-                        <p>loading={String(loading)} | fetched={String(initialPulsesFetched)} | pulses={pulses.length} | filtered={filteredPulses.length}</p>
-                        <p>errorMsg={errorMsg ?? "none"}</p>
+                        <p>city=&quot;{city}&quot; | lat={selectedCity?.lat?.toFixed(4) ?? "NULL"} | lon={selectedCity?.lon?.toFixed(4) ?? "NULL"}</p>
+                        <p>loading={String(loading)} | fetched={String(initialPulsesFetched)} | pulses={pulses.length} | err={errorMsg ?? "none"}</p>
+                        <p>coordQuery={String(selectedCity?.lat != null && selectedCity?.lon != null)}</p>
                       </div>
 
                       {(loading || !initialPulsesFetched) && pulses.length === 0 ? (
