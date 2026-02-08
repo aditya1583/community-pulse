@@ -3767,6 +3767,13 @@ export default function Home() {
                         </div>
                       )}
 
+                      {/* DEBUG: Remove after fixing feed issue */}
+                      <div className="bg-red-900/30 border border-red-500/50 rounded-xl p-3 text-xs text-red-300 mb-2">
+                        <p>DEBUG: city=&quot;{city}&quot; | lat={selectedCity?.lat ?? "null"} | lon={selectedCity?.lon ?? "null"}</p>
+                        <p>loading={String(loading)} | fetched={String(initialPulsesFetched)} | pulses={pulses.length} | filtered={filteredPulses.length}</p>
+                        <p>errorMsg={errorMsg ?? "none"}</p>
+                      </div>
+
                       {(loading || !initialPulsesFetched) && pulses.length === 0 ? (
                         <div className="bg-slate-800/40 border border-dashed border-slate-700/50 rounded-2xl p-10 text-center">
                           <p className="text-sm font-bold text-slate-400">Loading the local vibe for {city}...</p>
