@@ -53,13 +53,15 @@ export async function GET(request: NextRequest) {
   const start = Date.now();
 
   try {
-    // Find active cities with recent pulses (last 7 days)
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    // ONLY refresh cities with REAL USER activity in last 48 hours.
+    // No user posts = no seeding. We don't waste resources on dormant cities.
+    const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
 
     const { data: cityData, error: cityError } = await supabase
       .from("pulses")
       .select("city, lat, lon")
-      .gte("created_at", sevenDaysAgo)
+      .gte("created_at", twoDaysAgo)
+      .or("is_bot.is.null,is_bot.eq.false")  // ONLY real user posts
       .order("created_at", { ascending: false });
 
     if (cityError) {
@@ -75,7 +77,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (cityMap.size === 0) {
-      return NextResponse.json({ success: true, message: "No active cities", postsCreated: 0, durationMs: Date.now() - start });
+      return NextResponse.json({ success: true, message: "No active cities with real users", postsCreated: 0, durationMs: Date.now() - start });
     }
 
     // Pick the cities that need content most — find ones with fewest recent bot posts
