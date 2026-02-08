@@ -1446,111 +1446,33 @@ export default function Home() {
     console.log("[Pulses] fetchPulses called for city:", city);
 
     try {
-      const now = new Date();
-      // Expanded window to 30 days to ensure content visibility during testing
-      const start = startOfRecentWindow(now, 30);
-      const end = startOfNextLocalDay(now);
-      console.log("[Pulses] Query window:", start.toISOString(), "to", end.toISOString());
-
-      // Explicitly select only needed fields for privacy
-      // user_id is included for ownership check (is this my pulse?) - it's a UUID, not PII
-      // is_bot is included to identify seeded content
-      // poll_options is for "This or That" polls (may not exist if migration not applied)
-      let data: DBPulse[] | null = null;
-      let error: { message: string } | null = null;
-
-      // Include lat/lon for distance-based filtering
-      // Filter out expired posts at DB level for efficiency (1hr grace period)
-      const expiryGracePeriod = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
-
-      // COORDINATE-BASED QUERY: Use 10-mile bounding box when coordinates are available
-      // This ensures users see all nearby content regardless of city name differences
-      // 10 miles ≈ 0.145° latitude, ~0.17° longitude at 30° lat
+      // Use server-side API endpoint instead of Supabase JS client
+      // The JS client hangs in Capacitor WKWebView
       const userLat = selectedCity?.lat;
       const userLon = selectedCity?.lon;
-      const useCoordinateQuery = userLat != null && userLon != null;
+      const params = new URLSearchParams();
+      if (userLat != null && userLon != null) {
+        params.set("lat", String(userLat));
+        params.set("lon", String(userLon));
+      }
+      params.set("city", city);
+      params.set("limit", String(PULSES_PAGE_SIZE + 1));
 
-      // Bounding box: ~12 miles to ensure we capture content at edges
-      const latDelta = 0.175;  // ~12 miles
-      const lonDelta = 0.21;   // ~12 miles at ~30° latitude
+      const apiUrl = `${getApiUrl("/api/pulses/feed")}?${params}`;
+      console.log(`[Pulses] Fetching via API: ${apiUrl}`);
+      const res = await fetch(apiUrl, { signal: AbortSignal.timeout(15000) });
 
-      // Helper: wrap query with 15s timeout to prevent infinite hang
-      const withTimeout = <T,>(promise: Promise<T>, ms = 15000): Promise<T> =>
-        Promise.race([
-          promise,
-          new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`Query timed out after ${ms}ms`)), ms)),
-        ]);
-
-      let queryWithPolls;
-      if (useCoordinateQuery) {
-        // Query by bounding box - catches all nearby content regardless of city name
-        console.log(`[Pulses] Using coordinate query: ${userLat}, ${userLon} (±${latDelta}°)`);
-        const qStart = Date.now();
-        queryWithPolls = await withTimeout(supabase
-          .from("pulses")
-          .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, poll_options, lat, lon")
-          .gte("lat", userLat - latDelta)
-          .lte("lat", userLat + latDelta)
-          .gte("lon", userLon - lonDelta)
-          .lte("lon", userLon + lonDelta)
-          .gte("created_at", start.toISOString())
-          .lt("created_at", end.toISOString())
-          .or(`expires_at.is.null,expires_at.gt.${expiryGracePeriod}`)
-          .order("created_at", { ascending: false })
-          .limit(PULSES_PAGE_SIZE + 1));
-        console.log(`[Pulses] Coordinate query completed in ${Date.now() - qStart}ms, rows: ${queryWithPolls.data?.length ?? 'null'}, error: ${queryWithPolls.error?.message ?? 'none'}`);
-      } else {
-        // Fallback to city name match if no coordinates
-        // Use ilike with city base name to handle suffix variations
-        // e.g. "Leander, Texas, US" should match "Leander, Texas" in DB
-        const cityBase = city.split(",").slice(0, 2).join(",").trim();
-        console.log(`[Pulses] Using city name query: "${city}" (base: "${cityBase}")`);
-        queryWithPolls = await supabase
-          .from("pulses")
-          .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, poll_options, lat, lon")
-          .ilike("city", `${cityBase}%`)
-          .gte("created_at", start.toISOString())
-          .lt("created_at", end.toISOString())
-          .or(`expires_at.is.null,expires_at.gt.${expiryGracePeriod}`)
-          .order("created_at", { ascending: false })
-          .limit(PULSES_PAGE_SIZE + 1);
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(errBody.error || `API error ${res.status}`);
       }
 
-      // Fallback: If poll_options column doesn't exist, retry without it
-      if (queryWithPolls.error?.message?.includes("poll_options")) {
-        console.warn("[Pulses] poll_options column missing, fetching without it");
-        let fallbackQuery;
-        if (useCoordinateQuery) {
-          fallbackQuery = await supabase
-            .from("pulses")
-            .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, lat, lon")
-            .gte("lat", userLat - latDelta)
-            .lte("lat", userLat + latDelta)
-            .gte("lon", userLon - lonDelta)
-            .lte("lon", userLon + lonDelta)
-            .gte("created_at", start.toISOString())
-            .lt("created_at", end.toISOString())
-            .or(`expires_at.is.null,expires_at.gt.${expiryGracePeriod}`)
-            .order("created_at", { ascending: false })
-            .limit(PULSES_PAGE_SIZE + 1);
-        } else {
-          const cityBaseFb = city.split(",").slice(0, 2).join(",").trim();
-          fallbackQuery = await supabase
-            .from("pulses")
-            .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, lat, lon")
-            .ilike("city", `${cityBaseFb}%`)
-            .gte("created_at", start.toISOString())
-            .lt("created_at", end.toISOString())
-            .or(`expires_at.is.null,expires_at.gt.${expiryGracePeriod}`)
-            .order("created_at", { ascending: false })
-            .limit(PULSES_PAGE_SIZE + 1);
-        }
-        data = (fallbackQuery.data as DBPulse[]) ?? null;
-        error = fallbackQuery.error;
-      } else {
-        data = (queryWithPolls.data as DBPulse[]) ?? null;
-        error = queryWithPolls.error;
-      }
+      const result = await res.json();
+      const rawData: DBPulse[] = result.pulses || [];
+      console.log(`[Pulses] API returned ${rawData.length} pulses`);
+
+      let data: DBPulse[] | null = rawData;
+      let error: { message: string } | null = null;
 
       if (error) {
         console.error("[Pulses] Error fetching pulses:", error.message);
