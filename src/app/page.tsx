@@ -3705,12 +3705,7 @@ export default function Home() {
                         </div>
                       )}
 
-                      {/* DEBUG: Remove after fixing feed issue */}
-                      <div className="bg-red-900/30 border border-red-500/50 rounded-xl p-3 text-xs text-red-300 mb-2">
-                        <p>city=&quot;{city}&quot; | lat={selectedCity?.lat?.toFixed(4) ?? "NULL"} | lon={selectedCity?.lon?.toFixed(4) ?? "NULL"}</p>
-                        <p>loading={String(loading)} | fetched={String(initialPulsesFetched)} | pulses={pulses.length} | err={errorMsg ?? "none"}</p>
-                        <p>coordQuery={String(selectedCity?.lat != null && selectedCity?.lon != null)}</p>
-                      </div>
+                      {/* Debug overlay removed — feed fix confirmed working */}
 
                       {(loading || !initialPulsesFetched) && pulses.length === 0 ? (
                         <div className="bg-slate-800/40 border border-dashed border-slate-700/50 rounded-2xl p-10 text-center">
