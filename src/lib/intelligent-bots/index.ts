@@ -209,12 +209,15 @@ export async function generateIntelligentPost(
     };
   }
 
-  // Fetch real-time data in parallel
+  // Fetch real-time data in parallel (with Supabase caching to avoid timeouts)
+  const { cachedFetch } = await import("@/lib/api-cache");
+  const { lat, lon } = config.coords;
+
   const [traffic, weather, events, farmersMarkets] = await Promise.all([
-    fetchTrafficData(config.coords),
-    fetchWeatherData(config.coords),
-    fetchEventData(config.name, config.state, config.coords),
-    fetchFarmersMarkets(config.name, config.state, config.coords),
+    cachedFetch("traffic", config.name, () => fetchTrafficData(config!.coords), lat, lon),
+    cachedFetch("weather", config.name, () => fetchWeatherData(config!.coords), lat, lon),
+    cachedFetch("events", config.name, () => fetchEventData(config!.name, config!.state, config!.coords), lat, lon),
+    cachedFetch("farmers_markets", config.name, () => fetchFarmersMarkets(config!.name, config!.state, config!.coords), lat, lon),
   ]);
 
   // Build situation context
@@ -372,12 +375,15 @@ export async function generateColdStartPosts(
 
   console.log(`[IntelligentBots] Using config for ${config.name}, ${config.state} (coords: ${config.coords.lat}, ${config.coords.lon})`);
 
-  // Fetch real-time data (pass coords for accurate location-based results)
+  // Fetch real-time data with caching (avoids Vercel timeouts)
+  const { cachedFetch } = await import("@/lib/api-cache");
+  const { lat: cLat, lon: cLon } = config.coords;
+
   const [traffic, weather, events, farmersMarkets] = await Promise.all([
-    fetchTrafficData(config.coords),
-    fetchWeatherData(config.coords),
-    fetchEventData(config.name, config.state, config.coords),
-    fetchFarmersMarkets(config.name, config.state, config.coords),
+    cachedFetch("traffic", config.name, () => fetchTrafficData(config.coords), cLat, cLon),
+    cachedFetch("weather", config.name, () => fetchWeatherData(config.coords), cLat, cLon),
+    cachedFetch("events", config.name, () => fetchEventData(config.name, config.state, config.coords), cLat, cLon),
+    cachedFetch("farmers_markets", config.name, () => fetchFarmersMarkets(config.name, config.state, config.coords), cLat, cLon),
   ]);
 
   console.log(`[IntelligentBots] Data fetched - Weather: ${weather.temperature}°F ${weather.condition}, Events: ${events.length}, Markets: ${farmersMarkets.length}`);

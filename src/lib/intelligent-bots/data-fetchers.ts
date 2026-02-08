@@ -593,8 +593,8 @@ async function fetchFromUSDA(
 
     const markets: FarmersMarketData[] = [];
 
-    // Fetch details for first 10 markets (to get schedule, products)
-    for (const market of marketsRaw.slice(0, 10)) {
+    // Fetch details for first 3 markets only (avoid sequential timeout on Vercel)
+    for (const market of marketsRaw.slice(0, 3)) {
       if (!market.id) continue;
 
       try {
