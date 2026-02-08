@@ -511,7 +511,10 @@ export default function Home() {
         },
         (payload) => {
           const row = payload.new as DBPulse;
-          if (!row || row.city !== city) return;
+          // Match city loosely — "Leander, Texas" should match "Leander, Texas, US"
+          const cityBase = city.split(",").slice(0, 2).join(",").trim().toLowerCase();
+          const rowCityBase = (row.city || "").split(",").slice(0, 2).join(",").trim().toLowerCase();
+          if (!row || rowCityBase !== cityBase) return;
           if (!isInRecentWindow(row.created_at)) return;
 
           const pulse = mapDBPulseToPulse(row);
@@ -1486,11 +1489,14 @@ export default function Home() {
           .limit(PULSES_PAGE_SIZE + 1);
       } else {
         // Fallback to city name match if no coordinates
-        console.log(`[Pulses] Using city name query: "${city}"`);
+        // Use ilike with city base name to handle suffix variations
+        // e.g. "Leander, Texas, US" should match "Leander, Texas" in DB
+        const cityBase = city.split(",").slice(0, 2).join(",").trim();
+        console.log(`[Pulses] Using city name query: "${city}" (base: "${cityBase}")`);
         queryWithPolls = await supabase
           .from("pulses")
           .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, poll_options, lat, lon")
-          .eq("city", city)
+          .ilike("city", `${cityBase}%`)
           .gte("created_at", start.toISOString())
           .lt("created_at", end.toISOString())
           .or(`expires_at.is.null,expires_at.gt.${expiryGracePeriod}`)
@@ -1516,10 +1522,11 @@ export default function Home() {
             .order("created_at", { ascending: false })
             .limit(PULSES_PAGE_SIZE + 1);
         } else {
+          const cityBaseFb = city.split(",").slice(0, 2).join(",").trim();
           fallbackQuery = await supabase
             .from("pulses")
             .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, lat, lon")
-            .eq("city", city)
+            .ilike("city", `${cityBaseFb}%`)
             .gte("created_at", start.toISOString())
             .lt("created_at", end.toISOString())
             .or(`expires_at.is.null,expires_at.gt.${expiryGracePeriod}`)
