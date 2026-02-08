@@ -1778,7 +1778,8 @@ export default function Home() {
         } else if (postsCreated > 0) {
           console.log(`[Content Refresh] SUCCESS! Created ${postsCreated} posts for ${city} (${refreshType})`);
           // Trigger main refresh to pick up new posts (uses coordinate-based query)
-          setRefreshTrigger(prev => prev + 1);
+          // Re-fetch pulses to pick up newly seeded content
+          await fetchPulses();
         }
       } catch (err) {
         console.error("[Content Refresh] Error:", err);
