@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
+import { authBridge } from "@/lib/authBridge";
 import { useGeocodingAutocomplete } from "@/hooks/useGeocodingAutocomplete";
 import { useEvents } from "@/hooks/useEvents";
 import type { GeocodedCity } from "@/lib/geocoding";
@@ -838,7 +839,7 @@ export default function Home() {
       setAuthStatus("loading");
       setProfileLoading(false);
 
-      const { data: auth } = await supabase.auth.getUser();
+      const { data: auth } = await authBridge.getUser();
       const user = auth.user;
       setSessionUser(user);
 
@@ -890,7 +891,7 @@ export default function Home() {
     loadUser();
 
     // Listen for auth state changes (session refresh, sign in/out)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    const { data: { subscription } } = authBridge.onAuthStateChange(
       async (event, session) => {
         if (event === "TOKEN_REFRESHED" || event === "SIGNED_IN") {
           const user = session?.user ?? null;
@@ -2152,7 +2153,7 @@ export default function Home() {
           return;
         }
 
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        const { data: signUpData, error: signUpError } = await authBridge.signUp({
           email,
           password,
         });
@@ -2233,7 +2234,7 @@ export default function Home() {
           setShowAuthModal(false);
         }
       } else {
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        const { data: signInData, error: signInError } = await authBridge.signInWithPassword({
           email,
           password,
         });
@@ -2332,7 +2333,7 @@ export default function Home() {
       setAuthError(null);
       setAuthSuccess(null);
 
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const { error } = await authBridge.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
 
@@ -2642,23 +2643,10 @@ export default function Home() {
     const authorName = profile.anon_name || username || "Anonymous";
 
     try {
-      // Always refresh session to get a fresh access token.
-      // getSession() can return expired tokens that the server will reject as 401,
-      // which causes the login modal to appear even for logged-in users.
-      const { data: refreshed, error: refreshErr } =
-        await supabase.auth.refreshSession();
-      let accessToken = refreshed.session?.access_token;
-      let sessionError = refreshErr;
+      // Get a fresh access token via authBridge (works on both web and Capacitor)
+      const accessToken = await authBridge.getAccessToken();
 
-      // Fallback: if refresh fails, try getSession (might still have valid token)
       if (!accessToken) {
-        const { data: sessionData, error: sessErr } =
-          await supabase.auth.getSession();
-        accessToken = sessionData.session?.access_token;
-        sessionError = sessErr || refreshErr;
-      }
-
-      if (sessionError || !accessToken) {
         setErrorMsg("Sign in to post.");
         setShowAuthModal(true);
         return;
@@ -2847,23 +2835,10 @@ export default function Home() {
     const authorName = profile?.anon_name || username || "Anonymous";
 
     try {
-      // Always refresh session to get a fresh access token.
-      // getSession() can return expired tokens that the server will reject as 401,
-      // which causes the login modal to appear even for logged-in users.
-      const { data: refreshed, error: refreshErr } =
-        await supabase.auth.refreshSession();
-      let accessToken = refreshed.session?.access_token;
-      let sessionError = refreshErr;
+      // Get a fresh access token via authBridge (works on both web and Capacitor)
+      const accessToken = await authBridge.getAccessToken();
 
-      // Fallback: if refresh fails, try getSession (might still have valid token)
       if (!accessToken) {
-        const { data: sessionData, error: sessErr } =
-          await supabase.auth.getSession();
-        accessToken = sessionData.session?.access_token;
-        sessionError = sessErr || refreshErr;
-      }
-
-      if (sessionError || !accessToken) {
         setErrorMsg("Sign in to post.");
         setShowAuthModal(true);
         return;
@@ -3880,7 +3855,7 @@ export default function Home() {
                       userId={sessionUser?.id ?? null}
                       city={city}
                       onSignOut={async () => {
-                        await supabase.auth.signOut();
+                        await authBridge.signOut();
                         setSessionUser(null);
                         setProfile(null);
                         setAuthStatus("signed_out");
