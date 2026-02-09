@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voxlo — Project Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', system-ui, sans-serif; background: #0a0a0f; color: #e0e0e0; padding: 24px; min-height: 100vh; }
+  
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
+  .header h1 { font-size: 28px; font-weight: 700; background: linear-gradient(135deg, #6366f1, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header .version { background: #1e1e2e; padding: 6px 14px; border-radius: 20px; font-size: 13px; color: #a0a0b0; border: 1px solid #2a2a3a; }
+  .updated { font-size: 12px; color: #555; margin-top: 4px; }
+
+  /* Progress bar */
+  .progress-section { margin-bottom: 32px; }
+  .progress-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+  .progress-header span { font-size: 14px; color: #888; }
+  .progress-header .pct { color: #a855f7; font-weight: 600; }
+  .progress-bar { height: 8px; background: #1e1e2e; border-radius: 4px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, #6366f1, #a855f7); border-radius: 4px; transition: width 0.5s ease; }
+
+  /* Sections */
+  .section { background: #12121a; border: 1px solid #1e1e2e; border-radius: 16px; padding: 20px; margin-bottom: 20px; }
+  .section-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .section-title .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot-red { background: #ef4444; }
+  .dot-yellow { background: #eab308; }
+  .dot-green { background: #22c55e; }
+  .dot-blue { background: #3b82f6; }
+  .dot-purple { background: #a855f7; }
+
+  /* Task items */
+  .task { display: flex; align-items: flex-start; gap: 12px; padding: 12px; border-radius: 10px; margin-bottom: 8px; transition: all 0.2s; cursor: pointer; user-select: none; }
+  .task:hover { background: #1a1a28; }
+  .task.checked { opacity: 0.5; }
+  .task.checked .task-title { text-decoration: line-through; }
+  
+  .checkbox { width: 22px; height: 22px; min-width: 22px; border: 2px solid #333; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; margin-top: 1px; }
+  .checkbox.active { background: #6366f1; border-color: #6366f1; }
+  .checkbox svg { display: none; }
+  .checkbox.active svg { display: block; }
+  
+  .task-content { flex: 1; }
+  .task-title { font-size: 14px; font-weight: 500; line-height: 1.4; }
+  .task-desc { font-size: 12px; color: #666; margin-top: 4px; line-height: 1.4; }
+  
+  .tag { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px; margin-left: 8px; vertical-align: middle; }
+  .tag-blocker { background: #3b1111; color: #ef4444; }
+  .tag-core { background: #1a1a00; color: #eab308; }
+  .tag-done { background: #0a2a0a; color: #22c55e; }
+  .tag-backlog { background: #1a1a2e; color: #6366f1; }
+
+  /* Stats grid */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+  .stat-card { background: #12121a; border: 1px solid #1e1e2e; border-radius: 12px; padding: 16px; text-align: center; }
+  .stat-value { font-size: 28px; font-weight: 700; }
+  .stat-label { font-size: 11px; color: #666; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-red { color: #ef4444; }
+  .stat-yellow { color: #eab308; }
+  .stat-green { color: #22c55e; }
+  .stat-purple { color: #a855f7; }
+
+  /* Timeline */
+  .timeline { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+  .timeline-card { background: #12121a; border: 1px solid #1e1e2e; border-radius: 12px; padding: 16px; position: relative; overflow: hidden; }
+  .timeline-card.current { border-color: #6366f1; }
+  .timeline-card.current::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, #6366f1, #a855f7); }
+  .timeline-week { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+  .timeline-title { font-size: 14px; font-weight: 600; margin: 6px 0; }
+  .timeline-items { font-size: 12px; color: #888; line-height: 1.8; }
+
+  /* Root cause banner */
+  .banner { background: linear-gradient(135deg, #1a0a0a, #1a1a0a); border: 1px solid #2a1a1a; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; }
+  .banner-title { font-size: 13px; font-weight: 600; color: #ef4444; margin-bottom: 6px; }
+  .banner-text { font-size: 13px; color: #999; line-height: 1.5; }
+  .banner-text code { background: #1e1e2e; padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #a855f7; }
+
+  /* Reset button */
+  .reset-btn { position: fixed; bottom: 20px; right: 20px; background: #1e1e2e; border: 1px solid #2a2a3a; color: #666; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 12px; }
+  .reset-btn:hover { border-color: #ef4444; color: #ef4444; }
+
+  @media (max-width: 768px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .timeline { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>VOXLO</h1>
+    <div class="updated" id="updated"></div>
+  </div>
+  <div class="version">v1.0.28 · Build 28 · TestFlight</div>
+</div>
+
+<div class="stats" id="stats">
+  <div class="stat-card"><div class="stat-value stat-red" id="stat-blockers">3</div><div class="stat-label">Blockers</div></div>
+  <div class="stat-card"><div class="stat-value stat-yellow" id="stat-core">5</div><div class="stat-label">Core Tasks</div></div>
+  <div class="stat-card"><div class="stat-value stat-green" id="stat-done">0</div><div class="stat-label">Done</div></div>
+  <div class="stat-card"><div class="stat-value stat-purple" id="stat-total">0%</div><div class="stat-label">Progress</div></div>
+</div>
+
+<div class="progress-section">
+  <div class="progress-header">
+    <span>Phase 1 Progress</span>
+    <span class="pct" id="pct-label">0%</span>
+  </div>
+  <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+</div>
+
+<div class="banner">
+  <div class="banner-title">⚡ ROOT CAUSE — Supabase JS broken in WKWebView</div>
+  <div class="banner-text">Every iOS feature touching DB/auth must use server-side API routes. Pattern: Client → <code>/api/[feature]/route.ts</code> → Supabase (service role). Feed is fixed. Posting + auth need the same treatment.</div>
+</div>
+
+<div class="timeline">
+  <div class="timeline-card current">
+    <div class="timeline-week">This Week · Feb 9–15</div>
+    <div class="timeline-title">Unblock Core</div>
+    <div class="timeline-items">Fix posting<br>Fix AI summaries<br>Fix pull-to-refresh<br>Wire Phase 1 layout</div>
+  </div>
+  <div class="timeline-card">
+    <div class="timeline-week">Next Week · Feb 16–22</div>
+    <div class="timeline-title">Polish + Beta</div>
+    <div class="timeline-items">Full Phase 1 flow tested<br>Beta testers on TestFlight<br>Prep for any-city launch</div>
+  </div>
+  <div class="timeline-card">
+    <div class="timeline-week">Backlog</div>
+    <div class="timeline-title">Feature Expansion</div>
+    <div class="timeline-items">Events (Ticketmaster)<br>Gas prices, markets<br>Challenges + social<br>Performance tuning</div>
+  </div>
+</div>
+
+<div id="sections"></div>
+
+<button class="reset-btn" onclick="resetAll()">Reset All</button>
+
+<script>
+const TASKS = [
+  { id: 'post-fix', section: 'blockers', title: 'Fix Posting', desc: 'Server-side auth + post endpoint. Same pattern as feed fix. Unblocks everything.', tag: 'blocker' },
+  { id: 'ai-summary', section: 'blockers', title: 'Fix AI Summaries', desc: 'Not triggering. When they do, content is irrelevant. Debug /api/summary route + fix prompts.', tag: 'blocker' },
+  { id: 'pull-refresh', section: 'blockers', title: 'Fix Pull-to-Refresh', desc: 'Works sometimes, hangs other times. Likely WKWebView networking issue.', tag: 'blocker' },
+  { id: 'location-prompt', section: 'core', title: 'Location prompt on first launch', desc: '10-mile radius setup. LocationPrompt component exists, needs wiring to onboarding flow.', tag: 'core' },
+  { id: 'weather-top', section: 'core', title: 'Weather glance at top of feed', desc: 'Weather API route works. Needs top-of-feed card placement.', tag: 'core' },
+  { id: 'sections-layout', section: 'core', title: 'Sectioned scroll layout', desc: 'Traffic → Weather → Local sections. Components exist, need sectioned layout wrapper.', tag: 'core' },
+  { id: 'emoji-vibe', section: 'core', title: 'Emoji vibe on feed', desc: 'CurrentVibeCard + StatusRing built. Wire into main feed.', tag: 'core' },
+  { id: 'city-display', section: 'core', title: 'Show city name (never coordinates)', desc: 'Fixed via coordinate bounding box query.', tag: 'done', checked: true },
+  { id: 'bot-limits', section: 'core', title: 'Bot post limits (5-7/city)', desc: 'Cleanup endpoint + expiration rules. Bot posts deleted beyond limit.', tag: 'done', checked: true },
+  { id: 'feed-server', section: 'core', title: 'Feed via server-side API', desc: 'Bypass Supabase JS client. /api/pulses/feed works.', tag: 'done', checked: true },
+  { id: 'api-cache', section: 'done', title: 'API response caching', desc: 'All external APIs cached in Supabase api_cache table.', tag: 'done', checked: true },
+  { id: 'moderation', section: 'done', title: 'Content moderation pipeline', desc: '2-layer fail-closed: local PII/blocklist + OpenAI moderation API.', tag: 'done', checked: true },
+  { id: 'gamification', section: 'done', title: 'Gamification system', desc: 'XP, badges, leaderboard, challenges — fully built.', tag: 'done', checked: true },
+  { id: 'lean-cron', section: 'done', title: 'Lean cron (active cities only)', desc: 'Cron only seeds cities with user activity in last 48h.', tag: 'done', checked: true },
+  { id: 'testflight', section: 'done', title: 'Autonomous TestFlight pipeline', desc: 'Build + upload via xcrun altool. Fully automated.', tag: 'done', checked: true },
+  { id: 'events', section: 'backlog', title: 'Events integration (Ticketmaster)', desc: 'API route exists. Needs feed integration.', tag: 'backlog' },
+  { id: 'gas', section: 'backlog', title: 'Gas prices card', desc: 'Component + API built. Not wired to feed.', tag: 'backlog' },
+  { id: 'farmers', section: 'backlog', title: 'Farmers markets section', desc: 'USDA API + component built. Limit to 3 markets max.', tag: 'backlog' },
+  { id: 'challenges', section: 'backlog', title: 'Challenges system', desc: 'Full challenge CRUD built. Not exposed in UI.', tag: 'backlog' },
+  { id: 'venue-vibe', section: 'backlog', title: 'Venue vibe check', desc: 'Component built. Needs venue discovery flow.', tag: 'backlog' },
+  { id: 'air-quality', section: 'backlog', title: 'Air quality card', desc: 'API route exists. Not in feed.', tag: 'backlog' },
+  { id: 'push-notif', section: 'backlog', title: 'Push notifications', desc: 'Infrastructure built (web-push). Needs trigger logic.', tag: 'backlog' },
+];
+
+const SECTIONS = [
+  { id: 'blockers', title: '🔴 Critical Blockers', dot: 'dot-red' },
+  { id: 'core', title: '🟡 Phase 1 Core', dot: 'dot-yellow' },
+  { id: 'done', title: '✅ Completed', dot: 'dot-green' },
+  { id: 'backlog', title: '📦 Backlog (after Phase 1)', dot: 'dot-purple' },
+];
+
+let state = JSON.parse(localStorage.getItem('voxlo-dashboard') || '{}');
+
+function save() { localStorage.setItem('voxlo-dashboard', JSON.stringify(state)); }
+
+function toggle(id) {
+  state[id] = !state[id];
+  save();
+  render();
+}
+
+function resetAll() {
+  if (confirm('Reset all checkboxes?')) { state = {}; save(); render(); }
+}
+
+function render() {
+  const container = document.getElementById('sections');
+  container.innerHTML = '';
+
+  SECTIONS.forEach(sec => {
+    const tasks = TASKS.filter(t => t.section === sec.id);
+    if (!tasks.length) return;
+
+    const div = document.createElement('div');
+    div.className = 'section';
+    div.innerHTML = `<div class="section-title"><span class="dot ${sec.dot}"></span>${sec.title}</div>`;
+    
+    tasks.forEach(t => {
+      const checked = state[t.id] || t.checked || false;
+      const tagClass = { blocker: 'tag-blocker', core: 'tag-core', done: 'tag-done', backlog: 'tag-backlog' }[t.tag];
+      div.innerHTML += `
+        <div class="task ${checked ? 'checked' : ''}" onclick="toggle('${t.id}')">
+          <div class="checkbox ${checked ? 'active' : ''}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          </div>
+          <div class="task-content">
+            <div class="task-title">${t.title}<span class="tag ${tagClass}">${t.tag.toUpperCase()}</span></div>
+            <div class="task-desc">${t.desc}</div>
+          </div>
+        </div>`;
+    });
+
+    container.appendChild(div);
+  });
+
+  // Update stats
+  const all = TASKS.filter(t => t.section !== 'backlog');
+  const done = all.filter(t => state[t.id] || t.checked);
+  const blockers = TASKS.filter(t => t.section === 'blockers' && !state[t.id]);
+  const core = TASKS.filter(t => t.section === 'core' && !state[t.id] && !t.checked);
+  const pct = Math.round((done.length / all.length) * 100);
+
+  document.getElementById('stat-blockers').textContent = blockers.length;
+  document.getElementById('stat-core').textContent = core.length;
+  document.getElementById('stat-done').textContent = done.length;
+  document.getElementById('stat-total').textContent = pct + '%';
+  document.getElementById('pct-label').textContent = pct + '%';
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('updated').textContent = 'Updated: ' + new Date().toLocaleString();
+}
+
+render();
+</script>
+</body>
+</html>
