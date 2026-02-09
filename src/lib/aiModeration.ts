@@ -300,9 +300,8 @@ async function callHaikuModerationAPI(
 export async function moderateWithAI(
   content: string
 ): Promise<AIModerationResult> {
-  const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+  const openaiApiKey = process.env.OPENAI_API_KEY;
   const isProduction = process.env.NODE_ENV === "production";
-  // SECURITY: Production ALWAYS fails closed, regardless of env var
   const failOpen = isProduction ? false : process.env.MODERATION_FAIL_OPEN === "true";
   const timeoutMs =
     parseInt(process.env.MODERATION_TIMEOUT_MS || "", 10) || DEFAULT_TIMEOUT_MS;
@@ -314,38 +313,64 @@ export async function moderateWithAI(
   }
 
   // If no API key, fail closed (production) or fail open (if configured)
-  if (!anthropicApiKey) {
-    console.error("[aiModeration] ANTHROPIC_API_KEY is not configured");
+  if (!openaiApiKey) {
+    console.error("[aiModeration] OPENAI_API_KEY is not configured");
     if (failOpen) {
-      console.warn(
-        "[aiModeration] MODERATION_FAIL_OPEN=true, allowing content"
-      );
+      console.warn("[aiModeration] MODERATION_FAIL_OPEN=true, allowing content");
       return { allowed: true };
     }
-    // serviceError=true indicates this is a configuration/service issue, not content rejection
     return { allowed: false, reason: FRIENDLY_MODERATION_MESSAGE, serviceError: true };
   }
 
   try {
-    const moderation = await callHaikuModerationAPI(
-      content,
-      anthropicApiKey,
-      timeoutMs
-    );
+    // Use OpenAI Moderation API (free, fast, purpose-built)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-    const { decision, category, confidence, reason } = moderation;
+    const res = await fetch("https://api.openai.com/v1/moderations", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${openaiApiKey}`,
+      },
+      body: JSON.stringify({ input: content }),
+      signal: controller.signal,
+    });
 
-    // Build debug info (for server logs, not client)
-    const debugInfo = {
-      decision,
-      category,
-      confidence,
-      reason,
-    };
+    clearTimeout(timeout);
 
-    // Decision: Haiku says BLOCK
-    if (decision === "BLOCK") {
-      logModerationBlock(`category=${category}`, content.slice(0, 50), reason);
+    if (!res.ok) {
+      throw new Error(`OpenAI moderation API returned ${res.status}`);
+    }
+
+    const data = await res.json();
+    const result = data.results?.[0];
+
+    if (!result) {
+      throw new Error("No results from OpenAI moderation API");
+    }
+
+    // Check if flagged
+    if (result.flagged) {
+      // Find the highest-scoring category
+      const categories = result.category_scores || {};
+      let topCategory = "unknown";
+      let topScore = 0;
+      for (const [cat, score] of Object.entries(categories)) {
+        if ((score as number) > topScore) {
+          topCategory = cat;
+          topScore = score as number;
+        }
+      }
+
+      const debugInfo = {
+        decision: "BLOCK" as const,
+        category: topCategory,
+        confidence: topScore,
+        reason: `Flagged by OpenAI moderation: ${topCategory}`,
+      };
+
+      logModerationBlock(`category=${topCategory}`, content.slice(0, 50), debugInfo.reason);
       const blockResult: AIModerationResult = {
         allowed: false,
         reason: FRIENDLY_MODERATION_MESSAGE,
@@ -355,25 +380,22 @@ export async function moderateWithAI(
       return blockResult;
     }
 
-    // Content passed - Haiku says ALLOW
-    const allowResult: AIModerationResult = { allowed: true, _debug: debugInfo };
+    // Content passed
+    const allowResult: AIModerationResult = {
+      allowed: true,
+      _debug: { decision: "ALLOW", category: "clean", confidence: 0.99 },
+    };
     setCache(content, allowResult);
     return allowResult;
   } catch (error) {
-    // Log error without exposing user content in production
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    console.error("[aiModeration] Haiku API error:", errorMessage);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error("[aiModeration] OpenAI moderation error:", errorMessage);
 
-    // Fail-safe: closed by default, open only if explicitly configured
     if (failOpen) {
-      console.warn(
-        "[aiModeration] MODERATION_FAIL_OPEN=true, allowing content despite error"
-      );
+      console.warn("[aiModeration] MODERATION_FAIL_OPEN=true, allowing content despite error");
       return { allowed: true };
     }
 
-    // serviceError=true indicates this is a service/network issue, not content rejection
     return { allowed: false, reason: FRIENDLY_MODERATION_MESSAGE, serviceError: true };
   }
 }
