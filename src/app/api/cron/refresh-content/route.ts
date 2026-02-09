@@ -80,6 +80,27 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, message: "No active cities with real users", postsCreated: 0, durationMs: Date.now() - start });
     }
 
+    // STEP 0: Delete ALL expired bot posts globally (any city)
+    const now = new Date().toISOString();
+    const { data: expiredPosts, error: expiredErr } = await supabase
+      .from("pulses")
+      .select("id")
+      .eq("is_bot", true)
+      .not("expires_at", "is", null)
+      .lt("expires_at", now);
+
+    let expiredDeleted = 0;
+    if (!expiredErr && expiredPosts && expiredPosts.length > 0) {
+      const expiredIds = expiredPosts.map(p => p.id);
+      // Delete in batches of 100
+      for (let i = 0; i < expiredIds.length; i += 100) {
+        const batch = expiredIds.slice(i, i + 100);
+        const { error: delErr } = await supabase.from("pulses").delete().in("id", batch);
+        if (!delErr) expiredDeleted += batch.length;
+      }
+      console.log(`[Cron] Deleted ${expiredDeleted} expired bot posts`);
+    }
+
     // Pick the cities that need content most — find ones with fewest recent bot posts
     const cities = Array.from(cityMap.values());
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
@@ -182,6 +203,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      expiredDeleted,
       postsCreated: totalCreated,
       citiesProcessed: citiesToProcess.length,
       results,
