@@ -4,6 +4,41 @@ import React, { useCallback, useEffect, useMemo, useState, useRef } from "react"
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
 import { authBridge } from "@/lib/authBridge";
+
+/** Load profile via server-side endpoint (works in WKWebView) or Supabase JS fallback */
+async function loadProfileServerSide(accessToken: string): Promise<{ anon_name: string; name_locked: boolean } | null> {
+  try {
+    const res = await fetch(getApiUrl("/api/auth/profile"), {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.profile) {
+      return { anon_name: data.profile.anon_name, name_locked: data.profile.name_locked ?? false };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function createProfileServerSide(accessToken: string, anonName: string): Promise<{ anon_name: string; name_locked: boolean } | null> {
+  try {
+    const res = await fetch(getApiUrl("/api/auth/profile"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ anon_name: anonName }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.profile) {
+      return { anon_name: data.profile.anon_name, name_locked: data.profile.name_locked ?? false };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 import { useGeocodingAutocomplete } from "@/hooks/useGeocodingAutocomplete";
 import { useEvents } from "@/hooks/useEvents";
 import type { GeocodedCity } from "@/lib/geocoding";
@@ -852,34 +887,16 @@ export default function Home() {
       setAuthStatus("signed_in");
       setProfileLoading(true);
       try {
-        const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
+        const token = await authBridge.getAccessToken();
+        let profileResult = token ? await loadProfileServerSide(token) : null;
 
-        if (profileError) {
-          console.error("[Voxlo] Profile fetch error:", profileError);
-        }
-
-        if (profileData) {
-          setProfile({
-            anon_name: profileData.anon_name,
-            name_locked: profileData.name_locked ?? false,
-          });
-        } else {
+        if (profileResult) {
+          setProfile(profileResult);
+        } else if (token) {
+          // No profile exists — create one
           const anon = await generateUniqueUsername(supabase);
-
-          await supabase.from("profiles").insert({
-            id: user.id,
-            anon_name: anon,
-            name_locked: false,
-          });
-
-          setProfile({
-            anon_name: anon,
-            name_locked: false,
-          });
+          profileResult = await createProfileServerSide(token, anon);
+          setProfile(profileResult || { anon_name: anon, name_locked: false });
         }
       } catch (err) {
         console.error("[Voxlo] Profile load failed:", err);
@@ -898,28 +915,17 @@ export default function Home() {
           setSessionUser(user);
           if (user) {
             setAuthStatus("signed_in");
-            // Ensure profile is loaded (critical for Capacitor WKWebView
-            // where the initial loadUser() profile fetch may race or fail)
+            // Load profile via server-side endpoint (works in WKWebView)
             try {
               setProfileLoading(true);
-              const { data: profileData } = await supabase
-                .from("profiles")
-                .select("*")
-                .eq("id", user.id)
-                .single();
-              if (profileData) {
-                setProfile({
-                  anon_name: profileData.anon_name,
-                  name_locked: profileData.name_locked ?? false,
-                });
-              } else {
+              const token = await authBridge.getAccessToken();
+              let profileResult = token ? await loadProfileServerSide(token) : null;
+              if (profileResult) {
+                setProfile(profileResult);
+              } else if (token) {
                 const anon = await generateUniqueUsername(supabase);
-                await supabase.from("profiles").insert({
-                  id: user.id,
-                  anon_name: anon,
-                  name_locked: false,
-                });
-                setProfile({ anon_name: anon, name_locked: false });
+                profileResult = await createProfileServerSide(token, anon);
+                setProfile(profileResult || { anon_name: anon, name_locked: false });
               }
             } catch (err) {
               console.error("[Voxlo] Profile load in onAuthStateChange failed:", err);
@@ -2184,45 +2190,14 @@ export default function Home() {
           setProfileLoading(true);
 
           try {
-            const { data: existingProfile } = await supabase
-              .from("profiles")
-              .select("*")
-              .eq("id", signUpData.user.id)
-              .single();
-
-            if (existingProfile) {
-              setProfile({
-                anon_name: existingProfile.anon_name,
-                name_locked: existingProfile.name_locked ?? false,
-              });
-            } else {
+            const token = await authBridge.getAccessToken();
+            let profileResult = token ? await loadProfileServerSide(token) : null;
+            if (profileResult) {
+              setProfile(profileResult);
+            } else if (token) {
               const anon = await generateUniqueUsername(supabase);
-              const { error: insertError } = await supabase.from("profiles").insert({
-                id: signUpData.user.id,
-                anon_name: anon,
-                name_locked: false,
-              });
-
-              if (insertError) {
-                console.error("Error creating profile:", insertError);
-                const { data: retryProfile } = await supabase
-                  .from("profiles")
-                  .select("*")
-                  .eq("id", signUpData.user.id)
-                  .single();
-
-                if (retryProfile) {
-                  setProfile({
-                    anon_name: retryProfile.anon_name,
-                    name_locked: retryProfile.name_locked ?? false,
-                  });
-                }
-              } else {
-                setProfile({
-                  anon_name: anon,
-                  name_locked: false,
-                });
-              }
+              profileResult = await createProfileServerSide(token, anon);
+              setProfile(profileResult || { anon_name: anon, name_locked: false });
             }
           } finally {
             setProfileLoading(false);
@@ -2250,45 +2225,14 @@ export default function Home() {
           setProfileLoading(true);
 
           try {
-            const { data: profileData } = await supabase
-              .from("profiles")
-              .select("*")
-              .eq("id", signInData.user.id)
-              .single();
-
-            if (profileData) {
-              setProfile({
-                anon_name: profileData.anon_name,
-                name_locked: profileData.name_locked ?? false,
-              });
-            } else {
+            const token = await authBridge.getAccessToken();
+            let profileResult = token ? await loadProfileServerSide(token) : null;
+            if (profileResult) {
+              setProfile(profileResult);
+            } else if (token) {
               const anon = await generateUniqueUsername(supabase);
-              const { error: insertError } = await supabase.from("profiles").insert({
-                id: signInData.user.id,
-                anon_name: anon,
-                name_locked: false,
-              });
-
-              if (insertError) {
-                console.error("Error creating profile on sign in:", insertError);
-                const { data: retryProfile } = await supabase
-                  .from("profiles")
-                  .select("*")
-                  .eq("id", signInData.user.id)
-                  .single();
-
-                if (retryProfile) {
-                  setProfile({
-                    anon_name: retryProfile.anon_name,
-                    name_locked: retryProfile.name_locked ?? false,
-                  });
-                }
-              } else {
-                setProfile({
-                  anon_name: anon,
-                  name_locked: false,
-                });
-              }
+              profileResult = await createProfileServerSide(token, anon);
+              setProfile(profileResult || { anon_name: anon, name_locked: false });
             }
           } finally {
             setProfileLoading(false);

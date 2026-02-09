@@ -15,7 +15,15 @@ function isCapacitor(): boolean {
   return typeof window !== "undefined" && !!(window as any).Capacitor?.isNativePlatform?.();
 }
 
+// Listener registry for Capacitor auth state changes
+const _listeners: Array<(event: string, session: any) => void> = [];
+
 export const authBridge = {
+  /** Internal: notify all registered listeners */
+  _notifyListeners(event: string, session: any) {
+    _listeners.forEach(cb => { try { cb(event, session); } catch {} });
+  },
+
   /**
    * Sign in with email/password
    */
@@ -23,11 +31,11 @@ export const authBridge = {
     if (isCapacitor()) {
       try {
         const data = await serverAuth.signIn(email, password);
+        const user = { id: data.user.id, email: data.user.email } as any;
+        // Fire auth state change listeners
+        authBridge._notifyListeners("SIGNED_IN", { user });
         return {
-          data: {
-            user: { id: data.user.id, email: data.user.email } as any,
-            session: { access_token: data.access_token } as any,
-          },
+          data: { user, session: { access_token: data.access_token } as any },
           error: null,
         };
       } catch (err: any) {
@@ -44,9 +52,13 @@ export const authBridge = {
     if (isCapacitor()) {
       try {
         const data = await serverAuth.signUp(email, password);
+        const user = data.user ? { id: data.user.id, email: data.user.email } as any : null;
+        if (user && data.access_token) {
+          authBridge._notifyListeners("SIGNED_IN", { user });
+        }
         return {
           data: {
-            user: data.user ? { id: data.user.id, email: data.user.email } as any : null,
+            user,
             session: data.access_token ? { access_token: data.access_token } as any : null,
           },
           error: null,
@@ -98,15 +110,19 @@ export const authBridge = {
    */
   onAuthStateChange(callback: (event: string, session: any) => void) {
     if (isCapacitor()) {
-      // On Capacitor, check stored auth and fire initial state
+      // Register listener for future sign-in/out events
+      _listeners.push(callback);
+      // Fire initial state
       const user = serverAuth.getUser();
       if (user) {
         setTimeout(() => callback("SIGNED_IN", { user }), 0);
       } else {
         setTimeout(() => callback("SIGNED_OUT", null), 0);
       }
-      // Return a no-op unsubscribe
-      return { data: { subscription: { unsubscribe: () => {} } } };
+      return { data: { subscription: { unsubscribe: () => {
+        const idx = _listeners.indexOf(callback);
+        if (idx >= 0) _listeners.splice(idx, 1);
+      } } } };
     }
     return supabase.auth.onAuthStateChange(callback);
   },
@@ -117,6 +133,7 @@ export const authBridge = {
   async signOut() {
     if (isCapacitor()) {
       serverAuth.signOut();
+      authBridge._notifyListeners("SIGNED_OUT", null);
       return { error: null };
     }
     return supabase.auth.signOut();
