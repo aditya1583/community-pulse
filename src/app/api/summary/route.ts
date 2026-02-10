@@ -33,6 +33,50 @@ type SummaryRequestBody = {
   weatherCondition?: string;
 };
 
+// ============================================================================
+// SYSTEM PROMPT — Anti-hallucination, data-only summaries
+// ============================================================================
+const SYSTEM_PROMPT = `You are the Community Pulse summarizer. Your ONLY job is to generate short, friendly, and accurate summaries based strictly on the data provided to you.
+
+You must NEVER fabricate, guess, infer, or add any information that is not explicitly present in the provided data.
+
+## YOUR CATEGORIES
+
+You summarize data for exactly four categories:
+
+### 1. WEATHER
+- Summarize the current or forecasted weather using ONLY the data provided (temperature, conditions, humidity, wind, etc.)
+- Write a brief, natural sentence that a neighbor might say.
+- Use ONLY the exact numbers and conditions from the data. Do NOT estimate or round unless the data is already rounded.
+- If specific data points are missing (e.g., no wind info), do NOT mention them at all.
+
+### 2. TRAFFIC
+- Summarize traffic conditions using ONLY the data provided (road names, incident types, delays, travel times, etc.)
+- Keep it practical and actionable.
+- Do NOT invent road names, delay times, or incidents.
+- If no traffic data is provided, say: "No traffic updates available right now."
+
+### 3. EVENTS
+- Summarize local events using ONLY the data provided (event name, date, time, location, description).
+- Mention the key details: what, when, and where.
+- Do NOT create or suggest events that are not in the data.
+- If no events data is provided, say: "No upcoming events to share right now."
+
+### 4. LOCAL (Retail, Dining, Coffee, etc.)
+- Summarize local business updates using ONLY the data provided (store name, offer, hours, new openings, etc.)
+- Keep it conversational and relevant.
+- Do NOT invent business names, deals, menu items, or locations. Only state what the data tells you.
+- If no local data is provided, say: "No local business updates at the moment."
+
+## STRICT RULES — DO NOT BREAK THESE
+1. ONLY use information explicitly present in the provided data. If it's not in the data, it does not exist.
+2. NEVER fabricate names, numbers, locations, dates, events, businesses, weather conditions, or any other detail.
+3. NEVER assume or infer. If the data says it's 51°F, do NOT say "it might rain" unless rain is explicitly mentioned.
+4. If a category has no data, say so plainly. Do not fill the gap with made-up content.
+5. Keep each summary to 1-3 sentences max. Be concise, friendly, and direct.
+6. Use a warm, neighborly tone — like a helpful community bulletin, not a news broadcast.
+7. Include exact numbers and names from the data — do not paraphrase numbers or rename places.`;
+
 export async function POST(req: Request) {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
@@ -67,22 +111,24 @@ export async function POST(req: Request) {
     const displayCity = city.split(",")[0]?.trim() || city;
 
     if (context === "all") {
-      // Master summary - synthesize all data sources
-      const sections: string[] = [];
+      // Build structured data sections for the AI
+      const dataSections: string[] = [];
 
-      // Pulses section
-      if (pulses.length > 0) {
-        const pulseLines = pulses
-          .slice(0, 15)
-          .map(
-            (p) =>
-              `- [${p.tag}] (${p.mood}) by ${p.author || "Anonymous"}: ${p.message}`
-          )
-          .join("\n");
-        sections.push(`COMMUNITY PULSES (${pulses.length} recent):\n${pulseLines}`);
+      // Weather data
+      if (weatherCondition) {
+        dataSections.push(`<weather_data>\n${weatherCondition}\n</weather_data>`);
+      } else {
+        dataSections.push(`<weather_data>\nNo weather data available.\n</weather_data>`);
       }
 
-      // Events section
+      // Traffic data
+      if (trafficLevel) {
+        dataSections.push(`<traffic_data>\nTraffic level: ${trafficLevel}\n</traffic_data>`);
+      } else {
+        dataSections.push(`<traffic_data>\nNo traffic data available.\n</traffic_data>`);
+      }
+
+      // Events data
       if (events.length > 0) {
         const eventLines = events
           .slice(0, 5)
@@ -96,62 +142,53 @@ export async function POST(req: Request) {
             return `- ${e.name} at ${e.venue}${dateStr ? ` (${dateStr})` : ""}`;
           })
           .join("\n");
-        sections.push(`UPCOMING EVENTS (${events.length} total):\n${eventLines}`);
+        dataSections.push(`<events_data>\n${events.length} upcoming events:\n${eventLines}\n</events_data>`);
+      } else {
+        dataSections.push(`<events_data>\nNo events data available.\n</events_data>`);
       }
 
-      // News section
-      if (news.length > 0) {
-        const newsLines = news
-          .slice(0, 5)
-          .map((n) => `- ${n.title}${n.source ? ` (${n.source})` : ""}`)
+      // Local/community data (from pulses)
+      if (pulses.length > 0) {
+        const pulseLines = pulses
+          .slice(0, 15)
+          .map(
+            (p) =>
+              `- [${p.tag}] (${p.mood}) by ${p.author || "Anonymous"}: ${p.message}`
+          )
           .join("\n");
-        sections.push(`TOP NEWS HEADLINES:\n${newsLines}`);
+        dataSections.push(`<local_data>\n${pulses.length} community reports:\n${pulseLines}\n</local_data>`);
+      } else {
+        dataSections.push(`<local_data>\nNo local community data available.\n</local_data>`);
       }
 
-      // Traffic and weather
-      const conditions: string[] = [];
-      if (trafficLevel) {
-        conditions.push(`Traffic: ${trafficLevel}`);
-      }
-      if (weatherCondition) {
-        conditions.push(`Weather: ${weatherCondition}`);
-      }
-      if (conditions.length > 0) {
-        sections.push(`CURRENT CONDITIONS:\n${conditions.join("\n")}`);
-      }
-
-      if (sections.length === 0) {
+      if (!weatherCondition && !trafficLevel && events.length === 0 && pulses.length === 0) {
         return new Response(
           JSON.stringify({ error: "No data available to summarize" }),
           { status: 400, headers: { "Content-Type": "application/json" } }
         );
       }
 
-      prompt = `
-You are a well-connected neighborhood insider for ${displayCity}. Summarize the data provided below for a hyperlocal dashboard called "Voxlo". 
+      prompt = `Summarize the following data for ${displayCity}. Use the structured output format:
 
-CRITICAL RULES:
-- ONLY mention information explicitly present in the data below.
-- NEVER invent facts, laws, politics, or statistics.
-- If a section is empty, skip it.
-- Use a conversational, "punchy" tone. Think "Morning Brew" meets a friendly neighbors' group chat.
-- Add exactly 1 appropriate emoji per sentence to make it feel alive.
+**☀️ Weather**
+{1-2 sentence summary}
 
-Here's the data for ${displayCity}:
-${sections.join("\n\n")}
+**🚗 Traffic**
+{1-2 sentence summary}
 
-Task:
-1. Write 2-3 fast-paced sentences synthesizing this info.
-2. Lead with the "headline" - the most useful or interesting thing happening right now.
-3. Use phrases like "Neighbors are reporting," "Local word is," or "Heads up for those near..."
-4. Keep it focused on the 10-mile neighborhood vibe.
+**🎉 Events**
+{1-3 sentence summary}
 
-Example: "🚦 Heads up neighbors, traffic is slowing down near the old oak district. 🎵 On the bright side, the jazz fest kicks off at the park tonight! ☀️ Weather's perfect for it, so grab a blanket."
+**🏪 Local**
+{1-3 sentence summary}
 
-Return ONLY the summary text.
-      `.trim();
+Here is the data:
+
+${dataSections.join("\n\n")}
+
+Remember: ONLY use information from the data above. If a section says "No data available", use the fallback message for that category.`;
+
     } else if (context === "pulse") {
-      // Pulse-specific summary
       if (pulses.length === 0) {
         return new Response(
           JSON.stringify({ error: "No pulses available to summarize" }),
@@ -167,24 +204,15 @@ Return ONLY the summary text.
         )
         .join("\n");
 
-      prompt = `
-You are the neighborhood "vibe checker" for ${city}. Summarize these community updates for a local dashboard.
+      prompt = `Summarize these community updates for ${displayCity}. Focus on the mood and common threads. Keep it to 2-3 sentences max.
 
-CRITICAL RULES:
-- ONLY summarize the pulses below.
-- NEVER invent facts, laws, or statistics.
-- Use a punchy, conversational tone with 1-2 emojis.
-- Focus on the *mood* and *common threads* of what people are saying.
-
-The Neighborhood Pulse:
+<local_data>
 ${pulseLines}
+</local_data>
 
-Example: "✨ The neighborhood is feeling high-energy today! 🌮 Lots of love for the new taco spot on 4th, though some are reporting delays near the intersection."
+Remember: ONLY summarize what's in the data above. Never invent facts.`;
 
-Return ONLY the summary text.
-      `.trim();
     } else if (context === "events") {
-      // Events-specific summary
       if (events.length === 0) {
         return new Response(JSON.stringify({ summary: "No upcoming events in the area." }), {
           status: 200,
@@ -206,21 +234,14 @@ Return ONLY the summary text.
         })
         .join("\n");
 
-      prompt = `
-You are the local social scout for ${displayCity}. Summarize these upcoming events.
+      prompt = `Summarize these upcoming events for ${displayCity}. Keep it to 1-2 sentences.
 
-Rules:
-- 1-2 punchy sentences.
-- Add some "local excitement" flair.
-- Include 1-2 emojis.
-
-The Scene:
+<events_data>
 ${eventLines}
+</events_data>
 
-Example: "🎟️ The weekend is looking packed with ${events.length} events! 🎸 Don't miss the local band showcase and the farmers market on Saturday."
+Remember: ONLY mention events listed above. Never invent events.`;
 
-Return ONLY the summary text.
-      `.trim();
     } else if (context === "traffic") {
       const level = trafficLevel || "Unknown";
       return new Response(
@@ -237,7 +258,6 @@ Return ONLY the summary text.
         { status: 200, headers: { "Content-Type": "application/json" } }
       );
     } else if (context === "news") {
-      // News-specific summary
       if (news.length === 0) {
         return new Response(
           JSON.stringify({ summary: `No local news currently available for ${displayCity}.` }),
@@ -250,19 +270,11 @@ Return ONLY the summary text.
         .map((n) => `- ${n.title}`)
         .join("\n");
 
-      prompt = `
-You are a hyperlocal news aggregator for ${displayCity}. Summarize the top headlines.
+      prompt = `Summarize these headlines for ${displayCity}. Keep it to 1-2 sentences.
 
-Rules:
-- 1-2 short, professional but conversational sentences.
-- No speculation.
-- Use 1 emoji.
-
-The Headlines:
 ${newsLines}
 
-Return ONLY the summary text.
-      `.trim();
+Remember: ONLY summarize what's listed above.`;
     }
 
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -274,15 +286,11 @@ Return ONLY the summary text.
       body: JSON.stringify({
         model: "gpt-4o-mini",
         messages: [
-          {
-            role: "system",
-            content:
-              "You're a friendly local giving quick updates to neighbors. CRITICAL: You must ONLY summarize the data provided - never invent facts, legislation, statistics, or claims not in the input. If something isn't in the data, don't mention it. Use hedging language like 'neighbors report' or 'some are saying'. Be conversational but accurate.",
-          },
+          { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: prompt },
         ],
-        temperature: 0.3, // Lower temperature for more factual output
-        max_tokens: 150,
+        temperature: 0.2, // Low temperature for factual accuracy
+        max_tokens: 300,
       }),
     });
 
