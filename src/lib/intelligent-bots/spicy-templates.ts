@@ -5,6 +5,13 @@
  * 
  * These templates replace the bland "PSA: Beautiful weather today!"
  * with content people actually want to read and share.
+ * 
+ * CONTENT RULES (NON-NEGOTIABLE):
+ * - NEVER fabricate specific deals, discounts, happy hours, or promotions
+ * - NEVER claim specific prices unless pulled from a verified API
+ * - NEVER use "ALERT:" prefix for non-emergency content
+ * - All business-specific claims must be generic observations, not fabricated offers
+ * - Keep it observational and community-focused, not promotional
  */
 
 import type { WeatherData, TrafficData, EventData, FarmersMarketData } from "./types";
@@ -177,9 +184,9 @@ export const SPICY_RETAIL_TEMPLATES = {
   ],
   
   deals: [
-    "HEB has {item} on sale and I'm telling everyone I like",
-    "Costco is stocked with {item} season. This is not a drill.",
-    "Sale alert that actually matters: {item} at {store}. You're welcome.",
+    "HEB is packed in the {item} aisle. Either there's a sale or everyone had the same idea.",
+    "Costco is stocked with {item} season vibes. Plan your trip accordingly.",
+    "Pro tip: {store} early morning is the move. No crowds, full shelves.",
   ],
 };
 
@@ -188,12 +195,12 @@ export const SPICY_RETAIL_TEMPLATES = {
 // ============================================================================
 
 export const SPICY_HOT_TAKES = [
-  "Unpopular opinion: {restaurant} is mid and I'm tired of pretending it's not",
   "The {road} vs {road2} commute debate is getting old. They both suck. There.",
   "Hot take: {neighborhood} is overhyped. I said what I said.",
-  "Why does everyone act like {chain} is amazing? It's fine. It's FINE.",
   "Controversial but true: the best {food} in town isn't where you think",
-  "I will die on this hill: {local_place} peak hours are a scam. Go at 2pm.",
+  "I will die on this hill: {local_place} at peak hours is chaos. Go at 2pm.",
+  "Nobody talks about how good the sunsets are from {landmark}. Underrated.",
+  "Every time I drive past {landmark} I wonder how many people actually know it's there.",
 ];
 
 // ============================================================================

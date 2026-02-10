@@ -67,6 +67,10 @@ export async function generateFunFact(
 - Concise (1-2 sentences max, under 150 characters ideal)
 - Written in a casual, friendly tone
 
+NEVER fabricate specific deals, discounts, happy hours, prices, or promotions for any business.
+NEVER claim a business is having a sale, special, or event unless that data was explicitly provided.
+Stick to verifiable facts about the area, history, geography, or culture.
+
 Return ONLY a JSON object: {"fact": "your fact here", "category": "event|weather|traffic|local"}`,
         },
         {

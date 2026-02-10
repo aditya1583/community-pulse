@@ -3339,7 +3339,7 @@ export default function Home() {
 
         <PullToRefresh onRefresh={handlePullToRefresh} disabled={loading}>
           {/* Main Content Area */}
-          <main className="flex-1 flex justify-center px-4 pb-6 pt-[max(1rem,calc(env(safe-area-inset-top)+0.25rem))]">
+          <main className="flex-1 flex justify-center px-4 pb-6 pt-[max(0.5rem,env(safe-area-inset-top))]">
             <div className="w-full max-w-lg space-y-6">
 
               {/* VIEW BRANCHING: Dashboard (Pulse) vs Dedicated Tabs (Traffic/Events/Local/Status) */}
@@ -3843,49 +3843,15 @@ export default function Home() {
                 </p>
               )}
 
-              {/* Disclaimer */}
-              <div className="mt-8">
-                <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl px-4 py-3 text-center">
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
-                    <strong>Disclaimer:</strong> Voxlo displays user-submitted
-                    content. Posts may be inaccurate, incomplete, or misleading. Do not
-                    rely on this information for safety, travel, emergency, or
-                    decision-making purposes. All posts reflect the views of individual
-                    users, not the app&apos;s creators.
-                  </p>
-                </div>
-              </div>
-
-              {/* Attribution Footer */}
-              <footer className="py-6 pb-32 text-center border-t border-slate-800 mt-6">
-                <div className="space-y-3">
-                  <p className="text-[10px] text-slate-500 leading-relaxed max-w-md mx-auto">
-                    Voxlo aggregates real-time data from multiple sources to provide a hyperlocal experience.
-                  </p>
-                  <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
-                    <span>Weather by <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">Open-Meteo</a></span>
-                    <span>•</span>
-                    <span>Traffic by <a href="https://www.tomtom.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">TomTom</a></span>
-                    <span>•</span>
-                    <span>Maps & Geocoding by <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">OpenStreetMap</a></span>
-                  </div>
-                  <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
-                    <span>Events via <a href="https://www.ticketmaster.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">Ticketmaster</a></span>
-                    <span>•</span>
-                    <span>Places by <a href="https://foursquare.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">Foursquare</a></span>
-                    <span>•</span>
-                    <span>Gas info by <a href="https://www.eia.gov/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">EIA</a></span>
-                  </div>
-                  <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
-                    <span>AI by <a href="https://openai.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">OpenAI</a> & <a href="https://www.anthropic.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">Anthropic</a></span>
-                    <span>•</span>
-                    <span>Trust & Safety by <a href="https://perspectiveapi.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400">Google Perspective</a></span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 mt-4 flex justify-center gap-4">
-                    <a href="/terms" className="text-slate-500 hover:text-emerald-400 transition">Terms of Service</a>
-                    <a href="/privacy" className="text-slate-500 hover:text-emerald-400 transition">Privacy Policy</a>
-                  </p>
-                </div>
+              {/* Compact Footer */}
+              <footer className="py-4 pb-32 text-center mt-6">
+                <p className="text-[10px] text-slate-600 flex justify-center gap-3">
+                  <a href="/terms" className="text-slate-500 hover:text-emerald-400 transition">Terms</a>
+                  <span>•</span>
+                  <a href="/privacy" className="text-slate-500 hover:text-emerald-400 transition">Privacy</a>
+                  <span>•</span>
+                  <a href="/legal" className="text-slate-500 hover:text-emerald-400 transition">Legal &amp; Attributions</a>
+                </p>
               </footer>
             </div>
           </main>

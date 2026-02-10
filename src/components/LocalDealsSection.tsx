@@ -87,6 +87,25 @@ function getCategoryIcon(category: string): { emoji: string; gradient: string } 
 // Store for venue vibes (simple cache to avoid repeated fetches)
 type VenueVibesCache = Record<string, { vibes: VenueVibeAggregate[]; fetchedAt: number }>;
 
+// Client-side places cache (15-min TTL) — avoids slow API re-fetches on tab revisit
+const PLACES_CACHE_TTL_MS = 15 * 60 * 1000;
+type PlacesCacheEntry = { places: LocalPlace[]; source: DataSource; fetchedAt: number };
+const placesCache: Record<string, PlacesCacheEntry> = {};
+
+function getPlacesCacheKey(lat: number, lon: number, category: string): string {
+  // Round coords to 3 decimals (~100m) to allow cache hits for nearby positions
+  return `${lat.toFixed(3)},${lon.toFixed(3)},${category}`;
+}
+
+function getCachedPlaces(lat: number, lon: number, category: string): PlacesCacheEntry | null {
+  const key = getPlacesCacheKey(lat, lon, category);
+  const entry = placesCache[key];
+  if (entry && Date.now() - entry.fetchedAt < PLACES_CACHE_TTL_MS) {
+    return entry;
+  }
+  return null;
+}
+
 export default function LocalDealsSection({
   cityName,
   state,
@@ -112,6 +131,17 @@ export default function LocalDealsSection({
     }
 
     console.log(`[LocalDeals] Fetching places for category: ${category}, coords: ${lat},${lon}`);
+
+    // Check client-side cache first
+    const cached = getCachedPlaces(lat, lon, category);
+    if (cached) {
+      console.log(`[LocalDeals] Cache hit: ${cached.places.length} places (${Math.round((Date.now() - cached.fetchedAt) / 1000)}s old)`);
+      setPlaces(cached.places);
+      setDataSource(cached.source);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setDataSource(null);
@@ -146,6 +176,8 @@ export default function LocalDealsSection({
       // If Foursquare works and has places, use it
       if (!data.error && data.places?.length > 0) {
         console.log(`[LocalDeals] Foursquare returned ${data.places.length} places`);
+        const cacheKey = getPlacesCacheKey(lat, lon, category);
+        placesCache[cacheKey] = { places: data.places, source: "foursquare", fetchedAt: Date.now() };
         setPlaces(data.places);
         setDataSource("foursquare");
         setLoading(false);
@@ -204,6 +236,8 @@ export default function LocalDealsSection({
           phone: p.phone,
           url: p.website,
         }));
+        const osmCacheKey = getPlacesCacheKey(lat, lon, category);
+        placesCache[osmCacheKey] = { places: osmPlaces, source: "openstreetmap", fetchedAt: Date.now() };
         setPlaces(osmPlaces);
         setDataSource("openstreetmap");
         setError(null);
@@ -519,31 +553,7 @@ export default function LocalDealsSection({
         </div>
       )}
 
-      {/* Attribution */}
-      <div className="text-center pt-2">
-        <p className="text-[10px] text-slate-500">
-          Powered by{" "}
-          {dataSource === "openstreetmap" ? (
-            <a
-              href="https://www.openstreetmap.org/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-slate-400 hover:text-emerald-400 transition"
-            >
-              OpenStreetMap
-            </a>
-          ) : (
-            <a
-              href="https://foursquare.com/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-slate-400 hover:text-emerald-400 transition"
-            >
-              Foursquare
-            </a>
-          )}
-        </p>
-      </div>
+      {/* Attribution — minimal, full details in /legal */}
     </div>
   );
 }
