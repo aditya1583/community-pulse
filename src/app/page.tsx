@@ -2942,6 +2942,13 @@ export default function Home() {
   const localLat = selectedCity?.lat ?? lastValidCity.lat;
   const localLon = selectedCity?.lon ?? lastValidCity.lon;
 
+  // Force GPS refresh when switching to Local tab for accurate nearby results
+  useEffect(() => {
+    if (activeTab === "local" && !useManualLocation && geolocation.permissionStatus === "granted") {
+      geolocation.requestLocation();
+    }
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleDropPulseJump = useCallback(() => {
     setActiveTab("pulse");
 

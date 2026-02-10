@@ -454,7 +454,7 @@ export default function LocalDealsSection({
       {/* Places Grid */}
       {!loading && !error && places.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {places.map((place, index) => {
+          {[...places].sort((a, b) => (a.distance ?? 999) - (b.distance ?? 999)).map((place, index) => {
             const topVibe = getTopVibe(place.name);
             const vibeInfo = topVibe ? getVibeTypeInfo(topVibe.vibeType as VenueVibeType) : null;
 
