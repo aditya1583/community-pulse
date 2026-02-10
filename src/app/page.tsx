@@ -2617,8 +2617,8 @@ export default function Home() {
           tag: resolvedTag,
           message: trimmed,
           author: authorName,
-          lat: selectedCity?.lat ?? null,
-          lon: selectedCity?.lon ?? null,
+          lat: geolocation.lat ?? selectedCity?.lat ?? null,
+          lon: geolocation.lon ?? selectedCity?.lon ?? null,
         }),
       });
 
@@ -2813,6 +2813,8 @@ export default function Home() {
           tag: tabCategory,
           message: trimmed,
           author: authorName,
+          lat: geolocation.lat ?? selectedCity?.lat ?? null,
+          lon: geolocation.lon ?? selectedCity?.lon ?? null,
         }),
       });
 
