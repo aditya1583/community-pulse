@@ -738,12 +738,48 @@ export async function POST(req: NextRequest) {
       };
     });
 
-    console.log(`[Auto-Seed] Creating ${records.length} posts for ${body.city}`);
+    // DEDUPLICATION: Remove posts where same tag was posted in last 2 hours
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const { data: recentByTag } = await supabase
+      .from("pulses")
+      .select("tag, message")
+      .eq("city", body.city)
+      .eq("is_bot", true)
+      .gte("created_at", twoHoursAgo);
+
+    const recentTags = new Set((recentByTag || []).map(p => p.tag.toLowerCase()));
+    const recentMessages = new Set((recentByTag || []).map(p => p.message?.toLowerCase().slice(0, 40) || ""));
+
+    const dedupedRecords = records.filter(r => {
+      // Skip if same tag already posted recently
+      if (recentTags.has(r.tag.toLowerCase())) {
+        console.log(`[Auto-Seed] Skipping duplicate tag: ${r.tag}`);
+        return false;
+      }
+      // Skip if very similar message prefix
+      const prefix = r.message.toLowerCase().slice(0, 40);
+      if (recentMessages.has(prefix)) {
+        console.log(`[Auto-Seed] Skipping duplicate message prefix`);
+        return false;
+      }
+      return true;
+    });
+
+    if (dedupedRecords.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: "All posts were duplicates of recent content",
+        created: 0,
+        pulses: [],
+      });
+    }
+
+    console.log(`[Auto-Seed] Creating ${dedupedRecords.length} posts for ${body.city} (${records.length - dedupedRecords.length} deduped)`);
 
     // Insert into database
     const { data, error } = await supabase
       .from("pulses")
-      .insert(records)
+      .insert(dedupedRecords)
       .select("id, city, message, tag, mood, created_at");
 
     if (error) {

@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
+    "@capacitor/app": "^8.0.0",
     "@capacitor/geolocation": "^8.0.0",
     "@supabase/supabase-js": "^2.81.1",
     "framer-motion": "^12.28.1",

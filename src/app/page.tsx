@@ -3347,12 +3347,12 @@ export default function Home() {
                 /* --- DASHBOARD VIEW (HOME) --- */
                 <div key="dashboard-tab" className="space-y-6">
                   {/* Top Bar: Header + Auth Action */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-[3]">
                       <Header cityName={city} isLive={!loading} />
                     </div>
 
-                    <div className="flex-shrink-0 pt-1">
+                    <div className="flex-shrink-0 flex-[0] pt-1">
                       {!sessionUser ? (
                         <button
                           onClick={() => setShowAuthModal(true)}
@@ -3361,19 +3361,35 @@ export default function Home() {
                           Sign in
                         </button>
                       ) : (
-                        <button
-                          onClick={() => setActiveTab("status")}
-                          className="flex items-center gap-1.5 active:scale-95 transition-all"
-                        >
-                          <XPProgressBadge
-                            level={userLevel}
-                            xp={userXp}
-                            weeklyRank={userRank}
-                          />
-                          <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400/70 max-w-[80px] truncate">
-                            {displayName}
-                          </span>
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setActiveTab("status")}
+                            className="flex items-center gap-1.5 active:scale-95 transition-all"
+                          >
+                            <XPProgressBadge
+                              level={userLevel}
+                              xp={userXp}
+                              weeklyRank={userRank}
+                            />
+                            <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400/70 max-w-[56px] truncate">
+                              {displayName}
+                            </span>
+                          </button>
+                          <button
+                            onClick={async () => {
+                              await authBridge.signOut();
+                              setSessionUser(null);
+                              setProfile(null);
+                              setAuthStatus("signed_out");
+                            }}
+                            className="p-1 text-slate-500 hover:text-red-400 transition-colors active:scale-90"
+                            title="Sign out"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                            </svg>
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -3597,6 +3613,7 @@ export default function Home() {
                         onSubmit={handleAddPulse}
                         onSignInClick={() => setShowAuthModal(true)}
                         weather={weather}
+                        cityName={city}
                       />
                     </div>
 

@@ -1,5 +1,5 @@
 # VOXLO — PROJECT DASHBOARD
-Updated: 2026-02-09 12:23 CST
+Updated: 2026-02-10 09:30 CST
 
 ---
 
@@ -114,6 +114,19 @@ Backlog (after Phase 1):
 - **Traffic**: TomTom API
 - **Deployment**: Vercel (web) + TestFlight (iOS)
 - **Secrets**: macOS Keychain (OpenAI, Supabase, TomTom keys)
+
+---
+
+## FIXES FROM SCREENSHOT REVIEW (2026-02-10, with Ady)
+
+| # | Issue | Fix | File(s) |
+|---|-------|-----|---------|
+| 1 | Human vs bot post differentiation | Added green "RESIDENT" badge for human posts, kept blue "AI GENERATED" for bots | `PulseCard.tsx` |
+| 2 | Duplicate AI content | Added 2-hour dedup by tag + message prefix before inserting bot posts | `auto-seed/route.ts` (intelligent-seed already had 12h dedup) |
+| 3 | Location relevance warning | Soft warning "This seems outside your area" when mentioning other major cities | `PulseInput.tsx` |
+| 4 | Too many bot personas | Consolidated all bot types to "Voxlo AI" with single 🤖 emoji, kept category tags | `PulseCard.tsx` (BOT_TYPE_MAP + parseBotAuthor) |
+| 5 | Header city name truncation | Reduced username max-width (80→56px), gave header flex-[3] priority | `page.tsx` |
+| 6 | Sign-out hidden in Status tab | Added sign-out icon button in header next to username | `page.tsx` |
 
 ---
 

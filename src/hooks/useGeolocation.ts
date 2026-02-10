@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Capacitor } from "@capacitor/core";
 import { Geolocation } from "@capacitor/geolocation";
+import { App } from "@capacitor/app";
 import { getApiUrl } from "@/lib/api-config";
 
 export type GeolocationState = {
@@ -77,15 +78,17 @@ export function useGeolocation(): GeolocationState & GeolocationActions {
     if (stored) {
       try {
         const parsed: StoredLocation = JSON.parse(stored);
-        // Check if cache is still valid (24 hours)
-        const isValid = Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000;
+        // Check if cache is still valid (5 minutes)
+        const STALE_MS = 5 * 60 * 1000;
+        const isValid = Date.now() - parsed.timestamp < STALE_MS;
         // Invalidate cache if cityName is a known bad value from previous bugs
         // Also invalidate coordinate-format strings (e.g. "37.8°N, 122.4°W") from geocode failures
         const hasBadCity = !parsed.cityName
           || parsed.cityName === "Current Location"
           || parsed.cityName === "Unknown"
           || /\d+\.\d°[NSEW]/.test(parsed.cityName);
-        if (isValid && !hasBadCity) {
+        if (!hasBadCity) {
+          // Always show cached data immediately (no loading spinner)
           setState({
             lat: parsed.lat,
             lon: parsed.lon,
@@ -96,6 +99,10 @@ export function useGeolocation(): GeolocationState & GeolocationActions {
             error: null,
             permissionStatus: "granted",
           });
+          // If stale, trigger background refresh
+          if (!isValid) {
+            requestLocationInternal();
+          }
           return;
         }
         // Bad cache - clear it and re-geocode
@@ -293,6 +300,48 @@ export function useGeolocation(): GeolocationState & GeolocationActions {
       return false;
     }
   }, []);
+
+  // Auto-refresh location on app resume / tab focus if cache is stale
+  useEffect(() => {
+    const STALE_MS = 5 * 60 * 1000;
+
+    const refreshIfStale = () => {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try {
+          const parsed: StoredLocation = JSON.parse(stored);
+          if (Date.now() - parsed.timestamp > STALE_MS) {
+            requestLocationInternal();
+          }
+        } catch {
+          requestLocationInternal();
+        }
+      } else {
+        requestLocationInternal();
+      }
+    };
+
+    // Capacitor native: listen for app resume
+    let appListener: { remove: () => void } | null = null;
+    if (isNativeApp()) {
+      App.addListener("appStateChange", ({ isActive }) => {
+        if (isActive) refreshIfStale();
+      }).then((handle) => {
+        appListener = handle;
+      });
+    }
+
+    // Web: listen for tab becoming visible
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") refreshIfStale();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      if (appListener) appListener.remove();
+    };
+  }, [requestLocationInternal]);
 
   // Public request function
   const requestLocation = useCallback(async (): Promise<boolean> => {

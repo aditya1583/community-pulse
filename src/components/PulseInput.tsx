@@ -24,6 +24,8 @@ type PulseInputProps = {
   onSubmit: () => void;
   onSignInClick: () => void;
   weather?: { temp: number; description: string } | null;
+  /** Current city name for location relevance check */
+  cityName?: string;
 };
 
 
@@ -57,9 +59,29 @@ const PulseInput = forwardRef<HTMLTextAreaElement, PulseInputProps>(
       onSubmit,
       onSignInClick,
       weather,
+      cityName,
     },
     ref
   ) {
+    // Location relevance warning state
+    const [locationWarning, setLocationWarning] = useState(false);
+    const [locationWarningDismissed, setLocationWarningDismissed] = useState(false);
+
+    // Check if message mentions locations that seem outside the user's area
+    useEffect(() => {
+      if (!cityName || !message || locationWarningDismissed) {
+        setLocationWarning(false);
+        return;
+      }
+      const msgLower = message.toLowerCase();
+      const cityBase = cityName.split(",")[0].trim().toLowerCase();
+      // List of major city names that might indicate off-topic content
+      const majorCities = ["new york", "los angeles", "chicago", "houston", "phoenix", "philadelphia", "san antonio", "san diego", "dallas", "san francisco", "seattle", "denver", "miami", "atlanta", "boston"];
+      const mentionsOtherCity = majorCities.some(
+        (c) => msgLower.includes(c) && !cityBase.includes(c.split(" ")[0])
+      );
+      setLocationWarning(mentionsOtherCity);
+    }, [message, cityName, locationWarningDismissed]);
     // Derive category directly from tag prop, defaulting to "General"
     const selectedCategory: PulseCategory =
       tag && POST_TAGS.includes(tag as (typeof POST_TAGS)[number])
@@ -245,6 +267,21 @@ const PulseInput = forwardRef<HTMLTextAreaElement, PulseInputProps>(
 
           {showValidationErrors && messageValidationError && (
             <p className="text-red-400 text-[10px] font-bold px-1">{messageValidationError}</p>
+          )}
+
+          {/* Location relevance warning */}
+          {locationWarning && !locationWarningDismissed && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
+              <span>⚠️</span>
+              <span className="flex-1">This seems outside your area. Post anyway?</span>
+              <button
+                type="button"
+                onClick={() => setLocationWarningDismissed(true)}
+                className="text-amber-400 font-bold underline"
+              >
+                Yes
+              </button>
+            </div>
           )}
 
           {/* Submit row */}

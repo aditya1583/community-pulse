@@ -119,15 +119,15 @@ function parseActionableContent(message: string, author: string): ParsedActionDa
  * Bot name mapping - converts snake_case bot types to friendly display names
  */
 const BOT_TYPE_MAP: Record<string, { name: string; emoji: string }> = {
-  hot_take: { name: "Hot Take Bot", emoji: "\uD83C\uDF36\uFE0F" },
-  weather: { name: "Weather Bot", emoji: "\u2600\uFE0F" },
-  traffic: { name: "Traffic Bot", emoji: "\uD83D\uDE97" },
-  market_scout: { name: "Market Scout", emoji: "\uD83E\uDD55" },
-  community: { name: "Community Bot", emoji: "\uD83D\uDC65" },
-  event: { name: "Event Bot", emoji: "\uD83C\uDF89" },
-  poll: { name: "Poll Bot", emoji: "\uD83D\uDCCA" },
-  vibe_check: { name: "Vibe Check", emoji: "\u2728" },
-  local_guide: { name: "Local Guide", emoji: "\uD83D\uDCCD" },
+  hot_take: { name: "Voxlo AI", emoji: "\uD83E\uDD16" },
+  weather: { name: "Voxlo AI", emoji: "\uD83E\uDD16" },
+  traffic: { name: "Voxlo AI", emoji: "\uD83E\uDD16" },
+  market_scout: { name: "Voxlo AI", emoji: "\uD83E\uDD16" },
+  community: { name: "Voxlo AI", emoji: "\uD83E\uDD16" },
+  event: { name: "Voxlo AI", emoji: "\uD83E\uDD16" },
+  poll: { name: "Voxlo AI", emoji: "\uD83E\uDD16" },
+  vibe_check: { name: "Voxlo AI", emoji: "\uD83E\uDD16" },
+  local_guide: { name: "Voxlo AI", emoji: "\uD83E\uDD16" },
 };
 
 /**
@@ -140,8 +140,8 @@ function parseBotAuthor(author: string): {
   location: string | null;
   emoji: string;
 } {
-  // Default fallback
-  const fallback = { displayName: author, location: null, emoji: "\uD83E\uDD16" };
+  // Default fallback — all bots are "Voxlo AI"
+  const fallback = { displayName: "Voxlo AI", location: null, emoji: "\uD83E\uDD16" };
 
   // Try to match pattern: "Location bot_type_bot emoji" or "Location bot_type"
   const parts = author.split(" ");
@@ -170,19 +170,9 @@ function parseBotAuthor(author: string): {
     };
   }
 
-  // Fallback: convert snake_case to Title Case
-  const titleCase = botPart
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-
-  // Only append "Bot" if the name doesn't already contain "Bot" as a word
-  // This handles cases like "Oracle Bot" where emoji was at the end
-  const containsBot = /\bBot\b/i.test(titleCase);
-  const displayName = containsBot ? titleCase : `${titleCase} Bot`;
-
+  // All bots are unified as "Voxlo AI"
   return {
-    displayName,
+    displayName: "Voxlo AI",
     location,
     emoji: extractedEmoji || "\uD83E\uDD16",
   };
@@ -443,10 +433,15 @@ export default function PulseCard({
               return null;
             })()}
 
-            {pulse.is_bot && (
+            {pulse.is_bot ? (
               <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center gap-1">
                 <span className="w-1 h-1 rounded-full bg-sky-400 animate-pulse" />
                 AI Generated
+              </span>
+            ) : (
+              <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                <span className="w-1 h-1 rounded-full bg-emerald-400" />
+                Resident
               </span>
             )}
           </div>
