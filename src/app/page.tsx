@@ -1469,7 +1469,7 @@ export default function Home() {
 
       const apiUrl = `${getApiUrl("/api/pulses/feed")}?${params}`;
       console.log(`[Pulses] Fetching via API: ${apiUrl}`);
-      const res = await fetch(apiUrl, { signal: AbortSignal.timeout(15000) });
+      const res = await fetch(apiUrl, { signal: AbortSignal.timeout(8000) });
 
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({ error: res.statusText }));
@@ -1547,7 +1547,12 @@ export default function Home() {
   // ========= PULL-TO-REFRESH HANDLER =========
   const handlePullToRefresh = useCallback(async () => {
     console.log("[PullToRefresh] Triggered manual refresh");
-    await fetchPulses();
+    try {
+      await fetchPulses();
+    } catch (err) {
+      console.error("[PullToRefresh] fetchPulses error:", err);
+      // Swallow error so PullToRefresh component can clean up properly
+    }
   }, [fetchPulses]);
 
   // ========= AUTO-SEED AND REFRESH STALE CITIES =========
@@ -3332,7 +3337,7 @@ export default function Home() {
 
         <PullToRefresh onRefresh={handlePullToRefresh} disabled={loading}>
           {/* Main Content Area */}
-          <main className="flex-1 flex justify-center px-4 py-6 pt-[max(3.5rem,calc(env(safe-area-inset-top)+0.75rem))]">
+          <main className="flex-1 flex justify-center px-4 pb-6 pt-[max(1rem,calc(env(safe-area-inset-top)+0.25rem))]">
             <div className="w-full max-w-lg space-y-6">
 
               {/* VIEW BRANCHING: Dashboard (Pulse) vs Dedicated Tabs (Traffic/Events/Local/Status) */}
