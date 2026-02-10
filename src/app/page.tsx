@@ -3562,7 +3562,7 @@ export default function Home() {
                   {(hasRoadClosure || (trafficIncidents && trafficIncidents.some(i => i.severity >= 3))) && (
                     <div
                       onClick={() => setActiveTab("traffic")}
-                      className="mb-4 glass-card border border-red-500/30 bg-red-500/10 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:bg-red-500/20 transition-all"
+                      className="mb-4 glass-card border border-red-500/30 bg-red-500/10 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:bg-red-500/20 transition-all animate-pulse"
                     >
                       <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0">
                         <span className="text-xl">🚨</span>
@@ -3570,7 +3570,14 @@ export default function Home() {
                       <div className="flex-1 min-w-0">
                         <h4 className="text-[10px] font-black text-red-400 uppercase tracking-widest leading-none mb-1">Traffic Alert</h4>
                         <p className="text-sm font-bold text-white truncate">
-                          {hasRoadClosure ? "Road closures nearby" : "Major incidents detected"}
+                          {(() => {
+                            const closure = trafficIncidents?.find(i => i.type === "closure");
+                            if (closure?.roadName) return `${closure.roadName}: ${closure.description || "Closed"}`;
+                            if (hasRoadClosure) return "Road closures nearby";
+                            const severe = trafficIncidents?.find(i => i.severity >= 3);
+                            if (severe?.roadName) return `${severe.roadName}: ${severe.description || "Major incident"}`;
+                            return "Major incidents detected";
+                          })()}
                         </p>
                       </div>
                     </div>
