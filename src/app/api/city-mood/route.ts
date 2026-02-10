@@ -372,6 +372,8 @@ function generateVibeHeadline(
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const city = searchParams.get("city");
+  const lat = searchParams.get("lat") ? parseFloat(searchParams.get("lat")!) : null;
+  const lon = searchParams.get("lon") ? parseFloat(searchParams.get("lon")!) : null;
 
   // NEW: Accept context parameters for holistic vibe calculation
   const eventsCountParam = searchParams.get("eventsCount");
@@ -399,11 +401,27 @@ export async function GET(req: NextRequest) {
     const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000).toISOString();
 
     // Fetch recent pulses with mood AND tag for richer analysis
-    const { data, error } = await supabase
+    // Use bounding box when coordinates are available (matches feed query behavior)
+    let query = supabase
       .from("pulses")
       .select("mood, tag, created_at")
-      .eq("city", city)
       .gte("created_at", threeHoursAgo);
+
+    if (lat != null && lon != null) {
+      const latDelta = 0.175; // ~12 miles
+      const lonDelta = 0.21;
+      query = query
+        .gte("lat", lat - latDelta)
+        .lte("lat", lat + latDelta)
+        .gte("lon", lon - lonDelta)
+        .lte("lon", lon + lonDelta);
+    } else {
+      // Fallback to fuzzy city name match
+      const cityBase = city!.split(",").slice(0, 2).join(",").trim();
+      query = query.ilike("city", `${cityBase}%`);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error("Error fetching pulses for city mood:", error);

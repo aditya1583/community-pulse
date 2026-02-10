@@ -604,6 +604,8 @@ export default function Home() {
         // Build query params with full city context
         const params = new URLSearchParams();
         params.set("city", city);
+        if (selectedCity?.lat != null) params.set("lat", String(selectedCity.lat));
+        if (selectedCity?.lon != null) params.set("lon", String(selectedCity.lon));
 
         // Include events count for activity calculation
         if (ticketmasterEvents.length > 0) {
