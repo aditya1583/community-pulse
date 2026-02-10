@@ -3348,7 +3348,7 @@ export default function Home() {
 
         <PullToRefresh onRefresh={handlePullToRefresh} disabled={loading}>
           {/* Main Content Area */}
-          <main className="flex-1 flex justify-center px-4 pb-6 pt-2">
+          <main className="flex-1 flex justify-center px-4 pb-6 pt-[env(safe-area-inset-top,0.5rem)]">
             <div className="w-full max-w-lg space-y-6">
 
               {/* VIEW BRANCHING: Dashboard (Pulse) vs Dedicated Tabs (Traffic/Events/Local/Status) */}

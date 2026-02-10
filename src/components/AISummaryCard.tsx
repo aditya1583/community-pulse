@@ -299,18 +299,7 @@ export default function AISummaryCard({
         </p>
       </div>
 
-      {/* Share Today's Brief button */}
-      {summary && !summaryLoading && !summaryError && (
-        <ShareableSummaryCard
-          cityName={cityName}
-          vibeHeadline={vibeHeadline || `${displayCity} is ${pulsesCount > 0 ? "Active" : "Quiet"}`}
-          vibeEmoji={vibeEmoji}
-          summary={summary}
-          trafficLevel={trafficLevel}
-          eventsCount={events.length}
-          temperature={temperature}
-        />
-      )}
+      {/* Share Today's Brief - removed for cleaner UX */}
     </div>
   );
 }
