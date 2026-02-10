@@ -68,11 +68,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch cities", details: cityError.message }, { status: 500 });
     }
 
-    // Dedupe cities, keep first (most recent) coords
+    // Dedupe cities by normalized name (first segment before comma)
+    // This prevents "Leander, Texas, US" and "Leander, Texas" from being treated as separate cities
     const cityMap = new Map<string, { city: string; lat: number | null; lon: number | null }>();
     for (const p of cityData || []) {
-      if (!cityMap.has(p.city)) {
-        cityMap.set(p.city, { city: p.city, lat: p.lat, lon: p.lon });
+      const normalizedKey = p.city.split(",")[0].trim().toLowerCase();
+      if (!cityMap.has(normalizedKey)) {
+        cityMap.set(normalizedKey, { city: p.city, lat: p.lat, lon: p.lon });
       }
     }
 

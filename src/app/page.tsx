@@ -430,8 +430,10 @@ export default function Home() {
 
   // ========= AI SUMMARY =========
   useEffect(() => {
+    // Filter out bot posts — only real user posts go to AI summary
+    const userPulses = pulses.filter(p => !p.is_bot);
     // Need at least some data to generate a summary
-    const hasData = pulses.length > 0 || ticketmasterEvents.length > 0;
+    const hasData = userPulses.length > 0 || ticketmasterEvents.length > 0 || trafficLevel || weather;
 
     if (!hasData) {
       setSummary(null);
@@ -490,7 +492,7 @@ export default function Home() {
           body: JSON.stringify({
             city: city.split(',')[0].trim(),
             context: "all",
-            pulses,
+            pulses: userPulses,
             events: eventsForSummary,
             trafficLevel,
             weatherCondition,
