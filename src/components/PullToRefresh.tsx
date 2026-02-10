@@ -130,7 +130,7 @@ export default function PullToRefresh({
   const shouldShowSpinner = pullDistance > 10 || isRefreshing;
 
   return (
-    <div ref={containerRef} className="relative bg-[#09090b]">
+    <div ref={containerRef} className="relative bg-[#09090b]" style={{ minHeight: "100vh" }}>
       {/* Pull indicator - Only render when actively pulling or refreshing */}
       {shouldShowSpinner && (
         <div
