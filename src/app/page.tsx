@@ -2608,6 +2608,8 @@ export default function Home() {
           tag: resolvedTag,
           message: trimmed,
           author: authorName,
+          lat: selectedCity?.lat ?? null,
+          lon: selectedCity?.lon ?? null,
         }),
       });
 

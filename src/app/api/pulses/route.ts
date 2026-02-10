@@ -95,6 +95,8 @@ type PulseCreatePayload = {
   author: string;
   user_id: string;
   neighborhood?: string;
+  lat?: number | null;
+  lon?: number | null;
 };
 
 /**
@@ -163,7 +165,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { city, mood, tag, message, author, neighborhood } = body as Partial<PulseCreatePayload>;
+    const { city, mood, tag, message, author, neighborhood, lat, lon } = body as Partial<PulseCreatePayload>;
 
     // Validate required fields
     if (!city || typeof city !== "string" || !city.trim()) {
@@ -309,6 +311,8 @@ export async function POST(req: NextRequest) {
           author: author.trim(),
           user_id: user.id, // From verified auth, not from request body
           neighborhood: neighborhood?.trim() || null,
+          lat: typeof lat === "number" && isFinite(lat) ? lat : null,
+          lon: typeof lon === "number" && isFinite(lon) ? lon : null,
         },
       ])
       .select()
