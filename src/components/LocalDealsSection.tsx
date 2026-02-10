@@ -152,7 +152,7 @@ export default function LocalDealsSection({
 
     // Try Foursquare first with timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
       const query = categoryConfig?.query || "";
@@ -193,7 +193,7 @@ export default function LocalDealsSection({
 
     // Fallback to OpenStreetMap with timeout
     const osmController = new AbortController();
-    const osmTimeoutId = setTimeout(() => osmController.abort(), 8000);
+    const osmTimeoutId = setTimeout(() => osmController.abort(), 15000);
 
     try {
       const osmParams = new URLSearchParams({

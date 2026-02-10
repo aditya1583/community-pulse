@@ -3339,7 +3339,7 @@ export default function Home() {
 
         <PullToRefresh onRefresh={handlePullToRefresh} disabled={loading}>
           {/* Main Content Area */}
-          <main className="flex-1 flex justify-center px-4 pb-6 pt-[max(0.5rem,env(safe-area-inset-top))]">
+          <main className="flex-1 flex justify-center px-4 pb-6 pt-2">
             <div className="w-full max-w-lg space-y-6">
 
               {/* VIEW BRANCHING: Dashboard (Pulse) vs Dedicated Tabs (Traffic/Events/Local/Status) */}
@@ -3348,11 +3348,11 @@ export default function Home() {
                 <div key="dashboard-tab" className="space-y-6">
                   {/* Top Bar: Header + Auth Action */}
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-[3]">
+                    <div className="min-w-0 flex-1">
                       <Header cityName={city} isLive={!loading} />
                     </div>
 
-                    <div className="flex-shrink-0 flex-[0] pt-1">
+                    <div className="flex-shrink-0 pt-1">
                       {!sessionUser ? (
                         <button
                           onClick={() => setShowAuthModal(true)}

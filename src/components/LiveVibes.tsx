@@ -100,35 +100,10 @@ export default function LiveVibes({ city, onNavigateToLocal }: LiveVibesProps) {
   // Don't render while loading
   if (loading) return null;
 
-  // Empty state - show CTA to discover the feature
+  // Empty state - don't show CTA, just return null
+  // The feature will surface naturally when venues have vibes
   if (!hasVibes || vibes.length === 0) {
-    return (
-      <div className="bg-gradient-to-br from-violet-900/20 via-slate-800/50 to-fuchsia-900/20 border border-violet-500/20 rounded-xl p-4 mb-4">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-lg">✨</span>
-          <h3 className="text-sm font-semibold text-white">Live Vibes</h3>
-          <span className="text-[10px] text-slate-400 bg-slate-700/50 px-2 py-0.5 rounded-full">
-            NEW
-          </span>
-        </div>
-
-        <p className="text-sm text-slate-300 mb-3">
-          Know what&apos;s <span className="text-violet-400 font-medium">really</span> happening at local spots.
-          Is the coffee shop packed? Is the bar chill tonight?
-        </p>
-
-        <button
-          onClick={onNavigateToLocal}
-          className="w-full py-2.5 px-4 bg-gradient-to-r from-violet-600/80 to-fuchsia-600/80 text-white text-sm font-semibold rounded-lg hover:from-violet-500 hover:to-fuchsia-500 transition-all shadow-[0_0_16px_rgba(139,92,246,0.3)] border border-violet-400/30"
-        >
-          🎯 Log Your First Vibe
-        </button>
-
-        <p className="text-[10px] text-slate-500 text-center mt-2">
-          Real vibes from real neighbors, right now.
-        </p>
-      </div>
-    );
+    return null;
   }
 
   return (
