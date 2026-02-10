@@ -98,8 +98,6 @@ export default function PullToRefresh({
       } finally {
         setIsRefreshing(false);
         setPullDistance(0);
-        // Force scroll to top after refresh completes
-        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     } else {
       // Snap back
@@ -130,7 +128,7 @@ export default function PullToRefresh({
   const shouldShowSpinner = pullDistance > 10 || isRefreshing;
 
   return (
-    <div ref={containerRef} className="relative bg-[#09090b]" style={{ minHeight: "100vh" }}>
+    <div ref={containerRef} className="relative bg-[#09090b]" style={{ minHeight: "100vh", overscrollBehavior: "none" }}>
       {/* Pull indicator - Only render when actively pulling or refreshing */}
       {shouldShowSpinner && (
         <div
@@ -168,11 +166,12 @@ export default function PullToRefresh({
         </div>
       )}
 
-      {/* Content with pull transform */}
+      {/* Content with pull transform — no CSS transition on snap-back to prevent stuck state */}
       <div
-        className="transition-transform duration-200 ease-out"
         style={{
-          transform: pullDistance > 0 ? `translateY(${pullDistance}px)` : undefined,
+          transform: pullDistance > 0 ? `translateY(${pullDistance}px)` : 'translateY(0)',
+          transition: pullDistance > 0 ? 'transform 0.1s ease-out' : 'transform 0.15s ease-out',
+          willChange: pullDistance > 0 ? 'transform' : 'auto',
         }}
       >
         {children}

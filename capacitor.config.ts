@@ -9,6 +9,7 @@ const config: CapacitorConfig = {
     backgroundColor: '#09090b',
     allowsLinkPreview: false,
     preferredContentMode: 'mobile',
+    scrollEnabled: true,
   },
   server: {
     // For local dev with hot reload, uncomment the line below and comment out the Vercel URL:

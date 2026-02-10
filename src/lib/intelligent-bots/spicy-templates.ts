@@ -210,7 +210,7 @@ export const SPICY_HOT_TAKES = [
 export const SPICY_OBSERVATIONS = [
   "Someone in {neighborhood} is having a party and I can hear the bass from here. Living their best life I guess.",
   "To whoever's dog has been barking for 2 hours: we're all concerned. Is it okay? Are YOU okay?",
-  "The Christmas lights are still up on {street}. At this point I respect the commitment.",
+  "Spotted a cat just vibing on {street}. Zero urgency. Living the dream.",
   "Someone's learning to play drums in my neighborhood. We're all in this together now.",
   "Heard fireworks or gunshots? Classic {city} guessing game continues.",
   "Power flickered. Now we all check Nextdoor in unison. The ritual.",

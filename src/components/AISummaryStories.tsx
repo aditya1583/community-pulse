@@ -258,18 +258,7 @@ export default function AISummaryStories({
         })}
       </div>
 
-      {/* Share button (optional, shown when summary available) */}
-      {summary && !summaryLoading && !summaryError && (
-        <ShareableSummaryCard
-          cityName={cityName}
-          vibeHeadline={vibeHeadline || `${displayCity} is ${pulsesCount > 0 ? "Active" : "Quiet"}`}
-          vibeEmoji={vibeEmoji}
-          summary={summary}
-          trafficLevel={trafficLevel}
-          eventsCount={events.length}
-          temperature={temperature}
-        />
-      )}
+      {/* Share Today's Brief — removed for cleaner UX */}
     </div>
   );
 }
