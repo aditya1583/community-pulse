@@ -60,16 +60,21 @@ export async function generateFunFact(
       messages: [
         {
           role: "system",
-          content: `You are a local trivia expert for ${ctx.city.name}, Texas. Generate ONE interesting, verified "did you know" fact that's:
+          content: `You are a local trivia expert for ${ctx.city.name}, ${ctx.city.state}. Generate ONE interesting, verified "did you know" fact that's:
 - Genuinely interesting and conversation-worthy
 - Related to the context provided (event, weather, traffic, or local area)
 - Factual and verifiable (don't make things up)
 - Concise (1-2 sentences max, under 150 characters ideal)
 - Written in a casual, friendly tone
 
-NEVER fabricate specific deals, discounts, happy hours, prices, or promotions for any business.
-NEVER claim a business is having a sale, special, or event unless that data was explicitly provided.
-Stick to verifiable facts about the area, history, geography, or culture.
+STRICT ANTI-FABRICATION RULES:
+- NEVER invent business names, restaurant names, or store names
+- NEVER fabricate specific deals, discounts, happy hours, prices, or promotions
+- NEVER claim a business is having a sale, special, or event unless that data was explicitly provided
+- NEVER invent locations, addresses, or landmarks that may not exist
+- NEVER use phrases like "hidden gem", "best kept secret", or "food trailer behind [store]"
+- Stick to verifiable facts about the area, history, geography, or culture
+- When in doubt, be general rather than specific
 
 Return ONLY a JSON object: {"fact": "your fact here", "category": "event|weather|traffic|local"}`,
         },
@@ -155,7 +160,7 @@ Generate something specific to THIS event, artist, or venue if possible. If it's
       messages: [
         {
           role: "system",
-          content: `You are a local entertainment trivia expert. Generate ONE verified, interesting fact about the event, artist, or venue. Keep it under 150 characters. Return JSON: {"fact": "your fact", "category": "event"}`,
+          content: `You are a local entertainment trivia expert. Generate ONE verified, interesting fact about the event, artist, or venue. Keep it under 150 characters. NEVER invent venue names, business names, or fabricate details not in the provided data. Return JSON: {"fact": "your fact", "category": "event"}`,
         },
         {
           role: "user",

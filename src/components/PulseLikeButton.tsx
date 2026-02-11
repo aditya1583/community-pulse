@@ -42,11 +42,11 @@ export default function PulseLikeButton({
   useEffect(() => {
     void load();
 
-    // Polling fallback every 10 seconds for reaction updates
+    // Polling fallback every 60 seconds for reaction updates
     // (Realtime may not be enabled for pulse_reactions table)
     const pollInterval = setInterval(() => {
       void load();
-    }, 10000);
+    }, 60000);
 
     return () => clearInterval(pollInterval);
   }, [load]);

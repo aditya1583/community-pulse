@@ -732,12 +732,12 @@ const INSIDER_TIP_TEMPLATES = [
   "💡 Local hack: {restaurant}'s secret menu item is {secretItem}. Don't tell everyone.",
   "🎯 Pro tip only {city} OGs know: {landmark} is 10x better on {day} mornings. Trust me.",
   "🔓 Unlocking {city} knowledge: Skip the main entrance at {venue}. Go around back.",
-  "📍 {city} insider move: When {restaurant} is packed, {alternative} has the same vibe with no wait.",
-  "🗝️ Real ones know: The best parking for {landmark} is actually at {parkingSpot}. Free and close.",
-  "⭐ {city} life hack: {restaurant} does half-price {item} on {day}s. You didn't hear it from me.",
-  "🤐 Shhh... The locals' secret: {venue} has the best {feature} in town. Don't blow up my spot.",
-  "🎪 Newbie alert: When someone says 'meet at {landmark},' they mean the {specificSpot}. Now you know.",
-  "💎 Hidden gem status: {hiddenSpot} is {city}'s best kept secret. Reply if you've been there.",
+  "📍 {city} insider move: What's your go-to when your favorite spot is packed? Need backup options.",
+  "🗝️ Real ones know the best parking spots. Where do you park near {landmark}?",
+  "⭐ {city} life hack: What's the best deal you've found at a local spot? Share the love.",
+  "🤐 What's YOUR {city} best-kept-secret spot? Don't worry, we won't blow it up... much. 😏",
+  "🎪 Newbie alert: What do you wish someone told you when you first moved to {city}?",
+  "💎 What spot in {city} do you think deserves way more hype? Drop it below.",
 ];
 
 const INSIDER_VARIABLES = {
@@ -759,7 +759,7 @@ const NOSTALGIA_TEMPLATES = [
   "👴 Only real {city} natives remember when {memory}. If you know, you know.",
   "🌅 Miss the days when you could get to {destination} in {oldTime} minutes. Now it's {newTime}. Pain.",
   "🏡 Who else remembers when {area} was all just {oldFeature}? The growth is wild.",
-  "🎭 Pouring one out for {closedBusiness}. If you never got to go there, I'm sorry for your loss.",
+  "🎭 What closed business in {city} do you miss the most? Pour one out in the replies.",
   "📍 Back in the day, {landmark} was THE spot. What's the new THE spot now?",
   "🚗 Remember when there was no {road}? How did we even survive?",
   "✨ {city} before {change} hits different. Miss those vibes sometimes.",
@@ -1324,11 +1324,11 @@ const LANDMARK_FOOD_TEMPLATES = {
   // DISCOVERY - Hidden gems and new spots
   discovery: [
     // VALUE-GIVING
-    "🆕 Update: That new spot by {landmark} just opened last week. Tried it - actually pretty solid.",
-    "👀 Heads up: The restaurant near {landmark} changed ownership. New menu worth checking out.",
-    "🔍 Hidden gem alert: There's a food trailer behind {landmark} most people miss. Legit BBQ.",
-    "📍 Local tip: Skip the chains near {landmark}. The family-owned spot on the corner is 10x better.",
-    "✨ Discovery: The coffee inside {landmark} started serving pastries from that local bakery. 👌",
+    "🆕 Anyone noticed new spots opening up near {landmark} lately? What's good?",
+    "👀 What's your go-to restaurant near {landmark}? Looking for recommendations.",
+    "🔍 What are the underrated food spots near {landmark}? Drop your favorites below.",
+    "📍 Local tip: What local spots near {landmark} do you think deserve more love?",
+    "✨ Coffee lovers: Where's your favorite spot near {landmark}? Always looking for new places.",
     // QUESTIONS
     "🤔 Keep seeing that new spot by {landmark}. Anyone tried it yet?",
     "🗣️ What opened near {landmark} recently? Feel like I'm always last to know.",

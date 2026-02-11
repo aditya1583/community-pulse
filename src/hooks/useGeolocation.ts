@@ -78,8 +78,8 @@ export function useGeolocation(): GeolocationState & GeolocationActions {
     if (stored) {
       try {
         const parsed: StoredLocation = JSON.parse(stored);
-        // Check if cache is still valid (5 minutes)
-        const STALE_MS = 5 * 60 * 1000;
+        // Check if cache is still valid (24 hours — location persists across sessions)
+        const STALE_MS = 24 * 60 * 60 * 1000;
         const isValid = Date.now() - parsed.timestamp < STALE_MS;
         // Invalidate cache if cityName is a known bad value from previous bugs
         // Also invalidate coordinate-format strings (e.g. "37.8°N, 122.4°W") from geocode failures
@@ -303,7 +303,7 @@ export function useGeolocation(): GeolocationState & GeolocationActions {
 
   // Auto-refresh location on app resume / tab focus if cache is stale
   useEffect(() => {
-    const STALE_MS = 5 * 60 * 1000;
+    const STALE_MS = 24 * 60 * 60 * 1000;
 
     const refreshIfStale = () => {
       const stored = localStorage.getItem(STORAGE_KEY);

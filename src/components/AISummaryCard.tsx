@@ -43,8 +43,19 @@ type AISummaryCardProps = {
   temperature?: number;
 };
 
+/** Strip markdown bold/italic formatting and section headers */
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "$1")   // **bold** → bold
+    .replace(/__(.+?)__/g, "$1")         // __bold__ → bold
+    .replace(/\*(.+?)\*/g, "$1")         // *italic* → italic
+    .replace(/_(.+?)_/g, "$1")           // _italic_ → italic
+    .replace(/^#+\s+/gm, "")            // # headers
+    .trim();
+}
+
 function firstSentence(text: string): string {
-  const trimmed = text.trim();
+  const trimmed = stripMarkdown(text.trim());
   if (!trimmed) return "";
 
   const match = trimmed.match(/(.+?[.!?])(\s|$)/);

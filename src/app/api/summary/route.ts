@@ -168,19 +168,15 @@ export async function POST(req: Request) {
         );
       }
 
-      prompt = `Summarize the following data for ${displayCity}. Use the structured output format:
+      prompt = `Summarize the following data for ${displayCity}. Use the structured output format (NO markdown, NO asterisks, NO bold formatting):
 
-**☀️ Weather**
-{1-2 sentence summary}
+☀️ Weather: {1-2 sentence summary}
 
-**🚗 Traffic**
-{1-2 sentence summary}
+🚗 Traffic: {1-2 sentence summary}
 
-**🎉 Events**
-{1-3 sentence summary}
+🎉 Events: {1-3 sentence summary}
 
-**🏪 Local**
-{1-3 sentence summary}
+🏪 Local: {1-3 sentence summary}
 
 Here is the data:
 

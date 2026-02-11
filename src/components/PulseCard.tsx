@@ -446,9 +446,13 @@ export default function PulseCard({
             )}
           </div>
 
-          {/* Message content - increased readability */}
+          {/* Message content - increased readability (strip markdown from AI-generated briefs) */}
           <p className="text-[15px] text-white/90 leading-[1.6] mb-4 whitespace-pre-line font-medium tracking-tight text-balance">
-            {pulse.message}
+            {pulse.message
+              .replace(/\*\*(.+?)\*\*/g, "$1")
+              .replace(/__(.+?)__/g, "$1")
+              .replace(/\*(.+?)\*/g, "$1")
+              .replace(/_(.+?)_/g, "$1")}
           </p>
 
           {/* Action buttons for actionable content (farmers markets, venues) */}

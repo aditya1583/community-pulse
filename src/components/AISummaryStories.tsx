@@ -5,6 +5,17 @@ import type { TicketmasterEvent } from "@/hooks/useEvents";
 import type { TabId, TrafficLevel } from "./types";
 import ShareableSummaryCard from "./ShareableSummaryCard";
 
+/** Strip markdown bold/italic formatting */
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/__(.+?)__/g, "$1")
+    .replace(/\*(.+?)\*/g, "$1")
+    .replace(/_(.+?)_/g, "$1")
+    .replace(/^#+\s+/gm, "")
+    .trim();
+}
+
 /** Normalize and deduplicate events */
 function deduplicateEvents(events: TicketmasterEvent[]): TicketmasterEvent[] {
   const seen = new Set<string>();
@@ -90,7 +101,7 @@ export default function AISummaryStories({
         : summaryError
           ? "Error loading"
           : pulsesCount > 0
-            ? summary?.split(".")[0] || "Recent activity"
+            ? stripMarkdown(summary?.split(".")[0] || "") || "Recent activity"
             : "Be the first to share",
       color: "text-emerald-400",
       bgGradient: "from-emerald-500/20 to-emerald-600/10",
