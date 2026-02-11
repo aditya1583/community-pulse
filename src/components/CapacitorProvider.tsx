@@ -12,7 +12,7 @@ export function CapacitorProvider({ children }: { children: React.ReactNode }) {
         if (typeof window === 'undefined') return;
 
         const isCapacitor = !!(
-            (window as any).Capacitor ||
+            (window as any).Capacitor?.isNativePlatform?.() ||
             window.location.protocol === 'capacitor:' ||
             window.location.protocol === 'file:'
         );
