@@ -2551,13 +2551,27 @@ export default function Home() {
 
     try {
       // Get a fresh access token via authBridge (works on both web and Capacitor)
+      console.log("[Voxlo] Getting access token...");
       const accessToken = await authBridge.getAccessToken();
+      console.log("[Voxlo] Access token:", accessToken ? `${accessToken.slice(0, 20)}...` : "NULL");
 
       if (!accessToken) {
+        console.error("[Voxlo] No access token — showing sign-in");
         setErrorMsg("Sign in to post.");
         setShowAuthModal(true);
         return;
       }
+
+      const postBody = {
+        city,
+        mood,
+        tag: resolvedTag,
+        message: trimmed,
+        author: authorName,
+        lat: geolocation.lat ?? selectedCity?.lat ?? null,
+        lon: geolocation.lon ?? selectedCity?.lon ?? null,
+      };
+      console.log("[Voxlo] Posting pulse:", { ...postBody, message: postBody.message.slice(0, 30) });
 
       const res = await fetch(getApiUrl("/api/pulses"), {
         method: "POST",
@@ -2565,16 +2579,10 @@ export default function Home() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({
-          city,
-          mood,
-          tag: resolvedTag,
-          message: trimmed,
-          author: authorName,
-          lat: geolocation.lat ?? selectedCity?.lat ?? null,
-          lon: geolocation.lon ?? selectedCity?.lon ?? null,
-        }),
+        body: JSON.stringify(postBody),
       });
+
+      console.log("[Voxlo] POST /api/pulses response:", res.status, res.statusText);
 
       type CreatePulseResponse = { pulse?: unknown; error?: string; code?: string };
       let data: CreatePulseResponse | null = null;
@@ -2584,9 +2592,12 @@ export default function Home() {
         // ignore JSON parse error
       }
 
+      console.log("[Voxlo] Response data:", data ? { pulse: !!data.pulse, error: data.error, code: data.code } : "null");
+
       if (!res.ok || !data?.pulse) {
         const message =
           data?.error || "Could not post your pulse. Please try again.";
+        console.error("[Voxlo] Post failed:", res.status, message);
 
         if (data?.code === "MODERATION_FAILED") {
           setValidationError(message);
