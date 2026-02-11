@@ -1,5 +1,38 @@
 # QA Tracker — Voxlo
 
+## E2E Test Report — Build 46 + Vercel Deploy (2026-02-10 6:30PM CST)
+
+### ✅ PASSING
+| Feature | Status | Notes |
+|---------|--------|-------|
+| **Sign-in** | ✅ PASS | Works on web (was broken before fix) |
+| **Sign-up** | ✅ PASS | Creates account, email confirmation required |
+| **Posting** | ✅ PASS | Ady confirmed on iOS TestFlight (build 46) |
+| **Pulse Feed** | ✅ PASS | 5 AI posts loaded, sorted by distance |
+| **Events Tab** | ✅ PASS | 20 Ticketmaster events, Calendar/Map/Share buttons |
+| **Traffic Tab** | ✅ PASS | TomTom data, road closures, congestion level |
+| **Local Tab** | ✅ PASS | 12 places from Foursquare, distance + category filters |
+| **Legal Page** | ✅ PASS | All attributions, data sources, contact |
+| **Terms/Privacy** | ✅ PASS | Pages load |
+| **App Icon** | ✅ PASS | Neon green radar V (Ady confirmed) |
+| **RESIDENT badge** | ✅ PASS | User posts show green RESIDENT badge |
+| **AI GENERATED badge** | ✅ PASS | Bot posts show AI GENERATED badge |
+| **Onboarding checklist** | ✅ PASS | Welcome 25% Done with 4 steps |
+| **Traffic Alert banner** | ✅ PASS | Shows real road closures with pulse animation |
+| **City search** | ✅ PASS | Autocomplete in search bar |
+| **Bottom nav** | ✅ PASS | Pulse/Events/Post/Traffic/Local all navigate correctly |
+| **Poll voting** | ✅ PASS | Vibe Check polls render with voting buttons |
+
+### ⚠️ ISSUES FOUND
+| Issue | Severity | Status |
+|-------|----------|--------|
+| "BEYOND 10 MILES" on own post | Medium | Fixed — same-city posts forced in-radius |
+| Header truncation ("Leand...") | Low | Known, needs redesign |
+| Username truncation ("SUNNYH...") | Low | Header space issue |
+| Raw markdown in brief (`**☀️ Weather**`) | Low | Needs strip markdown |
+| "Share Today's Brief" removed | ✅ Fixed | Was in AISummaryStories.tsx |
+| Stale AI content (Christmas lights) | ✅ Fixed | Template replaced |
+
 Track all verified issues and fixes. **DO NOT touch items marked ✅ VERIFIED.**
 
 ## Build 45 — Verified by Ady (2026-02-10)
