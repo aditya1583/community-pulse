@@ -83,13 +83,57 @@ function getSupabaseClient(): SupabaseClient | null {
  * - Collapse repeated characters (3+ -> 1)
  * - Remove common obfuscation characters
  */
+/**
+ * Unicode homoglyph map — Cyrillic/Greek/other chars that look like Latin
+ */
+const HOMOGLYPH_MAP: Record<string, string> = {
+  // Cyrillic
+  'а': 'a', 'в': 'b', 'с': 'c', 'е': 'e', 'н': 'h', 'і': 'i',
+  'к': 'k', 'м': 'm', 'о': 'o', 'р': 'p', 'т': 't', 'х': 'x',
+  'у': 'y', 'ё': 'e', 'А': 'a', 'В': 'b', 'С': 'c', 'Е': 'e',
+  'К': 'k', 'М': 'm', 'О': 'o', 'Р': 'p', 'Т': 't', 'Х': 'x',
+  // Greek
+  'α': 'a', 'β': 'b', 'ε': 'e', 'η': 'n', 'ι': 'i', 'κ': 'k',
+  'ν': 'v', 'ο': 'o', 'ρ': 'p', 'τ': 't', 'υ': 'u', 'χ': 'x',
+  // Fullwidth Latin
+  'ａ': 'a', 'ｂ': 'b', 'ｃ': 'c', 'ｄ': 'd', 'ｅ': 'e', 'ｆ': 'f',
+  'ｇ': 'g', 'ｈ': 'h', 'ｉ': 'i', 'ｊ': 'j', 'ｋ': 'k', 'ｌ': 'l',
+  'ｍ': 'm', 'ｎ': 'n', 'ｏ': 'o', 'ｐ': 'p', 'ｑ': 'q', 'ｒ': 'r',
+  'ｓ': 's', 'ｔ': 't', 'ｕ': 'u', 'ｖ': 'v', 'ｗ': 'w', 'ｘ': 'x',
+  'ｙ': 'y', 'ｚ': 'z',
+};
+
+/**
+ * Strip zero-width characters and other invisible Unicode
+ */
+function stripZeroWidth(input: string): string {
+  return input.replace(/[\u200B\u200C\u200D\u200E\u200F\uFEFF\u00AD\u034F\u061C\u2060\u2061\u2062\u2063\u2064\u2066\u2067\u2068\u2069\u206A\u206B\u206C\u206D\u206E\u206F]/g, "");
+}
+
+/**
+ * Replace Unicode homoglyphs with Latin equivalents
+ */
+function replaceHomoglyphs(input: string): string {
+  let result = "";
+  for (const char of input) {
+    result += HOMOGLYPH_MAP[char] || char;
+  }
+  return result;
+}
+
 export function normalizeForBlocklist(input: string): string {
-  let normalized = input.toLowerCase();
+  // Strip zero-width characters first
+  let normalized = stripZeroWidth(input);
+
+  // Replace Unicode homoglyphs
+  normalized = replaceHomoglyphs(normalized);
+
+  normalized = normalized.toLowerCase();
 
   // Strip diacritics using NFKD normalization
   normalized = normalized.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
 
-  // Replace common obfuscation characters
+  // Leet speak normalization
   normalized = normalized
     .replace(/[0]/g, "o")
     .replace(/[1!|]/g, "i")
@@ -98,7 +142,8 @@ export function normalizeForBlocklist(input: string): string {
     .replace(/[5$]/g, "s")
     .replace(/[7]/g, "t")
     .replace(/[8]/g, "b")
-    .replace(/[9]/g, "g");
+    .replace(/[9]/g, "g")
+    .replace(/\+/g, "t");
 
   // Remove non-alphanumeric characters for matching, but keep spaces
   normalized = normalized.replace(/[^a-z0-9\s]/g, "");
@@ -296,7 +341,101 @@ export async function checkBlocklist(content: string): Promise<BlocklistResult> 
     }
   }
 
+  // --- Spaced-out evasion detection ---
+  // Collapse all spaces/separators and re-check: "f u c k" → "fuck"
+  const collapsed = normalizeForBlocklist(
+    stripZeroWidth(replaceHomoglyphs(content)).replace(/[\s.\-_*#!@^&()]+/g, "")
+  );
+  for (const entry of entries) {
+    const normalizedPhrase = normalizeForBlocklist(entry.phrase);
+    if (normalizedPhrase.length >= 4 && collapsed.includes(normalizedPhrase)) {
+      if (entry.severity === "block") {
+        return {
+          allowed: false,
+          reason: FRIENDLY_BLOCKLIST_MESSAGE,
+          matchedPhrase: entry.phrase,
+          severity: "block",
+        };
+      }
+    }
+  }
+
+  // --- Reversed text detection ---
+  const reversed = normalizedContent.split("").reverse().join("");
+  for (const entry of entries) {
+    const normalizedPhrase = normalizeForBlocklist(entry.phrase);
+    if (normalizedPhrase.length >= 4 && reversed.includes(normalizedPhrase)) {
+      if (entry.severity === "block") {
+        return {
+          allowed: false,
+          reason: FRIENDLY_BLOCKLIST_MESSAGE,
+          matchedPhrase: entry.phrase,
+          severity: "block",
+        };
+      }
+    }
+  }
+
+  // --- Dog whistle / coded hate detection ---
+  const dogWhistleResult = detectDogWhistles(content);
+  if (dogWhistleResult) {
+    return {
+      allowed: false,
+      reason: FRIENDLY_BLOCKLIST_MESSAGE,
+      matchedPhrase: dogWhistleResult,
+      severity: "block",
+    };
+  }
+
+  // --- Emoji context detection ---
+  const emojiResult = detectSexualEmojiContext(content);
+  if (emojiResult) {
+    return {
+      allowed: false,
+      reason: FRIENDLY_BLOCKLIST_MESSAGE,
+      matchedPhrase: emojiResult,
+      severity: "block",
+    };
+  }
+
   return { allowed: true };
+}
+
+/**
+ * Detect coded hate speech / dog whistles
+ */
+function detectDogWhistles(content: string): string | null {
+  const text = content.toLowerCase();
+
+  // 1488 (14 words + 88/HH)
+  if (/\b14\s*[\/\-]?\s*88\b/.test(text) || /\b1488\b/.test(text)) return "1488";
+
+  // Triple parentheses (((target)))
+  if (/\({3,}.*\){3,}/.test(content)) return "triple parentheses";
+
+  // Other numeric dog whistles
+  if (/\b88\b/.test(text) && /\bheil\b/i.test(text)) return "88+heil";
+
+  return null;
+}
+
+/**
+ * Detect sexual emoji patterns
+ */
+function detectSexualEmojiContext(content: string): string | null {
+  // Eggplant + peach combo (sexual innuendo)
+  if (/🍆\s*🍑/.test(content) || /🍑\s*🍆/.test(content)) {
+    // Only block if it's a standalone emoji message or clearly sexual context
+    const textOnly = content.replace(/[\u{1F300}-\u{1FFFF}\s]/gu, "").trim();
+    if (textOnly.length < 10) return "sexual emoji pattern";
+  }
+
+  // Sweat + tongue + eggplant/peach combos
+  if (/[💦🥵👅]{2,}/.test(content) && /[🍆🍑]/.test(content)) {
+    return "sexual emoji pattern";
+  }
+
+  return null;
 }
 
 /**

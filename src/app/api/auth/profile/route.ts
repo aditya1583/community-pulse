@@ -8,6 +8,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { runModerationPipeline } from "@/lib/moderationPipeline";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -69,6 +70,18 @@ export async function POST(req: NextRequest) {
 
   if (!anonName || typeof anonName !== "string") {
     return NextResponse.json({ error: "anon_name required" }, { status: 400 });
+  }
+
+  // Moderate the display name
+  const modResult = await runModerationPipeline(anonName, {
+    endpoint: "/api/auth/profile",
+    userId: user.id,
+  });
+  if (!modResult.allowed) {
+    return NextResponse.json(
+      { error: modResult.reason || "Display name not allowed" },
+      { status: modResult.serviceError ? 503 : 400 }
+    );
   }
 
   const supabase = getServiceClient();

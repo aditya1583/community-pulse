@@ -70,6 +70,7 @@ import {
   isPerspectiveEnabled,
   type PerspectiveResult,
 } from "./perspectiveModeration";
+import { logModerationEvent } from "./moderationLogger";
 import crypto from "crypto";
 
 // Friendly message shown to users when content is blocked
@@ -193,14 +194,29 @@ function getCategoryFromAIResult(result: AIModerationResult): ModerationCategory
  * 4. Perspective API (optional, supplementary toxicity signal)
  *
  * @param content - The text content to moderate
+ * @param options - Optional metadata for logging (endpoint, userId)
  * @returns PipelineResult with allowed status and telemetry
  */
 export async function runModerationPipeline(
-  content: string
+  content: string,
+  options?: { endpoint?: string; userId?: string }
 ): Promise<PipelineResult> {
   const requestId = generateRequestId();
   const contentHash = hashContent(content);
   const startTime = Date.now();
+
+  // Helper to fire-and-forget log blocked content
+  const logBlock = (layer: string, category: string, confidence?: number) => {
+    logModerationEvent({
+      content,
+      userId: options?.userId,
+      category,
+      confidenceScore: confidence,
+      layer,
+      action: "blocked",
+      endpoint: options?.endpoint,
+    }).catch(() => {});
+  };
 
   // --- LAYER 1: Dynamic Blocklist (cheap first-pass) ---
   try {
@@ -209,6 +225,7 @@ export async function runModerationPipeline(
     if (!blocklistResult.allowed) {
       const durationMs = Date.now() - startTime;
       logTelemetry(requestId, "blocklist", false, "blocklist", durationMs, contentHash);
+      logBlock("blocklist", "blocklist");
 
       return {
         allowed: false,
@@ -236,6 +253,7 @@ export async function runModerationPipeline(
   if (!localResult.allowed) {
     const durationMs = Date.now() - startTime;
     logTelemetry(requestId, "local", false, "profanity", durationMs, contentHash);
+    logBlock("local", "profanity");
 
     return {
       allowed: false,
@@ -257,6 +275,7 @@ export async function runModerationPipeline(
     const durationMs = Date.now() - startTime;
     const category = getCategoryFromAIResult(aiResult);
     logTelemetry(requestId, "haiku", false, category, durationMs, contentHash);
+    logBlock("ai", category, aiResult._debug?.confidence);
 
     return {
       allowed: false,
@@ -297,6 +316,7 @@ export async function runModerationPipeline(
           durationMs,
           contentHash
         );
+        logBlock("perspective", "toxicity");
 
         return {
           allowed: false,

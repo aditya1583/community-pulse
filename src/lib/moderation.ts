@@ -13,6 +13,10 @@ const FRIENDLY_DISALLOWED_CONTENT = "This type of content is not allowed.";
 const EXPLICIT_PROFANITY = [
   // Common explicit words
   "fuck",
+  "fukc",
+  "fcuk",
+  "fuck",
+  "fuk",
   "fucking",
   "fucked",
   "fucker",
@@ -91,6 +95,10 @@ const EXPLICIT_PROFANITY = [
   "fuk",
   "phuck",
   "phuk",
+  "fack",   // f4ck after leet normalization (4→a)
+  "fuq",
+  "azz",
+  "shyt",   // phonetic variant of shit
 ];
 
 const EXPLICIT_PROFANITY_TOKEN_REGEXES = EXPLICIT_PROFANITY.map(
@@ -140,11 +148,10 @@ const FUZZY_TARGETS = [
   "biatch",
   "biotch",
   "fuck",
-  "fuk",
+  "fuk",  // not in fuzzy: "fack" (false positive "back"), "sht" (too short)
   "fck",
-  "shit",
   "shyt",
-  "sht",
+  // Note: "shit" removed — exact match in EXPLICIT_PROFANITY; ED1 false-positives "shirt"
 ];
 
 // ENHANCED: Phonetic similarity map for character substitutions
@@ -172,7 +179,7 @@ const PHONETIC_SUBSTITUTIONS: Array<[RegExp, string]> = [
   [/[₀]/g, "0"],
   [/[¹]/g, "1"],
   // Common letter substitutions for obfuscation
-  [/[h]/g, ""], // 'h' is often silent or used for spacing: "asshole" → "assole"
+  // Note: 'h' removal moved to generateSubstitutionVariations only (too aggressive here)
 ];
 
 // ENHANCED: Common character substitution patterns
@@ -308,8 +315,10 @@ export function moderateContent(content: string): ModerationResult {
 
     // Extended fuzzy match for common misspellings and substitutions
     for (const token of view.tokens) {
+      if (token.length < 4) continue; // Skip short tokens to avoid false positives (e.g. "fun" ~ "fuk")
       for (const target of FUZZY_TARGETS) {
         if (token === target) continue;
+        if (target.length < 4) continue; // Skip short targets to avoid false positives (e.g. "shirt" ~ "sht")
         // Check edit distance
         if (isEditDistanceAtMost1(token, target)) {
           return { allowed: false, reason: FRIENDLY_DISALLOWED_LANGUAGE };
@@ -392,10 +401,7 @@ function generateSubstitutionVariations(token: string): string[] {
   }
 
   // Try common phonetic substitutions
-  const phonetic = current
-    .replace(/ph/g, "f")
-    .replace(/kn/g, "n")
-    .replace(/ck/g, "k");
+  const phonetic = current.replace(/ph/g, "f");
   variations.add(phonetic);
 
   return Array.from(variations);
@@ -408,8 +414,29 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/**
+ * Strip zero-width characters and invisible Unicode
+ */
+function stripZeroWidthChars(input: string): string {
+  return input.replace(/[\u200B\u200C\u200D\u200E\u200F\uFEFF\u00AD\u034F\u061C\u2060\u2061\u2062\u2063\u2064\u2066\u2067\u2068\u2069\u206A\u206B\u206C\u206D\u206E\u206F]/g, "");
+}
+
 function normalizeBase(input: string): string {
-  let normalized = stripDiacritics(input.toLowerCase());
+  // Strip zero-width characters first
+  let normalized = stripZeroWidthChars(input);
+  normalized = stripDiacritics(normalized.toLowerCase());
+  // Replace common masked profanity patterns before general normalization
+  // sh*t → shit, b*tch → bitch, f*ck → fuck, a** → ass, f**k → fuck
+  normalized = normalized
+    .replace(/sh[*_~]+t/g, "shit")
+    .replace(/b[*_~]+tch/g, "bitch")
+    .replace(/f[*_~]+ck/g, "fuck")
+    .replace(/f[*_~]{2,}k/g, "fuck")
+    .replace(/a[*_~]{1,2}(hole)?/g, (m, hole) => hole ? "asshole" : "ass")
+    .replace(/d[*_~]+ck/g, "dick")
+    .replace(/c[*_~]+nt/g, "cunt")
+    .replace(/p[*_~]+ss/g, "piss")
+    .replace(/[*_~]/g, "");
   // ENHANCED: Apply phonetic normalization early
   normalized = applyPhoneticNormalization(normalized);
   return normalized;
@@ -437,10 +464,7 @@ function applyLeetspeakReplacements(
     .replace(/8/g, "b")
     .replace(/9/g, "g")
     // Phonetic/visual substitutions
-    .replace(/ph/g, "f")
-    .replace(/kn/g, "n")
-    .replace(/ck/g, "k")
-    .replace(/qu/g, "kw");
+    .replace(/ph/g, "f");
 }
 
 function collapseRepeatedChars(input: string): string {
