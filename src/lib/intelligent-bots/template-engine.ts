@@ -571,10 +571,11 @@ interface TemplateVariables {
  * Format event date for display
  * e.g., "2026-01-10T19:00:00" → "Jan 10"
  */
-function formatEventDate(startTime?: Date): string {
+function formatEventDate(startTime?: Date | string): string {
   if (!startTime) return "Soon";
   try {
-    return startTime.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const d = startTime instanceof Date ? startTime : new Date(startTime);
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   } catch {
     return "Soon";
   }

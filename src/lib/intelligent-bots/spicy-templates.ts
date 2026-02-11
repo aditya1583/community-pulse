@@ -308,7 +308,8 @@ export function generateSpicyEventPost(
 ): { message: string; mood: string } {
   const templates = isLocal ? SPICY_EVENT_TEMPLATES.local : SPICY_EVENT_TEMPLATES.distant;
   
-  const date = event.startTime.toLocaleDateString("en-US", { 
+  const st = event.startTime instanceof Date ? event.startTime : new Date(event.startTime);
+  const date = st.toLocaleDateString("en-US", { 
     month: "short", 
     day: "numeric" 
   });

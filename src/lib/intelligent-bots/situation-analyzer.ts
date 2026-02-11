@@ -412,19 +412,24 @@ function getEventTemplateCategory(event: EventData): string {
 /**
  * Check if events warrant a post
  */
+/** Safely coerce startTime to Date (survives JSON cache round-trip) */
+function toDate(d: Date | string): Date {
+  return d instanceof Date ? d : new Date(d);
+}
+
 function checkForEventPost(ctx: SituationContext): PostDecision {
   const { events, timestamp } = ctx;
 
   // Find events starting within 4 hours (expanded window for better coverage)
   const startingSoon = events.filter((e) => {
-    const minsUntilStart = (e.startTime.getTime() - timestamp.getTime()) / 60000;
+    const minsUntilStart = (toDate(e.startTime).getTime() - timestamp.getTime()) / 60000;
     return minsUntilStart > 0 && minsUntilStart < 240; // 4 hours
   });
 
   if (startingSoon.length > 0) {
     // Sort by time (soonest first) then by attendance
     const sortedEvents = startingSoon.sort((a, b) => {
-      const timeDiff = a.startTime.getTime() - b.startTime.getTime();
+      const timeDiff = toDate(a.startTime).getTime() - toDate(b.startTime).getTime();
       if (Math.abs(timeDiff) < 30 * 60 * 1000) {
         // Within 30 mins, prioritize by attendance
         return (b.expectedAttendance || 0) - (a.expectedAttendance || 0);
@@ -433,7 +438,7 @@ function checkForEventPost(ctx: SituationContext): PostDecision {
     });
 
     const event = sortedEvents[0];
-    const minsUntilStart = (event.startTime.getTime() - timestamp.getTime()) / 60000;
+    const minsUntilStart = (toDate(event.startTime).getTime() - timestamp.getTime()) / 60000;
     const templateCategory = getEventTemplateCategory(event);
 
     // Higher priority for events starting very soon
@@ -454,7 +459,7 @@ function checkForEventPost(ctx: SituationContext): PostDecision {
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    return e.startTime >= today && e.startTime < tomorrow;
+    return toDate(e.startTime) >= today && toDate(e.startTime) < tomorrow;
   });
 
   if (todayEvents.length > 0 && Math.random() < 0.3) {
