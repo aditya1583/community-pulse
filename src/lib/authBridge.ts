@@ -91,17 +91,35 @@ export const authBridge = {
     if (isCapacitor()) {
       return serverAuth.getAccessToken();
     }
-    // Web: refresh then get session
+    // Web: try cached session first (instant), then refresh if needed
     try {
-      const { data: refreshed } = await supabase.auth.refreshSession();
-      if (refreshed.session?.access_token) return refreshed.session.access_token;
-    } catch { /* fall through */ }
-    try {
-      const { data } = await supabase.auth.getSession();
-      return data.session?.access_token || null;
+      const { data: cached } = await supabase.auth.getSession();
+      if (cached.session?.access_token) {
+        // Check if token expires in the next 60 seconds
+        const expiresAt = cached.session.expires_at ?? 0;
+        const now = Math.floor(Date.now() / 1000);
+        if (expiresAt - now > 60) {
+          return cached.session.access_token;
+        }
+        // Token expiring soon — try refresh with timeout
+        try {
+          const refreshPromise = supabase.auth.refreshSession();
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("refresh timeout")), 5000)
+          );
+          const { data: refreshed } = await Promise.race([refreshPromise, timeoutPromise]);
+          if (refreshed.session?.access_token) return refreshed.session.access_token;
+        } catch {
+          // Refresh failed/timed out — return cached token (may still work)
+          console.warn("[Voxlo] Token refresh failed, using cached token");
+          return cached.session.access_token;
+        }
+      }
     } catch {
-      return null;
+      // fall through
     }
+    // No session at all
+    return null;
   },
 
   /**
