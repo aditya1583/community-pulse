@@ -2449,6 +2449,14 @@ export default function Home() {
         );
       }
 
+      // If the pulse is from the same city, treat it as in-radius (distance 0)
+      // This prevents "BEYOND 10 MILES" for posts where GPS wasn't ready at post time
+      const pulseCity = (pulse.city || "").toLowerCase().trim();
+      const currentCity = (city || "").toLowerCase().trim();
+      if (pulseCity && currentCity && pulseCity === currentCity && (distanceMiles === null || distanceMiles > RADIUS_CONFIG.PRIMARY_RADIUS_MILES)) {
+        distanceMiles = 0;
+      }
+
       return { ...pulse, distanceMiles };
     });
 
