@@ -183,11 +183,11 @@ function isTabId(value: unknown): value is TabId {
   return typeof value === "string" && TAB_ID_SET.has(value as TabId);
 }
 
-// Hardcoded fallback gas stations for Central Texas when API fails
-const FALLBACK_GAS_STATIONS: Record<string, { name: string; distanceMiles: number }> = {
-  "leander": { name: "H-E-B Fuel", distanceMiles: 0.8 },
-  "cedar park": { name: "H-E-B Fuel", distanceMiles: 1.2 },
-  "austin": { name: "H-E-B Fuel", distanceMiles: 0.5 },
+// Hardcoded fallback gas stations for Central Texas when API fails completely
+const FALLBACK_GAS_STATIONS: Record<string, { name: string; distanceMiles?: number }> = {
+  "leander": { name: "H-E-B Fuel" },
+  "cedar park": { name: "H-E-B Fuel" },
+  "austin": { name: "H-E-B Fuel" },
 };
 
 export default function Home() {
@@ -790,17 +790,16 @@ export default function Home() {
   }, [selectedCity?.state]);
 
   // ========= NEAREST GAS STATION (for Current Vibe card) =========
+  // Use live GPS coords when available, fall back to selectedCity coords
   useEffect(() => {
-    const lat = selectedCity?.lat;
-    const lon = selectedCity?.lon;
+    const lat = geolocation.lat ?? selectedCity?.lat;
+    const lon = geolocation.lon ?? selectedCity?.lon;
     const cityName = selectedCity?.name?.toLowerCase() || "";
 
     if (!lat || !lon) {
-      console.log("[GasStation] No coordinates available, skipping fetch");
-      // Try fallback based on city name
+      // No coords at all — use name-based fallback without distance
       const fallback = FALLBACK_GAS_STATIONS[cityName];
       if (fallback) {
-        console.log("[GasStation] Using city-name fallback:", fallback.name);
         setNearestStation(fallback);
       } else {
         setNearestStation(null);
@@ -811,56 +810,27 @@ export default function Home() {
     let cancelled = false;
 
     const fetchNearestStation = async () => {
-      console.log(`[GasStation] Fetching nearest station for coords: ${lat}, ${lon} (city: ${cityName})`);
       try {
         const res = await fetch(getApiUrl(`/api/gas-stations?lat=${lat}&lon=${lon}&limit=1`));
         const data = await res.json();
 
-        console.log("[GasStation] API response:", data);
-
-        if (cancelled) {
-          console.log("[GasStation] Request cancelled");
-          return;
-        }
+        if (cancelled) return;
 
         if (data.stations && data.stations.length > 0) {
           const station = data.stations[0];
-          console.log("[GasStation] Found station:", station.name, "at", station.distanceMiles, "mi");
-
-          // CRITICAL: If the found station is > 3 miles away but we have a verified local fallback
-          // (like HEB Plus) that is closer, prioritize the fallback for a better "hyperlocal" feel.
-          const fallback = FALLBACK_GAS_STATIONS[cityName];
-          if (station.distanceMiles > 3 && fallback && (fallback.distanceMiles ?? 0) < station.distanceMiles) {
-            console.log("[GasStation] Dynamic station too far, using verified fallback:", fallback.name);
-            setNearestStation(fallback);
-          } else {
-            setNearestStation({
-              name: station.name,
-              distanceMiles: station.distanceMiles,
-            });
-          }
+          setNearestStation({
+            name: station.name,
+            distanceMiles: station.distanceMiles,
+          });
         } else {
-          console.log("[GasStation] No stations from API, trying fallback");
-          // Use fallback if API returns empty
+          // API returned empty — use generic fallback without fake distance
           const fallback = FALLBACK_GAS_STATIONS[cityName];
-          if (fallback) {
-            console.log("[GasStation] Using fallback:", fallback.name);
-            setNearestStation(fallback);
-          } else {
-            setNearestStation(null);
-          }
+          setNearestStation(fallback ?? null);
         }
-      } catch (error) {
-        console.error("[GasStation] Error fetching:", error);
+      } catch {
         if (!cancelled) {
-          // Use fallback on error
           const fallback = FALLBACK_GAS_STATIONS[cityName];
-          if (fallback) {
-            console.log("[GasStation] Using fallback after error:", fallback.name);
-            setNearestStation(fallback);
-          } else {
-            setNearestStation(null);
-          }
+          setNearestStation(fallback ?? null);
         }
       }
     };
@@ -870,7 +840,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [selectedCity?.lat, selectedCity?.lon, selectedCity?.name]);
+  }, [geolocation.lat, geolocation.lon, selectedCity?.lat, selectedCity?.lon, selectedCity?.name]);
 
   // ========= LOAD SESSION + PROFILE =========
   useEffect(() => {
