@@ -973,13 +973,11 @@ export default function Home() {
       const timeout = setTimeout(() => {
         console.warn("[Voxlo] Profile loading timeout - forcing ready state");
         setProfileLoading(false);
-        if (!profile) {
-          // Use a fallback profile so user can post
-          setProfile({
-            anon_name: `User${sessionUser.id.slice(0, 6)}`,
-            name_locked: false,
-          });
-        }
+        // Only set fallback if no profile was loaded by the real loader
+        setProfile(prev => prev ?? {
+          anon_name: `User${sessionUser.id.slice(0, 6)}`,
+          name_locked: false,
+        });
       }, 5000);
       return () => clearTimeout(timeout);
     }
@@ -2196,22 +2194,7 @@ export default function Home() {
 
           setSessionUser(signUpData.user);
           setAuthStatus("signed_in");
-          setProfileLoading(true);
-
-          try {
-            const token = await authBridge.getAccessToken();
-            let profileResult = token ? await loadProfileServerSide(token) : null;
-            if (profileResult) {
-              setProfile(profileResult);
-            } else if (token) {
-              const anon = await generateUniqueUsername(supabase);
-              profileResult = await createProfileServerSide(token, anon);
-              setProfile(profileResult || { anon_name: anon, name_locked: false });
-            }
-          } finally {
-            setProfileLoading(false);
-          }
-
+          // Close modal immediately — profile loading handled by onAuthStateChange
           setAuthEmail("");
           setAuthPassword("");
           setAuthPasswordConfirm("");
@@ -2231,22 +2214,7 @@ export default function Home() {
         if (signInData.user) {
           setSessionUser(signInData.user);
           setAuthStatus("signed_in");
-          setProfileLoading(true);
-
-          try {
-            const token = await authBridge.getAccessToken();
-            let profileResult = token ? await loadProfileServerSide(token) : null;
-            if (profileResult) {
-              setProfile(profileResult);
-            } else if (token) {
-              const anon = await generateUniqueUsername(supabase);
-              profileResult = await createProfileServerSide(token, anon);
-              setProfile(profileResult || { anon_name: anon, name_locked: false });
-            }
-          } finally {
-            setProfileLoading(false);
-          }
-
+          // Close modal immediately — profile loading handled by onAuthStateChange
           setAuthEmail("");
           setAuthPassword("");
           setAuthPasswordConfirm("");
