@@ -1,5 +1,39 @@
 # FIXES_LOG — Voxlo GA Blockers (2026-02-11)
 
+---
+
+## Commit: a65f208 (2026-02-12) — 5 Bug Fixes
+
+### FIX 1: Auth — Sign-in shows "Account created" for existing accounts ✅
+**Files:** `src/app/page.tsx`
+**What changed:** Supabase's `signUp()` on an already-registered email returns a user object with `identities: []` (empty array) instead of an error. The code was falling through to the "Account created! Check your email" branch. Now detects empty identities array and shows "This email is already registered. Please sign in instead." and auto-switches to the Sign In tab.
+
+### FIX 2: Duplicate weather posts (STORM ALERT ×3) ✅
+**Files:** `src/app/api/cron/refresh-content/route.ts`
+**What changed:** The cron route was generating posts via `generateIntelligentPost()` and inserting directly, bypassing the auto-seed dedup logic. Added per-tag dedup check before insert: queries `pulses` for `is_bot = true AND tag = {tag} AND created_at > now() - 2h` for the same city. If a matching post exists, skips insertion.
+
+### FIX 3: Data attribution inline in post body ✅
+**Files:** `src/components/PulseCard.tsx`
+**What changed:** The `📡 Data: Open-Meteo • timestamp` text was rendered inline in the message body. Now the PulseCard detects the `📡 Data:` prefix, splits it from the main message, and renders it as a 9px muted footer (`text-white/20`) below the card content, visually separated from the post.
+
+### FIX 4: Excess top padding on iOS ✅
+**Files:** `src/app/page.tsx`
+**What changed:** Reduced `pt-[env(safe-area-inset-top,0.5rem)]` default fallback from `0.5rem` to `0.25rem`. The `env(safe-area-inset-top)` still provides proper spacing on notched iPhones; the fallback is only for non-notch devices where 0.5rem was excessive.
+
+### FIX 5: Events showing wrong Leander (WV instead of TX) ✅
+**Files:** `src/app/api/events/ticketmaster/route.ts`, `src/hooks/useEvents.ts`, `src/app/page.tsx`
+**What changed:**
+1. Added `state` option to `useEvents` hook, passed from `selectedCity.state`
+2. Hook sends `state` query param to the Ticketmaster API route
+3. API route uses `stateCode` param in Ticketmaster Discovery API query to filter results by state
+4. Nominatim geocoding query now includes state (e.g., "Leander, TX, US") to avoid matching wrong city
+
+### Build Status
+✅ `npm run build` passes clean
+
+### Push Status
+✅ Pushed to origin/main
+
 ## Commit: 0e95b78
 
 ### BLOCKER 1: Location prompt flow ✅
