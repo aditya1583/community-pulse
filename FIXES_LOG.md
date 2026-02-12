@@ -2,6 +2,39 @@
 
 ---
 
+## Commit: 2d0fba1 (2026-02-12) — 4 Bug Fixes
+
+### FIX 1: Weather post deduplication not working ✅
+**Files:** `src/app/api/cron/refresh-content/route.ts`
+**What changed:** Extended dedup window from 2 hours to 3 hours. Now uses normalized city name comparison (splits on comma, compares first segment case-insensitively) so "Leander, Texas, US" and "Leander, Texas" match. Checks for ANY bot post with the same tag for that city within 3 hours, regardless of exact content or timestamp.
+
+### FIX 2: Duplicate user posts in feed ✅
+**Files:** `src/app/page.tsx`
+**What changed:** Added frontend dedup in `visiblePulses` memo. After filtering expired pulses, removes posts with identical `author + message` content within a 5-minute window. Uses a Map to track seen content keys with timestamps. React keys were already using `pulse.id` (not index), so this was a data-level issue.
+
+### FIX 3: Storm alert contradictory data ("0 inches of rain" + "thunderstorms") ✅
+**Files:** `src/lib/intelligent-bots/situation-analyzer.ts`, `src/lib/intelligent-bots/template-engine.ts`, `src/lib/intelligent-bots/engagement-posts.ts`
+**What changed:** Three-layer fix:
+1. **situation-analyzer.ts:** If weather code says "storm" but `precipitation < 0.1mm`, downgrades to a mild weather post (priority 3, perfectWeather template) instead of a dramatic storm alert (priority 9).
+2. **template-engine.ts:** `getWeatherCategory()` returns empty string (skip weather post) when storm code has `precipitation < 0.1mm`.
+3. **engagement-posts.ts:** `generateWeatherAlertPost()` and `analyzeForEngagement()` now require `precipitationMm > 2.5` (~0.1 inches) before generating storm alerts. Weather codes 80-99 (thunderstorms) with 0mm precip no longer trigger STORM ALERT posts.
+
+### FIX 4: Local tab reliability — API timing out ✅
+**Files:** `src/app/api/foursquare/places/route.ts`, `src/components/LocalDealsSection.tsx`
+**What changed:**
+1. **Foursquare route:** Reduced `AbortSignal.timeout` from 10s to 5s.
+2. **LocalDealsSection:** Added retry mechanism — if first OSM fetch fails/times out (5s), retries once more.
+3. **localStorage cache:** Added 1-hour localStorage persistence alongside 15-min in-memory cache. On fetch failure after both retries, falls back to stale localStorage data instead of showing "Search on Google Maps".
+4. **Cache promotion:** localStorage entries are promoted to in-memory cache on hit for faster subsequent reads.
+
+### Build Status
+✅ `npm run build` passes clean
+
+### Push Status
+✅ Pushed to origin/main
+
+---
+
 ## Commit: 4b155b0 (2026-02-12) — 5 Critical Bug Fixes
 
 ### FIX 1: Top Padding — Double safe area inset ✅
