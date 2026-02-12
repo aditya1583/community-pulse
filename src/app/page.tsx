@@ -3316,12 +3316,12 @@ export default function Home() {
                 /* --- DASHBOARD VIEW (HOME) --- */
                 <div key="dashboard-tab" className="space-y-6">
                   {/* Top Bar: Header + Auth Action */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1 overflow-hidden">
                       <Header cityName={city} isLive={!loading} />
                     </div>
 
-                    <div className="flex-shrink-0 pt-1">
+                    <div className="flex-shrink-0">
                       {!sessionUser ? (
                         <button
                           onClick={() => setShowAuthModal(true)}

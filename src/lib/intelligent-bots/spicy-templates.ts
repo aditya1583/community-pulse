@@ -95,7 +95,7 @@ export const SPICY_WEATHER_TEMPLATES = {
   
   perfect: [
     "{temp}°F and gorgeous. This is the one (1) nice weather day we get. GO OUTSIDE.",
-    "Perfect weather today. Quick, touch grass before it's 100°F again tomorrow",
+    "Perfect weather today. Quick, touch grass before it changes tomorrow",
     "Weather's nice which means every patio in town is packed rn",
     "{temp}°F, sunny, no humidity. Screenshot this weather, show your friends who ask why you live in Texas",
     "It's beautiful out. This is not a drill. Leave your house immediately.",
