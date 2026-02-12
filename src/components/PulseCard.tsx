@@ -456,14 +456,36 @@ export default function PulseCard({
             // Split data attribution (📡 Data: ...) into a subtle footer
             const attrMatch = cleaned.match(/\n\n(📡 Data:.+)$/s);
             const mainText = attrMatch ? cleaned.slice(0, cleaned.length - attrMatch[0].length) : cleaned;
-            const attribution = attrMatch ? attrMatch[1] : null;
+            // Convert UTC timestamp in attribution to local time
+            let attribution = attrMatch ? attrMatch[1] : null;
+            if (attribution) {
+              attribution = attribution.replace(
+                /(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) UTC/,
+                (_match, date, time) => {
+                  try {
+                    const d = new Date(`${date}T${time}Z`);
+                    return d.toLocaleString(undefined, {
+                      month: "short", day: "numeric",
+                      hour: "numeric", minute: "2-digit",
+                    });
+                  } catch { return `${date} ${time}`; }
+                }
+              );
+            }
             return (
               <>
                 <p className="text-[15px] text-white/90 leading-[1.6] mb-4 whitespace-pre-line font-medium tracking-tight text-balance">
                   {mainText}
                 </p>
                 {attribution && (
-                  <p className="text-[9px] text-white/20 mb-3 -mt-2 tracking-wide">{attribution}</p>
+                  <p className="text-[9px] text-white/20 mb-3 -mt-2 tracking-wide">{
+                    attribution.replace(/(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z| UTC)?)/g, (match) => {
+                      try {
+                        const d = new Date(match.includes('UTC') ? match.replace(' UTC', 'Z') : match);
+                        return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+                      } catch { return match; }
+                    })
+                  }</p>
                 )}
               </>
             );

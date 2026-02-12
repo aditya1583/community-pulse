@@ -131,11 +131,13 @@ export function formatPulseDateTime(createdAt: string | Date) {
   const month = d.getMonth() + 1;
   const day = d.getDate();
   const year = String(d.getFullYear()).slice(-2);
-  const hours12 = d.getHours() % 12 || 12;
+  const hours24 = d.getHours();
+  const hours12 = hours24 % 12 || 12;
   const minutes = String(d.getMinutes()).padStart(2, "0");
+  const ampm = hours24 >= 12 ? "PM" : "AM";
 
-  // Example: 12/26/25 9:07
-  return `${month}/${day}/${year} ${hours12}:${minutes}`;
+  // Example: 12/26/25 9:07 PM
+  return `${month}/${day}/${year} ${hours12}:${minutes} ${ampm}`;
 }
 
 export function formatPulseLocation(city: string, neighborhood?: string | null) {

@@ -127,7 +127,7 @@ export const FABRICATING_ENGAGEMENT_TYPES = new Set([
  */
 export function addDataAttribution(message: string, sources: string[]): string {
   if (sources.length === 0) return message;
-  const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+  const timestamp = new Date().toISOString();
   const sourceStr = sources.join(", ");
   return `${message}\n\n📡 Data: ${sourceStr} • ${timestamp}`;
 }
