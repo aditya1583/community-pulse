@@ -2,6 +2,37 @@
 
 ---
 
+## Commit: 4b155b0 (2026-02-12) — 5 Critical Bug Fixes
+
+### FIX 1: Top Padding — Double safe area inset ✅
+**Files:** `capacitor.config.ts`, `ios/App/App/capacitor.config.json`
+**What changed:** Changed `contentInset: 'always'` to `contentInset: 'automatic'`. The native WebView was adding safe area insets AND the CSS `env(safe-area-inset-top)` was adding them again, doubling the top padding. With `automatic`, only the CSS env() handles it.
+
+### FIX 2: Auth — signUp with existing email shows "Account created" ✅
+**Files:** `src/app/page.tsx`
+**What changed:** Added `created_at` timestamp check alongside existing empty-identities detection. If `signUpData.user.created_at` is more than 1 minute old AND no session was returned, the account already existed. Shows "already registered" and switches to sign-in tab. This catches cases where Supabase returns non-empty identities for existing confirmed emails.
+
+### FIX 3: Events — "No events nearby" for Leander TX ✅
+**Files:** `src/app/api/events/ticketmaster/route.ts`
+**What changed:** Removed `stateCode` parameter from Ticketmaster latlong queries. When `stateCode` is combined with `latlong`, it can filter OUT valid events (Ticketmaster's stateCode works best with keyword searches, not geo queries). The latlong+radius already constrains results geographically. State param is still used for metro fallback detection (finding nearest metro like Austin when Leander returns 0 events).
+
+### FIX 4: Coffee Shops — Wrong location / city center instead of GPS ✅
+**Files:** `src/app/page.tsx`
+**What changed:** `localLat`/`localLon` now prefer `geolocation.lat`/`geolocation.lon` (exact GPS) over `selectedCity` coords (city center). This means the Local tab's Foursquare places API gets the user's actual position instead of Leander city center (~30.5788, -97.8531), returning genuinely nearby coffee shops.
+
+### FIX 5: Location Permission Not Prompting ✅
+**Files:** `src/hooks/useGeolocation.ts`
+**What changed:** After loading cached location from localStorage, the hook now verifies actual native Capacitor geolocation permission. If the cache exists but native permission is still "prompt" (never granted to the iOS app), the cache is cleared and `permissionStatus` is set to "prompt", allowing the LocationPrompt component to display. This fixes the case where a web-session cache prevents the native app from ever showing the location prompt.
+
+### Build Status
+✅ `npm run build` passes clean
+✅ `npx cap sync ios` completed
+
+### Push Status
+✅ Pushed to origin/main
+
+---
+
 ## Commit: a65f208 (2026-02-12) — 5 Bug Fixes
 
 ### FIX 1: Auth — Sign-in shows "Account created" for existing accounts ✅
