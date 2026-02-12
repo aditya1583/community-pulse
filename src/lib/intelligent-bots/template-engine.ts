@@ -23,6 +23,7 @@ import {
   getRandomTemplate,
   fillTemplate,
 } from "./spicy-templates";
+import { addDataAttribution, getPostDataSources } from "./data-grounding";
 import { RADIUS_CONFIG } from "@/lib/constants/radius";
 import { formatDistance } from "@/lib/geo/distance";
 import {
@@ -782,6 +783,12 @@ export async function generatePost(
       // Use static facts
       message = maybeInjectFunFact(message, ctx.city, decision.postType, true);
     }
+  }
+
+  // Add data source attribution for freshness auditing
+  const sources = getPostDataSources(decision.postType);
+  if (sources.length > 0) {
+    message = addDataAttribution(message, sources);
   }
 
   return {

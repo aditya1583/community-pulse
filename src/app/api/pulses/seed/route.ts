@@ -139,6 +139,15 @@ function getExpiryTime(category: string): string {
 }
 
 export async function POST(req: NextRequest) {
+  // DEPRECATED: This endpoint uses static/fabricated pulse templates.
+  // All pulse generation should go through /api/auto-seed or /api/intelligent-seed
+  // which use real API data (TomTom, Open-Meteo, USDA).
+  return NextResponse.json({
+    error: "Deprecated: Use /api/auto-seed or /api/intelligent-seed instead. This endpoint generated fabricated content.",
+    seeded: 0,
+  }, { status: 410 }); // 410 Gone
+
+  // Original code kept for reference but unreachable:
   // Verify this is an authorized request (cron job or admin)
   const authHeader = req.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;

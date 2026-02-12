@@ -134,6 +134,16 @@ export {
   CIVIC_BOT_PERSONAS,
 } from "./civic-templates";
 
+// Data Grounding
+export {
+  checkDataAvailability,
+  DATA_GROUNDED_ENGAGEMENT_TYPES,
+  FABRICATING_ENGAGEMENT_TYPES,
+  addDataAttribution,
+  getPostDataSources,
+  type DataAvailability,
+} from "./data-grounding";
+
 // AI-Powered Fun Facts
 export {
   generateFunFact,
@@ -407,7 +417,19 @@ export async function generateColdStartPosts(
     return {
       success: false,
       posts: [],
-      reason: "Failed to generate seed posts",
+      reason: "No real data available to generate posts. Nothing happening right now — check back later.",
+      situationSummary,
+    };
+  }
+
+  // DATA GROUNDING: If fewer than 2 posts backed by real data, return empty
+  // This prevents showing a feed with only fabricated content
+  if (allPosts.length < 2) {
+    console.log(`[IntelligentBots] Only ${allPosts.length} post(s) generated from real data. Minimum is 2.`);
+    return {
+      success: false,
+      posts: [],
+      reason: "Not enough real data to populate feed. Nothing happening right now — check back later.",
       situationSummary,
     };
   }

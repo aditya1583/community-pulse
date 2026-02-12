@@ -43,3 +43,85 @@
 
 ## Push Status
 ⚠️ Git push to origin/main failed — permission denied (403). Needs repo owner to push or grant access.
+
+---
+
+## Commit: (2026-02-12) — Static Content Removal & Data Grounding
+
+### BLOCKER 6: Remove all static/fabricated pulse content ✅
+**Status:** Fixed — comprehensive data grounding enforced
+
+#### New File: `src/lib/intelligent-bots/data-grounding.ts`
+Central module that defines which engagement types are data-grounded vs fabricating:
+- `DATA_GROUNDED_ENGAGEMENT_TYPES`: Set of allowed types backed by real API data
+- `FABRICATING_ENGAGEMENT_TYPES`: Set of blocked types that invent specific details
+- `checkDataAvailability()`: Checks which APIs actually returned real data
+- `addDataAttribution()`: Adds `📡 Data: source • timestamp` to every bot post
+- `getPostDataSources()`: Maps post types to their API data sources
+
+#### Files Changed:
+
+**`src/lib/intelligent-bots/engagement-posts.ts`**
+- Imported data-grounding module
+- `analyzeForEngagement()`: Added `isAllowed()` gate — only data-grounded types can be selected
+- **DISABLED** engagement types that fabricate details:
+  - `hot_take` — fabricates claims about specific restaurants/roads
+  - `insider_tip` — fabricates "secret menu items", specific parking tips
+  - `nostalgia_trigger` — fabricates specific memories, old business names
+  - `community_callout` — fabricates specific actions at specific locations
+  - `fomo_alert` — fabricates happy hour times, restaurant wait times
+  - `weekly_roundup` — fabricates trending topics, weather summaries
+  - `local_spotlight` — fabricates restaurant appreciation claims
+  - `venue_checkin` — references venues from city config as verified
+  - `landmark_food` — fabricates specific food recommendations
+- **KEPT** data-grounded types:
+  - `this_or_that` — uses real weather temp from Open-Meteo
+  - `prediction` — uses real weather/traffic data
+  - `weather_alert` — uses real forecast from Open-Meteo
+  - `route_pulse` — uses real TomTom congestion data
+  - `school_alert` — time-based with real road names
+  - `farmers_market` — uses real USDA/OSM market data
+  - `confession_booth` — generic community questions, no fabrication
+  - `neighbor_challenge` — generic CTAs, no fabrication
+  - `would_you_rather` — clearly hypothetical scenarios
+  - `civic_alert` — civic awareness questions
+  - `poll` — asks questions, doesn't claim facts
+  - `recommendation` — asks questions, doesn't claim facts
+- `generateEngagementPost()`: Added hard block on non-grounded types + data attribution
+- `generateEngagementSeedPosts()`: Removed all fabricating types from priority list
+
+**`src/lib/intelligent-bots/template-engine.ts`**
+- Imported data-grounding module
+- `generatePost()`: Added data source attribution to all regular posts (Traffic → TomTom, Weather → Open-Meteo, Events → Ticketmaster)
+
+**`src/lib/intelligent-bots/index.ts`**
+- Exported data-grounding module
+- `generateColdStartPosts()`: Added minimum 2-post threshold — if fewer than 2 posts can be generated from real data, returns "Nothing happening right now — check back later" instead of fabricated content
+
+**`src/app/api/auto-seed/route.ts`**
+- DISABLED generic fallback traffic/weather/local templates that generated fabricated content without any API data
+- Generic `TRAFFIC_TEMPLATES` (morning_rush, evening_rush, light) — fabricated congestion claims
+- Generic `LOCAL_TEMPLATES` — fabricated community claims
+- Posts only generated when real event/weather data is passed in
+
+**`src/app/api/pulses/seed/route.ts`**
+- DEPRECATED entire endpoint (returns 410 Gone)
+- This endpoint had fully static `PULSE_TEMPLATES` with fabricated content like "Roads are looking clear!" and "Beautiful day out here!" without any API data
+- Redirects to /api/auto-seed or /api/intelligent-seed
+
+#### What's Still Allowed (Real Data Sources):
+| Source | API | Key Required | Status |
+|--------|-----|-------------|--------|
+| Traffic | TomTom Flow API | Yes (TOMTOM_API_KEY) | ✅ Configured |
+| Weather | Open-Meteo Forecast | No (free) | ✅ Always available |
+| Farmers Markets | USDA + OSM | No (free) | ✅ Always available |
+| Events | Ticketmaster | Yes (TICKETMASTER_CONSUMER_KEY) | ❌ Not configured |
+
+#### Every Bot Post Now Includes:
+```
+📡 Data: TomTom, Open-Meteo • 2026-02-12 16:48:23 UTC
+```
+This enables freshness auditing — you can see exactly what data backed each post and when.
+
+#### Build Status
+✅ `npm run build` passes clean (also fixed pre-existing `@capacitor/app` missing dependency)

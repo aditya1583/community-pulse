@@ -23,6 +23,7 @@ import type { CityConfig, SituationContext, PostType, GeneratedPost, PredictionM
 import { getLandmarkName, getLandmarkDisplay } from "./types";
 import { getRandomLandmark, getNearestLandmark, getRandomRoad } from "./city-configs";
 import { ExtendedPostType } from "./template-engine";
+import { DATA_GROUNDED_ENGAGEMENT_TYPES, addDataAttribution, getPostDataSources } from "./data-grounding";
 
 // ============================================================================
 // ENGAGEMENT POST TYPES
@@ -3138,6 +3139,10 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
   const { time, events } = ctx;
   const hour = time.hour;
 
+  // DATA GROUNDING GATE: Helper to check if an engagement type is allowed
+  // Only types backed by real API data are permitted
+  const isAllowed = (type: EngagementType): boolean => DATA_GROUNDED_ENGAGEMENT_TYPES.has(type);
+
   // ========== TIER 0: HYPERLOCAL REAL DATA (Highest priority) ==========
   // When we have REAL local data (farmers markets open TODAY), this beats everything
   // This is time-sensitive hyperlocal content that MUST be shown when relevant
@@ -3321,23 +3326,8 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
     };
   }
 
-  // Hot takes are gold - they demand responses
-  // Higher chance during "controversy hours" (evening when people are relaxed)
-  if (hour >= 18 && hour <= 22) {
-    if (Math.random() < 0.35) {
-      return {
-        shouldPost: true,
-        engagementType: "hot_take",
-        reason: "Evening hours - prime hot take time",
-      };
-    }
-  } else if (Math.random() < 0.2) {
-    return {
-      shouldPost: true,
-      engagementType: "hot_take",
-      reason: "Hot take for engagement spark",
-    };
-  }
+  // Hot takes - DISABLED: fabricates claims about specific restaurants/roads
+  // Re-enable when backed by real review/rating data
 
   // Confession booth - high engagement, people love sharing opinions anonymously
   if (Math.random() < 0.18) {
@@ -3358,72 +3348,16 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
   }
 
   // ========== HYPERLOCAL DATA (Real market/venue data) ==========
-  // NOTE: Farmers market is now handled in TIER 0 at the top for priority
-  // This section handles landmark food posts only
-
-  // Landmark-anchored food posts - time-aware and hyperlocal
-  // Higher chance during meal times when food is on people's minds
-  const isMealTime = (hour >= 7 && hour <= 10) || (hour >= 11 && hour <= 14) || (hour >= 17 && hour <= 21);
-  if (isMealTime && Math.random() < 0.25) {
-    return {
-      shouldPost: true,
-      engagementType: "landmark_food",
-      reason: "Meal time - landmark-anchored food recommendation",
-    };
-  }
-
-  // Coffee/snack time windows
-  if ((hour >= 14 && hour <= 16) && Math.random() < 0.2) {
-    return {
-      shouldPost: true,
-      engagementType: "landmark_food",
-      reason: "Afternoon slump - coffee/snack near landmark",
-    };
-  }
-
-  // Late night food options
-  if ((hour >= 21 || hour < 2) && Math.random() < 0.15) {
-    return {
-      shouldPost: true,
-      engagementType: "landmark_food",
-      reason: "Late night - food options near landmarks",
-    };
-  }
+  // NOTE: Farmers market handled in TIER 0
+  // landmark_food DISABLED: fabricates specific food tips/recommendations
 
   // ========== TIER 3: IDENTITY BUILDERS (Community bonding) ==========
 
-  // Insider tips - makes people feel like locals
-  if (Math.random() < 0.2) {
-    return {
-      shouldPost: true,
-      engagementType: "insider_tip",
-      reason: "Insider knowledge sharing - builds community identity",
-    };
-  }
+  // Insider tips - DISABLED: fabricates secret menu items, parking tips, etc.
 
-  // Nostalgia triggers - emotional engagement, especially good on weekends
-  if (time.isWeekend && Math.random() < 0.25) {
-    return {
-      shouldPost: true,
-      engagementType: "nostalgia_trigger",
-      reason: "Weekend nostalgia - emotional engagement",
-    };
-  } else if (Math.random() < 0.12) {
-    return {
-      shouldPost: true,
-      engagementType: "nostalgia_trigger",
-      reason: "Nostalgia trigger - remember when...",
-    };
-  }
+  // Nostalgia triggers - DISABLED: fabricates specific memories and business names
 
-  // Community callouts - celebrate/call out behavior (mostly positive)
-  if (Math.random() < 0.15) {
-    return {
-      shouldPost: true,
-      engagementType: "community_callout",
-      reason: "Community callout - behavioral engagement",
-    };
-  }
+  // Community callouts - DISABLED: fabricates specific actions at specific locations
 
   // ========== TIER 4: INTERACTIVE (Easy engagement) ==========
 
@@ -3447,16 +3381,7 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
 
   // ========== TIER 5: INFORMATIONAL (Traditional) ==========
 
-  // Venue check-in during evening hours or when events happening
-  if ((hour >= 17 && hour <= 22) || events.length > 0) {
-    if (Math.random() < 0.2) {
-      return {
-        shouldPost: true,
-        engagementType: "venue_checkin",
-        reason: "Evening time - venue vibe check",
-      };
-    }
-  }
+  // Venue check-in - DISABLED: references venues from city config as verified
 
   // Polls during meal times
   if ((hour >= 7 && hour <= 10) || (hour >= 11 && hour <= 14) || (hour >= 17 && hour <= 20)) {
@@ -3469,14 +3394,7 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
     }
   }
 
-  // Local spotlight
-  if (Math.random() < 0.1) {
-    return {
-      shouldPost: true,
-      engagementType: "local_spotlight",
-      reason: "Local business spotlight",
-    };
-  }
+  // Local spotlight - DISABLED: fabricates restaurant appreciation claims
 
   // Recommendation asks
   if (Math.random() < 0.12) {
@@ -3508,6 +3426,22 @@ export async function generateEngagementPost(
 
   if (!type) return null;
 
+  // DATA GROUNDING: Block engagement types that fabricate details
+  if (!DATA_GROUNDED_ENGAGEMENT_TYPES.has(type)) {
+    console.log(`[Engagement] Blocked fabricating type: ${type}`);
+    return null;
+  }
+
+  // Generate the post, then add data attribution
+  const addAttribution = (post: EngagementPost | null): EngagementPost | null => {
+    if (!post) return null;
+    const sources = getPostDataSources(post.tag, type);
+    if (sources.length > 0) {
+      post.message = addDataAttribution(post.message, sources);
+    }
+    return post;
+  };
+
   switch (type) {
     // Traditional engagement types
     case "poll":
@@ -3517,11 +3451,11 @@ export async function generateEngagementPost(
     case "venue_checkin":
       return generateVenueCheckinPost(ctx);
     case "school_alert":
-      return generateSchoolAlertPost(ctx);
+      return addAttribution(await generateSchoolAlertPost(ctx));
     case "local_spotlight":
       return generateLocalSpotlightPost(ctx);
     case "this_or_that":
-      return generateThisOrThatPost(ctx);
+      return addAttribution(await generateThisOrThatPost(ctx));
     case "fomo_alert":
       return generateFomoAlertPost(ctx);
     case "weekly_roundup":
@@ -3545,14 +3479,14 @@ export async function generateEngagementPost(
 
     // HYPERLOCAL CONTENT types
     case "farmers_market":
-      return generateFarmersMarketPost(ctx);
+      return addAttribution(await generateFarmersMarketPost(ctx));
     case "landmark_food":
       return generateLandmarkFoodPost(ctx);
 
     // XP-STAKED PREDICTIONS
     // In seed mode, skip event predictions to avoid duplicating regular Event posts
     case "prediction":
-      return generatePredictionPost(ctx, { skipEventPredictions: isSeedMode });
+      return addAttribution(await generatePredictionPost(ctx, { skipEventPredictions: isSeedMode }));
 
     // CIVIC ALERTS (50 XP predictions)
     case "civic_alert":
@@ -3560,10 +3494,10 @@ export async function generateEngagementPost(
 
     // WEATHER ALERTS (proactive forecast-based alerts)
     case "weather_alert":
-      return generateWeatherAlertPost(ctx);
+      return addAttribution(await generateWeatherAlertPost(ctx));
 
     case "route_pulse":
-      return generateRoutePulsePost(ctx);
+      return addAttribution(await generateRoutePulsePost(ctx));
     default:
       return null;
   }
@@ -3627,10 +3561,7 @@ export async function generateEngagementSeedPosts(
   // This ensures every cold-start gets hyperlocal content attempts
   // (generators will return null if no data, which is handled by the loop)
 
-  // Landmark-anchored food/coffee posts - FORCE INCLUDE IN TOP 3
-  // These use local landmarks (HEB, Target, parks) that everyone recognizes
-  // ALWAYS inserted at position 1 (after first prediction) to guarantee inclusion
-  priorities.splice(1, 0, "landmark_food");
+  // Landmark food posts DISABLED - fabricates specific food recommendations
 
   // Farmers market posts - DISABLED
   // These were causing persistent duplicate issues because:
@@ -3648,15 +3579,14 @@ export async function generateEngagementSeedPosts(
   //   console.log(`[SeedPosts] Including farmers_market - found ${ctx.farmersMarkets.length} markets`);
   // }
 
-  // ========== HIGH-ENGAGEMENT (Always include for viral potential) ==========
+  // ========== HIGH-ENGAGEMENT (Data-grounded types only) ==========
 
-  // Hot takes are engagement gold - always include one
-  priorities.push("hot_take");
+  // Hot takes DISABLED - fabricates claims about restaurants/roads
 
-  // Confession booth creates safe space for opinions
+  // Confession booth creates safe space for opinions (no fabrication)
   priorities.push("confession_booth");
 
-  // Challenges drive direct participation
+  // Challenges drive direct participation (no fabrication)
   priorities.push("neighbor_challenge");
 
   // Civic alerts on weekday evenings (when civic meetings happen)
@@ -3667,26 +3597,18 @@ export async function generateEngagementSeedPosts(
 
   // ========== IDENTITY BUILDERS (Community bonding) ==========
 
-  // Insider tips make people feel special
-  priorities.push("insider_tip");
+  // Insider tips DISABLED - fabricates secret menu items, etc.
 
-  // Nostalgia - especially good on weekends or evenings
-  if (ctx.time.isWeekend || ctx.time.hour >= 18) {
-    priorities.push("nostalgia_trigger");
-  }
+  // Nostalgia DISABLED - fabricates specific memories
 
-  // Community callouts celebrate local behavior
-  priorities.push("community_callout");
+  // Community callouts DISABLED - fabricates specific actions
 
   // ========== TRADITIONAL (Fill remaining slots) ==========
 
-  // Evening venue check
-  if (ctx.time.hour >= 17 && ctx.time.hour <= 22) {
-    priorities.push("venue_checkin");
-  }
+  // Evening venue check DISABLED - references unverified venues
 
   // Traditional poll and other types as fallbacks
-  priorities.push("poll", "local_spotlight", "recommendation");
+  priorities.push("poll", "recommendation");
 
   // Generate posts from priority list
   // Pass isSeedMode: true to prevent duplicate event posts

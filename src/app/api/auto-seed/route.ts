@@ -408,37 +408,16 @@ function generatePosts(data: AutoSeedRequest): Array<{ message: string; mood: st
     });
   }
 
-  // 4. Traffic post (time-based) - ALWAYS include regardless of other data
-  const trafficCategory = getTrafficCategory();
-  const trafficData = TRAFFIC_TEMPLATES[trafficCategory];
-  posts.push({
-    message: getRandomItem(trafficData.templates),
-    mood: trafficData.mood,
-    tag: "Traffic",
-  });
+  // 4. Traffic post - DISABLED in generic fallback (no real data)
+  // Generic traffic templates fabricate congestion claims without API data.
+  // Real traffic posts come from TomTom via the intelligent bot system.
 
-  // 5. General local post - ALWAYS include to ensure minimum content
-  const local = getRandomItem(LOCAL_TEMPLATES);
-  posts.push({
-    message: local.message,
-    mood: local.mood,
-    tag: "General",
-  });
+  // 5. General local post - DISABLED (fabricated content)
+  // Generic local templates fabricate community claims without data.
 
-  // 6. Add a second traffic or general post if we have fewer than 3 posts
-  // This ensures even cities with NO events/weather get meaningful content
-  if (posts.length < 3) {
-    const otherTraffic = getRandomItem(
-      TRAFFIC_TEMPLATES[getTrafficCategory()].templates.filter(
-        t => t !== posts.find(p => p.tag === "Traffic")?.message
-      )
-    );
-    posts.push({
-      message: otherTraffic,
-      mood: trafficData.mood,
-      tag: "Traffic",
-    });
-  }
+  // NOTE: If fewer than 2 posts could be generated from real data,
+  // the feed should show "Nothing happening right now — check back later"
+  // rather than fabricated content.
 
   // Limit to 5 posts max
   return posts.slice(0, 5);
