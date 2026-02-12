@@ -3352,10 +3352,9 @@ export default function Home() {
                               } catch (err) {
                                 console.error("[Voxlo] Sign-out error:", err);
                               }
-                              setSessionUser(null);
-                              setProfile(null);
-                              setAuthStatus("signed_out");
-                              setShowAuthModal(false);
+                              localStorage.clear();
+                              sessionStorage.clear();
+                              window.location.reload();
                             }}
                             className="p-2 text-slate-500 hover:text-red-400 transition-colors active:scale-90"
                             title="Sign out"
@@ -3814,10 +3813,9 @@ export default function Home() {
                         } catch (err) {
                           console.error("[Voxlo] Sign-out error:", err);
                         }
-                        setSessionUser(null);
-                        setProfile(null);
-                        setAuthStatus("signed_out");
-                        setActiveTab("pulse");
+                        localStorage.clear();
+                        sessionStorage.clear();
+                        window.location.reload();
                       }}
                     />
                   )}
