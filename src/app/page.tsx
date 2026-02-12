@@ -3345,15 +3345,13 @@ export default function Home() {
                             </span>
                           </button>
                           <button
-                            onClick={async (e) => {
+                            onClick={(e) => {
                               e.stopPropagation();
-                              try {
-                                await authBridge.signOut();
-                              } catch (err) {
-                                console.error("[Voxlo] Sign-out error:", err);
-                              }
+                              // Clear everything first, THEN attempt sign-out
+                              // authBridge.signOut() can hang on web — don't let it block logout
                               localStorage.clear();
                               sessionStorage.clear();
+                              authBridge.signOut().catch(() => {});
                               window.location.reload();
                             }}
                             className="p-2 text-slate-500 hover:text-red-400 transition-colors active:scale-90"
@@ -3807,14 +3805,10 @@ export default function Home() {
                     <StatusTab
                       userId={sessionUser?.id ?? null}
                       city={city}
-                      onSignOut={async () => {
-                        try {
-                          await authBridge.signOut();
-                        } catch (err) {
-                          console.error("[Voxlo] Sign-out error:", err);
-                        }
+                      onSignOut={() => {
                         localStorage.clear();
                         sessionStorage.clear();
+                        authBridge.signOut().catch(() => {});
                         window.location.reload();
                       }}
                     />
