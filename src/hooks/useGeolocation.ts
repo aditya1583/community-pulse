@@ -74,6 +74,7 @@ export function useGeolocation(): GeolocationState & GeolocationActions {
 
   // Check for stored location on mount
   useEffect(() => {
+    const initLocation = async () => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
@@ -88,6 +89,25 @@ export function useGeolocation(): GeolocationState & GeolocationActions {
           || parsed.cityName === "Unknown"
           || /\d+\.\d°[NSEW]/.test(parsed.cityName);
         if (!hasBadCity) {
+          // On native, verify actual permission before trusting cache
+          // Cache may exist from a previous web session or different install
+          if (isNativeApp()) {
+            try {
+              const status = await Geolocation.checkPermissions();
+              if (status.location !== "granted") {
+                // Cache exists but native permission was never granted — clear and show prompt
+                localStorage.removeItem(STORAGE_KEY);
+                setState(prev => ({ ...prev, permissionStatus: "prompt", lat: null, lon: null, loading: false }));
+                return;
+              }
+            } catch {
+              // Permission check failed — clear cache to be safe
+              localStorage.removeItem(STORAGE_KEY);
+              setState(prev => ({ ...prev, loading: false }));
+              return;
+            }
+          }
+
           // Always show cached data immediately (no loading spinner)
           setState({
             lat: parsed.lat,
@@ -116,6 +136,8 @@ export function useGeolocation(): GeolocationState & GeolocationActions {
 
     // Check initial permission status
     checkPermissionStatus();
+    };
+    initLocation();
   }, []);
 
   // Check permission status without requesting

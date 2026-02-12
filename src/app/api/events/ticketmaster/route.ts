@@ -539,11 +539,10 @@ export async function GET(req: NextRequest) {
       console.log(`[Ticketmaster] Searching at ${parsedLat},${parsedLng} radius ${parsedRadius}mi`);
     }
 
-    // Add stateCode filter to prevent wrong-state matches (e.g., Leander WV vs TX)
-    if (stateParam) {
-      params.set("stateCode", stateParam.toUpperCase());
-      console.log(`[Ticketmaster] Filtering by stateCode: ${stateParam.toUpperCase()}`);
-    }
+    // NOTE: stateCode is NOT added when using latlong — Ticketmaster's stateCode
+    // filter can conflict with latlong radius searches and filter OUT valid events.
+    // The latlong+radius already constrains results geographically.
+    // stateCode is only used for metro fallback state detection below.
 
     const url = `${baseUrl}?${params.toString()}`;
     const response = await fetch(url, {
@@ -616,9 +615,9 @@ export async function GET(req: NextRequest) {
     let fallbackInfo: { metro: string; distance: number } | undefined;
 
     if (events.length === 0 && parsedLat !== undefined && parsedLng !== undefined) {
-      // Extract state from city parameter (e.g., "Irwin, Illinois, US" → "IL")
-      let stateCode: string | null = null;
-      if (city) {
+      // Use stateParam directly if available, otherwise extract from city string
+      let stateCode: string | null = stateParam ? stateParam.toUpperCase() : null;
+      if (!stateCode && city) {
         // Try to find state name or code in the city string
         const STATE_NAMES: Record<string, string> = {
           alabama: "AL", alaska: "AK", arizona: "AZ", arkansas: "AR", california: "CA",

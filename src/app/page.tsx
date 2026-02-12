@@ -2154,10 +2154,14 @@ export default function Home() {
         }
 
         if (signUpData.user) {
-          // Supabase returns a user with empty identities array when email already exists
-          // (instead of an error). Detect this and redirect to sign in.
+          // Detect existing accounts: Supabase may return a user with empty identities
+          // OR a user whose created_at is old (account already existed).
           const identities = (signUpData.user as { identities?: unknown[] }).identities;
-          if (Array.isArray(identities) && identities.length === 0) {
+          const createdAt = signUpData.user.created_at ? new Date(signUpData.user.created_at).getTime() : 0;
+          const isOldAccount = createdAt > 0 && (Date.now() - createdAt) > 60_000; // created > 1 min ago
+          const emptyIdentities = Array.isArray(identities) && identities.length === 0;
+
+          if (emptyIdentities || (isOldAccount && !signUpData.session)) {
             setAuthError("This email is already registered. Please sign in instead.");
             setAuthMode("signin");
             setAuthPasswordConfirm("");
@@ -2913,8 +2917,9 @@ export default function Home() {
   }, [pulses]);
 
   const localState = selectedCity?.state ?? lastValidCity.state ?? "";
-  const localLat = selectedCity?.lat ?? lastValidCity.lat;
-  const localLon = selectedCity?.lon ?? lastValidCity.lon;
+  // Prefer exact GPS coordinates over city center for Local tab (closer results)
+  const localLat = geolocation.lat ?? selectedCity?.lat ?? lastValidCity.lat;
+  const localLon = geolocation.lon ?? selectedCity?.lon ?? lastValidCity.lon;
 
   // Force GPS refresh when switching to Local tab for accurate nearby results
   useEffect(() => {
