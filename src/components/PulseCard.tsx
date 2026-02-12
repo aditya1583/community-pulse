@@ -478,14 +478,7 @@ export default function PulseCard({
                   {mainText}
                 </p>
                 {attribution && (
-                  <p className="text-[9px] text-white/20 mb-3 -mt-2 tracking-wide">{
-                    attribution.replace(/(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z| UTC)?)/g, (match) => {
-                      try {
-                        const d = new Date(match.includes('UTC') ? match.replace(' UTC', 'Z') : match);
-                        return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-                      } catch { return match; }
-                    })
-                  }</p>
+                  <p className="text-[9px] text-white/20 mb-3 -mt-2 tracking-wide">{attribution}</p>
                 )}
               </>
             );
