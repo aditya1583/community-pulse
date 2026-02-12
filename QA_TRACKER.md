@@ -27,11 +27,14 @@
 | Issue | Severity | Status |
 |-------|----------|--------|
 | "BEYOND 10 MILES" on own post | Medium | Fixed — same-city posts forced in-radius |
-| Header truncation ("Leand...") | Low | Known, needs redesign |
-| Username truncation ("SUNNYH...") | Low | Header space issue |
+| Header truncation ("Leand...") | Low | ✅ Fixed — removed max-w/truncate from city name |
+| Username truncation ("SUNNYH...") | Low | ✅ Fixed — widened max-w to 80px/120px responsive |
 | Raw markdown in brief (`**☀️ Weather**`) | Low | Needs strip markdown |
 | "Share Today's Brief" removed | ✅ Fixed | Was in AISummaryStories.tsx |
 | Stale AI content (Christmas lights) | ✅ Fixed | Template replaced |
+
+| Foursquare API failing silently | Low | ✅ Fixed — skipped Foursquare, OSM is now primary |
+| Excessive re-renders (filterVisiblePulses) | Medium | ✅ Fixed — memoized with useMemo |
 
 Track all verified issues and fixes. **DO NOT touch items marked ✅ VERIFIED.**
 
