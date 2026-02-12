@@ -87,21 +87,44 @@ function getCategoryIcon(category: string): { emoji: string; gradient: string } 
 // Store for venue vibes (simple cache to avoid repeated fetches)
 type VenueVibesCache = Record<string, { vibes: VenueVibeAggregate[]; fetchedAt: number }>;
 
-// Client-side places cache (15-min TTL) — avoids slow API re-fetches on tab revisit
+// Client-side places cache (15-min in-memory, 1-hour localStorage) — avoids slow API re-fetches
 const PLACES_CACHE_TTL_MS = 15 * 60 * 1000;
+const LS_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour for localStorage
 type PlacesCacheEntry = { places: LocalPlace[]; source: DataSource; fetchedAt: number };
 const placesCache: Record<string, PlacesCacheEntry> = {};
 
 function getPlacesCacheKey(lat: number, lon: number, category: string): string {
-  // Round coords to 3 decimals (~100m) to allow cache hits for nearby positions
   return `${lat.toFixed(3)},${lon.toFixed(3)},${category}`;
+}
+
+function savePlacesToLocalStorage(key: string, entry: PlacesCacheEntry): void {
+  try {
+    localStorage.setItem(`places_${key}`, JSON.stringify(entry));
+  } catch { /* quota exceeded, ignore */ }
+}
+
+function getPlacesFromLocalStorage(key: string): PlacesCacheEntry | null {
+  try {
+    const raw = localStorage.getItem(`places_${key}`);
+    if (!raw) return null;
+    const entry: PlacesCacheEntry = JSON.parse(raw);
+    if (Date.now() - entry.fetchedAt < LS_CACHE_TTL_MS) return entry;
+    return null;
+  } catch { return null; }
 }
 
 function getCachedPlaces(lat: number, lon: number, category: string): PlacesCacheEntry | null {
   const key = getPlacesCacheKey(lat, lon, category);
-  const entry = placesCache[key];
-  if (entry && Date.now() - entry.fetchedAt < PLACES_CACHE_TTL_MS) {
-    return entry;
+  // Check in-memory first
+  const memEntry = placesCache[key];
+  if (memEntry && Date.now() - memEntry.fetchedAt < PLACES_CACHE_TTL_MS) {
+    return memEntry;
+  }
+  // Fall back to localStorage
+  const lsEntry = getPlacesFromLocalStorage(key);
+  if (lsEntry) {
+    placesCache[key] = lsEntry; // promote to memory
+    return lsEntry;
   }
   return null;
 }
@@ -150,70 +173,102 @@ export default function LocalDealsSection({
 
     const categoryConfig = DEAL_CATEGORIES.find(c => c.id === category);
 
-    // Use OSM as the primary data source (Foursquare API key expired/broken — skip to save latency)
-    const osmController = new AbortController();
-    const osmTimeoutId = setTimeout(() => osmController.abort(), 15000);
+    // Use OSM as the primary data source with retry logic
+    const osmParams = new URLSearchParams({
+      lat: lat.toString(),
+      lon: lon.toString(),
+      category: categoryConfig?.osmCategory || "all",
+      limit: "12",
+      radius: "5000",
+    });
+
+    interface OSMPlace {
+      id: string;
+      name: string;
+      category: string;
+      address: string;
+      distance: number;
+      lat: number;
+      lon: number;
+      phone?: string;
+      website?: string;
+    }
+
+    const attemptFetch = async (): Promise<LocalPlace[] | null> => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      try {
+        const response = await fetch(`/api/osm/places?${osmParams.toString()}`, {
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        const data = await response.json();
+        if (data.places?.length > 0) {
+          return (data.places as OSMPlace[]).map((p) => ({
+            id: p.id,
+            name: p.name,
+            category: p.category,
+            address: p.address,
+            distance: p.distance,
+            lat: p.lat,
+            lon: p.lon,
+            phone: p.phone,
+            url: p.website,
+          }));
+        }
+        return null;
+      } catch {
+        clearTimeout(timeoutId);
+        return null;
+      }
+    };
 
     try {
-      const osmParams = new URLSearchParams({
-        lat: lat.toString(),
-        lon: lon.toString(),
-        category: categoryConfig?.osmCategory || "all",
-        limit: "12",
-        radius: "5000", // 5km radius
-      });
-
       console.log("[LocalDeals] Trying OSM API...");
-      const osmResponse = await fetch(`/api/osm/places?${osmParams.toString()}`, {
-        signal: osmController.signal,
-      });
-      clearTimeout(osmTimeoutId);
-      const osmData = await osmResponse.json();
+      let osmPlaces = await attemptFetch();
 
-      if (osmData.places?.length > 0) {
-        console.log(`[LocalDeals] OSM returned ${osmData.places.length} places`);
-        interface OSMPlace {
-          id: string;
-          name: string;
-          category: string;
-          address: string;
-          distance: number;
-          lat: number;
-          lon: number;
-          phone?: string;
-          website?: string;
-        }
-        // Transform OSM data to match our LocalPlace format
-        const osmPlaces: LocalPlace[] = (osmData.places as OSMPlace[]).map((p) => ({
-          id: p.id,
-          name: p.name,
-          category: p.category,
-          address: p.address,
-          distance: p.distance,
-          lat: p.lat,
-          lon: p.lon,
-          phone: p.phone,
-          url: p.website,
-        }));
-        const osmCacheKey = getPlacesCacheKey(lat, lon, category);
-        placesCache[osmCacheKey] = { places: osmPlaces, source: "openstreetmap", fetchedAt: Date.now() };
+      // Retry once on failure
+      if (!osmPlaces) {
+        console.log("[LocalDeals] First attempt failed, retrying...");
+        osmPlaces = await attemptFetch();
+      }
+
+      if (osmPlaces && osmPlaces.length > 0) {
+        console.log(`[LocalDeals] OSM returned ${osmPlaces.length} places`);
+        const cacheKey = getPlacesCacheKey(lat, lon, category);
+        const entry: PlacesCacheEntry = { places: osmPlaces, source: "openstreetmap", fetchedAt: Date.now() };
+        placesCache[cacheKey] = entry;
+        savePlacesToLocalStorage(cacheKey, entry);
         setPlaces(osmPlaces);
         setDataSource("openstreetmap");
         setError(null);
       } else {
-        setError("No places found nearby");
-        setPlaces([]);
+        // Both attempts failed — try localStorage fallback (stale data better than nothing)
+        const cacheKey = getPlacesCacheKey(lat, lon, category);
+        const stale = getPlacesFromLocalStorage(cacheKey);
+        if (stale) {
+          console.log("[LocalDeals] Using stale localStorage cache as fallback");
+          setPlaces(stale.places);
+          setDataSource(stale.source);
+          setError(null);
+        } else {
+          setError("No places found nearby");
+          setPlaces([]);
+        }
       }
-    } catch (osmErr) {
-      clearTimeout(osmTimeoutId);
-      console.error("[LocalDeals] OSM fallback also failed:", osmErr);
-      // Provide a more helpful error message
-      if (osmErr instanceof Error && osmErr.name === "AbortError") {
-        setError("Request timed out - please check your connection");
+    } catch (err) {
+      console.error("[LocalDeals] OSM fetch failed:", err);
+      // Final fallback: localStorage
+      const cacheKey = getPlacesCacheKey(lat, lon, category);
+      const stale = getPlacesFromLocalStorage(cacheKey);
+      if (stale) {
+        setPlaces(stale.places);
+        setDataSource(stale.source);
+        setError(null);
       } else {
         setError("Unable to load places - please try again");
+        setPlaces([]);
       }
-      setPlaces([]);
     } finally {
       setLoading(false);
     }

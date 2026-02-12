@@ -2720,8 +2720,9 @@ export async function generateWeatherAlertPost(
       alertDay = day;
       break;
     }
-    // Storm is second priority
-    if (day.condition === "storm" || day.precipitationMm > 25) {
+    // Storm is second priority — but ONLY if precipitation is meaningful (>2.5mm / ~0.1 inches)
+    // Weather codes can indicate "thunderstorms" with 0 precip, which produces contradictory alerts
+    if ((day.condition === "storm" || day.precipitationMm > 25) && day.precipitationMm > 2.5) {
       if (!alertType || alertType === "freeze" || alertType === "heat") {
         alertType = "storm";
         alertDay = day;
@@ -3216,7 +3217,7 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
 
     // Check for storms in forecast
     const stormInForecast = ctx.weather.forecast.some(day =>
-      day.condition === 'storm' || day.precipitationMm > 25
+      (day.condition === 'storm' || day.precipitationMm > 25) && day.precipitationMm > 2.5
     );
     if (stormInForecast) {
       console.log("[AnalyzeEngagement] WEATHER ALERT: Storm in forecast!");

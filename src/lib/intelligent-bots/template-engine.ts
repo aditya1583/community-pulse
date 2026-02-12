@@ -1065,6 +1065,11 @@ function getWeatherCategory(ctx: SituationContext): string {
   // Never report "perfect" weather when conditions are actually problematic
 
   // 1. Active precipitation/adverse conditions - HIGHEST priority
+  // But downgrade storm to empty (skip) if no actual precipitation
+  if (weather.condition === "storm" && weather.precipitation < 0.1) {
+    // Storm code with no precip — don't generate a storm post
+    return "";
+  }
   if (["rain", "storm", "snow", "fog"].includes(weather.condition)) {
     return weather.condition;
   }

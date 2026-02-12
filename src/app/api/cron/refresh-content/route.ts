@@ -152,18 +152,24 @@ export async function GET(request: NextRequest) {
             });
 
             if (result.posted && result.post) {
-              // DEDUP: Check if a bot post with the same tag exists in the last 2 hours
-              const twoHrsAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-              const { count: recentCount } = await supabase
+              // DEDUP: Check if a bot post with the same tag exists in the last 3 hours
+              // Use normalized city name to catch variants like "Leander, Texas, US" vs "Leander, Texas"
+              const threeHrsAgo = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+              const normalizedCity = cityInfo.city.split(",")[0].trim();
+              const { data: recentPosts } = await supabase
                 .from("pulses")
-                .select("*", { count: "exact", head: true })
-                .eq("city", cityInfo.city)
+                .select("id, message, city")
                 .eq("is_bot", true)
                 .eq("tag", result.post.tag)
-                .gte("created_at", twoHrsAgo);
+                .gte("created_at", threeHrsAgo);
 
-              if ((recentCount ?? 0) > 0) {
-                console.log(`[Cron] Skipping duplicate ${result.post.tag} post for ${cityInfo.city} (exists within 2h)`);
+              // Check for any matching city (normalized comparison)
+              const matchingPosts = (recentPosts || []).filter(p => 
+                p.city.split(",")[0].trim().toLowerCase() === normalizedCity.toLowerCase()
+              );
+
+              if (matchingPosts.length > 0) {
+                console.log(`[Cron] Skipping duplicate ${result.post.tag} post for ${normalizedCity} (${matchingPosts.length} exist within 3h)`);
                 continue;
               }
 

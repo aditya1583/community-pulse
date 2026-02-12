@@ -189,8 +189,19 @@ function checkForTrafficPost(ctx: SituationContext): PostDecision {
 function checkForWeatherPost(ctx: SituationContext): PostDecision {
   const { weather, time } = ctx;
 
-  // Active precipitation
+  // Active precipitation — only post storm/rain if there's actual precipitation
+  // Weather codes can indicate "storm" with 0mm precip, which produces contradictory posts
   if (["rain", "storm", "snow"].includes(weather.condition)) {
+    if (weather.condition === "storm" && weather.precipitation < 0.1) {
+      // Thunderstorm code but no actual precipitation — downgrade to cloudy/general
+      return {
+        shouldPost: true,
+        postType: "Weather",
+        reason: `Storm code but no precipitation - downgraded`,
+        priority: 3,
+        templateCategory: "perfectWeather", // mild post instead of dramatic storm alert
+      };
+    }
     return {
       shouldPost: true,
       postType: "Weather",

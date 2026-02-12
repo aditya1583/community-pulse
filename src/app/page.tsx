@@ -2365,7 +2365,21 @@ export default function Home() {
   // 3. Sort by distance: in-radius (< 10mi) first, then out-of-radius
   // 4. Apply tag filter
 
-  const visiblePulses = useMemo(() => filterVisiblePulses(pulses), [pulses]);
+  const visiblePulses = useMemo(() => {
+    const filtered = filterVisiblePulses(pulses);
+    // Deduplicate: remove posts with identical content from the same author within 5 minutes
+    const seen = new Map<string, number>(); // key -> timestamp
+    return filtered.filter((p) => {
+      const key = `${p.author}::${p.message}`;
+      const ts = new Date(p.createdAt).getTime();
+      const existing = seen.get(key);
+      if (existing !== undefined && Math.abs(ts - existing) < 5 * 60 * 1000) {
+        return false; // duplicate within 5 min window
+      }
+      seen.set(key, ts);
+      return true;
+    });
+  }, [pulses]);
 
   const afterRecentFilter = useMemo(
     () => visiblePulses.filter((p) => isInRecentWindow(p.createdAt)),
