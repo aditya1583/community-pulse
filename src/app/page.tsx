@@ -2349,17 +2349,12 @@ export default function Home() {
   // 3. Sort by distance: in-radius (< 10mi) first, then out-of-radius
   // 4. Apply tag filter
 
-  const visiblePulses = filterVisiblePulses(pulses);
+  const visiblePulses = useMemo(() => filterVisiblePulses(pulses), [pulses]);
 
-  // Debug: log filtering results
-  if (pulses.length > 0 && visiblePulses.length !== pulses.length) {
-    console.log(`[Pulses] filterVisiblePulses: ${pulses.length} → ${visiblePulses.length} (${pulses.length - visiblePulses.length} expired)`);
-  }
-
-  const afterRecentFilter = visiblePulses.filter((p) => isInRecentWindow(p.createdAt));
-  if (visiblePulses.length > 0 && afterRecentFilter.length !== visiblePulses.length) {
-    console.log(`[Pulses] isInRecentWindow filter: ${visiblePulses.length} → ${afterRecentFilter.length}`);
-  }
+  const afterRecentFilter = useMemo(
+    () => visiblePulses.filter((p) => isInRecentWindow(p.createdAt)),
+    [visiblePulses]
+  );
 
   // Calculate distance for each pulse and sort by proximity
   const pulsesWithDistance = useMemo(() => {
@@ -3345,7 +3340,7 @@ export default function Home() {
                               xp={userXp}
                               weeklyRank={userRank}
                             />
-                            <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400/70 max-w-[56px] truncate">
+                            <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400/70 max-w-[80px] sm:max-w-[120px] truncate">
                               {displayName}
                             </span>
                           </button>

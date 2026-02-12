@@ -33,7 +33,7 @@ export default function Header({ cityName, isLive = true, radiusMiles = 10 }: He
 
       <div className="flex flex-col min-w-0">
         <div className="flex items-center gap-1.5">
-          <h1 className="text-base font-black text-white tracking-tight leading-none truncate max-w-[160px]">
+          <h1 className="text-base font-black text-white tracking-tight leading-none whitespace-nowrap">
             {displayCity}
           </h1>
           {isLive && (

@@ -150,48 +150,7 @@ export default function LocalDealsSection({
 
     const categoryConfig = DEAL_CATEGORIES.find(c => c.id === category);
 
-    // Try Foursquare first with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-    try {
-      const query = categoryConfig?.query || "";
-      const params = new URLSearchParams({
-        lat: lat.toString(),
-        lon: lon.toString(),
-        limit: "12",
-      });
-
-      if (query) {
-        params.set("query", query);
-      }
-
-      console.log("[LocalDeals] Trying Foursquare API...");
-      const response = await fetch(`/api/foursquare/places?${params.toString()}`, {
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      const data = await response.json();
-
-      // If Foursquare works and has places, use it
-      if (!data.error && data.places?.length > 0) {
-        console.log(`[LocalDeals] Foursquare returned ${data.places.length} places`);
-        const cacheKey = getPlacesCacheKey(lat, lon, category);
-        placesCache[cacheKey] = { places: data.places, source: "foursquare", fetchedAt: Date.now() };
-        setPlaces(data.places);
-        setDataSource("foursquare");
-        setLoading(false);
-        return;
-      }
-
-      // Foursquare failed or returned empty - try OSM fallback
-      console.log("[LocalDeals] Foursquare failed or empty, trying OSM fallback");
-    } catch (err) {
-      clearTimeout(timeoutId);
-      console.log("[LocalDeals] Foursquare error, trying OSM fallback:", err);
-    }
-
-    // Fallback to OpenStreetMap with timeout
+    // Use OSM as the primary data source (Foursquare API key expired/broken — skip to save latency)
     const osmController = new AbortController();
     const osmTimeoutId = setTimeout(() => osmController.abort(), 15000);
 
