@@ -28,6 +28,13 @@
 3. API route uses `stateCode` param in Ticketmaster Discovery API query to filter results by state
 4. Nominatim geocoding query now includes state (e.g., "Leander, TX, US") to avoid matching wrong city
 
+### FIX 6: Timestamps showing UTC instead of local timezone ✅
+**Files:** `src/components/PulseCard.tsx`, `src/lib/pulses.ts`
+**What changed:**
+1. `formatPulseDateTime()` now includes AM/PM (e.g., "2/12/26 12:00 PM" instead of "2/12/26 12:00")
+2. PulseCard data attribution footer: parses the server-generated "2026-02-12 18:00:42 UTC" string and converts to user's local time via `toLocaleString()` (e.g., "Feb 12, 12:00 PM"). No "UTC" ever shown to users.
+3. Verified other timestamp displays (AISummaryCard, EventCard, comments) already use local time methods.
+
 ### Build Status
 ✅ `npm run build` passes clean
 
