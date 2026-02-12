@@ -447,13 +447,27 @@ export default function PulseCard({
           </div>
 
           {/* Message content - increased readability (strip markdown from AI-generated briefs) */}
-          <p className="text-[15px] text-white/90 leading-[1.6] mb-4 whitespace-pre-line font-medium tracking-tight text-balance">
-            {pulse.message
+          {(() => {
+            const cleaned = pulse.message
               .replace(/\*\*(.+?)\*\*/g, "$1")
               .replace(/__(.+?)__/g, "$1")
               .replace(/\*(.+?)\*/g, "$1")
-              .replace(/_(.+?)_/g, "$1")}
-          </p>
+              .replace(/_(.+?)_/g, "$1");
+            // Split data attribution (📡 Data: ...) into a subtle footer
+            const attrMatch = cleaned.match(/\n\n(📡 Data:.+)$/s);
+            const mainText = attrMatch ? cleaned.slice(0, cleaned.length - attrMatch[0].length) : cleaned;
+            const attribution = attrMatch ? attrMatch[1] : null;
+            return (
+              <>
+                <p className="text-[15px] text-white/90 leading-[1.6] mb-4 whitespace-pre-line font-medium tracking-tight text-balance">
+                  {mainText}
+                </p>
+                {attribution && (
+                  <p className="text-[9px] text-white/20 mb-3 -mt-2 tracking-wide">{attribution}</p>
+                )}
+              </>
+            );
+          })()}
 
           {/* Action buttons for actionable content (farmers markets, venues) */}
           {actionData.type && <ActionButtons actionData={actionData} />}

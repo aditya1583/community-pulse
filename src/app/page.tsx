@@ -350,6 +350,7 @@ export default function Home() {
   } = useEvents(selectedCity?.lat ?? null, selectedCity?.lon ?? null, {
     radius: 25,
     city: city,
+    state: selectedCity?.state ?? undefined,
   });
 
   // Traffic
@@ -2153,6 +2154,17 @@ export default function Home() {
         }
 
         if (signUpData.user) {
+          // Supabase returns a user with empty identities array when email already exists
+          // (instead of an error). Detect this and redirect to sign in.
+          const identities = (signUpData.user as { identities?: unknown[] }).identities;
+          if (Array.isArray(identities) && identities.length === 0) {
+            setAuthError("This email is already registered. Please sign in instead.");
+            setAuthMode("signin");
+            setAuthPasswordConfirm("");
+            setAuthLoading(false);
+            return;
+          }
+
           if (!signUpData.session) {
             setAuthError("Account created! Please check your email to confirm your account before signing in.");
             setAuthEmail("");
@@ -3308,7 +3320,7 @@ export default function Home() {
 
         <PullToRefresh onRefresh={handlePullToRefresh} disabled={loading}>
           {/* Main Content Area */}
-          <main className="flex-1 flex justify-center px-4 pb-6 pt-[env(safe-area-inset-top,0.5rem)]">
+          <main className="flex-1 flex justify-center px-4 pb-6 pt-[env(safe-area-inset-top,0.25rem)]">
             <div className="w-full max-w-lg space-y-6">
 
               {/* VIEW BRANCHING: Dashboard (Pulse) vs Dedicated Tabs (Traffic/Events/Local/Status) */}

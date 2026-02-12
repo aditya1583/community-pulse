@@ -453,14 +453,17 @@ export async function GET(req: NextRequest) {
   let parsedLat = lat ? parseFloat(lat) : undefined;
   let parsedLng = lng ? parseFloat(lng) : undefined;
   const parsedRadius = radius ? parseInt(radius, 10) : 25; // Default 25 miles
+  const stateParam = searchParams.get("state"); // e.g., "TX"
 
   // If only city is provided, geocode it to get lat/lng
   // Ticketmaster API doesn't have a "city" parameter - it only supports latlong
   // Use Nominatim directly (avoids server-to-server API call issues)
   if (parsedLat === undefined && parsedLng === undefined && city) {
     try {
-      console.log(`[Ticketmaster] Geocoding city via Nominatim: ${city}`);
-      const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1&countrycodes=us`;
+      // Include state in geocoding query to avoid matching wrong city (e.g., Leander WV vs TX)
+      const geocodeQuery = stateParam ? `${city}, ${stateParam}, US` : city;
+      console.log(`[Ticketmaster] Geocoding city via Nominatim: ${geocodeQuery}`);
+      const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(geocodeQuery)}&format=json&limit=1&countrycodes=us`;
       const geocodeRes = await fetch(nominatimUrl, {
         headers: {
           "User-Agent": "CommunityPulse/1.0",
@@ -534,6 +537,12 @@ export async function GET(req: NextRequest) {
       params.set("radius", String(Math.min(parsedRadius, 100))); // Cap at 100 miles
       params.set("unit", "miles");
       console.log(`[Ticketmaster] Searching at ${parsedLat},${parsedLng} radius ${parsedRadius}mi`);
+    }
+
+    // Add stateCode filter to prevent wrong-state matches (e.g., Leander WV vs TX)
+    if (stateParam) {
+      params.set("stateCode", stateParam.toUpperCase());
+      console.log(`[Ticketmaster] Filtering by stateCode: ${stateParam.toUpperCase()}`);
     }
 
     const url = `${baseUrl}?${params.toString()}`;

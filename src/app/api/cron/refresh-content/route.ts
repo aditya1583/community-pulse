@@ -152,6 +152,21 @@ export async function GET(request: NextRequest) {
             });
 
             if (result.posted && result.post) {
+              // DEDUP: Check if a bot post with the same tag exists in the last 2 hours
+              const twoHrsAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+              const { count: recentCount } = await supabase
+                .from("pulses")
+                .select("*", { count: "exact", head: true })
+                .eq("city", cityInfo.city)
+                .eq("is_bot", true)
+                .eq("tag", result.post.tag)
+                .gte("created_at", twoHrsAgo);
+
+              if ((recentCount ?? 0) > 0) {
+                console.log(`[Cron] Skipping duplicate ${result.post.tag} post for ${cityInfo.city} (exists within 2h)`);
+                continue;
+              }
+
               const expirationHours = getExpirationHours(result.post.tag);
               const expiresAt = new Date(Date.now() + expirationHours * 60 * 60 * 1000).toISOString();
 

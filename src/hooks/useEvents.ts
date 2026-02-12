@@ -33,6 +33,8 @@ type UseEventsOptions = {
   radius?: number;
   /** City name as fallback when lat/lng unavailable */
   city?: string;
+  /** State code (e.g., "TX") for accurate geo-filtering */
+  state?: string;
   /** Whether to skip fetching (useful when location not yet available) */
   skip?: boolean;
 };
@@ -42,7 +44,7 @@ export function useEvents(
   lng: number | null,
   options: UseEventsOptions = {}
 ): UseEventsResult {
-  const { radius = RADIUS_CONFIG.PRIMARY_RADIUS_MILES, city, skip = false } = options;
+  const { radius = RADIUS_CONFIG.PRIMARY_RADIUS_MILES, city, state, skip = false } = options;
 
   const [events, setEvents] = useState<TicketmasterEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -85,6 +87,9 @@ export function useEvents(
         params.set("radius", radius.toString());
       } else if (city) {
         params.set("city", city);
+      }
+      if (state) {
+        params.set("state", state);
       }
 
       // MOBILE FIX: Add aggressive timeout for unreliable mobile networks
@@ -146,7 +151,7 @@ export function useEvents(
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lat, lng, radius, city, skip]);
+  }, [lat, lng, radius, city, state, skip]);
 
   return {
     events,
