@@ -1504,12 +1504,12 @@ export default function Home() {
     if (city) {
       fetchPulses();
 
-      // Auto-refresh every 2 minutes to catch new bot posts and remove expired ones
-      // This ensures users don't need to manually refresh to see new content
+      // Safety net refresh every 5 minutes (Supabase Realtime handles live updates)
+      // Only catches edge cases: expired posts, missed websocket events
       const refreshInterval = setInterval(() => {
-        console.log("[Pulses] Auto-refreshing feed...");
+        console.log("[Pulses] Safety-net refresh (Realtime is primary)...");
         fetchPulses();
-      }, 2 * 60 * 1000); // 2 minutes
+      }, 5 * 60 * 1000); // 5 minutes (was 2 min — Realtime handles inserts/deletes)
 
       return () => clearInterval(refreshInterval);
     }
