@@ -128,7 +128,7 @@ export default function Home() {
 
   // Tab state for new Neon theme
   // Persist tab state in sessionStorage so it survives navigation to venue pages
-  const [activeTab, setActiveTabState] = useState<TabId>("pulse");
+  const [activeTab, setActiveTabState] = useState<TabId>("events");
   const [localSection, setLocalSection] = useState<LocalSection>("deals");
 
   // Wrapper to persist tab changes
@@ -327,8 +327,8 @@ export default function Home() {
   useEffect(() => {
     if (process.env.NODE_ENV === "production") return;
     if (!isTabId(activeTab)) {
-      console.warn(`[tabs] Unknown activeTab "${String(activeTab)}" — defaulting to "pulse"`);
-      setActiveTab("pulse");
+      console.warn(`[tabs] Unknown activeTab "${String(activeTab)}" — defaulting to "events"`);
+      setActiveTab("events");
     }
   }, [activeTab]);
 
@@ -2782,27 +2782,52 @@ export default function Home() {
                           <p className="text-sm font-bold text-slate-400">Loading the local vibe for {city}...</p>
                         </div>
                       ) : filteredPulses.length === 0 ? (
-                        <div className="bg-slate-800/40 border border-dashed border-slate-700/50 rounded-2xl p-10 text-center">
-                          <p className="text-sm font-bold text-slate-400">No pulses yet for {city}. Be the first!</p>
+                        <div className="bg-slate-800/40 border border-dashed border-slate-700/50 rounded-2xl p-10 text-center space-y-3">
+                          <p className="text-lg">📝</p>
+                          <p className="text-sm font-bold text-slate-300">Be the first to share what&apos;s happening in {city}!</p>
+                          <p className="text-xs text-slate-500">Your neighbors are waiting to hear from you</p>
+                          <button
+                            type="button"
+                            onClick={() => setShowPulseModal(true)}
+                            className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition"
+                          >
+                            Share a Pulse
+                          </button>
                         </div>
                       ) : (
                         <>
                           {inRadiusPulses
                             .filter((pulse) => !happeningNowPulse || pulse.id !== happeningNowPulse.id)
-                            .map((pulse) => (
-                              <PulseCard
-                                key={pulse.id}
-                                pulse={pulse}
-                                isOwnPulse={sessionUser?.id === pulse.user_id}
-                                isFavorite={favoritePulseIds.includes(pulse.id)}
-                                onToggleFavorite={handleToggleFavorite}
-                                onDelete={handleDeletePulse}
-                                reporterId={sessionUser?.id}
-                                userIdentifier={sessionUser ? displayName : undefined}
-                                authorRank={pulse.user_id ? authorStats[pulse.user_id]?.rank : null}
-                                authorLevel={pulse.user_id ? authorStats[pulse.user_id]?.level : undefined}
-                              />
-                            ))}
+                            .flatMap((pulse, idx) => {
+                              const card = (
+                                <PulseCard
+                                  key={pulse.id}
+                                  pulse={pulse}
+                                  isOwnPulse={sessionUser?.id === pulse.user_id}
+                                  isFavorite={favoritePulseIds.includes(pulse.id)}
+                                  onToggleFavorite={handleToggleFavorite}
+                                  onDelete={handleDeletePulse}
+                                  reporterId={sessionUser?.id}
+                                  userIdentifier={sessionUser ? displayName : undefined}
+                                  authorRank={pulse.user_id ? authorStats[pulse.user_id]?.rank : null}
+                                  authorLevel={pulse.user_id ? authorStats[pulse.user_id]?.level : undefined}
+                                />
+                              );
+                              if (idx > 0 && idx % 5 === 4) {
+                                return [
+                                  card,
+                                  <button
+                                    key={`cta-${idx}`}
+                                    type="button"
+                                    onClick={() => setShowPulseModal(true)}
+                                    className="w-full bg-slate-800/30 border border-dashed border-slate-700/40 rounded-xl py-3 px-4 text-center transition hover:border-emerald-500/40 hover:bg-slate-800/50"
+                                  >
+                                    <span className="text-xs text-slate-400">What&apos;s happening near you? <span className="text-emerald-400 font-semibold">Share a pulse →</span></span>
+                                  </button>,
+                                ];
+                              }
+                              return [card];
+                            })}
 
                           {/* Out-of-radius Content */}
                           {outOfRadiusPulses.length > 0 && (

@@ -3,15 +3,15 @@
  */
 
 export const DASHBOARD_TABS = [
-  { id: "pulse", label: "Pulse" },
   { id: "events", label: "Events" },
+  { id: "pulse", label: "Pulse" },
   { id: "traffic", label: "Traffic" },
   { id: "local", label: "Local" },
   { id: "status", label: "Status" },
 ] as const;
 
 // Primary tabs shown in bottom navigation
-export const PRIMARY_TABS = ["pulse", "events", "traffic", "local"] as const;
+export const PRIMARY_TABS = ["events", "pulse", "traffic", "local"] as const;
 
 // Secondary tabs shown in inline tab bar
 export const SECONDARY_TABS = [

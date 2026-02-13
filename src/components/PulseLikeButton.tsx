@@ -16,13 +16,19 @@ type ReactionResponse = {
   userReactions?: string[];
 };
 
+const REACTION_TYPES = [
+  { type: "fire", emoji: "🔥" },
+  { type: "check", emoji: "👍" },
+  { type: "eyes", emoji: "👀" },
+] as const;
+
 export default function PulseLikeButton({
   pulseId,
   userIdentifier,
 }: PulseLikeButtonProps) {
-  const [count, setCount] = useState<number>(0);
-  const [liked, setLiked] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [userReactions, setUserReactions] = useState<string[]>([]);
+  const [loading, setLoading] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -32,8 +38,8 @@ export default function PulseLikeButton({
       const res = await fetch(apiPath);
       if (!res.ok) return;
       const data = (await res.json()) as ReactionResponse;
-      setCount(data.check ?? 0);
-      setLiked((data.userReactions ?? []).includes("check"));
+      setCounts({ fire: data.fire ?? 0, eyes: data.eyes ?? 0, check: data.check ?? 0 });
+      setUserReactions(data.userReactions ?? []);
     } catch {
       // ignore
     }
@@ -78,50 +84,53 @@ export default function PulseLikeButton({
     };
   }, [pulseId, load]);
 
-  const toggle = useCallback(async () => {
+  const toggle = useCallback(async (reactionType: string) => {
     if (!userIdentifier) return;
     if (loading) return;
 
-    setLoading(true);
+    setLoading(reactionType);
     try {
       const res = await fetch(getApiUrl(`/api/pulses/${pulseId}/react`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reactionType: "check", userIdentifier }),
+        body: JSON.stringify({ reactionType, userIdentifier }),
       });
       if (!res.ok) return;
 
       const data = (await res.json()) as ReactionResponse;
-      setCount(data.check ?? 0);
-      setLiked((data.userReactions ?? []).includes("check"));
+      setCounts({ fire: data.fire ?? 0, eyes: data.eyes ?? 0, check: data.check ?? 0 });
+      setUserReactions(data.userReactions ?? []);
     } finally {
-      setLoading(false);
+      setLoading(null);
     }
   }, [loading, pulseId, userIdentifier]);
 
   return (
-    <button
-      type="button"
-      onClick={toggle}
-      disabled={!userIdentifier || loading}
-      className={`inline-flex items-center gap-1 transition ${
-        liked
-          ? "text-emerald-300"
-          : userIdentifier
-            ? "text-slate-500 hover:text-emerald-200"
-            : "text-slate-700 cursor-not-allowed"
-      }`}
-      title={
-        !userIdentifier
-          ? "Sign in to like"
-          : liked
-            ? "Unlike"
-            : "Like"
-      }
-      aria-pressed={liked}
-    >
-      <span className="text-sm leading-none">{"\uD83D\uDC4D"}</span>
-      {count > 0 && <span className="text-[11px] font-mono">{count}</span>}
-    </button>
+    <div className="inline-flex items-center gap-1.5">
+      {REACTION_TYPES.map(({ type, emoji }) => {
+        const active = userReactions.includes(type);
+        const count = counts[type] ?? 0;
+        return (
+          <button
+            key={type}
+            type="button"
+            onClick={() => toggle(type)}
+            disabled={!userIdentifier || loading === type}
+            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs transition ${
+              active
+                ? "bg-emerald-500/20 text-emerald-300"
+                : userIdentifier
+                  ? "text-slate-500 hover:bg-slate-700/50 hover:text-slate-300"
+                  : "text-slate-700 cursor-not-allowed"
+            }`}
+            title={!userIdentifier ? "Sign in to react" : active ? `Remove ${type}` : type}
+            aria-pressed={active}
+          >
+            <span className="text-sm leading-none">{emoji}</span>
+            {count > 0 && <span className="text-[10px] font-mono">{count}</span>}
+          </button>
+        );
+      })}
+    </div>
   );
 }
