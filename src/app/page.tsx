@@ -183,12 +183,7 @@ function isTabId(value: unknown): value is TabId {
   return typeof value === "string" && TAB_ID_SET.has(value as TabId);
 }
 
-// Hardcoded fallback gas stations for Central Texas when API fails completely
-const FALLBACK_GAS_STATIONS: Record<string, { name: string; distanceMiles?: number }> = {
-  "leander": { name: "H-E-B Fuel" },
-  "cedar park": { name: "H-E-B Fuel" },
-  "austin": { name: "H-E-B Fuel" },
-};
+// Gas price data removed from home load per directive (Phase 2)
 
 export default function Home() {
   // Core state - initialize with defaults to avoid SSR hydration mismatch
@@ -383,8 +378,7 @@ export default function Home() {
   const [cityMoodError, setCityMoodError] = useState<string | null>(null);
 
   // Gas Prices (for quick view in Current Vibe section)
-  const [gasPrice, setGasPrice] = useState<number | null>(null);
-  const [nearestStation, setNearestStation] = useState<{ name: string; distanceMiles: number } | null>(null);
+  // Gas price state removed — no longer fetched on home load
 
   // City Autocomplete
   const {
@@ -693,7 +687,7 @@ export default function Home() {
     setTagFilter("All");
   }, [city]);
 
-  // ========= WEATHER =========
+  // ========= BUNDLED WEATHER + TRAFFIC (via /api/pulse) =========
   useEffect(() => {
     if (!city.trim()) {
       setWeather(null);
@@ -707,45 +701,62 @@ export default function Home() {
       try {
         setWeatherLoading(true);
         setWeatherError(null);
+        setTrafficLoading(true);
+        setTrafficError(null);
 
-        // MOBILE FIX: Add aggressive 5-second timeout
+        const params = new URLSearchParams({ city });
+        if (selectedCity?.lat != null) params.set("lat", String(selectedCity.lat));
+        if (selectedCity?.lon != null) params.set("lon", String(selectedCity.lon));
+
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-        const res = await fetch(getApiUrl("/api/weather"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            city,
-            lat: selectedCity?.lat,
-            lon: selectedCity?.lon,
-            country: selectedCity?.country,
-            state: selectedCity?.state,
-          }),
+        const res = await fetch(getApiUrl(`/api/pulse?${params}`), {
           signal: controller.signal,
         });
 
         clearTimeout(timeoutId);
 
-        const data = await res.json();
-
         if (cancelled) return;
 
-        if (!res.ok) {
+        const data = await res.json();
+
+        // Weather
+        if (data.weather) {
+          setWeather(data.weather);
+          setWeatherError(null);
+        } else {
           setWeather(null);
-          setWeatherError(data.error || "Unable to load weather.");
-          return;
+          setWeatherError("Unable to load weather.");
         }
 
-        setWeather(data);
+        // Traffic (from TomTom via bundled endpoint)
+        if (data.traffic) {
+          if (data.traffic.level) {
+            setTrafficLevel(data.traffic.level);
+            setTrafficError(null);
+          }
+          if (data.traffic.incidents) {
+            setTrafficIncidents(data.traffic.incidents);
+          }
+          if (data.traffic.hasRoadClosure !== undefined) {
+            setHasRoadClosure(data.traffic.hasRoadClosure);
+          }
+        } else {
+          // Traffic data unavailable — not critical
+          setTrafficLevel(null);
+        }
       } catch {
         if (!cancelled) {
           setWeather(null);
           setWeatherError("Unable to load weather.");
+          setTrafficLevel(null);
+          setTrafficError("Unable to load traffic right now.");
         }
       } finally {
         if (!cancelled) {
           setWeatherLoading(false);
+          setTrafficLoading(false);
         }
       }
     };
@@ -755,93 +766,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [city, selectedCity?.lat, selectedCity?.lon, selectedCity?.country, selectedCity?.state]);
-
-  // ========= GAS PRICES (for Current Vibe card) =========
-  useEffect(() => {
-    const stateCode = selectedCity?.state;
-    if (!stateCode) {
-      setGasPrice(null);
-      return;
-    }
-
-    let cancelled = false;
-
-    const fetchGasPrice = async () => {
-      try {
-        const res = await fetch(getApiUrl(`/api/gas-prices?state=${encodeURIComponent(stateCode)}`));
-        const data = await res.json();
-
-        if (cancelled) return;
-
-        if (data.regular) {
-          setGasPrice(data.regular);
-        }
-      } catch {
-        // Silently fail - gas price is supplementary info
-        if (!cancelled) setGasPrice(null);
-      }
-    };
-
-    fetchGasPrice();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedCity?.state]);
-
-  // ========= NEAREST GAS STATION (for Current Vibe card) =========
-  // Use live GPS coords when available, fall back to selectedCity coords
-  useEffect(() => {
-    const lat = geolocation.lat ?? selectedCity?.lat;
-    const lon = geolocation.lon ?? selectedCity?.lon;
-    const cityName = selectedCity?.name?.toLowerCase() || "";
-
-    if (!lat || !lon) {
-      // No coords at all — use name-based fallback without distance
-      const fallback = FALLBACK_GAS_STATIONS[cityName];
-      if (fallback) {
-        setNearestStation(fallback);
-      } else {
-        setNearestStation(null);
-      }
-      return;
-    }
-
-    let cancelled = false;
-
-    const fetchNearestStation = async () => {
-      try {
-        const res = await fetch(getApiUrl(`/api/gas-stations?lat=${lat}&lon=${lon}&limit=1`));
-        const data = await res.json();
-
-        if (cancelled) return;
-
-        if (data.stations && data.stations.length > 0) {
-          const station = data.stations[0];
-          setNearestStation({
-            name: station.name,
-            distanceMiles: station.distanceMiles,
-          });
-        } else {
-          // API returned empty — use generic fallback without fake distance
-          const fallback = FALLBACK_GAS_STATIONS[cityName];
-          setNearestStation(fallback ?? null);
-        }
-      } catch {
-        if (!cancelled) {
-          const fallback = FALLBACK_GAS_STATIONS[cityName];
-          setNearestStation(fallback ?? null);
-        }
-      }
-    };
-
-    fetchNearestStation();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [geolocation.lat, geolocation.lon, selectedCity?.lat, selectedCity?.lon, selectedCity?.name]);
+  }, [city, selectedCity?.lat, selectedCity?.lon]);
 
   // ========= LOAD SESSION + PROFILE =========
   useEffect(() => {
@@ -1832,83 +1757,6 @@ export default function Home() {
   };
 
   // ========= TRAFFIC =========
-  useEffect(() => {
-    if (!city) return;
-
-    const fetchTraffic = async () => {
-      try {
-        setTrafficLoading(true);
-        setTrafficError(null);
-
-        // Fetch both AI-based traffic level AND live TomTom incidents in parallel
-        // MOBILE FIX: Add aggressive 6-second timeout for mobile reliability
-        const trafficUrl = getApiUrl(`/api/traffic?city=${encodeURIComponent(city)}`);
-        const liveUrl = selectedCity?.lat && selectedCity?.lon
-          ? getApiUrl(`/api/traffic-live?lat=${selectedCity.lat}&lon=${selectedCity.lon}`)
-          : getApiUrl(`/api/traffic-live?city=${encodeURIComponent(city)}`);
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000);
-
-        const [trafficRes, liveRes] = await Promise.allSettled([
-          fetch(trafficUrl, { signal: controller.signal }),
-          fetch(liveUrl, { signal: controller.signal }),
-        ]);
-
-        clearTimeout(timeoutId);
-
-        // Process AI-based traffic level
-        let hasAiLevel = false;
-        if (trafficRes.status === "fulfilled" && trafficRes.value.ok) {
-          try {
-            const data = await trafficRes.value.json();
-            if (data?.level) {
-              setTrafficLevel(data.level);
-              setTrafficError(null);
-              hasAiLevel = true;
-            }
-          } catch {
-            // ignore JSON parse error
-          }
-        }
-
-        // Process live TomTom incidents
-        if (liveRes.status === "fulfilled" && liveRes.value.ok) {
-          try {
-            const liveData = await liveRes.value.json();
-            if (liveData?.incidents) {
-              setTrafficIncidents(liveData.incidents);
-            }
-            if (liveData?.hasRoadClosure !== undefined) {
-              setHasRoadClosure(liveData.hasRoadClosure);
-            }
-            // Use TomTom level when AI-based level is unavailable
-            if (!hasAiLevel && liveData?.level) {
-              setTrafficLevel(liveData.level);
-              setTrafficError(null);
-            }
-          } catch {
-            // ignore JSON parse error for live data
-          }
-        }
-
-        // If neither source provided a level, show error
-        if (!hasAiLevel && trafficRes.status !== "fulfilled") {
-          setTrafficError("Unable to load traffic right now.");
-          setTrafficLevel(null);
-        }
-      } catch (err: unknown) {
-        console.error("Error fetching traffic:", err);
-        setTrafficError("Unable to load traffic right now.");
-        setTrafficLevel(null);
-      } finally {
-        setTrafficLoading(false);
-      }
-    };
-
-    fetchTraffic();
-  }, [city, pulses.length, selectedCity?.lat, selectedCity?.lon]);
-
   // ========= CREATE EVENT HANDLER =========
   async function handleCreateEvent(e: React.FormEvent) {
     e.preventDefault();
@@ -3469,8 +3317,8 @@ export default function Home() {
                     onDropPulse={handleDropPulseJump}
                     cityMood={cityMood}
                     cityMoodLoading={cityMoodLoading}
-                    gasPrice={gasPrice}
-                    gasStationName={nearestStation?.name}
+                    gasPrice={null}
+                    gasStationName={null}
                     onGasPriceClick={() => {
                       setLocalSection("gas");
                       setActiveTab("local");
