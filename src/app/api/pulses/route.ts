@@ -345,6 +345,44 @@ export async function POST(req: NextRequest) {
 }
 
 /**
+ * GET /api/pulses - Diagnostic: test moderation + DB connectivity
+ * Returns service health without creating any data.
+ */
+export async function GET() {
+  const checks: Record<string, string> = {};
+  
+  // Check service role client
+  const serviceClient = getServiceRoleClient();
+  checks.serviceRole = serviceClient ? "ok" : "MISSING SUPABASE_SERVICE_ROLE_KEY";
+  
+  // Check OpenAI key
+  checks.openaiKey = process.env.OPENAI_API_KEY ? "configured" : "MISSING";
+  
+  // Check Supabase connectivity
+  if (serviceClient) {
+    try {
+      const { count, error } = await serviceClient
+        .from("pulses")
+        .select("id", { count: "exact", head: true });
+      checks.supabase = error ? `error: ${error.message}` : `ok (${count} rows)`;
+    } catch (e) {
+      checks.supabase = `crash: ${e instanceof Error ? e.message : String(e)}`;
+    }
+  }
+  
+  // Test moderation pipeline (dry run)
+  try {
+    const { runModerationPipeline } = await import("@/lib/moderationPipeline");
+    const result = await runModerationPipeline("hello world test");
+    checks.moderation = result.allowed ? "ok (allowed)" : `blocked: ${result.reason}`;
+  } catch (e) {
+    checks.moderation = `crash: ${e instanceof Error ? e.message : String(e)}`;
+  }
+  
+  return NextResponse.json({ status: "diagnostic", checks, timestamp: new Date().toISOString() });
+}
+
+/**
  * DELETE /api/pulses - Delete a pulse (owner only)
  *
  * Uses the user's token directly since RLS allows owner deletes.

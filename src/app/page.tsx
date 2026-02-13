@@ -1733,9 +1733,10 @@ export default function Home() {
       console.log("[Voxlo] Response data:", data ? { pulse: !!data.pulse, error: data.error, code: data.code } : "null");
 
       if (!res.ok || !data?.pulse) {
-        const message =
-          data?.error || "Could not post your pulse. Please try again.";
-        console.error("[Voxlo] Post failed:", res.status, message);
+        const serverMsg = data?.error;
+        const fallback = `Post failed (${res.status}). Please try again.`;
+        const message = serverMsg || fallback;
+        console.error("[Voxlo] Post failed:", res.status, res.statusText, "body:", JSON.stringify(data));
 
         if (data?.code === "MODERATION_FAILED") {
           setValidationError(message);
@@ -1820,8 +1821,9 @@ export default function Home() {
         }
       }
     } catch (err) {
-      console.error("Unexpected error creating pulse:", err);
-      setErrorMsg("Could not post your pulse. Please try again.");
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error("Unexpected error creating pulse:", errMsg, err);
+      setErrorMsg(`Network error: ${errMsg.slice(0, 80)}`);
       return;
     }
   };
@@ -1930,8 +1932,10 @@ export default function Home() {
       }
 
       if (!res.ok || !data?.pulse) {
-        const message =
-          data?.error || "Could not post your pulse. Please try again.";
+        const serverMsg = data?.error;
+        const fallback = `Post failed (${res.status}). Please try again.`;
+        const message = serverMsg || fallback;
+        console.error("[Voxlo] Tab post failed:", res.status, res.statusText, "body:", JSON.stringify(data));
 
         if (data?.code === "MODERATION_FAILED") {
           setTabMessageValidationError(message);
@@ -2015,8 +2019,9 @@ export default function Home() {
         }
       }
     } catch (err) {
-      console.error("Unexpected error creating tab pulse:", err);
-      setErrorMsg("Could not post your pulse. Please try again.");
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error("Unexpected error creating tab pulse:", errMsg, err);
+      setErrorMsg(`Network error: ${errMsg.slice(0, 80)}`);
       setLoading(false);
     }
   };
