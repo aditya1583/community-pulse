@@ -13,16 +13,6 @@ import type {
   PostType,
 } from "./types";
 import { getRandomRoad, getRandomLandmark, getRandomSchool, getAltRoute } from "./city-configs";
-import {
-  generateSpicyTrafficPost,
-  generateSpicyWeatherPost,
-  generateSpicyEventPost,
-  generateSpicyMarketPost,
-  SPICY_HOT_TAKES,
-  SPICY_OBSERVATIONS,
-  getRandomTemplate,
-  fillTemplate,
-} from "./spicy-templates";
 import { addDataAttribution, getPostDataSources } from "./data-grounding";
 import { RADIUS_CONFIG } from "@/lib/constants/radius";
 import { formatDistance } from "@/lib/geo/distance";
@@ -276,115 +266,18 @@ export type ExtendedPostType =
 
 interface BotPersona {
   name: string;
-  emoji: string;  // Consistent emoji for this bot type
+  emoji: string;
 }
 
-const BOT_PERSONAS: Record<ExtendedPostType, BotPersona[]> = {
-  Traffic: [
-    { name: "road_runner_bot", emoji: "🚗" },
-    { name: "commute_buddy_bot", emoji: "🛣️" },
-    { name: "traffic_whisperer_bot", emoji: "🚦" },
-  ],
-  Weather: [
-    { name: "sky_watcher_bot", emoji: "🌤️" },
-    { name: "weather_vibes_bot", emoji: "☀️" },
-    { name: "forecast_friend_bot", emoji: "🌡️" },
-  ],
-  Events: [
-    { name: "scene_scout_bot", emoji: "🎉" },
-    { name: "event_hype_bot", emoji: "🎭" },
-    { name: "whats_poppin_bot", emoji: "🎸" },
-  ],
-  General: [
-    { name: "neighborhood_pulse_bot", emoji: "💜" },
-    { name: "local_loop_bot", emoji: "🏘️" },
-    { name: "community_vibes_bot", emoji: "✨" },
-  ],
-  // Engagement bots for polls and recommendations
-  Engagement: [
-    { name: "poll_master_bot", emoji: "📊" },
-    { name: "curious_neighbor_bot", emoji: "🤔" },
-    { name: "local_insider_bot", emoji: "💡" },
-  ],
-  // School traffic specialist
-  SchoolTraffic: [
-    { name: "school_zone_alert_bot", emoji: "🏫" },
-    { name: "parent_pickup_pal_bot", emoji: "🚸" },
-  ],
-  // Venue check-in bot
-  VenueCheck: [
-    { name: "venue_vibes_bot", emoji: "📍" },
-    { name: "spot_checker_bot", emoji: "👀" },
-  ],
-  // Local/foodie bot (munching bot!)
-  Local: [
-    { name: "munching_bot", emoji: "🍔" },
-    { name: "foodie_finder_bot", emoji: "🌮" },
-    { name: "local_eats_bot", emoji: "😋" },
-  ],
+// Single bot persona — all posts come from "Pulse Bot 🤖"
+const PULSE_BOT: BotPersona = { name: "Pulse Bot", emoji: "🤖" };
 
-  // ========== NEW HIGH-ENGAGEMENT BOT PERSONAS ==========
-
-  // Hot Takes - controversial opinions that spark debate
-  HotTake: [
-    { name: "hot_take_bot", emoji: "🌶️" },
-    { name: "spicy_opinions_bot", emoji: "🔥" },
-    { name: "truth_bomb_bot", emoji: "💣" },
-  ],
-
-  // Insider Tips - makes locals feel special
-  InsiderTip: [
-    { name: "local_insider_bot", emoji: "💡" },
-    { name: "secret_keeper_bot", emoji: "🤫" },
-    { name: "pro_tip_bot", emoji: "🗝️" },
-  ],
-
-  // Nostalgia - remember when posts
-  Nostalgia: [
-    { name: "memory_lane_bot", emoji: "📸" },
-    { name: "throwback_bot", emoji: "🕰️" },
-    { name: "og_vibes_bot", emoji: "👴" },
-  ],
-
-  // Challenges - direct call to action
-  Challenge: [
-    { name: "challenge_bot", emoji: "🎯" },
-    { name: "game_on_bot", emoji: "🏆" },
-    { name: "dare_bot", emoji: "📣" },
-  ],
-
-  // Callouts - celebrate or call out behavior
-  Callout: [
-    { name: "community_watch_bot", emoji: "👀" },
-    { name: "shoutout_bot", emoji: "🙌" },
-    { name: "real_talk_bot", emoji: "💜" },
-  ],
-
-  // Would You Rather - hypotheticals
-  WouldYouRather: [
-    { name: "hypothetical_bot", emoji: "⚖️" },
-    { name: "dilemma_bot", emoji: "🤔" },
-    { name: "choice_bot", emoji: "🎲" },
-  ],
-
-  // Confession Booth - anonymous-style confessions
-  Confession: [
-    { name: "confession_booth_bot", emoji: "🤫" },
-    { name: "safe_space_bot", emoji: "🙈" },
-    { name: "no_judgment_bot", emoji: "🎭" },
-  ],
-};
-
-function getBotName(postType: PostType | ExtendedPostType, cityName: string): string {
-  const personas = BOT_PERSONAS[postType as ExtendedPostType] || BOT_PERSONAS.General;
-  const persona = personas[Math.floor(Math.random() * personas.length)];
-  // Format: "Leander munching_bot 🍔" with consistent emoji
-  return `${cityName} ${persona.name} ${persona.emoji}`;
+export function getBotPersona(_postType?: PostType | ExtendedPostType): BotPersona {
+  return PULSE_BOT;
 }
 
-function getBotPersona(postType: PostType | ExtendedPostType): BotPersona {
-  const personas = BOT_PERSONAS[postType as ExtendedPostType] || BOT_PERSONAS.General;
-  return personas[Math.floor(Math.random() * personas.length)];
+function getBotName(_postType: PostType | ExtendedPostType, cityName: string): string {
+  return `${cityName} ${PULSE_BOT.name} ${PULSE_BOT.emoji}`;
 }
 
 function getMood(templateCategory: string): string {
@@ -655,74 +548,18 @@ function fillTemplateStandard(template: string, variables: TemplateVariables): s
   return result;
 }
 
-/**
- * Generate a spicy (personality-driven) post based on context
- */
-function generateSpicyPost(
-  ctx: SituationContext,
-  decision: PostDecision,
-  variables: TemplateVariables
-): { message: string; mood: string } | null {
-  const { postType } = decision;
-
-  switch (postType) {
-    case "Traffic": {
-      const roadName = variables.road || "183";
-      return generateSpicyTrafficPost(ctx.traffic, roadName, variables.altRoute);
-    }
-    case "Weather": {
-      return generateSpicyWeatherPost(ctx.weather);
-    }
-    case "Events": {
-      if (ctx.events.length > 0) {
-        const isLocal = !ctx.events[0].distanceMiles || ctx.events[0].distanceMiles <= 10;
-        return generateSpicyEventPost(ctx.events[0], isLocal);
-      }
-      return null;
-    }
-    case "General": {
-      // Mix of hot takes and observations for general posts
-      if (Math.random() < 0.3) {
-        // Hot take
-        const template = getRandomTemplate(SPICY_HOT_TAKES);
-        const message = fillTemplate(template, {
-          restaurant: variables.restaurant,
-          road: variables.road,
-          road2: variables.altRoute,
-          neighborhood: ctx.city.name,
-          chain: "Chick-fil-A",
-          food: "tacos",
-          local_place: variables.landmark,
-        });
-        return { message, mood: "🌶️" };
-      } else {
-        // Observation
-        const template = getRandomTemplate(SPICY_OBSERVATIONS);
-        const message = fillTemplate(template, {
-          neighborhood: ctx.city.name,
-          street: variables.road,
-          city: ctx.city.name,
-        });
-        return { message, mood: "👀" };
-      }
-    }
-    default:
-      return null;
-  }
-}
-
 // ============================================================================
 // MAIN GENERATOR
 // ============================================================================
 
 /**
  * Generate a post based on the situation analysis
- * Now supports AI-generated fun facts and spicy templates!
+ * Uses standard data-grounded templates + optional AI fun facts.
  */
 export async function generatePost(
   ctx: SituationContext,
   decision: PostDecision,
-  options: { injectFunFact?: boolean; useAIFacts?: boolean; useSpicyTemplates?: boolean } = {}
+  options: { injectFunFact?: boolean; useAIFacts?: boolean } = {}
 ): Promise<GeneratedPost | null> {
   if (!decision.shouldPost || !decision.postType) {
     return null;
@@ -732,36 +569,15 @@ export async function generatePost(
   let message: string;
   let mood: string;
 
-  // Use spicy templates for more engaging content (default: true for 60% of posts)
-  const useSpicy = options.useSpicyTemplates ?? Math.random() < 0.6;
-
-  if (useSpicy) {
-    const spicyResult = generateSpicyPost(ctx, decision, variables);
-    if (spicyResult) {
-      message = spicyResult.message;
-      mood = spicyResult.mood;
-    } else {
-      // Fall back to standard templates
-      const templates = getTemplates(decision.postType, decision.templateCategory);
-      if (templates.length === 0) {
-        console.warn(`[TemplateEngine] No templates for ${decision.postType}/${decision.templateCategory}`);
-        return null;
-      }
-      const template = selectTemplate(templates);
-      message = fillTemplateStandard(template, variables);
-      mood = getMood(decision.templateCategory);
-    }
-  } else {
-    // Get standard templates for this category
-    const templates = getTemplates(decision.postType, decision.templateCategory);
-    if (templates.length === 0) {
-      console.warn(`[TemplateEngine] No templates for ${decision.postType}/${decision.templateCategory}`);
-      return null;
-    }
-    const template = selectTemplate(templates);
-    message = fillTemplateStandard(template, variables);
-    mood = getMood(decision.templateCategory);
+  // Use standard templates
+  const templates = getTemplates(decision.postType, decision.templateCategory);
+  if (templates.length === 0) {
+    console.warn(`[TemplateEngine] No templates for ${decision.postType}/${decision.templateCategory}`);
+    return null;
   }
+  const template = selectTemplate(templates);
+  message = fillTemplateStandard(template, variables);
+  mood = getMood(decision.templateCategory);
 
   // Should we add a fun fact?
   const shouldInjectFact = options.injectFunFact || Math.random() < FUN_FACT_INJECTION_RATE;
@@ -837,12 +653,11 @@ async function getAIFunFact(
 /**
  * Generate multiple posts for cold-start seeding
  * Uses different categories to provide variety
- * Now with AI-powered fun facts and spicy templates!
  */
 export async function generateSeedPosts(
   ctx: SituationContext,
   count: number = 3,
-  options: { useAIFacts?: boolean; useSpicyTemplates?: boolean } = {}
+  options: { useAIFacts?: boolean } = {}
 ): Promise<GeneratedPost[]> {
   const posts: GeneratedPost[] = [];
   const usedCategories = new Set<string>();
@@ -892,24 +707,8 @@ export async function generateSeedPosts(
     // Pass eventIndex to buildVariables so each event post uses the correct event
     const variables = buildVariables(ctx, option.eventIndex ?? 0);
     
-    // Use spicy templates 60% of the time for more engaging content
-    let message: string;
-    let postMood: string;
-    const useSpicy = options.useSpicyTemplates ?? Math.random() < 0.6;
-    
-    if (useSpicy) {
-      const spicyResult = generateSpicyPost(ctx, { shouldPost: true, postType: option.type, templateCategory: option.category, reason: "", priority: 5 }, variables);
-      if (spicyResult) {
-        message = spicyResult.message;
-        postMood = spicyResult.mood;
-      } else {
-        message = fillTemplateStandard(template, variables);
-        postMood = getMood(option.category);
-      }
-    } else {
-      message = fillTemplateStandard(template, variables);
-      postMood = getMood(option.category);
-    }
+    let message: string = fillTemplateStandard(template, variables);
+    let postMood: string = getMood(option.category);
 
     // Inject fun facts into seed posts more frequently (~40% for variety)
     if (Math.random() < 0.4) {

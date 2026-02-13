@@ -3,8 +3,6 @@
 import React, { useState, useRef, useCallback, useMemo } from "react";
 import type { TicketmasterEvent } from "@/hooks/useEvents";
 import type { TabId, TrafficLevel } from "./types";
-import ShareableSummaryCard from "./ShareableSummaryCard";
-
 /** Strip markdown bold/italic formatting */
 function stripMarkdown(text: string): string {
   return text

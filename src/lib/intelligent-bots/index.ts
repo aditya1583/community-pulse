@@ -26,14 +26,6 @@ export type {
   PostType,
   GeneratedPost,
   CooldownState,
-  // Civic types
-  CivicTopic,
-  CivicMeeting,
-  CivicDecision,
-  CivicStakes,
-  CivicEntityType,
-  CivicMeetingType,
-  CivicDecisionOutcome,
 } from "./types";
 
 // City Configs
@@ -77,62 +69,28 @@ export {
 } from "./template-engine";
 export type { ExtendedPostType } from "./template-engine";
 
-// Engagement Posts - Full suite of engagement-driving content
-// Traditional: Polls, Recommendations, Venue Check-ins
-// High-Engagement: Hot Takes, Confession Booth, Neighbor Challenges
-// Identity Builders: Insider Tips, Nostalgia Triggers, Community Callouts
-// Interactive: Would You Rather, This or That
-// Hyperlocal: Farmers Markets, Landmark Food
+// Engagement Posts - Data-grounded engagement content only
 export {
   generateEngagementPost,
   generateEngagementSeedPosts,
-  // Traditional engagement
   generatePollPost,
   generateRecommendationPost,
-  generateVenueCheckinPost,
   generateSchoolAlertPost,
-  generateLocalSpotlightPost,
   generateThisOrThatPost,
-  generateFomoAlertPost,
-  generateWeeklyRoundupPost,
-  // HIGH-ENGAGEMENT types (viral potential)
-  generateHotTakePost,
-  generateConfessionBoothPost,
   generateNeighborChallengePost,
-  // IDENTITY BUILDERS (community bonding)
-  generateInsiderTipPost,
-  generateNostalgiaTriggerPost,
-  generateCommunityCalloutPost,
-  // INTERACTIVE (easy engagement)
   generateWouldYouRatherPost,
-  // HYPERLOCAL (real data)
-  generateFarmersMarketPost,
-  generateLandmarkFoodPost,
-  // CIVIC (50 XP predictions)
+  generateConfessionBoothPost,
+  generatePredictionPost,
   generateCivicAlertPost,
-  // Analysis
+  generateWeatherAlertPost,
+  generateFarmersMarketPost,
+  generateRoutePulsePost,
   analyzeForEngagement,
   type EngagementPost,
   type EngagementType,
   type EngagementDecision,
   type PostActionData,
 } from "./engagement-posts";
-
-// Civic Templates - Morning Brew style civic content
-// Use these when you have real civic meeting data from /api/civic/meetings
-export {
-  generatePreMeetingAlert,
-  generatePostMeetingSummary,
-  generateCivicPrediction,
-  generateMeetingStartingAlert,
-  generateDecisionFlashAlert,
-  shouldGeneratePreMeetingAlert,
-  isHighStakesTopic,
-  getPredictionWorthyTopics,
-  formatEntityName,
-  CIVIC_PREDICTION_XP,
-  CIVIC_BOT_PERSONAS,
-} from "./civic-templates";
 
 // Data Grounding
 export {

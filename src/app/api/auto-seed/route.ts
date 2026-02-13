@@ -61,42 +61,10 @@ function getCityCoordinates(cityName: string): { lat: number; lon: number } | nu
  * 2. The Promoter - Hypes up events, excited about local happenings
  * 3. The Helper - Warns about weather, shares safety tips, gives advice
  */
-type BotPersonality = "complainer" | "promoter" | "helper";
-
-const BOT_PERSONAS: Record<BotPersonality, {
-  names: string[];
-  tags: string[];
-  mood: string;
-}> = {
-  complainer: {
-    names: ["TrafficGrump", "RoadRanter", "CommuteComplainer", "StuckInTraffic"],
-    tags: ["Traffic"],
-    mood: "😤",
-  },
-  promoter: {
-    names: ["EventHyper", "NightOwl", "LocalBuzz", "WeekendWarrior"],
-    tags: ["Events"],
-    mood: "🤩",
-  },
-  helper: {
-    names: ["WeatherWatch", "SafetyFirst", "LocalHelper", "NeighborTips"],
-    tags: ["Weather", "General"],
-    mood: "😊",
-  },
-};
-
-function getBotPersona(tag: string): BotPersonality {
-  if (tag === "Traffic") return "complainer";
-  if (tag === "Events") return "promoter";
-  return "helper";
-}
-
-function getBotName(tag: string, city: string): string {
-  const personality = getBotPersona(tag);
-  const persona = BOT_PERSONAS[personality];
-  const baseName = persona.names[Math.floor(Math.random() * persona.names.length)];
-  const citySlug = city.split(",")[0].trim().replace(/\s+/g, "");
-  return `${baseName}_${citySlug}`;
+// Single bot persona — all posts come from Pulse Bot
+function getBotName(_tag: string, city: string): string {
+  const citySlug = city.split(",")[0].trim();
+  return `${citySlug} Pulse Bot 🤖`;
 }
 
 // Event-based post templates - THE PROMOTER personality (excited, hype!)
