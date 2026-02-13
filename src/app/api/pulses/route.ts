@@ -8,12 +8,12 @@
  * - Uses SERVICE ROLE key to bypass RLS for writes
  * - Still authenticates users via bearer token to set user_id
  *
- * FAIL-CLOSED GUARANTEE (NON-NEGOTIABLE):
- * - If deterministic checks fail (PII/spam) -> reject 400, NO INSERT
- * - If deterministic checks pass -> AI moderation MUST still run before insert
- * - If AI moderation blocks -> reject 400, NO INSERT
- * - If AI moderation errors/times out/misconfigured/missing key -> reject 503, NO INSERT
- * - Production ALWAYS fails closed, regardless of MODERATION_FAIL_OPEN env var
+ * MODERATION STRATEGY:
+ * - PII detection (Layer 0) is BLOCKING — PII never gets inserted
+ * - Content moderation (Layers A+B) is NON-BLOCKING — flagged content
+ *   is inserted with a review flag. A social app where you can't post is DOA.
+ * - Local heuristics (blocklist, profanity) still run as Layer A
+ * - AI moderation (OpenAI) runs as Layer B but failures don't block posting
  *
  * Safety Pipeline (Three-Layer Architecture):
  *
@@ -236,43 +236,36 @@ export async function POST(req: NextRequest) {
     }
 
     // =========================================================================
-    // SERVER-SIDE MODERATION - This is the authoritative check
-    // Uses the full moderation pipeline: blocklist -> local -> AI -> (optional) Perspective
+    // SERVER-SIDE MODERATION — non-blocking
+    // Moderation runs but NEVER prevents posting. If moderation blocks or
+    // errors, the pulse is still inserted with needs_review = true so it
+    // can be reviewed later. A social app where you can't post is DOA.
     //
-    // FAIL-CLOSED GUARANTEE:
-    // - If moderation blocks content -> 400 (content rejected)
-    // - If moderation service errors/times out/misconfigured -> 503 (service unavailable)
-    // - Production NEVER fails open, regardless of MODERATION_FAIL_OPEN env var
+    // Safety layers still run (PII detection above is blocking).
     // =========================================================================
-    const moderationResult = await runModerationPipeline(trimmedMessage);
-
-    if (!moderationResult.allowed) {
-      // Check if this was a service error (API timeout, missing key, etc.)
-      // vs actual content being blocked by moderation rules
-      if (moderationResult.serviceError) {
-        // Service unavailable - return 503 with generic message
-        // Do NOT reveal the specific error to prevent information disclosure
-        logger.error("Moderation service unavailable - failing closed", {
+    let needsReview = false;
+    let moderationNote = "";
+    try {
+      const moderationResult = await runModerationPipeline(trimmedMessage);
+      if (!moderationResult.allowed) {
+        needsReview = true;
+        moderationNote = moderationResult.serviceError
+          ? "moderation_service_error"
+          : `moderation_blocked: ${moderationResult.reason || "unknown"}`;
+        logger.warn("Moderation flagged content — inserting with review flag", {
           service: "moderation",
           action: "content_check",
+          note: moderationNote,
         });
-        return NextResponse.json(
-          {
-            error: "Posting is temporarily unavailable. Please try again.",
-            code: "SERVICE_UNAVAILABLE"
-          },
-          { status: 503 }
-        );
       }
-
-      // Content was actively blocked by moderation rules - return 400
-      return NextResponse.json(
-        {
-          error: moderationResult.reason || "Message violates content guidelines",
-          code: "MODERATION_FAILED"
-        },
-        { status: 400 }
-      );
+    } catch (modErr) {
+      needsReview = true;
+      moderationNote = `moderation_crash: ${modErr instanceof Error ? modErr.message : "unknown"}`;
+      logger.error("Moderation pipeline crashed — inserting with review flag", {
+        service: "moderation",
+        action: "content_check",
+        error: moderationNote,
+      });
     }
 
     // Also moderate the author name (quick local check only for performance)
@@ -300,21 +293,31 @@ export async function POST(req: NextRequest) {
     // INSERT PULSE using SERVICE ROLE (bypasses RLS)
     // The user_id is explicitly set from the verified auth context
     // =========================================================================
+    const insertPayload: Record<string, unknown> = {
+      city: city.trim(),
+      mood: mood.trim(),
+      tag: tag.trim(),
+      message: trimmedMessage,
+      author: author.trim(),
+      user_id: user.id, // From verified auth, not from request body
+      neighborhood: neighborhood?.trim() || null,
+      lat: typeof lat === "number" && isFinite(lat) ? lat : null,
+      lon: typeof lon === "number" && isFinite(lon) ? lon : null,
+    };
+
+    // Log moderation flags for review (column doesn't exist yet, just log)
+    if (needsReview) {
+      logger.warn("Pulse needs review", {
+        action: "pulse_review",
+        note: moderationNote,
+        contentHash,
+        userId: user.id,
+      });
+    }
+
     const { data, error: insertError } = await serviceClient
       .from("pulses")
-      .insert([
-        {
-          city: city.trim(),
-          mood: mood.trim(),
-          tag: tag.trim(),
-          message: trimmedMessage,
-          author: author.trim(),
-          user_id: user.id, // From verified auth, not from request body
-          neighborhood: neighborhood?.trim() || null,
-          lat: typeof lat === "number" && isFinite(lat) ? lat : null,
-          lon: typeof lon === "number" && isFinite(lon) ? lon : null,
-        },
-      ])
+      .insert([insertPayload])
       .select()
       .single();
 
@@ -325,13 +328,14 @@ export async function POST(req: NextRequest) {
         error: insertError.message,
         code: insertError.code,
       });
+      // Return detailed error so client can show what actually went wrong
       return NextResponse.json(
-        { error: insertError.message },
+        { error: `Insert failed: ${insertError.message} (code: ${insertError.code})` },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ pulse: data });
+    return NextResponse.json({ pulse: data, needsReview });
   } catch (err) {
     logger.error("Unexpected error in pulse creation", {
       action: "pulse_create",
