@@ -132,7 +132,7 @@ export default function PullToRefresh({
       {/* Pull indicator - Only render when actively pulling or refreshing */}
       {shouldShowSpinner && (
         <div
-          className="fixed top-0 left-0 right-0 flex justify-center pt-10 pointer-events-none z-[9999]"
+          className="fixed top-0 left-0 right-0 flex justify-center pt-[calc(env(safe-area-inset-top,0px)+2.5rem)] pointer-events-none z-[9999]"
         >
           <div
             className="flex items-center gap-3 px-5 py-2.5 rounded-full bg-slate-900 border border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.15)] transition-all duration-200"

@@ -179,7 +179,7 @@ export default function LocalDealsSection({
       lon: lon.toString(),
       category: categoryConfig?.osmCategory || "all",
       limit: "12",
-      radius: "5000",
+      radius: "3000", // ~1.9 miles — keeps results feeling truly local
     });
 
     interface OSMPlace {
