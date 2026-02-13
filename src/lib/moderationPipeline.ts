@@ -268,28 +268,37 @@ export async function runModerationPipeline(
     };
   }
 
-  // --- LAYER 3: Claude Haiku (authoritative) ---
+  // --- LAYER 3: OpenAI Moderation API (authoritative) ---
   const aiResult: AIModerationResult = await moderateWithAI(content);
 
   if (!aiResult.allowed) {
-    const durationMs = Date.now() - startTime;
-    const category = getCategoryFromAIResult(aiResult);
-    logTelemetry(requestId, "haiku", false, category, durationMs, contentHash);
-    logBlock("ai", category, aiResult._debug?.confidence);
+    // If AI moderation had a SERVICE ERROR (timeout, API down, no key),
+    // fall through — content already passed local heuristics (Layer 2).
+    // Local checks catch profanity/slurs. Only block on actual content flags.
+    if (aiResult.serviceError) {
+      console.warn(
+        `[moderation] AI moderation unavailable — allowing content (passed local heuristics). requestId=${requestId}`
+      );
+      // Continue to Layer 4 or allow
+    } else {
+      // Content was genuinely flagged by AI — block it
+      const durationMs = Date.now() - startTime;
+      const category = getCategoryFromAIResult(aiResult);
+      logTelemetry(requestId, "haiku", false, category, durationMs, contentHash);
+      logBlock("ai", category, aiResult._debug?.confidence);
 
-    return {
-      allowed: false,
-      reason: aiResult.reason || FRIENDLY_MODERATION_MESSAGE,
-      // Propagate serviceError flag to allow route to return appropriate status code
-      serviceError: aiResult.serviceError,
-      _telemetry: {
-        requestId,
-        layer: "haiku",
-        category,
-        durationMs,
-        contentHash,
-      },
-    };
+      return {
+        allowed: false,
+        reason: aiResult.reason || FRIENDLY_MODERATION_MESSAGE,
+        _telemetry: {
+          requestId,
+          layer: "haiku",
+          category,
+          durationMs,
+          contentHash,
+        },
+      };
+    }
   }
 
   // --- LAYER 4: Perspective API (optional supplementary signal) ---
