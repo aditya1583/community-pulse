@@ -3,42 +3,6 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
-import { authBridge } from "@/lib/authBridge";
-
-/** Load profile via server-side endpoint (works in WKWebView) or Supabase JS fallback */
-async function loadProfileServerSide(accessToken: string): Promise<{ anon_name: string; name_locked: boolean } | null> {
-  try {
-    const res = await fetch(getApiUrl("/api/auth/profile"), {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data.profile) {
-      return { anon_name: data.profile.anon_name, name_locked: data.profile.name_locked ?? false };
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-async function createProfileServerSide(accessToken: string, anonName: string): Promise<{ anon_name: string; name_locked: boolean } | null> {
-  try {
-    const res = await fetch(getApiUrl("/api/auth/profile"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify({ anon_name: anonName }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data.profile) {
-      return { anon_name: data.profile.anon_name, name_locked: data.profile.name_locked ?? false };
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
 import { useGeocodingAutocomplete } from "@/hooks/useGeocodingAutocomplete";
 import { useEvents } from "@/hooks/useEvents";
 import type { GeocodedCity } from "@/lib/geocoding";
@@ -47,18 +11,14 @@ import {
   readOnboardingCompleted,
   resetComposerAfterSuccessfulPost,
   shouldShowFirstPulseOnboarding,
-  startOfRecentWindow,
   startOfNextLocalDay,
   writeOnboardingCompleted,
   filterVisiblePulses,
-  isPulseVisible,
   hasShownFirstPulseModalThisSession,
   markFirstPulseModalShown,
   type AuthStatus,
 } from "@/lib/pulses";
 import { moderateContent } from "@/lib/moderation";
-import { generateUniqueUsername } from "@/lib/username";
-
 // New Neon Theme Components
 // Force rebuild: PulseCard styling update
 import Header from "@/components/Header";
@@ -77,57 +37,18 @@ import PulseModal from "@/components/PulseModal";
 import TrafficContent from "@/components/TrafficContent";
 import LiveVibes from "@/components/LiveVibes";
 import { DASHBOARD_TABS, type TabId, type WeatherInfo, type Pulse, type CityMood, type TrafficLevel, type LocalSection } from "@/components/types";
+import { useAuth } from "@/hooks/useAuth";
+import type { Profile } from "@/hooks/useAuth";
+import { usePulses } from "@/hooks/usePulses";
 import { useGamification } from "@/hooks/useGamification";
 import XPProgressBadge from "@/components/XPProgressBadge";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import LocationPrompt from "@/components/LocationPrompt";
-import { calculateDistanceMiles } from "@/lib/geo/distance";
 import { RADIUS_CONFIG } from "@/lib/constants/radius";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
 import InstallPrompt from "@/components/InstallPrompt";
 import PullToRefresh from "@/components/PullToRefresh";
 import { getApiUrl } from "@/lib/api-config";
-
-// Real-time Live Updates
-type DBPulse = {
-  id: number;
-  city: string;
-  neighborhood?: string | null;
-  mood: string;
-  tag: string;
-  message: string;
-  author: string;
-  created_at: string;
-  user_id?: string;
-  expires_at?: string | null;
-  is_bot?: boolean;
-  hidden?: boolean;
-  poll_options?: string[] | null;
-  lat?: number | null;
-  lon?: number | null;
-};
-
-// Pagination constants
-const PULSES_PAGE_SIZE = 50;
-
-function mapDBPulseToPulse(row: DBPulse): Pulse {
-  return {
-    id: row.id,
-    city: row.city,
-    neighborhood: row.neighborhood ?? null,
-    mood: row.mood,
-    tag: row.tag,
-    message: row.message,
-    author: row.author,
-    createdAt: row.created_at,
-    user_id: row.user_id,
-    expiresAt: row.expires_at ?? null,
-    is_bot: row.is_bot ?? false,
-    poll_options: row.poll_options ?? null,
-    lat: row.lat ?? null,
-    lon: row.lon ?? null,
-  };
-}
 
 // EVENTS
 type EventItem = {
@@ -172,11 +93,6 @@ type StoredCity = {
   id?: string;
 };
 
-type Profile = {
-  anon_name: string;
-  name_locked?: boolean | null;
-};
-
 const TAB_ID_SET = new Set<TabId>(DASHBOARD_TABS.map((tab) => tab.id));
 
 function isTabId(value: unknown): value is TabId {
@@ -209,11 +125,6 @@ export default function Home() {
   const [tabMoodValidationError, setTabMoodValidationError] = useState<string | null>(null);
   const [tabMessageValidationError, setTabMessageValidationError] = useState<string | null>(null);
   const [showTabValidationErrors, setShowTabValidationErrors] = useState(false);
-  const [pulses, setPulses] = useState<Pulse[]>([]);
-  // Track whether initial pulse fetch has completed (prevents "No pulses" flash)
-  const [initialPulsesFetched, setInitialPulsesFetched] = useState(false);
-  // Author stats for displaying level/rank on pulse cards
-  const [authorStats, setAuthorStats] = useState<Record<string, { level: number; rank: number | null }>>({});
 
   // Tab state for new Neon theme
   // Persist tab state in sessionStorage so it survives navigation to venue pages
@@ -251,11 +162,23 @@ export default function Home() {
   }, []);
   const [showPulseModal, setShowPulseModal] = useState(false);
 
-  // Auth + anon profile
-  const [sessionUser, setSessionUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
-  const [profileLoading, setProfileLoading] = useState(false);
+  // Auth + anon profile (extracted to useAuth hook)
+  const {
+    sessionUser, setSessionUser,
+    profile, setProfile,
+    authStatus, setAuthStatus,
+    profileLoading, setProfileLoading,
+    showAuthModal, setShowAuthModal,
+    authMode, setAuthMode,
+    authEmail, setAuthEmail,
+    authPassword, setAuthPassword,
+    authPasswordConfirm, setAuthPasswordConfirm,
+    authLoading, setAuthLoading,
+    authError, setAuthError,
+    authSuccess, setAuthSuccess,
+    handleAuth,
+    handleForgotPassword,
+  } = useAuth();
 
   // User gamification stats (level, XP, tier)
   const {
@@ -267,6 +190,21 @@ export default function Home() {
 
   // Geolocation - true hyperlocal experience
   const geolocation = useGeolocation();
+
+  // Pulses/Feed (extracted to usePulses hook)
+  const {
+    pulses, setPulses,
+    initialPulsesFetched, setInitialPulsesFetched,
+    hasMorePulses,
+    loadingMore,
+    authorStats,
+    loading, setLoading, errorMsg, setErrorMsg,
+    fetchPulses,
+    handlePullToRefresh,
+    handleLoadMorePulses,
+    visiblePulses,
+    pulsesWithDistance,
+  } = usePulses({ city, selectedCity, geolocation });
   // Initialize with false to avoid hydration mismatch - restored in useEffect
   const [useManualLocation, setUseManualLocation] = useState(false);
   // Track if we've restored state from storage (prevents geolocation race)
@@ -305,25 +243,8 @@ export default function Home() {
   const [showValidationErrors, setShowValidationErrors] = useState(false);
   const [checklistDismissed, setChecklistDismissed] = useState(false);
 
-  // Auth form state
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authMode, setAuthMode] = useState<"signin" | "signup" | "forgot">("signin");
-  const [authEmail, setAuthEmail] = useState("");
-  const [authPassword, setAuthPassword] = useState("");
-  const [authPasswordConfirm, setAuthPasswordConfirm] = useState("");
-  const [authLoading, setAuthLoading] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [authSuccess, setAuthSuccess] = useState<string | null>(null);
-
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
   // Pull-to-refresh trigger
   // refreshTrigger removed — pull-to-refresh now directly awaits fetchPulses
-
-  // Pagination state
-  const [hasMorePulses, setHasMorePulses] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
 
   // Events state (legacy - user-created events from Supabase)
   const [events, setEvents] = useState<EventItem[]>([]);
@@ -527,64 +448,6 @@ export default function Home() {
     };
   }, [city, pulses, ticketmasterEvents, trafficLevel, weather]);
 
-  // ========= REAL-TIME FEED =========
-  useEffect(() => {
-    if (!city) return;
-
-    const channelName = `pulses-realtime-${city.replace(/[^a-zA-Z0-9]/g, '_')}`;
-
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "pulses",
-        },
-        (payload) => {
-          const row = payload.new as DBPulse;
-          // Match city loosely — "Leander, Texas" should match "Leander, Texas, US"
-          const cityBase = city.split(",").slice(0, 2).join(",").trim().toLowerCase();
-          const rowCityBase = (row.city || "").split(",").slice(0, 2).join(",").trim().toLowerCase();
-          if (!row || rowCityBase !== cityBase) return;
-          if (!isInRecentWindow(row.created_at)) return;
-
-          const pulse = mapDBPulseToPulse(row);
-
-          setPulses((prev) => {
-            const exists = prev.some((p) => String(p.id) === String(pulse.id));
-            if (exists) return prev;
-
-            return [pulse, ...prev].sort(
-              (a, b) =>
-                new Date(b.createdAt).getTime() -
-                new Date(a.createdAt).getTime()
-            );
-          });
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "DELETE",
-          schema: "public",
-          table: "pulses",
-        },
-        (payload) => {
-          const deleted = payload.old as { id?: number };
-          if (!deleted?.id) return;
-
-          setPulses((prev) => prev.filter((p) => p.id !== deleted.id));
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [city, setPulses]);
-
   // ========= CITY MOOD =========
   // ENHANCED: Now passes ALL city context (events, traffic, weather, news)
   // so the vibe calculation reflects total city activity, not just pulses.
@@ -768,116 +631,10 @@ export default function Home() {
     };
   }, [city, selectedCity?.lat, selectedCity?.lon]);
 
-  // ========= LOAD SESSION + PROFILE =========
-  useEffect(() => {
-    async function loadUser() {
-      setAuthStatus("loading");
-      setProfileLoading(false);
-
-      const { data: auth } = await authBridge.getUser();
-      const user = auth.user;
-      setSessionUser(user);
-
-      if (!user) {
-        setProfile(null);
-        setAuthStatus("signed_out");
-        return;
-      }
-
-      setAuthStatus("signed_in");
-      setProfileLoading(true);
-      try {
-        const token = await authBridge.getAccessToken();
-        let profileResult = token ? await loadProfileServerSide(token) : null;
-
-        if (profileResult) {
-          setProfile(profileResult);
-        } else if (token) {
-          // No profile exists — create one
-          const anon = await generateUniqueUsername(supabase);
-          profileResult = await createProfileServerSide(token, anon);
-          setProfile(profileResult || { anon_name: anon, name_locked: false });
-        }
-      } catch (err) {
-        console.error("[Voxlo] Profile load failed:", err);
-      } finally {
-        setProfileLoading(false);
-      }
-    }
-
-    loadUser();
-
-    // Listen for auth state changes (session refresh, sign in/out)
-    const { data: { subscription } } = authBridge.onAuthStateChange(
-      async (event, session) => {
-        if (event === "TOKEN_REFRESHED" || event === "SIGNED_IN") {
-          const user = session?.user ?? null;
-          setSessionUser(user);
-          if (user) {
-            setAuthStatus("signed_in");
-            // Load profile via server-side endpoint (works in WKWebView)
-            try {
-              setProfileLoading(true);
-              const token = await authBridge.getAccessToken();
-              let profileResult = token ? await loadProfileServerSide(token) : null;
-              if (profileResult) {
-                setProfile(profileResult);
-              } else if (token) {
-                const anon = await generateUniqueUsername(supabase);
-                profileResult = await createProfileServerSide(token, anon);
-                setProfile(profileResult || { anon_name: anon, name_locked: false });
-              }
-            } catch (err) {
-              console.error("[Voxlo] Profile load in onAuthStateChange failed:", err);
-            } finally {
-              setProfileLoading(false);
-            }
-          }
-        } else if (event === "SIGNED_OUT") {
-          setSessionUser(null);
-          setProfile(null);
-          setAuthStatus("signed_out");
-        }
-      }
-    );
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  // Listen for sign-in modal requests from child components (e.g., PollVoting)
-  useEffect(() => {
-    const handleShowSignIn = () => {
-      setShowAuthModal(true);
-    };
-
-    window.addEventListener("showSignInModal", handleShowSignIn);
-    return () => {
-      window.removeEventListener("showSignInModal", handleShowSignIn);
-    };
-  }, []);
-
   // Identity is ready when signed in with a profile, OR if profile loading is taking too long
   // This prevents the "WAIT..." button from getting stuck forever
   const identityReady =
     authStatus === "signed_in" && !!sessionUser && !profileLoading && !!profile;
-  
-  // Safety timeout: if profileLoading is stuck for >5 seconds, force it to complete
-  useEffect(() => {
-    if (profileLoading && authStatus === "signed_in" && sessionUser) {
-      const timeout = setTimeout(() => {
-        console.warn("[Voxlo] Profile loading timeout - forcing ready state");
-        setProfileLoading(false);
-        // Only set fallback if no profile was loaded by the real loader
-        setProfile(prev => prev ?? {
-          anon_name: `User${sessionUser.id.slice(0, 6)}`,
-          name_locked: false,
-        });
-      }, 5000);
-      return () => clearTimeout(timeout);
-    }
-  }, [profileLoading, authStatus, sessionUser, profile]);
 
   useEffect(() => {
     const userId = sessionUser?.id;
@@ -1338,119 +1095,6 @@ export default function Home() {
     }
   }
 
-  // ========= PULSES FETCH =========
-  // FIXED: Extracted fetchPulses to component level so pull-to-refresh can await it directly.
-  // Previously it was defined inside useEffect, causing a hang when Supabase took >800ms.
-  const fetchPulses = useCallback(async () => {
-    setLoading(true);
-    setErrorMsg(null);
-    // IMPORTANT: Don't clear pulses here - let the loading state show instead
-    // This prevents the "No pulses" flash before data arrives
-    setHasMorePulses(false);
-
-    console.log("[Pulses] fetchPulses called for city:", city);
-
-    try {
-      // Use server-side API endpoint instead of Supabase JS client
-      // The JS client hangs in Capacitor WKWebView
-      const userLat = selectedCity?.lat;
-      const userLon = selectedCity?.lon;
-      const params = new URLSearchParams();
-      if (userLat != null && userLon != null) {
-        params.set("lat", String(userLat));
-        params.set("lon", String(userLon));
-      }
-      params.set("city", city);
-      params.set("limit", String(PULSES_PAGE_SIZE + 1));
-
-      const apiUrl = `${getApiUrl("/api/pulses/feed")}?${params}`;
-      console.log(`[Pulses] Fetching via API: ${apiUrl}`);
-      const res = await fetch(apiUrl, { signal: AbortSignal.timeout(8000) });
-
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(errBody.error || `API error ${res.status}`);
-      }
-
-      const result = await res.json();
-      const rawData: DBPulse[] = result.pulses || [];
-      console.log(`[Pulses] API returned ${rawData.length} pulses`);
-
-      let data: DBPulse[] | null = rawData;
-      let error: { message: string } | null = null;
-
-      if (error) {
-        console.error("[Pulses] Error fetching pulses:", error.message);
-        setErrorMsg("Could not load pulses. Try again in a bit.");
-        setPulses([]);
-      } else if (data) {
-        console.log(`[Pulses] Fetched ${data.length} pulses from DB for "${city}"`);
-
-        // Debug: log expiry info for first few pulses
-        if (data.length > 0) {
-          const now = new Date();
-          data.slice(0, 3).forEach((p, i) => {
-            const expiresAt = p.expires_at ? new Date(p.expires_at) : null;
-            const isExpired = expiresAt ? expiresAt.getTime() < now.getTime() - 60 * 60 * 1000 : false;
-            console.log(`[Pulses] #${i + 1}: tag=${p.tag}, created=${p.created_at}, expires=${p.expires_at}, expired=${isExpired}`);
-          });
-        }
-
-        const hasMore = data.length > PULSES_PAGE_SIZE;
-        setHasMorePulses(hasMore);
-
-        const pageData = hasMore ? data.slice(0, PULSES_PAGE_SIZE) : data;
-
-        const mapped: Pulse[] = (pageData as DBPulse[]).map((row) => ({
-          ...mapDBPulseToPulse(row),
-          author: row.author || "Anonymous",
-        }));
-        setPulses(mapped);
-      } else {
-        console.log(`[Pulses] No data returned for "${city}" (data is null/undefined)`);
-        // Explicit empty case
-        setPulses([]);
-      }
-    } catch (fetchErr) {
-      console.error("[Pulses] fetchPulses CAUGHT ERROR:", fetchErr);
-      setErrorMsg(fetchErr instanceof Error ? fetchErr.message : "Unknown fetch error");
-      setPulses([]);
-    } finally {
-      setLoading(false);
-      setInitialPulsesFetched(true);
-    }
-  }, [city, selectedCity?.lat, selectedCity?.lon, supabase]);
-
-  // Initial load + auto-refresh interval
-  useEffect(() => {
-    // Reset the flag when city changes to indicate we need to fetch again
-    setInitialPulsesFetched(false);
-
-    if (city) {
-      fetchPulses();
-
-      // Safety net refresh every 5 minutes (Supabase Realtime handles live updates)
-      // Only catches edge cases: expired posts, missed websocket events
-      const refreshInterval = setInterval(() => {
-        console.log("[Pulses] Safety-net refresh (Realtime is primary)...");
-        fetchPulses();
-      }, 5 * 60 * 1000); // 5 minutes (was 2 min — Realtime handles inserts/deletes)
-
-      return () => clearInterval(refreshInterval);
-    }
-  }, [city, fetchPulses]);
-
-  // ========= PULL-TO-REFRESH HANDLER =========
-  const handlePullToRefresh = useCallback(async () => {
-    console.log("[PullToRefresh] Triggered manual refresh");
-    try {
-      await fetchPulses();
-    } catch (err) {
-      console.error("[PullToRefresh] fetchPulses error:", err);
-      // Swallow error so PullToRefresh component can clean up properly
-    }
-  }, [fetchPulses]);
-
   // ========= AUTO-SEED AND REFRESH STALE CITIES =========
   // When a city has no pulses OR content is stale, automatically generate fresh bot posts
   // This keeps the app feeling alive with continuous content generation
@@ -1649,113 +1293,6 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [city, initialPulsesFetched, pulses.length, ticketmasterEvents, ticketmasterLoading, weather, weatherLoading, autoSeedAttempted, staleRefreshAttempted, loading, selectedCity?.lat, selectedCity?.lon]);
 
-  // ========= FETCH AUTHOR STATS =========
-  // Batch fetch level and rank for all unique authors when pulses change
-  useEffect(() => {
-    const fetchAuthorStats = async () => {
-      // Get unique user IDs from pulses
-      const userIds = [
-        ...new Set(
-          pulses
-            .map((p) => p.user_id)
-            .filter((id): id is string => Boolean(id))
-        ),
-      ];
-
-      if (userIds.length === 0) {
-        setAuthorStats({});
-        return;
-      }
-
-      try {
-        const res = await fetch(
-          `/api/gamification/batch-stats?userIds=${userIds.join(",")}`
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setAuthorStats(data.stats || {});
-        }
-      } catch (err) {
-        console.error("[fetchAuthorStats] Error:", err);
-      }
-    };
-
-    if (pulses.length > 0) {
-      fetchAuthorStats();
-    }
-  }, [pulses]);
-
-  // ========= LOAD MORE PULSES =========
-  const handleLoadMorePulses = async () => {
-    if (loadingMore || !hasMorePulses || pulses.length === 0) return;
-
-    setLoadingMore(true);
-
-    const now = new Date();
-    const start = startOfRecentWindow(now, 7);
-    const loadMoreExpiryGrace = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
-
-    const oldestPulse = pulses[pulses.length - 1];
-    const cursor = oldestPulse.createdAt;
-
-    try {
-      // Use same column selection as initial fetch (with poll_options and lat/lon)
-      let data: DBPulse[] | null = null;
-      let error: { message: string } | null = null;
-
-      const queryWithPolls = await supabase
-        .from("pulses")
-        .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, poll_options, lat, lon")
-        .eq("city", city)
-        .gte("created_at", start.toISOString())
-        .lt("created_at", cursor)
-        .or(`expires_at.is.null,expires_at.gt.${loadMoreExpiryGrace}`)
-        .order("created_at", { ascending: false })
-        .limit(PULSES_PAGE_SIZE + 1);
-
-      if (queryWithPolls.error?.message?.includes("poll_options")) {
-        const fallbackQuery = await supabase
-          .from("pulses")
-          .select("id, city, neighborhood, mood, tag, message, author, created_at, user_id, expires_at, is_bot, lat, lon")
-          .eq("city", city)
-          .gte("created_at", start.toISOString())
-          .lt("created_at", cursor)
-          .or(`expires_at.is.null,expires_at.gt.${loadMoreExpiryGrace}`)
-          .order("created_at", { ascending: false })
-          .limit(PULSES_PAGE_SIZE + 1);
-        data = (fallbackQuery.data as DBPulse[]) ?? null;
-        error = fallbackQuery.error;
-      } else {
-        data = (queryWithPolls.data as DBPulse[]) ?? null;
-        error = queryWithPolls.error;
-      }
-
-      if (error) {
-        console.error("Error loading more pulses:", error.message);
-      } else if (data) {
-        const hasMore = data.length > PULSES_PAGE_SIZE;
-        setHasMorePulses(hasMore);
-
-        const pageData = hasMore ? data.slice(0, PULSES_PAGE_SIZE) : data;
-
-        const mapped: Pulse[] = (pageData as DBPulse[]).map((row) => ({
-          ...mapDBPulseToPulse(row),
-          author: row.author || "Anonymous",
-        }));
-
-        setPulses((prev) => {
-          const existingIds = new Set(prev.map((p) => p.id));
-          const newPulses = mapped.filter((p) => !existingIds.has(p.id));
-          return [...prev, ...newPulses];
-        });
-      }
-    } catch (err) {
-      console.error("Unexpected error loading more pulses:", err);
-    } finally {
-      setLoadingMore(false);
-    }
-  };
-
   // ========= TRAFFIC =========
   // ========= CREATE EVENT HANDLER =========
   async function handleCreateEvent(e: React.FormEvent) {
@@ -1928,189 +1465,6 @@ export default function Home() {
     }
   }
 
-  // ========= PASSWORD VALIDATION =========
-  function validatePassword(password: string): { valid: boolean; error?: string } {
-    if (password.length < 8) {
-      return { valid: false, error: "Password must be at least 8 characters" };
-    }
-
-    if (!/[a-z]/.test(password)) {
-      return { valid: false, error: "Password must contain at least one lowercase letter" };
-    }
-
-    if (!/[A-Z]/.test(password)) {
-      return { valid: false, error: "Password must contain at least one uppercase letter" };
-    }
-
-    if (!/[0-9]/.test(password)) {
-      return { valid: false, error: "Password must contain at least one number" };
-    }
-
-    return { valid: true };
-  }
-
-  // ========= AUTH HANDLER =========
-  async function handleAuth(e: React.FormEvent) {
-    e.preventDefault();
-
-    const email = authEmail.trim();
-    const password = authPassword.trim();
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setAuthError("Please enter a valid email address.");
-      return;
-    }
-
-    if (!email || !password) {
-      setAuthError("Please enter both email and password.");
-      return;
-    }
-
-    try {
-      setAuthLoading(true);
-      setAuthError(null);
-
-      if (authMode === "signup") {
-        const passwordValidation = validatePassword(password);
-        if (!passwordValidation.valid) {
-          setAuthError(passwordValidation.error || "Password does not meet requirements.");
-          setAuthLoading(false);
-          return;
-        }
-
-        if (password !== authPasswordConfirm) {
-          setAuthError("Passwords do not match.");
-          setAuthLoading(false);
-          return;
-        }
-
-        const { data: signUpData, error: signUpError } = await authBridge.signUp({
-          email,
-          password,
-        });
-
-        if (signUpError) {
-          if (signUpError.message.toLowerCase().includes("already registered") ||
-            signUpError.message.toLowerCase().includes("already exists") ||
-            signUpError.message.toLowerCase().includes("user already")) {
-            setAuthError("This email is already registered. Please check your email for a confirmation link, or try signing in.");
-            return;
-          }
-          setAuthError(signUpError.message || "Could not create account. Please try again.");
-          return;
-        }
-
-        if (signUpData.user) {
-          // Detect existing accounts: Supabase may return a user with empty identities
-          // OR a user whose created_at is old (account already existed).
-          const identities = (signUpData.user as { identities?: unknown[] }).identities;
-          const createdAt = signUpData.user.created_at ? new Date(signUpData.user.created_at).getTime() : 0;
-          const isOldAccount = createdAt > 0 && (Date.now() - createdAt) > 60_000; // created > 1 min ago
-          const emptyIdentities = Array.isArray(identities) && identities.length === 0;
-
-          if (emptyIdentities || (isOldAccount && !signUpData.session)) {
-            setAuthError("This email is already registered. Please sign in instead.");
-            setAuthMode("signin");
-            setAuthPasswordConfirm("");
-            setAuthLoading(false);
-            return;
-          }
-
-          if (!signUpData.session) {
-            setAuthError("Account created! Please check your email to confirm your account before signing in.");
-            setAuthEmail("");
-            setAuthPassword("");
-            setAuthPasswordConfirm("");
-            setAuthStatus("signed_out");
-            return;
-          }
-
-          setSessionUser(signUpData.user);
-          setAuthStatus("signed_in");
-          // Close modal immediately — profile loading handled by onAuthStateChange
-          setAuthEmail("");
-          setAuthPassword("");
-          setAuthPasswordConfirm("");
-          setShowAuthModal(false);
-        }
-      } else {
-        const { data: signInData, error: signInError } = await authBridge.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (signInError) {
-          setAuthError(signInError.message || "Invalid email or password.");
-          return;
-        }
-
-        if (signInData.user) {
-          setSessionUser(signInData.user);
-          setAuthStatus("signed_in");
-          // Close modal immediately — profile loading handled by onAuthStateChange
-          setAuthEmail("");
-          setAuthPassword("");
-          setAuthPasswordConfirm("");
-          setShowAuthModal(false);
-        }
-      }
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Something went wrong. Please try again.";
-      console.error("Auth error:", err);
-      setAuthError(message);
-    } finally {
-      setAuthLoading(false);
-    }
-  }
-
-  async function handleForgotPassword(e: React.FormEvent) {
-    e.preventDefault();
-
-    const email = authEmail.trim();
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (!email) {
-      setAuthError("Please enter your email address.");
-      return;
-    }
-
-    if (!emailRegex.test(email)) {
-      setAuthError("Please enter a valid email address.");
-      return;
-    }
-
-    try {
-      setAuthLoading(true);
-      setAuthError(null);
-      setAuthSuccess(null);
-
-      const { error } = await authBridge.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-
-      if (error) {
-        setAuthError(error.message || "Could not send reset email. Please try again.");
-        return;
-      }
-
-      setAuthSuccess("Check your email for a password reset link.");
-      setAuthEmail("");
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Something went wrong. Please try again.";
-      console.error("Forgot password error:", err);
-      setAuthError(message);
-    } finally {
-      setAuthLoading(false);
-    }
-  }
-
   // ========= AI USERNAME GENERATOR HANDLERS =========
   async function handleGenerateUsername() {
     const prompt = usernamePrompt.trim();
@@ -2206,95 +1560,6 @@ export default function Home() {
       setUsernameGenerating(false);
     }
   }
-
-  // ========= FILTER AND SORT PULSES BY DISTANCE =========
-  // 1. Filter expired pulses (client-side safety net)
-  // 2. Calculate distance from user's location
-  // 3. Sort by distance: in-radius (< 10mi) first, then out-of-radius
-  // 4. Apply tag filter
-
-  const visiblePulses = useMemo(() => {
-    const filtered = filterVisiblePulses(pulses);
-    // Deduplicate: remove posts with identical content from the same author within 5 minutes
-    const seen = new Map<string, number>(); // key -> timestamp
-    return filtered.filter((p) => {
-      const key = `${p.author}::${p.message}`;
-      const ts = new Date(p.createdAt).getTime();
-      const existing = seen.get(key);
-      if (existing !== undefined && Math.abs(ts - existing) < 5 * 60 * 1000) {
-        return false; // duplicate within 5 min window
-      }
-      seen.set(key, ts);
-      return true;
-    });
-  }, [pulses]);
-
-  const afterRecentFilter = useMemo(
-    () => visiblePulses.filter((p) => isInRecentWindow(p.createdAt)),
-    [visiblePulses]
-  );
-
-  // Calculate distance for each pulse and sort by proximity
-  const pulsesWithDistance = useMemo(() => {
-    // Use geolocation if available, otherwise use selected city coordinates
-    const userLat = geolocation.lat ?? selectedCity?.lat ?? null;
-    const userLon = geolocation.lon ?? selectedCity?.lon ?? null;
-
-    if (!userLat || !userLon) {
-      // No location available - return pulses with null distance, sorted by time
-      return afterRecentFilter.map((p) => ({ ...p, distanceMiles: null }));
-    }
-
-    // Calculate distance for each pulse
-    const withDistance = afterRecentFilter.map((pulse) => {
-      // Use pulse's stored coordinates if available
-      const pulseLat = pulse.lat ?? null;
-      const pulseLon = pulse.lon ?? null;
-
-      let distanceMiles: number | null = null;
-
-      if (pulseLat !== null && pulseLon !== null) {
-        distanceMiles = calculateDistanceMiles(
-          { lat: userLat, lon: userLon },
-          { lat: pulseLat, lon: pulseLon }
-        );
-      }
-
-      // If the pulse is from the same city, treat it as in-radius (distance 0)
-      // This prevents "BEYOND 10 MILES" for posts where GPS wasn't ready at post time
-      const pulseCity = (pulse.city || "").toLowerCase().trim();
-      const currentCity = (city || "").toLowerCase().trim();
-      if (pulseCity && currentCity && pulseCity === currentCity && (distanceMiles === null || distanceMiles > RADIUS_CONFIG.PRIMARY_RADIUS_MILES)) {
-        distanceMiles = 0;
-      }
-
-      return { ...pulse, distanceMiles };
-    });
-
-    // Sort: in-radius first (by distance), then out-of-radius (by distance)
-    // Within each group, maintain time-based order for same-distance pulses
-    return withDistance.sort((a, b) => {
-      const distA = a.distanceMiles;
-      const distB = b.distanceMiles;
-      const radiusMiles = RADIUS_CONFIG.PRIMARY_RADIUS_MILES;
-
-      // Handle null distances - push to end
-      if (distA === null && distB === null) return 0;
-      if (distA === null) return 1;
-      if (distB === null) return -1;
-
-      // Categorize: in-radius vs out-of-radius
-      const aInRadius = distA <= radiusMiles;
-      const bInRadius = distB <= radiusMiles;
-
-      // In-radius pulses come first
-      if (aInRadius && !bInRadius) return -1;
-      if (!aInRadius && bInRadius) return 1;
-
-      // Within same category, sort by distance (closest first)
-      return distA - distB;
-    });
-  }, [afterRecentFilter, geolocation.lat, geolocation.lon, selectedCity?.lat, selectedCity?.lon]);
 
   // Apply tag filter
   const filteredPulses = pulsesWithDistance.filter((p) => tagFilter === "All" || p.tag === tagFilter);
