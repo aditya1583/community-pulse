@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
+import { authBridge } from "@/lib/authBridge";
 import { useGeocodingAutocomplete } from "@/hooks/useGeocodingAutocomplete";
 import { useEvents } from "@/hooks/useEvents";
 import type { GeocodedCity } from "@/lib/geocoding";
