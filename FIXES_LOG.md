@@ -230,3 +230,36 @@ This enables freshness auditing — you can see exactly what data backed each po
 
 #### Build Status
 ✅ `npm run build` passes clean (also fixed pre-existing `@capacitor/app` missing dependency)
+
+---
+
+## Commit: 510784a (2026-02-13) — Phase 1 Dead Code Removal
+
+### CHANGE 1: 19 Bot Personas → Single Pulse Bot 🤖 ✅
+**Files:** `src/lib/intelligent-bots/template-engine.ts`, `src/app/api/auto-seed/route.ts`
+**What changed:** Replaced 19 randomized bot personas (TrafficGrump, EventHyper, munching_bot, etc.) with a single "Pulse Bot 🤖" persona. All bot posts now use consistent `{city} Pulse Bot 🤖` author name. Removed BOT_PERSONAS record, simplified getBotName/getBotPersona to always return Pulse Bot.
+
+### CHANGE 2: Dead Components Removed (6 files, ~2,925 lines) ✅
+**Files deleted:** `VenueVibeCheck.tsx` (964), `ChallengeCard.tsx` (614), `NotificationSettings.tsx` (448), `AISummaryCard.tsx` (316), `ShareableSummaryCard.tsx` (360), `PulseReactions.tsx` (223)
+**What changed:** All confirmed dead — no imports found in codebase. Removed dead import of ShareableSummaryCard from AISummaryStories.tsx.
+
+### CHANGE 3: Dead API Routes Removed (6 routes, ~1,600 lines) ✅
+**Files deleted:** `/api/challenges/route.ts`, `/api/challenges/[id]/claim/route.ts`, `/api/civic/meetings/route.ts`, `/api/civic/meetings/[id]/decisions/route.ts`, `/api/pulses/seed/route.ts` (was already 410), `/api/vibe-confirm/route.ts`
+**What changed:** All confirmed dead — no frontend references found. Civic meeting routes had no data source anyway.
+
+### CHANGE 4: Intelligent Bots System Gutted ✅
+**Files deleted:** `spicy-templates.ts` (345), `challenge-generator.ts` (595), `civic-templates.ts` (539)
+**Files rewritten:** `engagement-posts.ts` (3,628 → 928), `template-engine.ts` (1,098 → 902)
+**What changed:** Removed all fabricated engagement types and their handlers. Kept only data-grounded types: weather_alert, route_pulse, this_or_that, prediction, school_alert, farmers_market, confession_booth, neighbor_challenge, would_you_rather, civic_alert, poll, recommendation. Removed spicy template system entirely — all posts now use standard data-backed templates.
+
+### Totals
+- Total codebase: 62,223 → 53,431 lines (**-8,792 lines**)
+- Intelligent bots: 9,464 → 6,080 lines
+- Components: 50 → 44
+- API routes: 58 → 52
+
+### Build Status
+✅ `npm run build` passes clean
+
+### Push Status
+✅ Pushed to apple/main
