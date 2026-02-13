@@ -230,7 +230,7 @@ export async function GET(req: NextRequest) {
           id: `osm-${el.id}`,
           name: tags.name || tags.brand || tags.operator || "Place",
           category: TAG_LABELS[amenity] || amenity,
-          address: addressParts.length > 0 ? addressParts.join(", ") : "Address unknown",
+          address: addressParts.length > 0 ? addressParts.join(", ") : null,
           distance: haversineDistance(parsedLat, parsedLon, elLat, elLon),
           lat: elLat,
           lon: elLon,

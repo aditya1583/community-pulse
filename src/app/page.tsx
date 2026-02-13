@@ -142,13 +142,12 @@ export default function Home() {
     }
   };
 
-  // Restore tab and local section from sessionStorage on mount
+  // Restore local section from sessionStorage on mount
+  // NOTE: We do NOT restore the active tab — "events" is always the default
+  // because events are the wedge feature. sessionStorage in WKWebView persists
+  // across app restarts, so restoring would override the intended default.
   useEffect(() => {
     try {
-      const savedTab = sessionStorage.getItem("cp-active-tab");
-      if (savedTab && isTabId(savedTab)) {
-        setActiveTabState(savedTab);
-      }
       // Also restore local section if navigating to local tab
       const savedLocalSection = sessionStorage.getItem("cp-local-section");
       if (savedLocalSection && ["deals", "gas", "markets", "heatmap"].includes(savedLocalSection)) {

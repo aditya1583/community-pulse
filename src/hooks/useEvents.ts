@@ -112,7 +112,16 @@ export function useEvents(
         throw new Error(data.error || "Failed to fetch events");
       }
 
-      setEvents(data.events || []);
+      // Deduplicate events by name + venue + date
+      const rawEvents: TicketmasterEvent[] = data.events || [];
+      const seen = new Set<string>();
+      const dedupedEvents = rawEvents.filter((e: TicketmasterEvent) => {
+        const key = `${e.name}|${e.venue || ""}|${(e.date || "").slice(0, 10)}`.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      setEvents(dedupedEvents);
       setError(data.error || null);
       setFallback(data.fallback || null);
     } catch (err) {

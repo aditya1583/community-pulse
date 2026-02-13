@@ -221,10 +221,10 @@ async function fetchTraffic(city: string, lat?: number, lon?: number) {
     } catch { /* ignore */ }
   }
 
-  // Calculate level
+  // Calculate level based on ACTUAL flow, not just closures
+  // Road closures are shown as incidents, not used to override flow level
   let level: string;
-  if (hasRoadClosure) level = "Severe";
-  else if (flowPercent >= 80) level = "Light";
+  if (flowPercent >= 80) level = "Light";
   else if (flowPercent >= 60) level = "Moderate";
   else if (flowPercent >= 40) level = "Heavy";
   else level = "Severe";

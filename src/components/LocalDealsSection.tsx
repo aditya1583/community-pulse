@@ -540,7 +540,7 @@ export default function LocalDealsSection({
                     </div>
 
                     <div className="flex items-center justify-between mt-1.5">
-                      {place.address && (
+                      {place.address && place.address !== "Address unknown" && (
                         <p className="text-[10px] text-slate-500 truncate max-w-[140px]">
                           {place.address}
                         </p>
