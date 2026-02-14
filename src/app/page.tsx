@@ -872,15 +872,29 @@ export default function Home() {
     }
 
     try {
-      const { error } = await supabase
-        .from("pulses")
-        .delete()
-        .eq("id", pulseId)
-        .eq("user_id", userId);
+      // Use authBridge + API endpoint instead of supabase client directly.
+      // On Capacitor/WKWebView, the supabase JS client has no session
+      // (auth goes through authBridge/serverAuth), so direct supabase.delete()
+      // fires with no auth token and RLS silently blocks it.
+      const accessToken = await authBridge.getAccessToken();
+      if (!accessToken) {
+        setErrorMsg("Sign in to delete pulses.");
+        setShowAuthModal(true);
+        return;
+      }
 
-      if (error) {
-        console.error("Error deleting pulse:", error);
-        setErrorMsg("Could not delete pulse. Please try again.");
+      const res = await fetch(getApiUrl(`/api/pulses?id=${pulseId}`), {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        const msg = data?.error || `Delete failed (${res.status})`;
+        console.error("Error deleting pulse:", msg);
+        setErrorMsg(msg);
         return;
       }
 

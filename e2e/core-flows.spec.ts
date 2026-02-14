@@ -48,6 +48,10 @@ async function signIn(page: Page) {
     return false;
   }
 
+  // Sign in button is only on the Pulse (dashboard) tab
+  await clickTab(page, "Pulse");
+  await page.waitForTimeout(500);
+
   const signInBtn = page.locator("button:has-text('Sign in')").first();
   if (!await signInBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
     return true; // Already signed in
@@ -177,11 +181,18 @@ test.describe("Posting Flow", () => {
 
     // Go to Pulse tab
     await clickTab(page, "Pulse");
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(1500);
+
+    // Dismiss first-pulse onboarding modal if it appears
+    const dismissBtn = page.locator("button:has-text('Maybe Later'), button:has-text('Close'), button:has-text('Got it'), button[aria-label='Close']");
+    if (await dismissBtn.first().isVisible({ timeout: 2000 }).catch(() => false)) {
+      await dismissBtn.first().click();
+      await page.waitForTimeout(500);
+    }
 
     // Click post button (center FAB in bottom nav)
     const postFab = page.locator("button[aria-label='Post a pulse']").first();
-    if (await postFab.isVisible().catch(() => false)) {
+    if (await postFab.isVisible({ timeout: 3000 }).catch(() => false)) {
       await postFab.click();
     } else {
       // Try "Drop a Pulse" CTA
@@ -192,12 +203,8 @@ test.describe("Posting Flow", () => {
     // PulseModal should be open
     await expect(page.locator("text=/Launch Pulse|Complete Pulse|Syncing/i").first()).toBeVisible({ timeout: 5000 });
 
-    // Select a vibe emoji (first available one)
-    const vibeButtons = page.locator("button").filter({ hasText: /^[😊🔥😎😴💪🎉❤️🤔😡🙈⚡]$/ });
-    const vibeCount = await vibeButtons.count();
-    if (vibeCount > 0) {
-      await vibeButtons.first().click();
-    }
+    // Select a vibe (buttons have format "😌 Chill", "😊 Blessed", etc.)
+    await page.locator("button:has-text('Chill'), button:has-text('Blessed'), button:has-text('Excited')").first().click();
     await page.waitForTimeout(300);
 
     // Type a message

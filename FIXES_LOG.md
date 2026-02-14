@@ -2,13 +2,25 @@
 
 ---
 
-## Commit: TBD (2026-02-14) — CORS fix for posting on iOS
+## Commit: TBD (2026-02-14) — 3 fixes: CORS, delete, green banner
 
-### FIX: Posting broken on iOS/Capacitor — CORS headers missing on API responses ✅
+### FIX 1: Posting broken on iOS/Capacitor — CORS headers missing on API responses ✅
 **Files:** `src/middleware.ts`
 **Root cause:** Middleware handled OPTIONS preflight with `Access-Control-Allow-Origin: *` but did NOT add CORS headers to the actual POST/GET responses. WKWebView (Capacitor) sends requests from `capacitor://` origin to `https://voxlo-theta.vercel.app`, which is cross-origin. Browser allows the preflight but blocks the actual response because it lacks `Access-Control-Allow-Origin`.
-**What changed:** Added CORS headers (`Access-Control-Allow-Origin: *`, methods, headers) to ALL `/api/*` responses via middleware, not just OPTIONS preflight.
-**Impact:** ALL posting was broken on iOS since the fetch interceptor was added. Web posting was unaffected (same-origin).
+**What changed:** Added CORS headers to ALL `/api/*` responses via middleware, not just OPTIONS preflight.
+**Impact:** ALL posting was broken on iOS. Web unaffected (same-origin). Ady confirmed fix works.
+
+### FIX 2: Delete pulse does nothing on iOS/Capacitor ✅
+**Files:** `src/app/page.tsx`
+**Root cause:** `handleDeletePulse` used `supabase.from("pulses").delete()` directly. On Capacitor, auth goes through `authBridge`/`serverAuth` — the Supabase JS client has NO active session. So the delete fires with no auth token, RLS silently blocks it, and no error is returned.
+**What changed:** Replaced direct Supabase client call with `fetch(getApiUrl("/api/pulses?id=X"), { method: "DELETE", headers: { Authorization: Bearer token } })` using `authBridge.getAccessToken()`. Same pattern as posting.
+**Impact:** Delete was silently failing on iOS for ALL users.
+
+### FIX 3: Bright green banner at top of iOS app ✅
+**Files:** `public/manifest.webmanifest`
+**Root cause:** `manifest.webmanifest` had `theme_color: "#10b981"` (emerald green). With `viewport-fit: cover` and `statusBarStyle: "black-translucent"`, iOS uses the theme color behind the status bar area, rendering a visible green bar.
+**What changed:** Changed `theme_color` from `#10b981` to `#09090b` (matches app background).
+**Impact:** Cosmetic — bright green rectangle at top of every screen on iOS.
 
 ---
 
