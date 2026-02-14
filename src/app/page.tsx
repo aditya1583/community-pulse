@@ -44,6 +44,8 @@ import { usePulses } from "@/hooks/usePulses";
 import { useGamification } from "@/hooks/useGamification";
 import XPProgressBadge from "@/components/XPProgressBadge";
 import { useGeolocation } from "@/hooks/useGeolocation";
+import { useHomeData } from "@/hooks/useHomeData";
+import { useSummary } from "@/hooks/useSummary";
 import LocationPrompt from "@/components/LocationPrompt";
 import { RADIUS_CONFIG } from "@/lib/constants/radius";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
@@ -257,29 +259,17 @@ export default function Home() {
     state: selectedCity?.state ?? undefined,
   });
 
-  // Traffic
-  const [trafficLevel, setTrafficLevel] = useState<TrafficLevel | null>(null);
-  const [trafficLoading, setTrafficLoading] = useState(false);
-  const [trafficError, setTrafficError] = useState<string | null>(null);
-  const [trafficIncidents, setTrafficIncidents] = useState<Array<{
-    id: string;
-    type: "accident" | "roadwork" | "closure" | "congestion" | "other";
-    description: string;
-    roadName?: string;
-    delay?: number;
-    severity: 1 | 2 | 3 | 4;
-  }>>([]);
-  const [hasRoadClosure, setHasRoadClosure] = useState(false);
+  // Bundled weather + traffic data (extracted to useHomeData hook)
+  const {
+    weather, weatherLoading, weatherError,
+    trafficLevel, trafficLoading, trafficError,
+    trafficIncidents, hasRoadClosure,
+  } = useHomeData({ city, lat: selectedCity?.lat, lon: selectedCity?.lon });
 
-  // Summary
-  const [summary, setSummary] = useState<string | null>(null);
-  const [summaryLoading, setSummaryLoading] = useState(false);
-  const [summaryError, setSummaryError] = useState<string | null>(null);
-
-  // Weather
-  const [weather, setWeather] = useState<WeatherInfo | null>(null);
-  const [weatherLoading, setWeatherLoading] = useState(false);
-  const [weatherError, setWeatherError] = useState<string | null>(null);
+  // AI Summary (extracted to useSummary hook)
+  const { summary, summaryLoading, summaryError } = useSummary({
+    city, pulses, ticketmasterEvents, trafficLevel, weather,
+  });
 
   // City Mood
   const [cityMood, setCityMood] = useState<CityMood | null>(null);
@@ -332,109 +322,7 @@ export default function Home() {
     return () => window.clearTimeout(t);
   }, [cityDropdownOpen, renderCitySuggestionsMenu]);
 
-  // ========= AI SUMMARY =========
-  useEffect(() => {
-    // Filter out bot posts — only real user posts go to AI summary
-    const userPulses = pulses.filter(p => !p.is_bot);
-    // Need at least some data to generate a summary
-    const hasData = userPulses.length > 0 || ticketmasterEvents.length > 0 || trafficLevel || weather;
-
-    if (!hasData) {
-      setSummary(null);
-      setSummaryError(null);
-      setSummaryLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-
-    const run = async () => {
-      try {
-        setSummaryLoading(true);
-        setSummaryError(null);
-
-        // Prepare events data for the summary (deduplicated by normalized name)
-        // Robust normalization: lowercase, trim, collapse whitespace, remove special chars
-        const normalizeEventName = (name: string): string => {
-          return name
-            .toLowerCase()
-            .trim()
-            .replace(/\s+/g, " ")           // Collapse multiple spaces
-            .replace(/[^\w\s]/g, "");       // Remove special characters
-        };
-
-        const seenEventNames = new Set<string>();
-        const eventsForSummary = ticketmasterEvents
-          .filter((e) => {
-            const normalizedName = normalizeEventName(e.name);
-            if (seenEventNames.has(normalizedName)) {
-              return false;
-            }
-            seenEventNames.add(normalizedName);
-            return true;
-          })
-          .slice(0, 10)
-          .map((e) => ({
-            name: e.name,
-            venue: e.venue,
-            date: e.date,
-            time: e.time,
-          }));
-
-        // Get weather condition if available
-        const weatherCondition = weather
-          ? `${weather.description}, ${Math.round(weather.temp)}F`
-          : undefined;
-
-        // Create an AbortController for the summary fetch timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
-
-        const res = await fetch(getApiUrl("/api/summary"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            city: city.split(',')[0].trim(),
-            context: "all",
-            pulses: userPulses,
-            events: eventsForSummary,
-            trafficLevel,
-            weatherCondition,
-          }),
-          signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-
-        const data = await res.json();
-
-        if (cancelled) return;
-
-        if (!res.ok) {
-          setSummaryError(data.error || "Failed to get summary");
-          setSummary(null);
-          return;
-        }
-
-        setSummary(data.summary);
-      } catch {
-        if (!cancelled) {
-          setSummaryError("Unable to summarize right now.");
-          setSummary(null);
-        }
-      } finally {
-        if (!cancelled) {
-          setSummaryLoading(false);
-        }
-      }
-    };
-
-    run();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [city, pulses, ticketmasterEvents, trafficLevel, weather]);
+  // AI SUMMARY — extracted to useSummary hook
 
   // ========= CITY MOOD =========
   // ENHANCED: Now passes ALL city context (events, traffic, weather, news)
@@ -538,86 +426,7 @@ export default function Home() {
     setTagFilter("All");
   }, [city]);
 
-  // ========= BUNDLED WEATHER + TRAFFIC (via /api/pulse) =========
-  useEffect(() => {
-    if (!city.trim()) {
-      setWeather(null);
-      setWeatherError(null);
-      return;
-    }
-
-    let cancelled = false;
-
-    const run = async () => {
-      try {
-        setWeatherLoading(true);
-        setWeatherError(null);
-        setTrafficLoading(true);
-        setTrafficError(null);
-
-        const params = new URLSearchParams({ city });
-        if (selectedCity?.lat != null) params.set("lat", String(selectedCity.lat));
-        if (selectedCity?.lon != null) params.set("lon", String(selectedCity.lon));
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-        const res = await fetch(getApiUrl(`/api/pulse?${params}`), {
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        if (cancelled) return;
-
-        const data = await res.json();
-
-        // Weather
-        if (data.weather) {
-          setWeather(data.weather);
-          setWeatherError(null);
-        } else {
-          setWeather(null);
-          setWeatherError("Unable to load weather.");
-        }
-
-        // Traffic (from TomTom via bundled endpoint)
-        if (data.traffic) {
-          if (data.traffic.level) {
-            setTrafficLevel(data.traffic.level);
-            setTrafficError(null);
-          }
-          if (data.traffic.incidents) {
-            setTrafficIncidents(data.traffic.incidents);
-          }
-          if (data.traffic.hasRoadClosure !== undefined) {
-            setHasRoadClosure(data.traffic.hasRoadClosure);
-          }
-        } else {
-          // Traffic data unavailable — not critical
-          setTrafficLevel(null);
-        }
-      } catch {
-        if (!cancelled) {
-          setWeather(null);
-          setWeatherError("Unable to load weather.");
-          setTrafficLevel(null);
-          setTrafficError("Unable to load traffic right now.");
-        }
-      } finally {
-        if (!cancelled) {
-          setWeatherLoading(false);
-          setTrafficLoading(false);
-        }
-      }
-    };
-
-    run();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [city, selectedCity?.lat, selectedCity?.lon]);
+  // BUNDLED WEATHER + TRAFFIC — extracted to useHomeData hook
 
   // Identity is ready when signed in with a profile, OR if profile loading is taking too long
   // This prevents the "WAIT..." button from getting stuck forever
