@@ -39,7 +39,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#09090b",
+  themeColor: "#000000",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -55,7 +55,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
-        className={`${outfit.variable} font-sans antialiased bg-slate-950 text-slate-50`}
+        className={`${outfit.variable} font-sans antialiased bg-black text-slate-50`}
       >
         <CapacitorProvider>
           <ServiceWorkerRegister />

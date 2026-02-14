@@ -6,7 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'out',
   ios: {
     contentInset: 'automatic',
-    backgroundColor: '#09090b',
+    backgroundColor: '#000000',
     allowsLinkPreview: false,
     preferredContentMode: 'mobile',
     scrollEnabled: true,

@@ -28,7 +28,7 @@ async function loadApp(page: Page) {
   }
 
   // Wait for main content (bottom nav has "Events", "Pulse", etc.)
-  await page.locator("button:has-text('Events')").waitFor({ timeout: 15_000 });
+  await page.locator("button:has-text('Events')").first().waitFor({ timeout: 15_000 });
   await page.waitForTimeout(1500); // hydration + data fetch
 }
 
@@ -236,6 +236,29 @@ test.describe("Posting Flow", () => {
     await page.waitForTimeout(2000);
     const feedContent = await page.textContent("main") || "";
     expect(feedContent).toContain(testMessage);
+
+    // CLEANUP: Delete the test post via API so it doesn't pollute the feed
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+      if (supabaseUrl && (serviceKey || anonKey)) {
+        const key = serviceKey || anonKey;
+        const cleanupRes = await fetch(
+          `${supabaseUrl}/rest/v1/pulses?message=eq.${encodeURIComponent(testMessage)}`,
+          {
+            method: "DELETE",
+            headers: {
+              apikey: anonKey || key,
+              Authorization: `Bearer ${key}`,
+            },
+          }
+        );
+        console.log(`[E2E Cleanup] Deleted test post: ${cleanupRes.status}`);
+      }
+    } catch (e) {
+      console.warn("[E2E Cleanup] Failed to delete test post:", e);
+    }
   });
 
   test("Delete a pulse: tap delete, confirm, verify gone", async ({ page }) => {

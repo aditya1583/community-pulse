@@ -16,11 +16,16 @@
 **What changed:** Replaced direct Supabase client call with `fetch(getApiUrl("/api/pulses?id=X"), { method: "DELETE", headers: { Authorization: Bearer token } })` using `authBridge.getAccessToken()`. Same pattern as posting.
 **Impact:** Delete was silently failing on iOS for ALL users.
 
-### FIX 3: Bright green banner at top of iOS app ✅
-**Files:** `public/manifest.webmanifest`
-**Root cause:** `manifest.webmanifest` had `theme_color: "#10b981"` (emerald green). With `viewport-fit: cover` and `statusBarStyle: "black-translucent"`, iOS uses the theme color behind the status bar area, rendering a visible green bar.
-**What changed:** Changed `theme_color` from `#10b981` to `#09090b` (matches app background).
-**Impact:** Cosmetic — bright green rectangle at top of every screen on iOS.
+### FIX 3: Green/gray banner at top of iOS app ✅
+**Files:** `public/manifest.webmanifest`, `src/app/layout.tsx`, `capacitor.config.ts`
+**Root cause:** `manifest.webmanifest` had `theme_color: "#10b981"` (emerald). First fix changed to `#09090b` but that was still visible as a gray bar against the content background. The safe-area zone behind the status bar needs to be pure black to be invisible.
+**What changed:** Set ALL background/theme colors to `#000000` — manifest theme_color, manifest background_color, viewport themeColor, Capacitor backgroundColor, body class (bg-black).
+**Impact:** Cosmetic — visible colored bar at top of every screen on iOS.
+
+### FIX 4: Events tab shows "Sign in to share" even when signed in ✅
+**Files:** `src/app/page.tsx`
+**Root cause:** `isSignedIn={!!sessionUser}` — on app launch, Events is the default tab and renders before auth resolves. `sessionUser` starts null, so `isSignedIn=false` → "Sign in to share" flashes. On Capacitor with authBridge, this delay is longer.
+**What changed:** Changed all 4 instances of `isSignedIn={!!sessionUser}` to `isSignedIn={authStatus !== "signed_out"}`. During "loading" state, assumes signed in (no flash). Shows sign-in prompt only after auth explicitly resolves to signed_out.
 
 ---
 

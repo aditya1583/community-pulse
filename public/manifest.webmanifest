@@ -4,8 +4,8 @@
     "description": "Hyperlocal vibes within 10 miles. Stay connected with your immediate community.",
     "start_url": "/",
     "display": "standalone",
-    "background_color": "#020617",
-    "theme_color": "#09090b",
+    "background_color": "#000000",
+    "theme_color": "#000000",
     "icons": [
         {
             "src": "/icon-192.png",

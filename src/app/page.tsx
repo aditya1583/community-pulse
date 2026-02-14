@@ -1643,7 +1643,7 @@ export default function Home() {
                         tag={tag}
                         message={message}
                         displayName={displayName}
-                        isSignedIn={!!sessionUser}
+                        isSignedIn={authStatus !== "signed_out"}
                         identityReady={identityReady}
                         loading={loading}
                         moodValidationError={moodValidationError}
@@ -1833,7 +1833,7 @@ export default function Home() {
                       state={selectedCity?.state}
                       lat={selectedCity?.lat}
                       lon={selectedCity?.lon}
-                      isSignedIn={!!sessionUser}
+                      isSignedIn={authStatus !== "signed_out"}
                       identityReady={identityReady}
                       displayName={displayName}
                       pulseLoading={loading}
@@ -1858,7 +1858,7 @@ export default function Home() {
                       cityName={city}
                       trafficIncidents={trafficIncidents}
                       hasRoadClosure={hasRoadClosure}
-                      isSignedIn={!!sessionUser}
+                      isSignedIn={authStatus !== "signed_out"}
                       identityReady={identityReady}
                       displayName={displayName}
                       pulseLoading={loading}
@@ -1882,7 +1882,7 @@ export default function Home() {
                       lon={localLon}
                       userId={sessionUser?.id ?? null}
                       onSignInClick={() => setShowAuthModal(true)}
-                      isSignedIn={!!sessionUser}
+                      isSignedIn={authStatus !== "signed_out"}
                       identityReady={identityReady}
                       displayName={displayName}
                       pulseLoading={loading}
