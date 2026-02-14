@@ -53,3 +53,5 @@ Claude skills/
 antigravity-awesome-skills/
 iOS Secrets/
 *.cer
+test-results/
+playwright-report/
