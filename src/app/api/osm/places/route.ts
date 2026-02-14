@@ -84,6 +84,15 @@ function haversineDistance(
   return R * c;
 }
 
+// Server-side cache: places barely change, Overpass is slow (~5s)
+// Key: rounded lat/lon (3 decimals ≈ 110m) + category
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const placesCache = new Map<string, { data: OSMPlacesResponse; ts: number }>();
+
+function getCacheKey(lat: number, lon: number, category: string, radius: number): string {
+  return `${lat.toFixed(2)},${lon.toFixed(2)},${category},${radius}`;
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const lat = searchParams.get("lat");
@@ -101,6 +110,15 @@ export async function GET(req: NextRequest) {
 
   const parsedLat = parseFloat(lat);
   const parsedLon = parseFloat(lon);
+
+  // Check server-side cache first (saves 4-5s Overpass round-trip)
+  const cacheKey = getCacheKey(parsedLat, parsedLon, category, radiusMeters);
+  const cached = placesCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+    return NextResponse.json(cached.data, {
+      headers: { "X-Cache": "HIT", "Cache-Control": "public, max-age=300" },
+    });
+  }
 
   try {
     // Get category config (amenities and/or shops)
@@ -244,18 +262,28 @@ export async function GET(req: NextRequest) {
       // Limit results
       .slice(0, limit);
 
-    return NextResponse.json(
-      {
-        places,
-        total: places.length,
-        source: "openstreetmap",
+    const responseData: OSMPlacesResponse = {
+      places,
+      total: places.length,
+      source: "openstreetmap",
+    };
+
+    // Store in server-side cache
+    placesCache.set(cacheKey, { data: responseData, ts: Date.now() });
+    // Evict old entries if cache gets large
+    if (placesCache.size > 200) {
+      const oldest = [...placesCache.entries()]
+        .sort((a, b) => a[1].ts - b[1].ts)
+        .slice(0, 50);
+      oldest.forEach(([k]) => placesCache.delete(k));
+    }
+
+    return NextResponse.json(responseData, {
+      headers: {
+        "X-Cache": "MISS",
+        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=1800",
       },
-      {
-        headers: {
-          "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=1800", // 1 hour cache
-        },
-      }
-    );
+    });
   } catch (error) {
     if (error instanceof Error && error.name === "TimeoutError") {
       console.error("[OSM] Request timeout");
