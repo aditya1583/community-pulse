@@ -87,10 +87,16 @@ async function fetchFeed(city: string, lat?: number, lon?: number, limit = 26) {
   }
   const supabase = createClient(supabaseUrl, supabaseKey);
 
+  // Fuzzy match on city name (DB stores "Leander, Texas", client sends "Leander")
+  const cityBase = city.split(",").slice(0, 2).join(",").trim();
+  const now = new Date();
+  const gracePeriod = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+
   const query = supabase
     .from("pulses")
-    .select("id, author, message, tag, city, lat, lon, likes, created_at, expires_at, is_bot, image_url, poll_options, poll_votes, user_id")
-    .eq("city", city)
+    .select("id, author, message, mood, tag, city, neighborhood, lat, lon, created_at, expires_at, is_bot, poll_options, user_id")
+    .ilike("city", `${cityBase}%`)
+    .or(`expires_at.is.null,expires_at.gt.${gracePeriod}`)
     .order("created_at", { ascending: false })
     .limit(limit);
 
