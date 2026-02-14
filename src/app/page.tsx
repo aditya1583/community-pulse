@@ -1,25 +1,16 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
-import type { User } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
 import { authBridge } from "@/lib/authBridge";
 import { useGeocodingAutocomplete } from "@/hooks/useGeocodingAutocomplete";
 import { useEvents } from "@/hooks/useEvents";
 import type { GeocodedCity } from "@/lib/geocoding";
 import {
-  isInRecentWindow,
-  readOnboardingCompleted,
-  resetComposerAfterSuccessfulPost,
   shouldShowFirstPulseOnboarding,
-  startOfNextLocalDay,
-  writeOnboardingCompleted,
-  filterVisiblePulses,
   hasShownFirstPulseModalThisSession,
   markFirstPulseModalShown,
-  type AuthStatus,
 } from "@/lib/pulses";
-import { moderateContent } from "@/lib/moderation";
 // New Neon Theme Components
 // Force rebuild: PulseCard styling update
 import Header from "@/components/Header";
@@ -33,19 +24,23 @@ import PulseCard from "@/components/PulseCard";
 import LocalTab from "@/components/LocalTab";
 import StatusTab from "@/components/StatusTab";
 import PulseInput from "@/components/PulseInput";
-import FAB from "@/components/FAB";
 import PulseModal from "@/components/PulseModal";
 import TrafficContent from "@/components/TrafficContent";
 // LiveVibes removed (dead feature)
-import { DASHBOARD_TABS, type TabId, type WeatherInfo, type Pulse, type CityMood, type TrafficLevel } from "@/components/types";
+import { DASHBOARD_TABS, type TabId, type Pulse } from "@/components/types";
 import { useAuth } from "@/hooks/useAuth";
-import type { Profile } from "@/hooks/useAuth";
+// Profile type inferred from useAuth
 import { usePulses } from "@/hooks/usePulses";
 import { useGamification } from "@/hooks/useGamification";
 import XPProgressBadge from "@/components/XPProgressBadge";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useHomeData } from "@/hooks/useHomeData";
 import { useSummary } from "@/hooks/useSummary";
+import { useCityMood } from "@/hooks/useCityMood";
+import { useStreak } from "@/hooks/useStreak";
+import { useUsername } from "@/hooks/useUsername";
+import { useAutoSeed } from "@/hooks/useAutoSeed";
+import { usePostPulse } from "@/hooks/usePostPulse";
 import LocationPrompt from "@/components/LocationPrompt";
 import { RADIUS_CONFIG } from "@/lib/constants/radius";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
@@ -65,11 +60,7 @@ type EventItem = {
   is_sponsored?: boolean | null;
 };
 
-// GLOBAL POSTING STREAK
-type StreakInfo = {
-  currentStreak: number;
-  lastActiveDate: string | null;
-};
+// GLOBAL POSTING STREAK — type moved to useStreak hook
 
 // Saved Favorites
 type FavoritePulseId = number;
@@ -112,22 +103,9 @@ export default function Home() {
   const [lastValidCity, setLastValidCity] = useState<GeocodedCity>(DEFAULT_CITY);
   const [tagFilter, setTagFilter] = useState("All");
   const [username, setUsername] = useState<string>("");
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const [mood, setMood] = useState("");
-  const [tag, setTag] = useState("General");
-  const [message, setMessage] = useState("");
+  // validationError, mood, tag, message — extracted to usePostPulse hook
 
-  // Tab-specific pulse input state (Traffic, Events, Local tabs each have their own input)
-  const [trafficMood, setTrafficMood] = useState("");
-  const [trafficMessage, setTrafficMessage] = useState("");
-  const [eventsMood, setEventsMood] = useState("");
-  const [eventsMessage, setEventsMessage] = useState("");
-  const [localMood, setLocalMood] = useState("");
-  const [localMessage, setLocalMessage] = useState("");
-  // Tab-specific validation (reuse existing error state but with separate show flags)
-  const [tabMoodValidationError, setTabMoodValidationError] = useState<string | null>(null);
-  const [tabMessageValidationError, setTabMessageValidationError] = useState<string | null>(null);
-  const [showTabValidationErrors, setShowTabValidationErrors] = useState(false);
+  // Tab-specific pulse state — extracted to usePostPulse hook
 
   // Tab state for new Neon theme
   // Persist tab state in sessionStorage so it survives navigation to venue pages
@@ -202,11 +180,12 @@ export default function Home() {
   // Ref to ensure storage restoration only happens once (survives re-renders and StrictMode)
   const storageRestorationAttempted = useRef(false);
 
-  // USER STREAK
-  const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
-  const [, setStreakLoading] = useState(false);
-  const [userPulseCount, setUserPulseCount] = useState(0);
-  const [pulseCountResolved, setPulseCountResolved] = useState(false);
+  // USER STREAK (extracted to useStreak hook)
+  const {
+    streakInfo, userPulseCount, setUserPulseCount,
+    pulseCountResolved, setPulseCountResolved,
+    onboardingCompleted, setOnboardingCompleted, loadStreak,
+  } = useStreak(sessionUser?.id);
 
   // Saved Favorites
   const [favoritePulseIds, setFavoritePulseIds] = useState<FavoritePulseId[]>(
@@ -214,23 +193,21 @@ export default function Home() {
   );
   const [favoritesLoading, setFavoritesLoading] = useState(false);
 
-  // AI username generator / persona switcher
-  const [usernamePrompt, setUsernamePrompt] = useState("");
-  const [usernameGenerating, setUsernameGenerating] = useState(false);
-  const [usernameErrorMsg, setUsernameErrorMsg] = useState<string | null>(null);
-  const [showUsernameEditor, setShowUsernameEditor] = useState(false);
-  const [lastAnonName, setLastAnonName] = useState<string | null>(null);
+  // AI username generator (extracted to useUsername hook)
+  const {
+    usernamePrompt, setUsernamePrompt,
+    usernameGenerating, usernameErrorMsg,
+    showUsernameEditor, setShowUsernameEditor,
+    lastAnonName,
+    handleLockUsername, handleGenerateUsername, handleRevertUsername,
+  } = useUsername({ sessionUser, profile, setProfile, username, setUsername });
 
   // First-time user onboarding
   const [showFirstPulseModal, setShowFirstPulseModal] = useState(false);
   const [showFirstPulseBadgeToast, setShowFirstPulseBadgeToast] = useState(false);
   const [hasShownOnboarding, setHasShownOnboarding] = useState(false);
-  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
 
-  // Form validation errors for mood and tag
-  const [moodValidationError, setMoodValidationError] = useState<string | null>(null);
-  const [tagValidationError, setTagValidationError] = useState<string | null>(null);
-  const [showValidationErrors, setShowValidationErrors] = useState(false);
+  // Form validation — extracted to usePostPulse hook
   const [checklistDismissed, setChecklistDismissed] = useState(false);
 
   // Pull-to-refresh trigger
@@ -271,10 +248,11 @@ export default function Home() {
     city, pulses, ticketmasterEvents, trafficLevel, weather,
   });
 
-  // City Mood
-  const [cityMood, setCityMood] = useState<CityMood | null>(null);
-  const [cityMoodLoading, setCityMoodLoading] = useState(false);
-  const [cityMoodError, setCityMoodError] = useState<string | null>(null);
+  // City Mood (extracted to useCityMood hook)
+  const { cityMood, cityMoodLoading, cityMoodError } = useCityMood({
+    city, lat: selectedCity?.lat, lon: selectedCity?.lon,
+    ticketmasterEvents, trafficLevel, weather, pulsesLength: pulses.length,
+  });
 
   // Gas Prices (for quick view in Current Vibe section)
   // Gas price state removed — no longer fetched on home load
@@ -324,76 +302,7 @@ export default function Home() {
 
   // AI SUMMARY — extracted to useSummary hook
 
-  // ========= CITY MOOD =========
-  // ENHANCED: Now passes ALL city context (events, traffic, weather, news)
-  // so the vibe calculation reflects total city activity, not just pulses.
-  useEffect(() => {
-    if (!city) return;
-
-    async function fetchCityMood() {
-      try {
-        setCityMoodLoading(true);
-        setCityMoodError(null);
-
-        // Build query params with full city context
-        const params = new URLSearchParams();
-        params.set("city", city);
-        if (selectedCity?.lat != null) params.set("lat", String(selectedCity.lat));
-        if (selectedCity?.lon != null) params.set("lon", String(selectedCity.lon));
-
-        // Include events count for activity calculation
-        if (ticketmasterEvents.length > 0) {
-          params.set("eventsCount", String(ticketmasterEvents.length));
-        }
-
-        // Include traffic level for commute mood
-        if (trafficLevel) {
-          params.set("trafficLevel", trafficLevel);
-        }
-
-        // Include weather condition for environmental context
-        if (weather) {
-          params.set("weatherCondition", `${weather.description}, ${Math.round(weather.temp)}F`);
-        }
-
-        // MOBILE FIX: Add aggressive 5-second timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-        const res = await fetch(getApiUrl(`/api/city-mood?${params.toString()}`), {
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!res.ok) {
-          throw new Error("Failed to fetch city mood");
-        }
-
-        const data = await res.json();
-        setCityMood({
-          dominantMood: data.dominantMood,
-          scores: data.scores || [],
-          pulseCount: data.pulseCount || 0,
-          // New vibe system fields
-          tagScores: data.tagScores || [],
-          dominantTag: data.dominantTag || null,
-          vibeHeadline: data.vibeHeadline,
-          vibeSubtext: data.vibeSubtext,
-          vibeEmotion: data.vibeEmotion,
-          vibeIntensity: data.vibeIntensity,
-        });
-      } catch (err: unknown) {
-        console.error("Error fetching city mood:", err);
-        setCityMoodError("Unable to load city mood right now.");
-        setCityMood(null);
-      } finally {
-        setCityMoodLoading(false);
-      }
-    }
-
-    fetchCityMood();
-  }, [city, pulses.length, ticketmasterEvents.length, trafficLevel, weather]);
+  // CITY MOOD — extracted to useCityMood hook
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -433,117 +342,53 @@ export default function Home() {
   const identityReady =
     authStatus === "signed_in" && !!sessionUser && !profileLoading && !!profile;
 
-  useEffect(() => {
-    const userId = sessionUser?.id;
+  // Pulse posting logic (extracted to usePostPulse hook)
+  const {
+    mood, setMood, tag, setTag, message, setMessage,
+    moodValidationError, setMoodValidationError,
+    tagValidationError, setTagValidationError,
+    validationError, setValidationError,
+    showValidationErrors,
+    handleAddPulse,
+    trafficMood, setTrafficMood, trafficMessage, setTrafficMessage,
+    eventsMood, setEventsMood, eventsMessage, setEventsMessage,
+    localMood, setLocalMood, localMessage, setLocalMessage,
+    tabMoodValidationError, setTabMoodValidationError,
+    tabMessageValidationError, setTabMessageValidationError,
+    showTabValidationErrors,
+    handleTrafficPulseSubmit, handleEventsPulseSubmit, handleLocalPulseSubmit,
+  } = usePostPulse({
+    city,
+    sessionUser,
+    profile,
+    username,
+    identityReady,
+    geolocationLat: geolocation.lat,
+    geolocationLon: geolocation.lon,
+    selectedCityLat: selectedCity?.lat,
+    selectedCityLon: selectedCity?.lon,
+    pulseCountResolved,
+    userPulseCount,
+    onboardingCompleted,
+    setPulses,
+    setLoading,
+    setErrorMsg,
+    setShowAuthModal,
+    setShowPulseModal,
+    setPulseCountResolved,
+    setUserPulseCount,
+    setOnboardingCompleted,
+    setShowFirstPulseModal,
+    setHasShownOnboarding,
+    setShowFirstPulseBadgeToast,
+    loadStreak,
+  });
 
+  // Reset first-pulse modal state on user change
+  useEffect(() => {
     setShowFirstPulseModal(false);
     setHasShownOnboarding(false);
-    setPulseCountResolved(false);
-
-    if (!userId) {
-      setOnboardingCompleted(false);
-      return;
-    }
-
-    setOnboardingCompleted(readOnboardingCompleted(window.localStorage, userId));
   }, [sessionUser?.id]);
-
-  // USER STREAK
-  const loadStreak = useCallback(async () => {
-    const userId = sessionUser?.id;
-
-    if (!userId) {
-      setStreakInfo(null);
-      setUserPulseCount(0);
-      setStreakLoading(false);
-      setPulseCountResolved(false);
-      return;
-    }
-
-    try {
-      setStreakLoading(true);
-      setPulseCountResolved(false);
-
-      const { data, error, count } = await supabase
-        .from("pulses")
-        .select("created_at", { count: "exact" })
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(365);
-
-      if (error) {
-        console.error("Error loading streak data:", error);
-        return;
-      }
-
-      const rows = data || [];
-      const nextCount = count ?? rows.length;
-      setUserPulseCount(nextCount);
-      setPulseCountResolved(true);
-
-      if (nextCount > 0 && !onboardingCompleted) {
-        writeOnboardingCompleted(window.localStorage, userId);
-        setOnboardingCompleted(true);
-      }
-
-      if (rows.length === 0) {
-        setStreakInfo({ currentStreak: 0, lastActiveDate: null });
-        return;
-      }
-
-      const dateStrings = Array.from(
-        new Set(
-          rows.map((row: { created_at: string }) => {
-            const d = new Date(row.created_at);
-            return d.toLocaleDateString("en-CA");
-          })
-        )
-      ).sort((a, b) => (a < b ? 1 : -1));
-
-      const today = new Date();
-      const todayStr = today.toLocaleDateString("en-CA");
-
-      let streak = 0;
-      let offsetDays = 0;
-
-      function offsetDate(days: number) {
-        const d = new Date();
-        d.setDate(d.getDate() - days);
-        return d.toLocaleDateString("en-CA");
-      }
-
-      for (const dayStr of dateStrings) {
-        const expected = offsetDate(offsetDays);
-
-        if (dayStr === expected) {
-          streak += 1;
-          offsetDays += 1;
-        } else {
-          if (streak === 0 && dayStr === offsetDate(1) && todayStr !== dayStr) {
-            streak = 1;
-            offsetDays = 2;
-          } else {
-            break;
-          }
-        }
-      }
-
-      const lastActive = dateStrings[0] ?? null;
-
-      setStreakInfo({
-        currentStreak: streak,
-        lastActiveDate: lastActive,
-      });
-    } catch (err) {
-      console.error("Unexpected error loading streak:", err);
-    } finally {
-      setStreakLoading(false);
-    }
-  }, [sessionUser, onboardingCompleted]);
-
-  useEffect(() => {
-    loadStreak();
-  }, [loadStreak]);
 
   // ========= FIRST-TIME USER ONBOARDING =========
   // Use sessionStorage to track if modal has been shown (survives navigation within session)
@@ -892,203 +737,15 @@ export default function Home() {
     }
   }
 
-  // ========= AUTO-SEED AND REFRESH STALE CITIES =========
-  // When a city has no pulses OR content is stale, automatically generate fresh bot posts
-  // This keeps the app feeling alive with continuous content generation
-  const [autoSeedAttempted, setAutoSeedAttempted] = useState<string | null>(null);
-  const [staleRefreshAttempted, setStaleRefreshAttempted] = useState<string | null>(null);
-
-  // Constants for stale content detection
-  const STALE_PULSE_THRESHOLD = 5; // Trigger refresh if fewer than this many pulses
-  const STALE_AGE_HOURS = 1; // Trigger refresh if newest pulse is older than this
-
-  const isSeedingRef = useRef(false);
-
-  useEffect(() => {
-    const triggerAutoSeed = async () => {
-      // Use visible pulses for logic to ensure we don't count hidden/expired content
-      // This ensures that if we have 50 old posts that are all hidden, we still trigger a refresh
-      const validPulses = filterVisiblePulses(pulses);
-
-      // Determine if this is a cold start (empty) or stale content situation
-      // UPDATED: Treat < 5 pulses as "empty" to trigger auto-seed top-up
-      const isEmpty = validPulses.length < 5;
-      const isStale = !isEmpty && (
-        validPulses.length < STALE_PULSE_THRESHOLD ||
-        (validPulses.length > 0 && isContentStale(validPulses))
-      );
-
-      if (isSeedingRef.current) {
-        console.log("[Content Refresh] Skipping - seeding already in progress");
-        return;
-      }
-
-      // Check if content is stale (oldest non-expired pulse is too old)
-      function isContentStale(pulsesToCheck: Pulse[]): boolean {
-        if (pulsesToCheck.length === 0) return false;
-
-        // Find the newest pulse
-        const newestPulse = pulsesToCheck.reduce((newest, p) => {
-          const pTime = new Date(p.createdAt).getTime();
-          const newestTime = new Date(newest.createdAt).getTime();
-          return pTime > newestTime ? p : newest;
-        }, pulsesToCheck[0]);
-
-        const newestAge = Date.now() - new Date(newestPulse.createdAt).getTime();
-        const staleAgeMs = STALE_AGE_HOURS * 60 * 60 * 1000;
-
-        return newestAge > staleAgeMs;
-      }
-
-      // Debug logging
-      console.log("[Content Refresh] Checking conditions:", {
-        city,
-        initialPulsesFetched,
-        totalPulses: pulses.length,
-        visiblePulses: validPulses.length,
-        isEmpty,
-        isStale,
-        autoSeedAttempted,
-        staleRefreshAttempted,
-        loading,
-        ticketmasterLoading,
-      });
-
-      // Skip if no action needed
-      if (!isEmpty && !isStale) {
-        console.log("[Content Refresh] Skipping - city has fresh content");
-        return;
-      }
-
-      // 1. Initial fetch must be complete
-      if (!initialPulsesFetched) {
-        console.log("[Content Refresh] Skipping - initial fetch not complete");
-        return;
-      }
-
-      // 2. Check if we've already attempted for this city
-      if (isEmpty && autoSeedAttempted === city) {
-        console.log("[Content Refresh] Skipping - already attempted empty seed for this city");
-        return;
-      }
-      if (isStale && staleRefreshAttempted === city) {
-        console.log("[Content Refresh] Skipping - already attempted stale refresh for this city");
-        return;
-      }
-
-      // 3. Not currently loading
-      if (loading) {
-        console.log("[Content Refresh] Skipping - still loading pulses");
-        return;
-      }
-
-      // Wait for events AND weather to finish loading
-      // This prevents using stale data from a previous city
-      if (ticketmasterLoading) {
-        console.log("[Content Refresh] Skipping - waiting for events to load");
-        return;
-      }
-      if (weatherLoading) {
-        console.log("[Content Refresh] Skipping - waiting for weather to load");
-        return;
-      }
-
-      // CRITICAL: Verify weather data matches current city to prevent stale data
-      // This catches the race condition when switching cities quickly
-      const cityNamePart = city.split(",")[0].toLowerCase().trim();
-      const weatherMatchesCity = weather?.cityName?.toLowerCase().includes(cityNamePart);
-
-      if (weather && !weatherMatchesCity) {
-        console.log("[Content Refresh] Skipping - weather data is stale (from different city)", {
-          weatherCity: weather.cityName,
-          currentCity: city,
-        });
-        return;
-      }
-
-      const refreshType = isEmpty ? "cold-start" : "stale-refresh";
-      console.log(`[Content Refresh] Triggering ${refreshType} for:`, city);
-
-      try {
-        isSeedingRef.current = true;
-        console.log(`[Content Refresh] ${refreshType} for ${city}...`);
-
-        // For stale refresh, use the cron refresh endpoint; for cold-start, use auto-seed
-        const endpoint = isEmpty ? "/api/auto-seed" : "/api/cron/refresh-content";
-        const requestBody = isEmpty
-          ? {
-            city,
-            // CRITICAL: Pass coordinates for universal intelligent bot support
-            // This enables contextual polls, farmers markets, and weather-based
-            // content for ANY city, not just pre-configured Texas cities
-            lat: selectedCity?.lat,
-            lon: selectedCity?.lon,
-            events: ticketmasterEvents.slice(0, 3).map((e) => ({
-              name: e.name,
-              venue: e.venue,
-              date: e.date,
-              category: e.category,
-            })),
-            // Only include weather if it matches the current city
-            weather: weather && weatherMatchesCity
-              ? {
-                description: weather.description,
-                temp: weather.temp,
-                icon: weather.icon,
-              }
-              : null,
-          }
-          : {
-            city,
-            force: false, // Let server decide if refresh is needed
-          };
-
-        const res = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestBody),
-        });
-
-        const data = await res.json();
-        console.log(`[Content Refresh] ${refreshType} API Response:`, res.status, data);
-
-        if (!res.ok) {
-          console.error(`[Content Refresh] ${refreshType} API Error:`, data);
-          // Don't mark as attempted so we can retry
-          return;
-        }
-
-        // Mark as attempted only after successful API call
-        if (isEmpty) {
-          setAutoSeedAttempted(city);
-        } else {
-          setStaleRefreshAttempted(city);
-        }
-
-        // Handle postsCreated (from refresh endpoint) or created (from auto-seed)
-        const postsCreated = data.postsCreated ?? data.created ?? 0;
-
-        if (postsCreated === 0) {
-          // Server reported no new posts created (e.g., city already has recent pulses)
-          console.log(`[Content Refresh] Skipped - ${data.message || "city may already have recent pulses"}`);
-        } else if (postsCreated > 0) {
-          console.log(`[Content Refresh] SUCCESS! Created ${postsCreated} posts for ${city} (${refreshType})`);
-          // Trigger main refresh to pick up new posts (uses coordinate-based query)
-          // Re-fetch pulses to pick up newly seeded content
-          await fetchPulses();
-        }
-      } catch (err) {
-        console.error("[Content Refresh] Error:", err);
-      } finally {
-        isSeedingRef.current = false;
-      }
-    };
-
-    triggerAutoSeed();
-    // Note: We intentionally use pulses.length instead of pulses to avoid infinite loops
-    // The stale check inside uses pulses directly but only runs when conditions are met
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [city, initialPulsesFetched, pulses.length, ticketmasterEvents, ticketmasterLoading, weather, weatherLoading, autoSeedAttempted, staleRefreshAttempted, loading, selectedCity?.lat, selectedCity?.lon]);
+  // AUTO-SEED AND REFRESH STALE CITIES — extracted to useAutoSeed hook
+  useAutoSeed({
+    city, pulses, initialPulsesFetched, loading,
+    ticketmasterEvents, ticketmasterLoading,
+    weather, weatherLoading,
+    selectedCityLat: selectedCity?.lat,
+    selectedCityLon: selectedCity?.lon,
+    fetchPulses,
+  });
 
   // ========= TRAFFIC =========
   // ========= CREATE EVENT HANDLER =========
@@ -1189,34 +846,7 @@ export default function Home() {
     }
   }
 
-  async function handleLockUsername() {
-    if (!sessionUser || !profile) return;
-
-    try {
-      setUsernameGenerating(true);
-      setUsernameErrorMsg(null);
-
-      const { error } = await supabase
-        .from("profiles")
-        .update({ name_locked: true })
-        .eq("id", sessionUser.id);
-
-      if (error) {
-        console.error("Error locking username:", error);
-        setUsernameErrorMsg("Could not lock name right now. Try again.");
-        return;
-      }
-
-      setProfile((prev) =>
-        prev ? { ...prev, name_locked: true } : prev
-      );
-    } catch (err) {
-      console.error("Unexpected error locking username:", err);
-      setUsernameErrorMsg("Could not lock name right now.");
-    } finally {
-      setUsernameGenerating(false);
-    }
-  }
+  // handleLockUsername — extracted to useUsername hook
 
   // ========= DELETE PULSE HANDLER =========
   async function handleDeletePulse(pulseId: number) {
@@ -1262,101 +892,7 @@ export default function Home() {
     }
   }
 
-  // ========= AI USERNAME GENERATOR HANDLERS =========
-  async function handleGenerateUsername() {
-    const prompt = usernamePrompt.trim();
-    if (!sessionUser) return;
-
-    if (profile?.name_locked) {
-      setUsernameErrorMsg("Your anonymous name is locked and can't be changed.");
-      return;
-    }
-
-    const wordCount = prompt.split(/\s+/).filter(Boolean).length;
-    if (wordCount < 3) {
-      setUsernameErrorMsg("Use at least 3 words to describe your vibe.");
-      return;
-    }
-
-    try {
-      setUsernameGenerating(true);
-      setUsernameErrorMsg(null);
-
-      const res = await fetch(getApiUrl("/api/username"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.username) {
-        throw new Error(data.error || "Could not generate username.");
-      }
-
-      const newName: string = data.username;
-
-      setLastAnonName(profile?.anon_name || username || null);
-
-      const updatedProfileName = newName;
-
-      setProfile((prev) =>
-        prev
-          ? { ...prev, anon_name: updatedProfileName }
-          : { anon_name: updatedProfileName }
-      );
-      setUsername(updatedProfileName);
-
-      const userId = sessionUser.id;
-      const { error } = await supabase
-        .from("profiles")
-        .update({ anon_name: updatedProfileName })
-        .eq("id", userId);
-
-      if (error) {
-        console.error("Error updating profile anon_name:", error);
-      }
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Unable to generate a name right now.";
-      console.error("Error generating username:", err);
-      setUsernameErrorMsg(message);
-    } finally {
-      setUsernameGenerating(false);
-    }
-  }
-
-  async function handleRevertUsername() {
-    if (!sessionUser || !lastAnonName) return;
-
-    try {
-      setUsernameGenerating(true);
-      setUsernameErrorMsg(null);
-
-      setProfile((prev) =>
-        prev ? { ...prev, anon_name: lastAnonName } : { anon_name: lastAnonName }
-      );
-      setUsername(lastAnonName);
-
-      const { error } = await supabase
-        .from("profiles")
-        .update({ anon_name: lastAnonName })
-        .eq("id", sessionUser.id);
-
-      if (error) {
-        console.error("Error reverting anon_name:", error);
-      } else {
-        setLastAnonName(null);
-      }
-    } catch (err) {
-      console.error("Error reverting username:", err);
-      setUsernameErrorMsg("Unable to revert name right now.");
-    } finally {
-      setUsernameGenerating(false);
-    }
-  }
+  // handleGenerateUsername, handleRevertUsername — extracted to useUsername hook
 
   // Apply tag filter
   const filteredPulses = pulsesWithDistance.filter((p) => tagFilter === "All" || p.tag === tagFilter);
@@ -1415,426 +951,10 @@ export default function Home() {
     return candidates.length > 0 ? candidates[0].pulse : null;
   }, [filteredPulses]);
 
-  // ========= ADD PULSE =========
-  const handleAddPulse = async () => {
-    console.log("[Voxlo] handleAddPulse called", {
-      message: message.slice(0, 20),
-      mood,
-      tag,
-      identityReady,
-      sessionUser: !!sessionUser,
-      profile: profile?.anon_name,
-    });
-    const trimmed = message.trim();
-    const resolvedTag = tag || "General";
-
-    if (!sessionUser) {
-      setErrorMsg("Sign in to post.");
-      setShowAuthModal(true);
-      return;
-    }
-
-    if (!identityReady) {
-      setErrorMsg("Please wait...");
-      return;
-    }
-
-    let hasErrors = false;
-
-    // Mood is now mandatory
-    if (!mood) {
-      setMoodValidationError("Please select a vibe");
-      hasErrors = true;
-    } else {
-      setMoodValidationError(null);
-    }
-
-    // Tag/Category defaults to General if not selected
-    if (!tag) {
-      setTag(resolvedTag);
-    }
-    setTagValidationError(null);
-
-    // Message is required (matches server validation)
-    if (!trimmed) {
-      setValidationError("Please enter a message");
-      hasErrors = true;
-    } else {
-      const moderationResult = moderateContent(trimmed);
-      if (!moderationResult.allowed) {
-        setValidationError(
-          moderationResult.reason || "Pulse contains disallowed language."
-        );
-        hasErrors = true;
-      } else {
-        setValidationError(null);
-      }
-    }
-
-    if (hasErrors) {
-      setShowValidationErrors(true);
-      return;
-    }
-
-    setErrorMsg(null);
-    setShowValidationErrors(false);
-
-    const wasFirstPulse =
-      pulseCountResolved && userPulseCount === 0 && !onboardingCompleted;
-
-    const authorName = profile.anon_name || username || "Anonymous";
-
-    try {
-      // Get a fresh access token via authBridge (works on both web and Capacitor)
-      console.log("[Voxlo] Getting access token...");
-      const accessToken = await authBridge.getAccessToken();
-      console.log("[Voxlo] Access token:", accessToken ? `${accessToken.slice(0, 20)}...` : "NULL");
-
-      if (!accessToken) {
-        console.error("[Voxlo] No access token — showing sign-in");
-        setErrorMsg("Sign in to post.");
-        setShowAuthModal(true);
-        return;
-      }
-
-      const postBody = {
-        city,
-        mood,
-        tag: resolvedTag,
-        message: trimmed,
-        author: authorName,
-        lat: geolocation.lat ?? selectedCity?.lat ?? null,
-        lon: geolocation.lon ?? selectedCity?.lon ?? null,
-      };
-      console.log("[Voxlo] Posting pulse:", { ...postBody, message: postBody.message.slice(0, 30) });
-
-      const res = await fetch(getApiUrl("/api/pulses"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify(postBody),
-      });
-
-      console.log("[Voxlo] POST /api/pulses response:", res.status, res.statusText);
-
-      type CreatePulseResponse = { pulse?: unknown; error?: string; code?: string };
-      let data: CreatePulseResponse | null = null;
-      try {
-        data = await res.json();
-      } catch {
-        // ignore JSON parse error
-      }
-
-      console.log("[Voxlo] Response data:", data ? { pulse: !!data.pulse, error: data.error, code: data.code } : "null");
-
-      if (!res.ok || !data?.pulse) {
-        const serverMsg = data?.error;
-        const fallback = `Post failed (${res.status}). Please try again.`;
-        const message = serverMsg || fallback;
-        console.error("[Voxlo] Post failed:", res.status, res.statusText, "body:", JSON.stringify(data));
-
-        if (data?.code === "MODERATION_FAILED") {
-          setValidationError(message);
-          setShowValidationErrors(true);
-          return;
-        }
-
-        if (res.status === 401) {
-          setErrorMsg("Sign in to post.");
-          setShowAuthModal(true);
-          return;
-        }
-
-        setErrorMsg(message);
-        return;
-      }
-
-      // Optimistically insert the created pulse into local state so the author sees it immediately,
-      // even if realtime delivery is delayed or the websocket reconnects.
-      const raw = data.pulse as Record<string, unknown>;
-      const createdAt =
-        typeof raw.created_at === "string"
-          ? raw.created_at
-          : typeof raw.createdAt === "string"
-            ? raw.createdAt
-            : new Date().toISOString();
-
-      const createdPulse: Pulse = {
-        id: Number(raw.id),
-        city: typeof raw.city === "string" ? raw.city : city,
-        neighborhood:
-          typeof raw.neighborhood === "string" ? raw.neighborhood : null,
-        mood: typeof raw.mood === "string" ? raw.mood : mood,
-        tag: typeof raw.tag === "string" ? raw.tag : resolvedTag,
-        message: typeof raw.message === "string" ? raw.message : trimmed,
-        author: typeof raw.author === "string" ? raw.author : authorName,
-        createdAt,
-        user_id: typeof raw.user_id === "string" ? raw.user_id : sessionUser.id,
-      };
-
-      if (createdPulse.id) {
-        setPulses((prev) => {
-          const exists = prev.some((p) => String(p.id) === String(createdPulse.id));
-          if (exists) return prev;
-          return [createdPulse, ...prev].sort(
-            (a, b) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-        });
-      }
-
-      const reset = resetComposerAfterSuccessfulPost();
-      setMessage(reset.message);
-      setMood(reset.mood);
-      setTag(reset.tag);
-      setValidationError(null);
-      setMoodValidationError(null);
-      setTagValidationError(null);
-      setShowValidationErrors(false);
-
-      // Close the pulse modal after successful post
-      setShowPulseModal(false);
-
-      setPulseCountResolved(true);
-      setUserPulseCount((prev) => prev + 1);
-
-      if (wasFirstPulse) {
-        writeOnboardingCompleted(window.localStorage, sessionUser.id);
-        setOnboardingCompleted(true);
-        setShowFirstPulseModal(false);
-        setHasShownOnboarding(true);
-      }
-
-      if (sessionUser) {
-        await loadStreak();
-
-        if (wasFirstPulse) {
-          setShowFirstPulseBadgeToast(true);
-          setTimeout(() => {
-            setShowFirstPulseBadgeToast(false);
-          }, 5000);
-        }
-      }
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      console.error("Unexpected error creating pulse:", errMsg, err);
-      setErrorMsg(`Network error: ${errMsg.slice(0, 80)}`);
-      return;
-    }
-  };
+  // handleAddPulse, handleTabPulseSubmit, tab handlers — extracted to usePostPulse hook
 
   const displayName = profile?.anon_name || username || "...";
   const currentStreak = streakInfo?.currentStreak ?? 0;
-
-  // ========= TAB-SPECIFIC PULSE HANDLERS =========
-  // These handle posting from the in-tab inputs (Traffic, Events, Local)
-  type TabCategory = "Traffic" | "Events" | "General";
-
-  const handleTabPulseSubmit = async (
-    tabCategory: TabCategory,
-    tabMood: string,
-    tabMessage: string,
-    setTabMood: (m: string) => void,
-    setTabMessage: (m: string) => void
-  ) => {
-    const trimmed = tabMessage.trim();
-
-    if (!sessionUser) {
-      setErrorMsg("Sign in to post.");
-      setShowAuthModal(true);
-      return;
-    }
-
-    if (!identityReady) {
-      setErrorMsg("Please wait...");
-      return;
-    }
-
-    let hasErrors = false;
-
-    // Mood is mandatory
-    if (!tabMood) {
-      setTabMoodValidationError("Please select a vibe");
-      hasErrors = true;
-    } else {
-      setTabMoodValidationError(null);
-    }
-
-    // Message is required
-    if (!trimmed) {
-      setTabMessageValidationError("Please enter a message");
-      hasErrors = true;
-    } else {
-      const moderationResult = moderateContent(trimmed);
-      if (!moderationResult.allowed) {
-        setTabMessageValidationError(
-          moderationResult.reason || "Pulse contains disallowed language."
-        );
-        hasErrors = true;
-      } else {
-        setTabMessageValidationError(null);
-      }
-    }
-
-    if (hasErrors) {
-      setShowTabValidationErrors(true);
-      return;
-    }
-
-    setErrorMsg(null);
-    setShowTabValidationErrors(false);
-
-    const wasFirstPulse =
-      pulseCountResolved && userPulseCount === 0 && !onboardingCompleted;
-
-    const authorName = profile?.anon_name || username || "Anonymous";
-
-    try {
-      // Get a fresh access token via authBridge (works on both web and Capacitor)
-      const accessToken = await authBridge.getAccessToken();
-
-      if (!accessToken) {
-        setErrorMsg("Sign in to post.");
-        setShowAuthModal(true);
-        return;
-      }
-
-      setLoading(true);
-
-      const res = await fetch(getApiUrl("/api/pulses"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          city,
-          mood: tabMood,
-          tag: tabCategory,
-          message: trimmed,
-          author: authorName,
-          lat: geolocation.lat ?? selectedCity?.lat ?? null,
-          lon: geolocation.lon ?? selectedCity?.lon ?? null,
-        }),
-      });
-
-      type CreatePulseResponse = { pulse?: unknown; error?: string; code?: string };
-      let data: CreatePulseResponse | null = null;
-      try {
-        data = await res.json();
-      } catch {
-        // ignore JSON parse error
-      }
-
-      if (!res.ok || !data?.pulse) {
-        const serverMsg = data?.error;
-        const fallback = `Post failed (${res.status}). Please try again.`;
-        const message = serverMsg || fallback;
-        console.error("[Voxlo] Tab post failed:", res.status, res.statusText, "body:", JSON.stringify(data));
-
-        if (data?.code === "MODERATION_FAILED") {
-          setTabMessageValidationError(message);
-          setShowTabValidationErrors(true);
-          setLoading(false);
-          return;
-        }
-
-        if (res.status === 401) {
-          setErrorMsg("Sign in to post.");
-          setShowAuthModal(true);
-          setLoading(false);
-          return;
-        }
-
-        setErrorMsg(message);
-        setLoading(false);
-        return;
-      }
-
-      // Optimistically insert the created pulse
-      const raw = data.pulse as Record<string, unknown>;
-      const createdAt =
-        typeof raw.created_at === "string"
-          ? raw.created_at
-          : typeof raw.createdAt === "string"
-            ? raw.createdAt
-            : new Date().toISOString();
-
-      const createdPulse: Pulse = {
-        id: Number(raw.id),
-        city: typeof raw.city === "string" ? raw.city : city,
-        neighborhood:
-          typeof raw.neighborhood === "string" ? raw.neighborhood : null,
-        mood: typeof raw.mood === "string" ? raw.mood : tabMood,
-        tag: typeof raw.tag === "string" ? raw.tag : tabCategory,
-        message: typeof raw.message === "string" ? raw.message : trimmed,
-        author: typeof raw.author === "string" ? raw.author : authorName,
-        createdAt,
-        user_id: typeof raw.user_id === "string" ? raw.user_id : sessionUser.id,
-      };
-
-      if (createdPulse.id) {
-        setPulses((prev) => {
-          const exists = prev.some((p) => String(p.id) === String(createdPulse.id));
-          if (exists) return prev;
-          return [createdPulse, ...prev].sort(
-            (a, b) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-        });
-      }
-
-      // Reset the tab-specific form
-      setTabMood("");
-      setTabMessage("");
-      setTabMoodValidationError(null);
-      setTabMessageValidationError(null);
-      setShowTabValidationErrors(false);
-
-      setLoading(false);
-
-      setPulseCountResolved(true);
-      setUserPulseCount((prev) => prev + 1);
-
-      if (wasFirstPulse) {
-        writeOnboardingCompleted(window.localStorage, sessionUser.id);
-        setOnboardingCompleted(true);
-        setShowFirstPulseModal(false);
-        setHasShownOnboarding(true);
-      }
-
-      if (sessionUser) {
-        await loadStreak();
-
-        if (wasFirstPulse) {
-          setShowFirstPulseBadgeToast(true);
-          setTimeout(() => {
-            setShowFirstPulseBadgeToast(false);
-          }, 5000);
-        }
-      }
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      console.error("Unexpected error creating tab pulse:", errMsg, err);
-      setErrorMsg(`Network error: ${errMsg.slice(0, 80)}`);
-      setLoading(false);
-    }
-  };
-
-  // Specific handlers for each tab
-  const handleTrafficPulseSubmit = () => {
-    handleTabPulseSubmit("Traffic", trafficMood, trafficMessage, setTrafficMood, setTrafficMessage);
-  };
-
-  const handleEventsPulseSubmit = () => {
-    handleTabPulseSubmit("Events", eventsMood, eventsMessage, setEventsMood, setEventsMessage);
-  };
-
-  const handleLocalPulseSubmit = () => {
-    handleTabPulseSubmit("General", localMood, localMessage, setLocalMood, setLocalMessage);
-  };
 
   const recentPulseCount2h = useMemo(() => {
     const cutoff = Date.now() - 2 * 60 * 60 * 1000;
