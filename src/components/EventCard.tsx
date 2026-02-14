@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/../lib/supabaseClient";
 import type { TicketmasterEvent, EventsFallback } from "@/hooks/useEvents";
-import type { FarmersMarket } from "./types";
+// FarmersMarket import removed
 import { RADIUS_CONFIG } from "@/lib/constants/radius";
 import TabPulseInput from "./TabPulseInput";
 
@@ -62,11 +62,8 @@ type EventCardProps = {
   fallback?: EventsFallback | null;
   /** City name for hyperlocal pulse prompts */
   cityName?: string;
-  /** State code for farmers market lookup */
   state?: string;
-  /** Latitude for farmers market lookup */
   lat?: number;
-  /** Longitude for farmers market lookup */
   lon?: number;
   // Pulse input props
   isSignedIn?: boolean;
@@ -373,8 +370,7 @@ export default function EventCard({
 }: EventCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [venueVibeCount, setVenueVibeCount] = useState<number>(0);
-  const [farmersMarkets, setFarmersMarkets] = useState<FarmersMarket[]>([]);
-  const [marketsLoading, setMarketsLoading] = useState(false);
+  // Farmers markets removed
 
   // Fetch venue vibes for the featured event's venue
   useEffect(() => {
@@ -410,41 +406,7 @@ export default function EventCard({
     fetchVenueVibes();
   }, [events]);
 
-  // Fetch farmers markets for Local Markets Today section
-  useEffect(() => {
-    const fetchMarkets = async () => {
-      if (!cityName || !hasLocation) {
-        setFarmersMarkets([]);
-        return;
-      }
-
-      setMarketsLoading(true);
-      try {
-        let url = `/api/farmers-markets?city=${encodeURIComponent(cityName)}`;
-        if (state) url += `&state=${encodeURIComponent(state)}`;
-        if (lat && lon) url += `&lat=${lat}&lon=${lon}`;
-
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (data.markets && data.markets.length > 0) {
-          // Filter to only show markets open today, limit to 3
-          const openMarkets = data.markets
-            .filter((m: FarmersMarket) => m.isOpenToday)
-            .slice(0, 3);
-          setFarmersMarkets(openMarkets);
-        } else {
-          setFarmersMarkets([]);
-        }
-      } catch {
-        setFarmersMarkets([]);
-      } finally {
-        setMarketsLoading(false);
-      }
-    };
-
-    fetchMarkets();
-  }, [cityName, state, lat, lon, hasLocation]);
+  // Farmers markets fetch removed
 
   // Loading state
   if (isLoading) {
@@ -533,47 +495,6 @@ export default function EventCard({
 
   return (
     <div className="space-y-3">
-      {/* Local Markets Today Section */}
-      {!marketsLoading && farmersMarkets.length > 0 && (
-        <div className="glass-card premium-border bg-gradient-to-br from-emerald-500/10 via-green-500/5 to-transparent rounded-3xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 flex items-center justify-center text-xl shadow-inner">{"\uD83E\uDD6C"}</div>
-              <div className="flex flex-col">
-                <h3 className="text-sm font-black text-white uppercase tracking-wider">Local Markets</h3>
-                <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Open Today</p>
-              </div>
-            </div>
-          </div>
-          <div className="space-y-3">
-            {farmersMarkets.map((market) => (
-              <a
-                key={market.id}
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(market.name + ' ' + market.address)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-between gap-4 p-3 bg-black/20 backdrop-blur-sm rounded-2xl border border-white/5 hover:bg-black/30 transition-all duration-300 group"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-white truncate group-hover:text-emerald-400 transition-colors">{market.name}</p>
-                  <p className="text-[11px] font-medium text-slate-500 truncate mt-0.5">{market.schedule}</p>
-                </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  {market.distance && (
-                    <span className="text-[10px] font-black text-slate-400">{market.distance.toFixed(1)} mi</span>
-                  )}
-                  <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center transform group-hover:rotate-45 transition-transform duration-500">
-                    <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                    </svg>
-                  </div>
-                </div>
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Metro Fallback Banner */}
       {fallback && (
         <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg">

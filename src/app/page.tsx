@@ -36,8 +36,8 @@ import PulseInput from "@/components/PulseInput";
 import FAB from "@/components/FAB";
 import PulseModal from "@/components/PulseModal";
 import TrafficContent from "@/components/TrafficContent";
-import LiveVibes from "@/components/LiveVibes";
-import { DASHBOARD_TABS, type TabId, type WeatherInfo, type Pulse, type CityMood, type TrafficLevel, type LocalSection } from "@/components/types";
+// LiveVibes removed (dead feature)
+import { DASHBOARD_TABS, type TabId, type WeatherInfo, type Pulse, type CityMood, type TrafficLevel } from "@/components/types";
 import { useAuth } from "@/hooks/useAuth";
 import type { Profile } from "@/hooks/useAuth";
 import { usePulses } from "@/hooks/usePulses";
@@ -130,7 +130,7 @@ export default function Home() {
   // Tab state for new Neon theme
   // Persist tab state in sessionStorage so it survives navigation to venue pages
   const [activeTab, setActiveTabState] = useState<TabId>("events");
-  const [localSection, setLocalSection] = useState<LocalSection>("deals");
+  // localSection removed — LocalTab simplified to single view
 
   // Wrapper to persist tab changes
   const setActiveTab = (tab: TabId) => {
@@ -147,19 +147,7 @@ export default function Home() {
   // NOTE: We do NOT restore the active tab — "events" is always the default
   // because events are the wedge feature. sessionStorage in WKWebView persists
   // across app restarts, so restoring would override the intended default.
-  useEffect(() => {
-    try {
-      // Also restore local section if navigating to local tab
-      const savedLocalSection = sessionStorage.getItem("cp-local-section");
-      if (savedLocalSection && ["deals", "gas", "markets", "heatmap"].includes(savedLocalSection)) {
-        setLocalSection(savedLocalSection as LocalSection);
-        // Clear it after reading so it doesn't persist unexpectedly
-        sessionStorage.removeItem("cp-local-section");
-      }
-    } catch {
-      // Ignore storage errors
-    }
-  }, []);
+  // Storage restoration removed — no longer needed
   const [showPulseModal, setShowPulseModal] = useState(false);
 
   // Auth + anon profile (extracted to useAuth hook)
@@ -2590,7 +2578,6 @@ export default function Home() {
                     gasPrice={null}
                     gasStationName={null}
                     onGasPriceClick={() => {
-                      setLocalSection("gas");
                       setActiveTab("local");
                     }}
                   />
@@ -2703,12 +2690,6 @@ export default function Home() {
                       </div>
                     </div>
                   )}
-
-                  {/* Live Vibes - Floating avatars of currently active moods */}
-                  <LiveVibes city={city} onNavigateToLocal={() => {
-                    setLocalSection("deals");
-                    setActiveTab("local");
-                  }} />
 
                   {/* Pulse Input & Feed (Main Home Content) */}
                   <div className="space-y-4 pt-4">
@@ -2956,8 +2937,6 @@ export default function Home() {
                       state={localState}
                       lat={localLat}
                       lon={localLon}
-                      section={localSection}
-                      onSectionChange={setLocalSection}
                       userId={sessionUser?.id ?? null}
                       onSignInClick={() => setShowAuthModal(true)}
                       isSignedIn={!!sessionUser}
