@@ -2,6 +2,16 @@
 
 ---
 
+## Commit: TBD (2026-02-14) — CORS fix for posting on iOS
+
+### FIX: Posting broken on iOS/Capacitor — CORS headers missing on API responses ✅
+**Files:** `src/middleware.ts`
+**Root cause:** Middleware handled OPTIONS preflight with `Access-Control-Allow-Origin: *` but did NOT add CORS headers to the actual POST/GET responses. WKWebView (Capacitor) sends requests from `capacitor://` origin to `https://voxlo-theta.vercel.app`, which is cross-origin. Browser allows the preflight but blocks the actual response because it lacks `Access-Control-Allow-Origin`.
+**What changed:** Added CORS headers (`Access-Control-Allow-Origin: *`, methods, headers) to ALL `/api/*` responses via middleware, not just OPTIONS preflight.
+**Impact:** ALL posting was broken on iOS since the fetch interceptor was added. Web posting was unaffected (same-origin).
+
+---
+
 ## Commit: 2d0fba1 (2026-02-12) — 4 Bug Fixes
 
 ### FIX 1: Weather post deduplication not working ✅
