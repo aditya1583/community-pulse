@@ -109,7 +109,13 @@ export default function Home() {
 
   // Tab state for new Neon theme
   // Persist tab state in sessionStorage so it survives navigation to venue pages
-  const [activeTab, setActiveTabState] = useState<TabId>("events");
+  const [activeTab, setActiveTabState] = useState<TabId>(() => {
+    // After sign-out, land on pulse tab (not events) so the sign-in prompt is prominent
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("signed_out")) {
+      return "pulse";
+    }
+    return "events";
+  });
   // localSection removed — LocalTab simplified to single view
 
   // Wrapper to persist tab changes
@@ -279,6 +285,16 @@ export default function Home() {
   const pulseTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [renderCitySuggestionsMenu, setRenderCitySuggestionsMenu] = useState(false);
   const cityDropdownOpen = showCitySuggestions && citySuggestions.length > 0;
+
+  // After sign-out redirect, show auth modal and clean URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("signed_out")) {
+      setShowAuthModal(true);
+      // Clean the URL without triggering a reload
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (process.env.NODE_ENV === "production") return;
@@ -1083,7 +1099,7 @@ export default function Home() {
   return (
     <>
       {/* Fixed background that extends into iOS safe areas */}
-      <div className="fixed inset-0 bg-[#09090b] -z-50" aria-hidden="true" />
+      <div className="fixed inset-0 bg-black -z-50" aria-hidden="true" />
 
       <div className="min-h-screen neon-grid-bg text-slate-50 flex flex-col">
         {/* First-Time User Onboarding Modal */}
@@ -1432,7 +1448,7 @@ export default function Home() {
                               localStorage.clear();
                               sessionStorage.clear();
                               authBridge.signOut().catch(() => {});
-                              window.location.reload();
+                              window.location.href = "/?signed_out=1";
                             }}
                             className="p-2 text-slate-500 hover:text-red-400 transition-colors active:scale-90"
                             title="Sign out"
@@ -1905,7 +1921,7 @@ export default function Home() {
                         localStorage.clear();
                         sessionStorage.clear();
                         authBridge.signOut().catch(() => {});
-                        window.location.reload();
+                        window.location.href = "/?signed_out=1";
                       }}
                     />
                   )}
