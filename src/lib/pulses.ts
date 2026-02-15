@@ -140,6 +140,38 @@ export function formatPulseDateTime(createdAt: string | Date) {
   return `${month}/${day}/${year} ${hours12}:${minutes} ${ampm}`;
 }
 
+/** Slack-style relative time: "2m", "1h", "5:30 PM", "Yesterday", "Feb 12" */
+export function formatRelativeTime(createdAt: string | Date) {
+  const d = createdAt instanceof Date ? createdAt : new Date(createdAt);
+  if (Number.isNaN(d.getTime())) return "";
+
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHr = Math.floor(diffMs / 3600000);
+
+  if (diffMin < 1) return "now";
+  if (diffMin < 60) return `${diffMin}m`;
+  if (diffHr < 6) return `${diffHr}h`;
+
+  // Same day → show time
+  const isToday = d.toDateString() === now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday = d.toDateString() === yesterday.toDateString();
+
+  const hours12 = (d.getHours() % 12) || 12;
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  const ampm = d.getHours() >= 12 ? "PM" : "AM";
+  const timeStr = `${hours12}:${minutes} ${ampm}`;
+
+  if (isToday) return timeStr;
+  if (isYesterday) return `Yesterday`;
+
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return `${months[d.getMonth()]} ${d.getDate()}`;
+}
+
 export function formatPulseLocation(city: string, neighborhood?: string | null) {
   const safeCity = (city || "").trim();
   const safeNeighborhood = (neighborhood || "").trim();

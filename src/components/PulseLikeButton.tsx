@@ -17,9 +17,7 @@ type ReactionResponse = {
 };
 
 const REACTION_TYPES = [
-  { type: "fire", emoji: "🔥" },
   { type: "check", emoji: "👍" },
-  { type: "eyes", emoji: "👀" },
 ] as const;
 
 export default function PulseLikeButton({
