@@ -335,3 +335,18 @@ This enables freshness auditing — you can see exactly what data backed each po
 
 ### Deploy Status
 ✅ Pushed to apple/main, Vercel deployed
+
+---
+
+## Commit: d648985 (2026-02-14) — Distance badges + action bar fix
+
+### FIX 1: Distance badge shows on ALL pulses with distance ✅
+**Files:** `src/components/PulseCard.tsx`
+**What changed:** DistanceBadge now uses `showAlways` prop and shows for any pulse with `distanceMiles > 0`. Previously only showed for >10mi. Now in-radius events show green distance, out-of-radius show amber/orange.
+
+### FIX 2: Action bar overlap reduced ✅
+**Files:** `src/components/PulseCard.tsx`
+**What changed:** Footer restructured from single row to flex-col with inner justify-between. Reduced gap from 3 to 2. Timestamp font reduced to 10px.
+
+### Build/Test Status
+✅ `npm run build` clean, 7/8 E2E pass
