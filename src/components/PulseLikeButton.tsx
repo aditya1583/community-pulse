@@ -17,7 +17,9 @@ type ReactionResponse = {
 };
 
 const REACTION_TYPES = [
+  { type: "fire", emoji: "🔥" },
   { type: "check", emoji: "👍" },
+  { type: "eyes", emoji: "👀" },
 ] as const;
 
 export default function PulseLikeButton({
@@ -27,12 +29,12 @@ export default function PulseLikeButton({
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [userReactions, setUserReactions] = useState<string[]>([]);
   const [loading, setLoading] = useState<string | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const params = userIdentifier ? `?userIdentifier=${encodeURIComponent(userIdentifier)}` : '';
       const apiPath = getApiUrl(`/api/pulses/${pulseId}/react${params}`);
-
       const res = await fetch(apiPath);
       if (!res.ok) return;
       const data = (await res.json()) as ReactionResponse;
@@ -45,47 +47,25 @@ export default function PulseLikeButton({
 
   useEffect(() => {
     void load();
-
-    // Polling fallback every 60 seconds for reaction updates
-    // (Realtime may not be enabled for pulse_reactions table)
-    const pollInterval = setInterval(() => {
-      void load();
-    }, 60000);
-
+    const pollInterval = setInterval(() => void load(), 60000);
     return () => clearInterval(pollInterval);
   }, [load]);
 
-  // REALTIME: Subscribe to pulse_reactions for this pulse to get instant updates
-  // Note: Requires Realtime to be enabled for pulse_reactions in Supabase dashboard
   useEffect(() => {
-    const channelName = `pulse-reactions-${pulseId}`;
-
     const channel = supabase
-      .channel(channelName)
-      .on(
-        "postgres_changes",
-        {
-          event: "*", // Listen for INSERT and DELETE
-          schema: "public",
-          table: "pulse_reactions",
-          filter: `pulse_id=eq.${pulseId}`,
-        },
-        () => {
-          // Reload reaction count when any change happens
-          void load();
-        }
-      )
+      .channel(`pulse-reactions-${pulseId}`)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "pulse_reactions",
+        filter: `pulse_id=eq.${pulseId}`,
+      }, () => void load())
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [pulseId, load]);
 
   const toggle = useCallback(async (reactionType: string) => {
-    if (!userIdentifier) return;
-    if (loading) return;
-
+    if (!userIdentifier || loading) return;
     setLoading(reactionType);
     try {
       const res = await fetch(getApiUrl(`/api/pulses/${pulseId}/react`), {
@@ -94,18 +74,24 @@ export default function PulseLikeButton({
         body: JSON.stringify({ reactionType, userIdentifier }),
       });
       if (!res.ok) return;
-
       const data = (await res.json()) as ReactionResponse;
       setCounts({ fire: data.fire ?? 0, eyes: data.eyes ?? 0, check: data.check ?? 0 });
       setUserReactions(data.userReactions ?? []);
     } finally {
       setLoading(null);
+      setShowPicker(false);
     }
   }, [loading, pulseId, userIdentifier]);
 
+  // Reactions that have counts > 0 (shown as pills)
+  const activeReactions = REACTION_TYPES.filter(({ type }) => (counts[type] ?? 0) > 0);
+  // Reactions user hasn't used yet (for the picker)
+  const availableReactions = REACTION_TYPES.filter(({ type }) => !userReactions.includes(type));
+
   return (
-    <div className="inline-flex items-center gap-1.5">
-      {REACTION_TYPES.map(({ type, emoji }) => {
+    <div className="flex items-center gap-1.5 flex-wrap relative">
+      {/* Existing reaction pills */}
+      {activeReactions.map(({ type, emoji }) => {
         const active = userReactions.includes(type);
         const count = counts[type] ?? 0;
         return (
@@ -114,21 +100,53 @@ export default function PulseLikeButton({
             type="button"
             onClick={() => toggle(type)}
             disabled={!userIdentifier || loading === type}
-            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs transition ${
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-all border ${
               active
-                ? "bg-emerald-500/20 text-emerald-300"
+                ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300"
                 : userIdentifier
-                  ? "text-slate-500 hover:bg-slate-700/50 hover:text-slate-300"
-                  : "text-slate-700 cursor-not-allowed"
+                  ? "bg-slate-800/60 border-slate-700/50 text-slate-300 hover:bg-slate-700/60 hover:border-slate-600/50"
+                  : "bg-slate-800/40 border-slate-700/30 text-slate-500 cursor-not-allowed"
             }`}
             title={!userIdentifier ? "Sign in to react" : active ? `Remove ${type}` : type}
-            aria-pressed={active}
           >
             <span className="text-sm leading-none">{emoji}</span>
-            {count > 0 && <span className="text-[10px] font-mono">{count}</span>}
+            <span className="text-[11px] font-mono tabular-nums">{count}</span>
           </button>
         );
       })}
+
+      {/* Add reaction button */}
+      {userIdentifier && (
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowPicker(!showPicker)}
+            className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-800/40 border border-slate-700/30 text-slate-500 hover:bg-slate-700/60 hover:text-slate-300 hover:border-slate-600/50 transition-all"
+            title="Add reaction"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.182 15.182a4.5 4.5 0 01-6.364 0M21 12a9 9 0 11-18 0 9 9 0 0118 0zM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75zm-.375 0h.008v.015h-.008V9.75zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75zm-.375 0h.008v.015h-.008V9.75z" />
+            </svg>
+          </button>
+
+          {/* Emoji picker dropdown */}
+          {showPicker && availableReactions.length > 0 && (
+            <div className="absolute bottom-full left-0 mb-1 flex items-center gap-1 bg-slate-800 border border-slate-700/50 rounded-full px-1.5 py-1 shadow-xl z-10">
+              {availableReactions.map(({ type, emoji }) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => toggle(type)}
+                  className="w-7 h-7 rounded-full hover:bg-slate-700 flex items-center justify-center transition text-base"
+                  title={type}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

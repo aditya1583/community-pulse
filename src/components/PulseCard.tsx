@@ -513,8 +513,12 @@ export default function PulseCard({
             />
           )}
 
-          <div className="flex flex-col gap-2 pt-2 mt-auto border-t border-white/5">
-          <div className="flex items-center justify-between gap-2">
+          {/* Slack-style reaction pills */}
+          <div className="pt-2">
+            <PulseLikeButton pulseId={pulse.id} userIdentifier={userIdentifier} />
+          </div>
+
+          <div className="flex items-center justify-between gap-2 pt-2 mt-auto border-t border-white/5">
             <div className="flex items-center gap-2.5 min-w-0">
               {pulse.is_bot ? (
                 (() => {
@@ -544,9 +548,6 @@ export default function PulseCard({
             </div>
 
             <div className="flex items-center gap-3 flex-shrink-0">
-              {/* Single 👍 reaction — Slack-style */}
-              <PulseLikeButton pulseId={pulse.id} userIdentifier={userIdentifier} />
-
               {reporterId ? (
                 <ReportPulseButton pulseId={pulse.id} reporterId={reporterId} />
               ) : (
@@ -579,7 +580,6 @@ export default function PulseCard({
                 {formatRelativeTime(pulse.createdAt)}
               </span>
             </div>
-          </div>
           </div>
 
           {/* Comments Section */}
