@@ -312,3 +312,26 @@ This enables freshness auditing — you can see exactly what data backed each po
 ### Deploy Status
 ✅ Pushed to apple/main, Vercel auto-deployed
 ✅ Verified on https://voxlo-theta.vercel.app/?signed_out=1 — auth modal shows, Pulse tab active
+
+---
+
+## Commit: 86eb8f4 (2026-02-14) — Default tab = Pulse, cache-busting
+
+### FIX 1: Default landing page changed from Events → Pulse ✅
+**Files:** `src/app/page.tsx`, `e2e/core-flows.spec.ts`
+**What changed:** `useState<TabId>("events")` → `useState<TabId>("pulse")`. Fallback also updated. E2E test updated to verify Pulse loads as default (city search bar visible).
+**Root cause:** Events was hardcoded as default tab. Ady wants Pulse (the main feed) as the landing page.
+
+### FIX 2: Cache-busting headers for WKWebView ✅
+**Files:** `next.config.ts`
+**What changed:** Added `Cache-Control: no-cache, no-store, must-revalidate` header for all routes. Prevents WKWebView from serving stale HTML/JS after deploys.
+
+### Verification
+- ✅ Fresh load → Location prompt → Pulse tab (not Events)
+- ✅ Signed-in load → Pulse tab with dashboard + feed
+- ✅ Sign-out → Auth modal on Pulse tab
+- ✅ 7/8 E2E tests pass on deployed Vercel URL
+- ✅ `npm run build` clean
+
+### Deploy Status
+✅ Pushed to apple/main, Vercel deployed
