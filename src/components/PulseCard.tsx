@@ -12,7 +12,7 @@ import ReportPulseButton from "@/components/ReportPulseButton";
 import StatusRing from "@/components/StatusRing";
 import { StatusIndicator } from "@/components/StatusRing";
 import DistanceBadge from "@/components/DistanceBadge";
-import { RADIUS_CONFIG } from "@/lib/constants/radius";
+// RADIUS_CONFIG removed — DistanceBadge handles its own radius logic
 
 // ============================================================================
 // ACTIONABLE CONTENT DETECTION
@@ -392,11 +392,11 @@ export default function PulseCard({
               {pulse.tag}
             </span>
 
-            {/* Distance badge for out-of-radius content */}
+            {/* Distance badge — always show when distance is available */}
             {pulse.distanceMiles !== undefined &&
               pulse.distanceMiles !== null &&
-              pulse.distanceMiles > RADIUS_CONFIG.PRIMARY_RADIUS_MILES && (
-                <DistanceBadge distanceMiles={pulse.distanceMiles} size="xs" />
+              pulse.distanceMiles > 0 && (
+                <DistanceBadge distanceMiles={pulse.distanceMiles} size="xs" showAlways />
               )}
           </div>
         </div>
@@ -513,7 +513,8 @@ export default function PulseCard({
             />
           )}
 
-          <div className="flex items-center justify-between gap-3 pt-2 mt-auto border-t border-white/5">
+          <div className="flex flex-col gap-2 pt-2 mt-auto border-t border-white/5">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0">
               {pulse.is_bot ? (
                 (() => {
@@ -542,7 +543,7 @@ export default function PulseCard({
               )}
             </div>
 
-            <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
               {/* Share Button - Web Share API */}
               <button
                 type="button"
@@ -626,10 +627,11 @@ export default function PulseCard({
                 </button>
               )}
 
-              <span className="text-slate-500 font-mono">
+              <span className="text-slate-500 font-mono text-[10px]">
                 {formatPulseDateTime(pulse.createdAt)}
               </span>
             </div>
+          </div>
           </div>
 
           {/* Comments Section */}
