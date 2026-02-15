@@ -73,28 +73,23 @@ async function signIn(page: Page) {
 // ─── Tests ───
 
 test.describe("App Load & Default Tab", () => {
-  test("Events tab loads as default on fresh app open", async ({ page }) => {
+  test("Pulse tab loads as default on fresh app open", async ({ page }) => {
     await loadApp(page);
 
-    // Events is the default tab — check for Events content
-    // On Events tab: city search bar is NOT visible (only on pulse/dashboard tab)
-    // We should see event cards or the events empty state
-    const mainContent = await page.textContent("main");
+    // Pulse is the default tab — city search bar should be visible
+    const citySearch = page.locator("input[placeholder*='Switch city']");
+    await expect(citySearch).toBeVisible({ timeout: 10000 });
 
-    // The bottom nav "Events" button should appear active/highlighted
-    // Events tab should show Ticketmaster events or "No events" message
-    const hasEventsContent =
-      mainContent?.includes("Events") ||
-      mainContent?.includes("No events") ||
-      mainContent?.includes("Ticketmaster") ||
-      mainContent?.includes("event") ||
+    // Should see pulse content (dashboard cards, pulse feed)
+    const mainContent = await page.textContent("main");
+    const hasPulseContent =
+      mainContent?.includes("Pulse") ||
+      mainContent?.includes("Traffic") ||
+      mainContent?.includes("Weather") ||
+      mainContent?.includes("Sign in") ||
       false;
 
-    expect(hasEventsContent).toBe(true);
-
-    // City search input (only on Pulse tab) should NOT be visible
-    const citySearch = page.locator("input[placeholder*='Switch city']");
-    await expect(citySearch).toBeHidden();
+    expect(hasPulseContent).toBe(true);
   });
 });
 

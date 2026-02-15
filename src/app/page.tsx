@@ -109,13 +109,7 @@ export default function Home() {
 
   // Tab state for new Neon theme
   // Persist tab state in sessionStorage so it survives navigation to venue pages
-  const [activeTab, setActiveTabState] = useState<TabId>(() => {
-    // After sign-out, land on pulse tab (not events) so the sign-in prompt is prominent
-    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("signed_out")) {
-      return "pulse";
-    }
-    return "events";
-  });
+  const [activeTab, setActiveTabState] = useState<TabId>("pulse");
   // localSection removed — LocalTab simplified to single view
 
   // Wrapper to persist tab changes
@@ -130,8 +124,8 @@ export default function Home() {
   };
 
   // Restore local section from sessionStorage on mount
-  // NOTE: We do NOT restore the active tab — "events" is always the default
-  // because events are the wedge feature. sessionStorage in WKWebView persists
+  // NOTE: We do NOT restore the active tab — "pulse" is always the default
+  // Pulse is the main landing page. sessionStorage in WKWebView persists
   // across app restarts, so restoring would override the intended default.
   // Storage restoration removed — no longer needed
   const [showPulseModal, setShowPulseModal] = useState(false);
@@ -299,8 +293,8 @@ export default function Home() {
   useEffect(() => {
     if (process.env.NODE_ENV === "production") return;
     if (!isTabId(activeTab)) {
-      console.warn(`[tabs] Unknown activeTab "${String(activeTab)}" — defaulting to "events"`);
-      setActiveTab("events");
+      console.warn(`[tabs] Unknown activeTab "${String(activeTab)}" — defaulting to "pulse"`);
+      setActiveTab("pulse");
     }
   }, [activeTab]);
 

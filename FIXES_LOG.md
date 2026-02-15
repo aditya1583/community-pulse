@@ -290,3 +290,25 @@ This enables freshness auditing — you can see exactly what data backed each po
 
 ### Push Status
 ✅ Pushed to apple/main
+
+---
+
+## Commit: 530d67c (2026-02-14) — Sign-out redirect + iOS gap fix
+
+### FIX 1: Sign-out redirects to login screen (not Events page) ✅
+**Files:** `src/app/page.tsx`
+**What changed:** Sign-out handler changed from `window.location.reload()` to `window.location.href = "/?signed_out=1"`. On load, `?signed_out=1` param triggers auth modal and sets active tab to Pulse. URL cleaned via `history.replaceState`. Both sign-out handlers updated (Pulse header + Status tab).
+**Root cause:** Default tab was `"events"` — after reload, user landed on Events with no sign-in prompt.
+
+### FIX 2: Pure black background for iOS safe-area gap ✅
+**Files:** `src/app/page.tsx`, `src/app/globals.css`
+**What changed:** Fixed background div `bg-[#09090b]` → `bg-black` in page.tsx. CSS `--background: #09090b` → `--background: #000000` in globals.css.
+**Root cause:** `#09090b` (dark gray) was visible through the transparent iOS status bar, creating a subtle gap/bar at the top.
+
+### Build Status
+✅ `npm run build` passes clean
+✅ 7/8 E2E tests pass (1 skipped)
+
+### Deploy Status
+✅ Pushed to apple/main, Vercel auto-deployed
+✅ Verified on https://voxlo-theta.vercel.app/?signed_out=1 — auth modal shows, Pulse tab active
