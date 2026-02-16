@@ -146,7 +146,7 @@ export function usePulses({ city, selectedCity, geolocation }: UsePulsesParams) 
 
       const apiUrl = `${getApiUrl("/api/pulses/feed")}?${params}`;
       console.log(`[Pulses] Fetching via API: ${apiUrl}`);
-      const res = await fetch(apiUrl, { signal: AbortSignal.timeout(8000) });
+      const res = await fetch(apiUrl, { signal: AbortSignal.timeout(15000) });
 
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({ error: res.statusText }));
@@ -192,8 +192,15 @@ export function usePulses({ city, selectedCity, geolocation }: UsePulsesParams) 
       }
     } catch (fetchErr) {
       console.error("[Pulses] fetchPulses CAUGHT ERROR:", fetchErr);
-      setErrorMsg(fetchErr instanceof Error ? fetchErr.message : "Unknown fetch error");
-      setPulses([]);
+      // Don't show abort/timeout errors to user — just log and keep any cached pulses
+      const isAbort = fetchErr instanceof DOMException && fetchErr.name === "AbortError";
+      const isTimeout = fetchErr instanceof DOMException && fetchErr.name === "TimeoutError";
+      if (isAbort || isTimeout) {
+        console.warn("[Pulses] Request timed out — keeping existing data");
+      } else {
+        setErrorMsg("Could not load pulses. Pull down to retry.");
+        setPulses([]);
+      }
     } finally {
       setLoading(false);
       setInitialPulsesFetched(true);

@@ -196,7 +196,7 @@ export default function LocalDealsSection({
 
     const attemptFetch = async (): Promise<LocalPlace[] | null> => {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000); // Overpass API is slow (~5s), give it room
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // Overpass API can be slow on first call, give it room
       try {
         const response = await fetch(`/api/osm/places?${osmParams.toString()}`, {
           signal: controller.signal,
