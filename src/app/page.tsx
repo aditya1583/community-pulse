@@ -109,7 +109,7 @@ export default function Home() {
 
   // Tab state for new Neon theme
   // Persist tab state in sessionStorage so it survives navigation to venue pages
-  const [activeTab, setActiveTabState] = useState<TabId>("pulse");
+  const [activeTab, setActiveTabState] = useState<TabId>("events");
   // localSection removed — LocalTab simplified to single view
 
   // Wrapper to persist tab changes
@@ -293,8 +293,8 @@ export default function Home() {
   useEffect(() => {
     if (process.env.NODE_ENV === "production") return;
     if (!isTabId(activeTab)) {
-      console.warn(`[tabs] Unknown activeTab "${String(activeTab)}" — defaulting to "pulse"`);
-      setActiveTab("pulse");
+      console.warn(`[tabs] Unknown activeTab "${String(activeTab)}" — defaulting to "events"`);
+      setActiveTab("events");
     }
   }, [activeTab]);
 
@@ -1398,7 +1398,7 @@ export default function Home() {
 
         <PullToRefresh onRefresh={handlePullToRefresh} disabled={loading}>
           {/* Main Content Area */}
-          <main className="flex-1 flex justify-center px-4 pb-6 pt-[env(safe-area-inset-top,0.25rem)]">
+          <main className="flex-1 flex justify-center px-4 pb-6 pt-0">
             <div className="w-full max-w-lg space-y-6">
 
               {/* VIEW BRANCHING: Dashboard (Pulse) vs Dedicated Tabs (Traffic/Events/Local/Status) */}

@@ -93,6 +93,8 @@ function getCacheKey(lat: number, lon: number, category: string, radius: number)
   return `${lat.toFixed(2)},${lon.toFixed(2)},${category},${radius}`;
 }
 
+export const maxDuration = 30; // Allow up to 30s for Overpass API (Vercel default is 10s)
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const lat = searchParams.get("lat");
@@ -141,7 +143,7 @@ export async function GET(req: NextRequest) {
 
     // Build Overpass QL query
     const query = `
-      [out:json][timeout:15];
+      [out:json][timeout:8];
       (
         ${queryParts.join("\n        ")}
       );
@@ -168,7 +170,7 @@ export async function GET(req: NextRequest) {
             "User-Agent": "CommunityPulse/1.0",
           },
           body: `data=${encodeURIComponent(query)}`,
-          signal: AbortSignal.timeout(12000),
+          signal: AbortSignal.timeout(8000),
         });
 
         if (response.ok) {

@@ -73,23 +73,19 @@ async function signIn(page: Page) {
 // ─── Tests ───
 
 test.describe("App Load & Default Tab", () => {
-  test("Pulse tab loads as default on fresh app open", async ({ page }) => {
+  test("Events tab loads as default on fresh app open", async ({ page }) => {
     await loadApp(page);
 
-    // Pulse is the default tab — city search bar should be visible
-    const citySearch = page.locator("input[placeholder*='Switch city']");
-    await expect(citySearch).toBeVisible({ timeout: 10000 });
-
-    // Should see pulse content (dashboard cards, pulse feed)
+    // Events is the default tab — should see events content
     const mainContent = await page.textContent("main");
-    const hasPulseContent =
-      mainContent?.includes("Pulse") ||
-      mainContent?.includes("Traffic") ||
-      mainContent?.includes("Weather") ||
+    const hasEventsContent =
+      mainContent?.includes("Events") ||
+      mainContent?.includes("event") ||
       mainContent?.includes("Sign in") ||
+      mainContent?.includes("Happening") ||
       false;
 
-    expect(hasPulseContent).toBe(true);
+    expect(hasEventsContent).toBe(true);
   });
 });
 
