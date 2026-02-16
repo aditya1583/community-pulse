@@ -2,6 +2,40 @@
 
 ---
 
+## Commit: 5edd8f1 (2026-02-16) — Moderation categories 6-10 + evasion techniques
+
+### ENHANCEMENT 1: Categories 6-10 added to PII detection layer ✅
+**Files:** `src/lib/piiDetection.ts`
+**What changed:** Added 3 new PIICategory types (`misinformation`, `illegal_activity`, `platform_manipulation`) and detection functions:
+- **Category 6 — Dangerous misinformation:** Medical misinfo (drink bleach, vaccines cause autism, 5g/covid), fake emergencies (bomb threats, active shooter), election misinfo (rigged, stolen, stop the steal)
+- **Category 7 — Spam & manipulation:** Extended existing scam patterns with fake giveaways, engagement bait (like/share to win, tag friends, f4f, l4l, sub4sub)
+- **Category 8 — PII exposure:** Already existed — verified email, phone, SSN, credit card, address, social handle detection all working
+- **Category 9 — Illegal activity:** Drug sales (weed, molly, coke, xanax, etc.), weapons trafficking (ghost guns, unregistered), stolen goods, fake IDs/documents, trafficking language
+- **Category 10 — Platform manipulation:** Impersonation ("I'm the admin"), fake authority claims, misleading official announcements
+
+### ENHANCEMENT 2: Evasion technique verification ✅
+**Files:** `src/lib/__tests__/moderationAuditCategories.test.ts`
+**What changed:** Added tests verifying all evasion techniques are caught:
+- Zero-width characters (already handled by `stripZeroWidthChars` in moderation.ts + blocklist.ts)
+- Cyrillic homoglyphs (already handled by `PHONETIC_SUBSTITUTIONS` in moderation.ts + `HOMOGLYPH_MAP` in blocklist.ts)
+- Emoji substitution (sexual emoji combos caught by blocklist `detectSexualEmojiContext`, emoji-only spam by PII `detectSpam`)
+- URL shorteners (caught by scam patterns: bit.ly, tinyurl, etc.)
+- Multilingual slurs — Spanish (puta, pendejo, pinche, mierda, chinga) and Hindi (chutiya, madarchod, benchod, etc.) already in `SPAM_WORDS`
+
+### ENHANCEMENT 3: Test suite expanded ✅
+**Files:** `src/lib/__tests__/moderationAuditCategories.test.ts`, `MODERATION_AUDIT.md`
+**What changed:** 21 tests → 48 tests. Added test sections for all 5 new categories + comprehensive evasion technique tests. MODERATION_AUDIT.md updated with full results table.
+
+### Supabase Migration
+✅ `ops_moderation_log` table already exists — no migration needed.
+
+### Build/Test Status
+✅ `npm run build` passes clean
+✅ 48/48 moderation audit tests pass
+✅ Pushed to apple/main
+
+---
+
 ## Commit: (2026-02-16) — Content moderation: scam detection + audit
 
 ### ENHANCEMENT 1: Scam & phishing pattern detection ✅
