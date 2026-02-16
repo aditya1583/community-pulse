@@ -43,6 +43,7 @@ export type PIICategory =
   | "self_identification"
   | "social_handle"
   | "contact_phrase"
+  | "scam"
   | "spam";
 
 export type PIIDetectionResult = {
@@ -553,6 +554,57 @@ function detectContactIntent(text: string): boolean {
 }
 
 // ============================================================================
+// Scam / Phishing Detection
+// ============================================================================
+
+/**
+ * Scam and phishing patterns — financial fraud, crypto scams, phishing URLs
+ */
+const SCAM_PATTERNS: RegExp[] = [
+  // Money transfer requests
+  /\bsend\s+(?:me\s+)?money\b/i,
+  /\bsend\s+(?:me\s+)?\$?\d+/i,
+  /\bwire\s+(?:me\s+)?money\b/i,
+  /\bvenmo\s+me\b/i,
+  /\bcashapp\s+me\b/i,
+  /\bzelle\s+me\b/i,
+  /\bpaypal\s+me\b/i,
+  /\bpay\s+me\s+\$?\d+/i,
+  // Crypto scams
+  /\bcrypto\s+pump\b/i,
+  /\bpump\s+and\s+dump\b/i,
+  /\b(?:buy|invest\s+in)\s+(?:this\s+)?(?:coin|token|nft)\b/i,
+  /\b(?:100|10|50|1000)x\s+(?:gains?|returns?|profit)\b/i,
+  /\bguaranteed\s+(?:returns?|profit|income)\b/i,
+  /\bdouble\s+your\s+(?:money|crypto|bitcoin|eth)\b/i,
+  /\bfree\s+(?:crypto|bitcoin|eth|nft|money)\b/i,
+  /\bsend\s+(?:\d+\s+)?(?:btc|eth|sol|crypto)\b/i,
+  // Phishing URL patterns
+  /\b(?:bit\.ly|tinyurl|t\.co|rb\.gy|cutt\.ly|shorturl)\b/i,
+  /\bclick\s+(?:this\s+)?(?:link|here)\b/i,
+  /\b(?:verify|confirm)\s+your\s+(?:account|identity|wallet)\b/i,
+  /\blogin\s+(?:here|now|at)\b/i,
+  // Advance-fee / Nigerian prince patterns
+  /\binheritance\b.*\bmillion\b/i,
+  /\blottery\s+(?:winner|winning)\b/i,
+  /\byou\s+(?:have\s+)?won\b/i,
+  /\bclaim\s+your\s+(?:prize|reward|money)\b/i,
+  // MLM / pyramid scheme
+  /\b(?:join\s+)?my\s+team\b.*\b(?:income|money|earn)\b/i,
+  /\bpassive\s+income\s+(?:opportunity|stream)\b/i,
+  /\bwork\s+from\s+home\b.*\b(?:\$|earn|money)\b/i,
+  /\bfinancial\s+freedom\b.*\b(?:join|opportunity|dm)\b/i,
+];
+
+/**
+ * Detect scam/phishing content
+ */
+function detectScam(text: string): boolean {
+  const normalized = normalizeText(text);
+  return SCAM_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+// ============================================================================
 // Main Detection Function
 // ============================================================================
 
@@ -574,6 +626,9 @@ export function detectPII(text: string): PIIDetectionResult {
 
   // Strict: any contact intent should be blocked early (before moderation/insert)
   if (detectContactIntent(text)) addCategory("contact_phrase");
+
+  // Scam detection
+  if (detectScam(text)) addCategory("scam");
 
   // PII detectors
   if (detectEmail(text)) addCategory("email");

@@ -2,6 +2,27 @@
 
 ---
 
+## Commit: (2026-02-16) — Content moderation: scam detection + audit
+
+### ENHANCEMENT 1: Scam & phishing pattern detection ✅
+**Files:** `src/lib/piiDetection.ts`
+**What changed:** Added `scam` category to PIICategory type. Added `SCAM_PATTERNS` array with 25+ regex patterns covering: money transfer requests (send money, venmo/cashapp/zelle me), crypto scams (pump and dump, guaranteed returns, double your bitcoin), phishing URLs (bit.ly, click this link, verify your account), advance-fee fraud (lottery winner, claim your prize), and MLM/pyramid scheme patterns. Added `detectScam()` function called in `detectPII()` pipeline.
+**Impact:** Scam content is now blocked at the PII layer (blocking) — never reaches the database.
+
+### ENHANCEMENT 2: Moderation migration SQL ✅
+**Files:** `moderation-migration.sql` (new)
+**What changed:** Created Supabase migration file for `ops_moderation_log` table with proper columns (id, created_at, user_id, content_hash, category, confidence_score, action, source, layer, endpoint), indexes, and RLS (service-role-only access). Table already referenced by `moderationLogger.ts`.
+
+### ENHANCEMENT 3: Moderation audit — categories 1-5 ✅
+**Files:** `src/lib/__tests__/moderationAuditCategories.test.ts` (new), `MODERATION_AUDIT.md` (new)
+**What changed:** Created comprehensive test suite (21 tests) covering all 5 highest-risk categories: profanity/slurs (common, leet speak, spaced-out, racial), sexual content (solicitation, explicit), violence/threats (direct, indirect, self-harm), harassment/bullying (targeted insults, phrases), hate speech (dog whistles, slur variants). Plus scam detection, PII, and Unicode evasion tests. All 21 pass. MODERATION_AUDIT.md documents full architecture, endpoint coverage, and test results.
+
+### Build Status
+✅ `npm run build` passes clean
+✅ 21/21 moderation audit tests pass
+
+---
+
 ## Commit: TBD (2026-02-14) — 3 fixes: CORS, delete, green banner
 
 ### FIX 1: Posting broken on iOS/Capacitor — CORS headers missing on API responses ✅
