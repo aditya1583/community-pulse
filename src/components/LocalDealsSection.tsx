@@ -37,10 +37,6 @@ type LocalDealsSectionProps = {
 
 const DEAL_CATEGORIES = [
   { id: "all", label: "All", query: "", osmCategory: "all", emoji: "🏪" },
-  { id: "coffee", label: "Coffee", query: "coffee", osmCategory: "coffee", emoji: "☕" },
-  { id: "food", label: "Food", query: "restaurants", osmCategory: "restaurants", emoji: "🍽️" },
-  { id: "bars", label: "Bars", query: "bars", osmCategory: "bars", emoji: "🍺" },
-  { id: "groceries", label: "Grocery", query: "grocery", osmCategory: "grocery", emoji: "🛒" },
 ] as const;
 
 // Category-based icons and colors for places without photos

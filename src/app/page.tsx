@@ -148,6 +148,21 @@ export default function Home() {
     handleForgotPassword,
   } = useAuth();
 
+  // Defensive: if authStatus resolved to "signed_in" but sessionUser is still null
+  // (can happen on Capacitor/WKWebView when auth state fires before getUser resolves),
+  // re-fetch the user from authBridge so isOwnPulse checks work.
+  useEffect(() => {
+    if (authStatus === "signed_in" && !sessionUser) {
+      let cancelled = false;
+      authBridge.getUser().then(({ data }) => {
+        if (!cancelled && data.user) {
+          setSessionUser(data.user);
+        }
+      }).catch(() => {/* ignore */});
+      return () => { cancelled = true; };
+    }
+  }, [authStatus, sessionUser, setSessionUser]);
+
   // User gamification stats (level, XP, tier)
   const {
     level: userLevel,

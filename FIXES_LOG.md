@@ -350,3 +350,29 @@ This enables freshness auditing — you can see exactly what data backed each po
 
 ### Build/Test Status
 ✅ `npm run build` clean, 7/8 E2E pass
+
+---
+
+## Commit: (2026-02-16) — Dead code cleanup, bot audit, session fallback
+
+### Task 1: Bot fun facts audit ✅
+**Status:** No changes needed
+**Finding:** `fun-facts-ai.ts` uses GPT-4o-mini with comprehensive anti-fabrication rules in system prompts. No hardcoded facts — all generated dynamically from real context (events, weather, traffic). Prompts are well-structured with explicit rules against inventing business names, deals, or locations.
+
+### Task 2: Dead code removal ✅
+**Files:** `src/components/PulseCard.tsx`, `src/lib/pulses.ts`, `src/lib/__tests__/pulses.test.ts`
+**What changed:**
+1. Removed `ExpiryBadge` component and its `ClockIcon` helper from PulseCard.tsx (~70 lines). Neither was referenced anywhere in the codebase.
+2. Removed `formatPulseDateTime` export from `pulses.ts` (~15 lines) — no callers outside its own test file.
+3. Updated test file to remove `formatPulseDateTime` import and test cases.
+
+### Task 3: Local tab dead code cleanup ✅
+**Files:** `src/components/LocalDealsSection.tsx`
+**What changed:** Removed 4 unused category entries from `DEAL_CATEGORIES` (coffee, food, bars, groceries). The filter pills UI was already removed in commit 2bc0710, but the data array still had the entries. `activeCategory` is hardcoded to `"all"` so only the "all" entry is needed. `CATEGORY_ICONS` kept — still used for rendering place cards.
+
+### Task 4: Delete button session fallback ✅
+**Files:** `src/app/page.tsx`
+**What changed:** Added defensive `useEffect` that re-fetches the user from `authBridge.getUser()` when `authStatus === "signed_in"` but `sessionUser` is null. This handles the Capacitor/WKWebView race condition where `onAuthStateChange` fires SIGNED_IN before `getUser()` resolves, leaving `sessionUser` null and breaking `isOwnPulse` checks (delete button hidden on own posts).
+
+### Build Status
+✅ `npm run build` passes clean

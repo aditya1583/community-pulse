@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  formatPulseDateTime,
   formatPulseLocation,
   isInLocalToday,
   isInRecentWindow,
@@ -122,11 +121,7 @@ describe("pulse helpers", () => {
     ).toBe(false);
   });
 
-  it("formats date/time and location without blanks", () => {
-    const nowIso = new Date().toISOString();
-    expect(formatPulseDateTime(nowIso)).toBeTruthy();
-    expect(formatPulseDateTime("not-a-date")).toBe("Unknown time");
-
+  it("formats location without blanks", () => {
     expect(formatPulseLocation("Austin, TX, US")).toBe("Austin, TX, US");
     expect(formatPulseLocation("Austin, TX, US", "Downtown")).toBe(
       "Austin, TX, US · Downtown"

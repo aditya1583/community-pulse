@@ -124,22 +124,6 @@ export function isInRecentWindow(createdAt: string | Date, now: Date = new Date(
   return t >= start && t < end;
 }
 
-export function formatPulseDateTime(createdAt: string | Date) {
-  const d = createdAt instanceof Date ? createdAt : new Date(createdAt);
-  if (Number.isNaN(d.getTime())) return "Unknown time";
-
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
-  const year = String(d.getFullYear()).slice(-2);
-  const hours24 = d.getHours();
-  const hours12 = hours24 % 12 || 12;
-  const minutes = String(d.getMinutes()).padStart(2, "0");
-  const ampm = hours24 >= 12 ? "PM" : "AM";
-
-  // Example: 12/26/25 9:07 PM
-  return `${month}/${day}/${year} ${hours12}:${minutes} ${ampm}`;
-}
-
 /** Slack-style relative time: "2m", "1h", "5:30 PM", "Yesterday", "Feb 12" */
 export function formatRelativeTime(createdAt: string | Date) {
   const d = createdAt instanceof Date ? createdAt : new Date(createdAt);
