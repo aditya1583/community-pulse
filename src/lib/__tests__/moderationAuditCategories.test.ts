@@ -192,16 +192,202 @@ describe("PII Detection", () => {
 });
 
 // ============================================================================
+// Category 6: Dangerous Misinformation
+// ============================================================================
+describe("Category 6: Dangerous Misinformation", () => {
+  it("blocks medical misinformation", () => {
+    expectBlocked("drink bleach to cure covid", "drink-bleach");
+    expectBlocked("vaccines cause autism in kids", "antivax");
+    expectBlocked("5g causes covid spread", "5g-covid");
+    expectBlocked("miracle cure for cancer", "miracle-cure");
+  });
+
+  it("blocks fake emergencies / bomb threats", () => {
+    expectBlocked("bomb at the school downtown", "bomb-threat");
+    expectBlocked("active shooter at the mall", "shooter");
+    expectBlocked("there's a bomb in the building", "bomb-building");
+  });
+
+  it("blocks election misinformation", () => {
+    expectBlocked("the election is rigged", "election-rigged");
+    expectBlocked("voting machines are hacked", "voting-hacked");
+    expectBlocked("stop the steal", "stop-steal");
+  });
+
+  it("allows legitimate content", () => {
+    expectAllowed("The weather forecast looks great today", "clean-weather");
+    expectAllowed("Election day is coming up, go vote!", "clean-election");
+  });
+});
+
+// ============================================================================
+// Category 7: Spam & Manipulation
+// ============================================================================
+describe("Category 7: Spam & Manipulation", () => {
+  it("blocks crypto pump schemes", () => {
+    const r1 = detectPII("crypto pump happening now!");
+    expect(r1.blocked).toBe(true);
+    expect(r1.categories).toContain("scam");
+  });
+
+  it("blocks fake giveaways and engagement bait", () => {
+    const r1 = detectPII("free iphone giveaway just follow and share");
+    expect(r1.blocked).toBe(true);
+
+    const r2 = detectPII("like and share to win a free gift card");
+    expect(r2.blocked).toBe(true);
+
+    const r3 = detectPII("tag 3 friends to enter");
+    expect(r3.blocked).toBe(true);
+  });
+
+  it("blocks follow-for-follow spam", () => {
+    const r1 = detectPII("follow for follow anyone? f4f");
+    expect(r1.blocked).toBe(true);
+  });
+
+  it("allows legitimate content", () => {
+    const r1 = detectPII("I love this community event");
+    expect(r1.blocked).toBe(false);
+  });
+});
+
+// ============================================================================
+// Category 8: Personal Information Exposure
+// ============================================================================
+describe("Category 8: Personal Information Exposure", () => {
+  it("blocks email addresses", () => {
+    const r = detectPII("email me at test@example.com");
+    expect(r.blocked).toBe(true);
+    expect(r.categories).toContain("email");
+  });
+
+  it("blocks obfuscated emails", () => {
+    const r = detectPII("reach me at test (at) example (dot) com");
+    expect(r.blocked).toBe(true);
+    expect(r.categories).toContain("email");
+  });
+
+  it("blocks SSN with context", () => {
+    const r = detectPII("my ssn is 123-45-6789");
+    expect(r.blocked).toBe(true);
+    expect(r.categories).toContain("ssn");
+  });
+
+  it("blocks credit card numbers (Luhn valid)", () => {
+    const r = detectPII("my card is 4111 1111 1111 1111");
+    expect(r.blocked).toBe(true);
+    expect(r.categories).toContain("credit_card");
+  });
+
+  it("blocks phone numbers with context", () => {
+    const r = detectPII("text me at 512-555-1234");
+    expect(r.blocked).toBe(true);
+    expect(r.categories).toContain("phone");
+  });
+
+  it("blocks addresses with context", () => {
+    const r = detectPII("I live at 123 Main Street");
+    expect(r.blocked).toBe(true);
+    expect(r.categories).toContain("address");
+  });
+
+  it("blocks social handles", () => {
+    const r = detectPII("follow me on instagram: @myhandle");
+    expect(r.blocked).toBe(true);
+    expect(r.categories).toContain("social_handle");
+  });
+});
+
+// ============================================================================
+// Category 9: Illegal Activity
+// ============================================================================
+describe("Category 9: Illegal Activity", () => {
+  it("blocks drug sales", () => {
+    expectBlocked("selling weed hit me up", "drug-sale-weed");
+    expectBlocked("got molly for sale", "drug-sale-molly");
+    expectBlocked("plug for xans hmu", "drug-plug");
+  });
+
+  it("blocks weapons trafficking", () => {
+    expectBlocked("ghost gun for sale no serial", "ghost-gun");
+    expectBlocked("selling guns no background check", "gun-sale");
+  });
+
+  it("blocks stolen goods", () => {
+    expectBlocked("selling stolen phones cheap", "stolen-phones");
+    expectBlocked("buy stolen laptops here", "stolen-laptops");
+  });
+
+  it("blocks fake ID offers", () => {
+    expectBlocked("buy fake ids here", "fake-id");
+    expectBlocked("selling fake passport", "fake-passport");
+  });
+
+  it("allows legitimate content", () => {
+    expectAllowed("New city ordinance approved today", "clean-ordinance");
+    expectAllowed("Community health event at the park", "clean-health");
+  });
+});
+
+// ============================================================================
+// Category 10: Platform Manipulation
+// ============================================================================
+describe("Category 10: Platform Manipulation", () => {
+  it("blocks impersonation", () => {
+    expectBlocked("I'm the admin of this app", "impersonation-admin");
+    expectBlocked("this is the official moderator speaking", "impersonation-mod");
+    expectBlocked("official admin announcement", "fake-announcement");
+  });
+
+  it("blocks fake authority claims", () => {
+    expectBlocked("law enforcement warning: evacuate now", "fake-law-enforcement");
+    expectBlocked("official statement from the police department", "fake-official");
+  });
+
+  it("allows legitimate content", () => {
+    expectAllowed("The admin at my school is nice", "clean-admin");
+    expectAllowed("I asked the moderator a question on Reddit", "clean-mod");
+  });
+});
+
+// ============================================================================
 // Unicode / Zero-width evasion
 // ============================================================================
 describe("Unicode & Zero-width Evasion", () => {
   it("blocks profanity with zero-width chars", () => {
-    // f\u200Buck
     expectBlocked("f\u200Buck this", "zero-width-fuck");
+    expectBlocked("s\u200Bh\u200Bi\u200Bt", "zero-width-shit");
   });
 
   it("blocks Cyrillic homoglyphs", () => {
     // "fuсk" with Cyrillic 'с'
     expectBlocked("fu\u0441k this", "cyrillic-c-fuck");
+    // "аss" with Cyrillic 'а'
+    expectBlocked("\u0430sshole", "cyrillic-a-asshole");
+  });
+
+  it("blocks emoji substitution in sexual context via blocklist", () => {
+    // Sexual emoji combos are caught by blocklist layer's detectSexualEmojiContext
+    // Testing that the PII layer catches emoji-only spam
+    const r = detectPII("🍆🍑💦");
+    expect(r.blocked).toBe(true);
+    expect(r.categories).toContain("spam");
+  });
+
+  it("blocks URL shorteners hiding malicious links", () => {
+    const r = detectPII("check out this deal at bit.ly/scam123");
+    expect(r.blocked).toBe(true);
+    expect(r.categories).toContain("scam");
+  });
+
+  it("blocks multilingual slurs — Spanish", () => {
+    expectBlocked("eres un pinche pendejo", "spanish-slur");
+    expectBlocked("hijo de puta", "spanish-puta");
+  });
+
+  it("blocks multilingual slurs — Hindi", () => {
+    expectBlocked("tu chutiya hai", "hindi-chutiya");
+    expectBlocked("madarchod saala", "hindi-mc");
   });
 });

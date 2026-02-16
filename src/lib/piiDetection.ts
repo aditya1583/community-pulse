@@ -44,7 +44,10 @@ export type PIICategory =
   | "social_handle"
   | "contact_phrase"
   | "scam"
-  | "spam";
+  | "spam"
+  | "misinformation"
+  | "illegal_activity"
+  | "platform_manipulation";
 
 export type PIIDetectionResult = {
   blocked: boolean;
@@ -594,6 +597,16 @@ const SCAM_PATTERNS: RegExp[] = [
   /\bpassive\s+income\s+(?:opportunity|stream)\b/i,
   /\bwork\s+from\s+home\b.*\b(?:\$|earn|money)\b/i,
   /\bfinancial\s+freedom\b.*\b(?:join|opportunity|dm)\b/i,
+  // Category 7: Spam & manipulation — fake giveaways, engagement bait
+  /\bfree\s+(?:iphone|giveaway|gift\s*card)\b/i,
+  /\bgiveaway\b.*\b(?:follow|like|share|retweet|rt)\b/i,
+  /\b(?:like|share|retweet)\s+(?:to|and)\s+(?:win|enter)\b/i,
+  /\btag\s+\d+\s+friends?\b/i,
+  /\b(?:comment|drop)\s+(?:your\s+)?(?:email|handle|@)\b/i,
+  /\bfollow\s+(?:for|4)\s+follow\b/i,
+  /\bf4f\b/i,
+  /\bl4l\b/i,
+  /\bsub\s*4\s*sub\b/i,
 ];
 
 /**
@@ -602,6 +615,94 @@ const SCAM_PATTERNS: RegExp[] = [
 function detectScam(text: string): boolean {
   const normalized = normalizeText(text);
   return SCAM_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+// ============================================================================
+// Category 6: Dangerous Misinformation
+// ============================================================================
+
+const MISINFORMATION_PATTERNS: RegExp[] = [
+  // Medical misinformation
+  /\bdrink\s+bleach\b/i,
+  /\bbleach\s+cures?\b/i,
+  /\binjecting?\s+(?:bleach|disinfectant)\b/i,
+  /\bvaccines?\s+cause\s+autism\b/i,
+  /\b(?:covid|corona)\s+(?:is\s+)?(?:a\s+)?(?:hoax|fake|scam)\b/i,
+  /\b5g\s+(?:causes?|spreads?)\s+(?:covid|corona|cancer|virus)\b/i,
+  /\bcure\s+cancer\s+with\b/i,
+  /\bmiracle\s+cure\b/i,
+  // Fake emergency / bomb threats
+  /\bbomb\s+(?:at|in|threat)\b/i,
+  /\bactive\s+shooter\s+at\b/i,
+  /\bshooter\s+at\b/i,
+  /\bexplosive\s+(?:at|in|device)\b/i,
+  /\bthere\s*(?:'s|is)\s+a\s+bomb\b/i,
+  // Election misinformation
+  /\belection\s+(?:is\s+)?(?:rigged|stolen|fake)\b/i,
+  /\bvoting\s+machines?\s+(?:are\s+)?(?:hacked|rigged)\b/i,
+  /\billegal\s+(?:votes?|ballots?|voting)\b/i,
+  /\bstop\s+the\s+steal\b/i,
+];
+
+function detectMisinformation(text: string): boolean {
+  const normalized = normalizeText(text);
+  return MISINFORMATION_PATTERNS.some((p) => p.test(normalized));
+}
+
+// ============================================================================
+// Category 9: Illegal Activity
+// ============================================================================
+
+const ILLEGAL_ACTIVITY_PATTERNS: RegExp[] = [
+  // Drug sales
+  /\b(?:buy|sell(?:ing)?|got|have)\s+(?:weed|molly|mdma|coke|cocaine|heroin|meth|fentanyl|xanax|oxy|percs?|shrooms|acid|lsd|dmt)\b/i,
+  /\b(?:weed|molly|coke|cocaine|meth|xanax|oxy)\s+(?:for\s+sale|available|plug)\b/i,
+  /\bplug\s+for\s+(?:weed|molly|coke|pills?|xans?)\b/i,
+  /\bhmu\s+for\s+(?:weed|molly|coke|pills?|gas)\b/i,
+  /\b(?:selling|moving)\s+(?:packs?|weight|zips?|pounds?|qps?|eighths?|quarters?)\b/i,
+  // Weapons
+  /\b(?:buy|sell(?:ing)?|got)\s+(?:guns?|firearms?|weapons?|ammo)\s+(?:no\s+)?(?:serial|background|papers?)\b/i,
+  /\bghost\s+gun\b/i,
+  /\bunregistered\s+(?:gun|firearm|weapon)\b/i,
+  /\b(?:guns?|weapons?)\s+for\s+sale\b/i,
+  // Stolen goods
+  /\b(?:stolen|boosted|lifted)\s+(?:goods|items?|merch|phones?|laptops?|cars?)\b/i,
+  /\b(?:buy|sell(?:ing)?)\s+stolen\b/i,
+  // Trafficking language
+  /\bfresh\s+(?:girls?|boys?|meat)\s+available\b/i,
+  /\byoung\s+(?:girls?|boys?)\s+(?:available|for\s+sale)\b/i,
+  /\bescort\s+(?:service|available)\b/i,
+  // Fake IDs / documents
+  /\bfake\s+(?:id|ids|passport|license|documents?)\b/i,
+  /\b(?:buy|sell(?:ing)?|got)\s+fake\s+(?:id|ids)\b/i,
+];
+
+function detectIllegalActivity(text: string): boolean {
+  const normalized = normalizeText(text);
+  return ILLEGAL_ACTIVITY_PATTERNS.some((p) => p.test(normalized));
+}
+
+// ============================================================================
+// Category 10: Platform Manipulation
+// ============================================================================
+
+const PLATFORM_MANIPULATION_PATTERNS: RegExp[] = [
+  // Impersonation
+  /\bi(?:'m| am)\s+(?:the|an?)\s+(?:admin|moderator|mod|owner|staff|developer|dev)\b/i,
+  /\bofficial\s+(?:admin|moderator|mod|announcement)\b/i,
+  /\bthis\s+is\s+(?:the|an?)\s+(?:admin|mod|owner)\b/i,
+  // Fake emergencies for attention
+  /\b(?:amber|silver)\s+alert\b.*\bshare\b/i,
+  /\burgent\s*:\s*(?:missing|kidnapped|abducted)\b/i,
+  // Misleading authority claims
+  /\bverified\s+(?:by|account)\b/i,
+  /\bofficial\s+(?:statement|notice|warning)\s+from\b/i,
+  /\blaw\s+enforcement\s+(?:notice|warning|alert)\b/i,
+];
+
+function detectPlatformManipulation(text: string): boolean {
+  const normalized = normalizeText(text);
+  return PLATFORM_MANIPULATION_PATTERNS.some((p) => p.test(normalized));
 }
 
 // ============================================================================
@@ -629,6 +730,15 @@ export function detectPII(text: string): PIIDetectionResult {
 
   // Scam detection
   if (detectScam(text)) addCategory("scam");
+
+  // Category 6: Dangerous misinformation
+  if (detectMisinformation(text)) addCategory("misinformation");
+
+  // Category 9: Illegal activity
+  if (detectIllegalActivity(text)) addCategory("illegal_activity");
+
+  // Category 10: Platform manipulation
+  if (detectPlatformManipulation(text)) addCategory("platform_manipulation");
 
   // PII detectors
   if (detectEmail(text)) addCategory("email");

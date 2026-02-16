@@ -1,8 +1,8 @@
-# Moderation Audit — Categories 1-5 (Highest Risk)
+# Moderation Audit — Categories 1-10
 
 **Date:** 2026-02-16
 **Test file:** `src/lib/__tests__/moderationAuditCategories.test.ts`
-**Result:** ✅ 21/21 tests pass
+**Result:** ✅ 48/48 tests pass
 
 ---
 
@@ -96,6 +96,67 @@ The moderation system uses a **4-layer pipeline** (runs in order, short-circuits
 |------|--------------|--------|
 | Zero-width chars | `f\u200Buck` | ✅ BLOCKED |
 | Cyrillic homoglyphs | `fu\u0441k` (Cyrillic с) | ✅ BLOCKED |
+
+---
+
+### Category 6: Dangerous Misinformation ✅
+
+| Test | Input Pattern | Result |
+|------|--------------|--------|
+| Medical misinfo | `drink bleach`, `vaccines cause autism`, `5g causes covid`, `miracle cure` | ✅ BLOCKED |
+| Fake emergencies | `bomb at the school`, `active shooter at`, `there's a bomb` | ✅ BLOCKED |
+| Election misinfo | `election is rigged`, `voting machines hacked`, `stop the steal` | ✅ BLOCKED |
+| Clean content | weather, election encouragement | ✅ ALLOWED |
+
+### Category 7: Spam & Manipulation ✅
+
+| Test | Input Pattern | Result |
+|------|--------------|--------|
+| Crypto pumps | `crypto pump` (via scam layer) | ✅ BLOCKED |
+| Fake giveaways | `free iphone giveaway`, `like and share to win`, `tag 3 friends` | ✅ BLOCKED |
+| Follow spam | `follow for follow`, `f4f` | ✅ BLOCKED |
+| Clean content | community events | ✅ ALLOWED |
+
+### Category 8: Personal Information Exposure ✅
+
+| Test | Input Pattern | Result |
+|------|--------------|--------|
+| Email | `test@example.com` | ✅ BLOCKED |
+| Obfuscated email | `test (at) example (dot) com` | ✅ BLOCKED |
+| SSN | `123-45-6789` with context | ✅ BLOCKED |
+| Credit card | `4111 1111 1111 1111` (Luhn valid) | ✅ BLOCKED |
+| Phone | `512-555-1234` with context | ✅ BLOCKED |
+| Address | `123 Main Street` with context | ✅ BLOCKED |
+| Social handles | `@myhandle` with platform context | ✅ BLOCKED |
+
+### Category 9: Illegal Activity ✅
+
+| Test | Input Pattern | Result |
+|------|--------------|--------|
+| Drug sales | `selling weed`, `got molly for sale`, `plug for xans` | ✅ BLOCKED |
+| Weapons | `ghost gun`, `selling guns no background` | ✅ BLOCKED |
+| Stolen goods | `selling stolen phones`, `buy stolen laptops` | ✅ BLOCKED |
+| Fake IDs | `buy fake ids`, `selling fake passport` | ✅ BLOCKED |
+| Clean content | ordinance news, health events | ✅ ALLOWED |
+
+### Category 10: Platform Manipulation ✅
+
+| Test | Input Pattern | Result |
+|------|--------------|--------|
+| Impersonation | `I'm the admin`, `official moderator`, `official admin announcement` | ✅ BLOCKED |
+| Fake authority | `law enforcement warning`, `official statement from` | ✅ BLOCKED |
+| Clean content | casual admin/mod mentions | ✅ ALLOWED |
+
+### Evasion Techniques ✅
+
+| Test | Input Pattern | Result |
+|------|--------------|--------|
+| Zero-width chars | `f\u200Buck`, `s\u200Bh\u200Bi\u200Bt` | ✅ BLOCKED |
+| Cyrillic homoglyphs | `fu\u0441k` (Cyrillic с), `\u0430sshole` (Cyrillic а) | ✅ BLOCKED |
+| Emoji substitution | `🍆🍑💦` (sexual emoji combo) | ✅ BLOCKED |
+| URL shorteners | `bit.ly/scam123` | ✅ BLOCKED |
+| Spanish slurs | `pinche pendejo`, `hijo de puta` | ✅ BLOCKED |
+| Hindi slurs | `chutiya`, `madarchod` | ✅ BLOCKED |
 
 ---
 
