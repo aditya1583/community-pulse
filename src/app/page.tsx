@@ -1398,7 +1398,7 @@ export default function Home() {
 
         <PullToRefresh onRefresh={handlePullToRefresh} disabled={loading}>
           {/* Main Content Area */}
-          <main className="flex-1 flex justify-center px-4 pb-6 pt-0">
+          <main className="flex-1 flex justify-center px-4 pb-6" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
             <div className="w-full max-w-lg space-y-6">
 
               {/* VIEW BRANCHING: Dashboard (Pulse) vs Dedicated Tabs (Traffic/Events/Local/Status) */}
