@@ -141,7 +141,7 @@ export default function LocalDealsSection({
   const [places, setPlaces] = useState<LocalPlace[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState<CategoryId>("all");
+  const [activeCategory] = useState<CategoryId>("all");
   const [dataSource, setDataSource] = useState<DataSource>(null);
   const [venueVibes, setVenueVibes] = useState<VenueVibesCache>({});
 
@@ -320,9 +320,7 @@ export default function LocalDealsSection({
     fetchPlaces(activeCategory);
   }, [activeCategory, fetchPlaces]);
 
-  const handleCategoryChange = (category: CategoryId) => {
-    setActiveCategory(category);
-  };
+  // handleCategoryChange removed — filters disabled until Overpass API is stable
 
   // Get the top vibe for a venue (by name)
   const getTopVibe = (venueName: string): VenueVibeAggregate | null => {
@@ -390,25 +388,7 @@ export default function LocalDealsSection({
 
   return (
     <div className="space-y-4">
-      {/* Category Pills */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-        {DEAL_CATEGORIES.map((category) => {
-          const isActive = activeCategory === category.id;
-          return (
-            <button
-              key={category.id}
-              onClick={() => handleCategoryChange(category.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${isActive
-                ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"
-                : "bg-slate-800/60 text-slate-400 hover:text-white hover:bg-slate-700/50"
-                }`}
-            >
-              <span>{category.emoji}</span>
-              <span>{category.label}</span>
-            </button>
-          );
-        })}
-      </div>
+      {/* Category filters removed — showing all places until Overpass API is stable */}
 
       {/* Loading State */}
       {loading && (

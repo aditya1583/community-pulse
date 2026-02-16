@@ -109,7 +109,7 @@ export default function Home() {
 
   // Tab state for new Neon theme
   // Persist tab state in sessionStorage so it survives navigation to venue pages
-  const [activeTab, setActiveTabState] = useState<TabId>("events");
+  const [activeTab, setActiveTabState] = useState<TabId>("pulse");
   // localSection removed — LocalTab simplified to single view
 
   // Wrapper to persist tab changes
@@ -293,8 +293,8 @@ export default function Home() {
   useEffect(() => {
     if (process.env.NODE_ENV === "production") return;
     if (!isTabId(activeTab)) {
-      console.warn(`[tabs] Unknown activeTab "${String(activeTab)}" — defaulting to "events"`);
-      setActiveTab("events");
+      console.warn(`[tabs] Unknown activeTab "${String(activeTab)}" — defaulting to "pulse"`);
+      setActiveTab("pulse");
     }
   }, [activeTab]);
 

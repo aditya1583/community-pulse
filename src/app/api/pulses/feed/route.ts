@@ -70,7 +70,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ pulses: data || [], count: data?.length || 0 });
+    // Hide AI-generated (bot) posts older than 24 hours — keeps feed fresh
+    // Resident (user) posts show regardless of age
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    const filtered = (data || []).filter((pulse: { is_bot?: boolean; created_at: string }) => {
+      if (!pulse.is_bot) return true; // resident posts always show
+      return pulse.created_at >= twentyFourHoursAgo;
+    });
+
+    return NextResponse.json({ pulses: filtered, count: filtered.length });
   } catch (err) {
     console.error("[Feed API] Unexpected error:", err);
     return NextResponse.json(
