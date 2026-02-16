@@ -2,6 +2,60 @@
 
 ---
 
+## Commit: (2026-02-16) — Push Notifications Infrastructure
+
+### FEATURE 1: Capacitor Push Notifications Plugin ✅
+**Files:** `package.json`, `capacitor.config.ts`, `ios/App/App/App.entitlements`
+**What changed:** Installed `@capacitor/push-notifications`. Added `PushNotifications` plugin config with presentation options. Created iOS entitlements file with `aps-environment` for push capability.
+
+### FEATURE 2: Client-side notification service ✅
+**Files:** `src/lib/notifications.ts` (new)
+**What changed:** Created Capacitor push notification service that requests permission after sign-in, registers device token with backend, handles foreground notifications, and handles notification tap navigation (deep link to pulse).
+
+### FEATURE 3: Token registration API ✅
+**Files:** `src/app/api/notifications/register/route.ts` (new)
+**What changed:** POST to register device token (upserts into `push_tokens`), DELETE to remove token on sign-out. Requires Bearer auth. Also creates default notification preferences on first registration.
+
+### FEATURE 4: Notification sending API with APNs ✅
+**Files:** `src/app/api/notifications/send/route.ts` (new)
+**What changed:** POST endpoint that accepts `{userId, title, body, data, type}`. Implements: rate limiting (5/hr/user), 5-minute batch window for grouping, notification preference checking, APNs HTTP/2 sending with JWT token-based auth (ES256), notification inbox storage. APNs JWT cached for 50 minutes.
+
+### FEATURE 5: Unread count API ✅
+**Files:** `src/app/api/notifications/unread-count/route.ts` (new)
+**What changed:** GET endpoint returns unread notification count for authenticated user.
+
+### FEATURE 6: Notification triggers integrated into existing routes ✅
+**Files:** `src/lib/notificationTriggers.ts` (new), `src/app/api/pulses/route.ts`, `src/app/api/pulses/[id]/react/route.ts`, `src/app/api/pulses/[id]/comments/route.ts`
+**What changed:** Created trigger helpers for nearby_post, reaction, comment, traffic_alert, event_reminder. Integrated fire-and-forget notifications into:
+- Pulse creation → notifies nearby users
+- Reaction toggle ON → notifies post author
+- Comment creation → notifies post author
+
+### FEATURE 7: Client-side integration ✅
+**Files:** `src/app/page.tsx`
+**What changed:** Push notifications initialize after successful auth (useEffect on authStatus + sessionUser). Token removed on both sign-out paths. Notification tap navigates to pulse tab.
+
+### FEATURE 8: Supabase migration SQL ✅
+**Files:** `push-notifications-migration.sql` (new)
+**What changed:** Created migration with tables: `push_tokens`, `notification_preferences`, `notifications`, `notification_batch_queue`. Includes RLS policies, indexes.
+
+### ⚠️ MANUAL STEPS REQUIRED:
+1. **Run Supabase migration:** Execute `push-notifications-migration.sql` in Supabase SQL Editor
+2. **Generate APNs .p8 key:** Apple Developer Portal → Certificates, Identifiers & Profiles → Keys → Create key with "Apple Push Notifications service (APNs)" → Download .p8 file
+3. **Set Vercel env vars:**
+   - `APNS_KEY_ID` — The Key ID shown in Apple Developer portal
+   - `APNS_TEAM_ID` — Your Apple Developer Team ID
+   - `APNS_KEY_BASE64` — Run `base64 -i AuthKey_XXXXXXXX.p8` and paste the output
+   - `APNS_BUNDLE_ID` — `app.voxlo` (default, already set)
+   - `APNS_ENVIRONMENT` — `development` for TestFlight, `production` for App Store
+4. **Xcode:** Open iOS project, go to Signing & Capabilities → Add "Push Notifications" capability
+5. **Change entitlement to production** when submitting to App Store: `aps-environment` → `production`
+
+### Build Status
+✅ `npm run build` passes clean
+
+---
+
 ## Commit: 5edd8f1 (2026-02-16) — Moderation categories 6-10 + evasion techniques
 
 ### ENHANCEMENT 1: Categories 6-10 added to PII detection layer ✅

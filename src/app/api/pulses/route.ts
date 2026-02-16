@@ -48,6 +48,7 @@ import { runModerationPipeline, quickModerateContent } from "@/lib/moderationPip
 import { detectPII, hashContentForLogging, logPIIDetection } from "@/lib/piiDetection";
 import { checkRateLimit, RATE_LIMITS, buildRateLimitHeaders } from "@/lib/rateLimit";
 import { logger } from "@/lib/logger";
+import { notifyNearbyUsers } from "@/lib/notificationTriggers";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -358,6 +359,18 @@ export async function POST(req: NextRequest) {
         { error: `Insert failed: ${insertError.message} (code: ${insertError.code})` },
         { status: 500 }
       );
+    }
+
+    // Fire-and-forget: notify nearby users about the new post
+    if (data && data.lat && data.lon && data.user_id) {
+      notifyNearbyUsers(
+        data.lat,
+        data.lon,
+        10,
+        data.message?.substring(0, 80) || "New post",
+        data.id,
+        data.user_id
+      ).catch(() => {});
     }
 
     return NextResponse.json({ pulse: data, needsReview });

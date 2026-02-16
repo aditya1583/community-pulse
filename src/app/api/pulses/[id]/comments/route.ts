@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { runModerationPipeline } from "@/lib/moderationPipeline";
+import { notifyComment } from "@/lib/notificationTriggers";
 
 export const dynamic = "force-dynamic";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -218,7 +219,7 @@ export async function POST(
     // Check if pulse exists and is not expired
     const { data: pulse, error: pulseError } = await supabase
       .from("pulses")
-      .select("id, expires_at")
+      .select("id, expires_at, user_id")
       .eq("id", pulseId)
       .single();
 
@@ -263,6 +264,16 @@ export async function POST(
     if (insertError) {
       console.error("[CommentsAPI] Insert error:", insertError);
       return NextResponse.json({ error: "Failed to add comment" }, { status: 500 });
+    }
+
+    // Notify the post author about the comment (fire and forget)
+    if (pulse.user_id) {
+      notifyComment(
+        pulse.user_id,
+        userIdentifier,
+        message,
+        pulseId
+      ).catch(() => {});
     }
 
     // Get updated comment count

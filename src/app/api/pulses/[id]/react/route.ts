@@ -7,6 +7,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { notifyReaction } from "@/lib/notificationTriggers";
 
 export const dynamic = "force-dynamic";
 // Valid reaction types
@@ -109,7 +110,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     // Check if the pulse exists
     const { data: pulse, error: pulseError } = await supabase
       .from("pulses")
-      .select("id")
+      .select("id, user_id, message")
       .eq("id", pulseId)
       .single();
 
@@ -168,6 +169,17 @@ export async function POST(req: NextRequest, context: RouteContext) {
           { error: "Failed to add reaction" },
           { status: 500 }
         );
+      }
+
+      // Notify the post author about the reaction (fire and forget)
+      if (pulse.user_id && pulse.user_id !== trimmedUserIdentifier) {
+        notifyReaction(
+          pulse.user_id,
+          reactionType,
+          trimmedUserIdentifier,
+          pulse.message || "",
+          pulseId
+        ).catch(() => {});
       }
     }
 

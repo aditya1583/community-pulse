@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { authBridge } from "@/lib/authBridge";
+import { initPushNotifications, removePushToken } from "@/lib/notifications";
 import { useGeocodingAutocomplete } from "@/hooks/useGeocodingAutocomplete";
 import { useEvents } from "@/hooks/useEvents";
 import type { GeocodedCity } from "@/lib/geocoding";
@@ -162,6 +163,24 @@ export default function Home() {
       return () => { cancelled = true; };
     }
   }, [authStatus, sessionUser, setSessionUser]);
+
+  // Initialize push notifications when signed in
+  useEffect(() => {
+    if (authStatus === "signed_in" && sessionUser) {
+      authBridge.getAccessToken().then((token) => {
+        if (token) {
+          initPushNotifications(token, (data) => {
+            // Handle notification tap navigation
+            if (data.pulseId) {
+              // Navigate to pulse tab and scroll to pulse
+              // For now, just switch to pulse tab
+              setActiveTab("pulse");
+            }
+          }).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+  }, [authStatus, sessionUser]);
 
   // User gamification stats (level, XP, tier)
   const {
@@ -1461,6 +1480,7 @@ export default function Home() {
                               e.stopPropagation();
                               // Clear everything first, THEN attempt sign-out
                               // authBridge.signOut() can hang on web — don't let it block logout
+                              removePushToken().catch(() => {});
                               localStorage.clear();
                               sessionStorage.clear();
                               authBridge.signOut().catch(() => {});
@@ -1940,6 +1960,7 @@ export default function Home() {
                       userId={sessionUser?.id ?? null}
                       city={city}
                       onSignOut={() => {
+                        removePushToken().catch(() => {});
                         localStorage.clear();
                         sessionStorage.clear();
                         authBridge.signOut().catch(() => {});
