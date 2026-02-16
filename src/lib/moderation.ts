@@ -200,9 +200,13 @@ const SUBSTITUTION_MAP: { [key: string]: string[] } = {
 const ABUSE_PATTERNS = [
   /kill\s+(your)?self/i,
   /go\s+die/i,
-  /i('ll)?\s+kill\s+you/i,
+  /i('ll|m\s+going\s+to|m\s+gonna)?\s+kill\s+(you|him|her|them|everyone)/i,
   /hope\s+you\s+die/i,
   /kys\b/i, // "kill yourself" abbreviation
+  /\b(?:gonna|going\s+to|will|i'?ll)\s+(?:bomb|shoot|stab|attack|hurt|murder)/i,
+  /\byou'?re?\s+(?:dead|gonna\s+die)\b/i,
+  /\bwatch\s+your\s+back\b/i,
+  /\bi\s+know\s+where\s+you\s+live\b/i,
 ];
 
 const SOLICITATION_TOKEN_SEQUENCES: Array<readonly string[]> = [

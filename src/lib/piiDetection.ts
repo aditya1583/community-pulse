@@ -631,12 +631,17 @@ const MISINFORMATION_PATTERNS: RegExp[] = [
   /\b5g\s+(?:causes?|spreads?)\s+(?:covid|corona|cancer|virus)\b/i,
   /\bcure\s+cancer\s+with\b/i,
   /\bmiracle\s+cure\b/i,
-  // Fake emergency / bomb threats
-  /\bbomb\s+(?:at|in|threat)\b/i,
+  // Fake emergency / bomb threats / violence
+  /\bbomb\s+(?:at|in|the|this|that|threat)\b/i,
+  /\b(?:gonna|going\s+to|will|i'?ll)\s+bomb\b/i,
+  /\bplant\s+(?:a\s+)?bomb\b/i,
+  /\bblow\s+(?:up|it\s+up)\b/i,
   /\bactive\s+shooter\s+at\b/i,
-  /\bshooter\s+at\b/i,
+  /\bshooter?\s+(?:at|in)\b/i,
+  /\bshoot\s+(?:up|the|this|that|everyone)\b/i,
   /\bexplosive\s+(?:at|in|device)\b/i,
   /\bthere\s*(?:'s|is)\s+a\s+bomb\b/i,
+  /\b(?:gonna|going\s+to|will)\s+(?:shoot|stab|attack|hurt|harm)\b/i,
   // Election misinformation
   /\belection\s+(?:is\s+)?(?:rigged|stolen|fake)\b/i,
   /\bvoting\s+machines?\s+(?:are\s+)?(?:hacked|rigged)\b/i,
