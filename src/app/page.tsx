@@ -296,6 +296,13 @@ export default function Home() {
   const cityDropdownOpen = showCitySuggestions && citySuggestions.length > 0;
 
   // After sign-out redirect, show auth modal and clean URL
+  // Auto-dismiss error messages after 6 seconds
+  useEffect(() => {
+    if (!errorMsg) return;
+    const t = setTimeout(() => setErrorMsg(null), 6000);
+    return () => clearTimeout(t);
+  }, [errorMsg, setErrorMsg]);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.has("signed_out")) {
@@ -1471,6 +1478,13 @@ export default function Home() {
                     </div>
                   </div>
 
+                  {/* Moderation / error banner — shown at top of feed */}
+                  {errorMsg && (
+                    <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/40 rounded-lg px-3 py-2 animate-pulse">
+                      {errorMsg}
+                    </p>
+                  )}
+
                   {/* City selector */}
                   <div className="relative z-50">
                     <div className="group relative">
@@ -1937,11 +1951,7 @@ export default function Home() {
                 </div>
               )}
 
-              {errorMsg && activeTab === "pulse" && (
-                <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/40 rounded-lg px-3 py-2">
-                  {errorMsg}
-                </p>
-              )}
+              {/* Error banner moved to top of feed — see dashboard view */}
 
               {/* Compact Footer */}
               <footer className="py-4 pb-32 text-center mt-6">
