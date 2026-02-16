@@ -478,12 +478,16 @@ function detectSSN(text: string): boolean {
 
   const normalized = normalizeText(text);
 
+  // If someone says "ssn" + any number sequence (5+ digits), block it
+  // Don't be format-picky — "my ssn is 333-444-6766" is PII regardless of digit grouping
+  if (/\b(?:\d[-.\s]*){5,}\d\b/.test(normalized)) return true;
+
   // SSN with separators: 123-45-6789, 123 45 6789, 123.45.6789
   if (/\b\d{3}[-.\s]\d{2}[-.\s]\d{4}\b/.test(normalized)) return true;
 
   // SSN spaced out: "1 2 3 4 5 6 7 8 9"
   const allDigits = extractDigits(normalized);
-  return allDigits.length === 9;
+  return allDigits.length >= 7;
 }
 
 /**

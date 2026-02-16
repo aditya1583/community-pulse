@@ -245,13 +245,38 @@ export async function POST(req: NextRequest) {
     // =========================================================================
     let needsReview = false;
     let moderationNote = "";
+    // Hard-block categories: threats, violence, hate speech, sexual content involving minors
+    // Soft-block (needs_review): profanity, spam, misinformation, etc.
+    const HARD_BLOCK_REASONS = [
+      "violence", "threat", "self-harm", "hate", "sexual/minors",
+      "harassment", "bomb", "shoot", "attack", "terrorism",
+    ];
     try {
       const moderationResult = await runModerationPipeline(trimmedMessage);
       if (!moderationResult.allowed) {
+        const reason = (moderationResult.reason || "").toLowerCase();
+        const isHardBlock = HARD_BLOCK_REASONS.some(r => reason.includes(r));
+
+        if (isHardBlock) {
+          logger.warn("Moderation HARD BLOCKED content", {
+            service: "moderation",
+            action: "hard_block",
+            reason: moderationResult.reason,
+          });
+          return NextResponse.json(
+            {
+              error: moderationResult.reason || "Content violates community guidelines",
+              code: "MODERATION_BLOCKED",
+            },
+            { status: 400 }
+          );
+        }
+
+        // Soft block: allow but flag for review
         needsReview = true;
         moderationNote = moderationResult.serviceError
           ? "moderation_service_error"
-          : `moderation_blocked: ${moderationResult.reason || "unknown"}`;
+          : `moderation_flagged: ${moderationResult.reason || "unknown"}`;
         logger.warn("Moderation flagged content — inserting with review flag", {
           service: "moderation",
           action: "content_check",
