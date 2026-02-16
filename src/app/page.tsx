@@ -1478,13 +1478,6 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {/* Moderation / error banner — shown at top of feed */}
-                  {errorMsg && (
-                    <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/40 rounded-lg px-3 py-2 animate-pulse">
-                      {errorMsg}
-                    </p>
-                  )}
-
                   {/* City selector */}
                   <div className="relative z-50">
                     <div className="group relative">
@@ -1706,6 +1699,12 @@ export default function Home() {
                         weather={weather}
                         cityName={city}
                       />
+                      {/* Moderation / error banner — below compose box */}
+                      {errorMsg && (
+                        <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/40 rounded-lg px-3 py-2 mt-2 animate-pulse">
+                          {errorMsg}
+                        </p>
+                      )}
                     </div>
 
                     {/* Filter chips */}
