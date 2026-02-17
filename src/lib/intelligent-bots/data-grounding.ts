@@ -83,7 +83,6 @@ function isWeatherDataReal(weather: WeatherData): boolean {
  */
 export const DATA_GROUNDED_ENGAGEMENT_TYPES = new Set([
   // Uses real weather data from Open-Meteo
-  "this_or_that",       // Weather/time-contextual polls (uses real temp)
   "prediction",         // XP predictions (uses real weather/traffic data)
   "weather_alert",      // Forecast-based alerts (uses real forecast)
 
@@ -94,11 +93,8 @@ export const DATA_GROUNDED_ENGAGEMENT_TYPES = new Set([
   // Uses real market data from USDA/OSM
   "farmers_market",     // Real market data with real addresses
 
-  // Generic community questions (no specific claims fabricated)
-  "confession_booth",   // "What's your unpopular opinion?" - no fabrication
-  "neighbor_challenge", // "Describe {city} in 3 words" - no fabrication
-  "would_you_rather",   // Hypothetical choices - clearly hypothetical
-  "civic_alert",        // Civic awareness questions - no fabrication
+  // REMOVED: confession_booth, neighbor_challenge, would_you_rather, this_or_that, civic_alert
+  // These are engagement bait with zero informational value
 
   // Polls that ask questions without claiming specific facts
   "poll",               // "Best tacos in {city}?" - asks, doesn't claim

@@ -24,8 +24,8 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const MAX_CITIES_PER_RUN = 2;
-const POSTS_PER_CITY = 2;
-const MAX_BOT_POSTS_PER_CITY = 7;
+const POSTS_PER_CITY = 1;
+const MAX_BOT_POSTS_PER_CITY = 5;
 
 function getExpirationHours(tag: string): number {
   const t = tag.toLowerCase();
@@ -152,24 +152,70 @@ export async function GET(request: NextRequest) {
             });
 
             if (result.posted && result.post) {
-              // DEDUP: Check if a bot post with the same tag exists in the last 3 hours
-              // Use normalized city name to catch variants like "Leander, Texas, US" vs "Leander, Texas"
-              const threeHrsAgo = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+              // DEDUP: Check last 24h bot posts for same city — tag match OR content similarity
+              const twentyFourHrsAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
               const normalizedCity = cityInfo.city.split(",")[0].trim();
               const { data: recentPosts } = await supabase
                 .from("pulses")
-                .select("id, message, city")
+                .select("id, message, city, tag")
                 .eq("is_bot", true)
-                .eq("tag", result.post.tag)
-                .gte("created_at", threeHrsAgo);
+                .gte("created_at", twentyFourHrsAgo);
 
-              // Check for any matching city (normalized comparison)
-              const matchingPosts = (recentPosts || []).filter(p => 
+              const cityPosts = (recentPosts || []).filter(p => 
                 p.city.split(",")[0].trim().toLowerCase() === normalizedCity.toLowerCase()
               );
 
-              if (matchingPosts.length > 0) {
-                console.log(`[Cron] Skipping duplicate ${result.post.tag} post for ${normalizedCity} (${matchingPosts.length} exist within 3h)`);
+              // Check 1: Same tag in last 6 hours = skip
+              const sixHrsAgo = Date.now() - 6 * 60 * 60 * 1000;
+              const sameTagRecent = cityPosts.filter(p => 
+                p.tag === result.post.tag && new Date(p.created_at || 0).getTime() > sixHrsAgo
+              );
+              if (sameTagRecent.length > 0) {
+                console.log(`[Cron] Skipping: ${result.post.tag} already posted for ${normalizedCity} within 6h`);
+                continue;
+              }
+
+              // Check 2: Event name dedup — extract event-like names and match against existing posts
+              // Matches "Texas Longhorns vs LSU Tigers" even with completely different wording
+              const newMsg = result.post.message.toLowerCase();
+              const eventNamePatterns = [
+                // "X vs Y" or "X vs. Y"
+                /(\w[\w\s]+?)\s+vs\.?\s+(\w[\w\s]+?)(?:\s+at\s|\s+in\s|\s+tonight|\s+today|[.!,]|$)/i,
+                // Event names in quotes or after common prefixes
+                /(?:game day|event|tonight|kicking off)[:\s]*([^.!?]+)/i,
+              ];
+              const extractEventKey = (msg: string): string | null => {
+                for (const pattern of eventNamePatterns) {
+                  const match = msg.match(pattern);
+                  if (match) return match[0].toLowerCase().replace(/[^\w\s]/g, '').trim();
+                }
+                return null;
+              };
+              const newEventKey = extractEventKey(newMsg);
+              if (newEventKey) {
+                const eventWords = newEventKey.split(/\s+/).filter(w => w.length > 2);
+                const hasEventDupe = cityPosts.some(p => {
+                  const existingMsg = p.message.toLowerCase();
+                  // Check if >60% of event key words appear in existing post
+                  const matchCount = eventWords.filter(w => existingMsg.includes(w)).length;
+                  return matchCount / Math.max(eventWords.length, 1) > 0.6;
+                });
+                if (hasEventDupe) {
+                  console.log(`[Cron] Skipping: event "${newEventKey}" already covered for ${normalizedCity}`);
+                  continue;
+                }
+              }
+
+              // Check 3: General content similarity — word overlap
+              const newWords = new Set(newMsg.replace(/[^\w\s]/g, '').split(/\s+/).filter((w: string) => w.length > 3));
+              const isDuplicate = cityPosts.some(p => {
+                const existingWords = new Set(p.message.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter((w: string) => w.length > 3));
+                const overlap = [...newWords].filter(w => existingWords.has(w)).length;
+                const similarity = overlap / Math.max(newWords.size, 1);
+                return similarity > 0.5; // >50% word overlap = duplicate
+              });
+              if (isDuplicate) {
+                console.log(`[Cron] Skipping: content too similar to existing post for ${normalizedCity}`);
                 continue;
               }
 

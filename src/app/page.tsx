@@ -965,11 +965,21 @@ export default function Home() {
   // Apply tag filter
   const filteredPulses = pulsesWithDistance.filter((p) => tagFilter === "All" || p.tag === tagFilter);
 
+  // Boost resident posts: recent resident posts (<2h) float to top, rest chronological
+  const boostedPulses = [...filteredPulses].sort((a, b) => {
+    const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
+    const aIsRecentResident = !a.is_bot && new Date(a.created_at).getTime() > twoHoursAgo;
+    const bIsRecentResident = !b.is_bot && new Date(b.created_at).getTime() > twoHoursAgo;
+    if (aIsRecentResident && !bIsRecentResident) return -1;
+    if (!aIsRecentResident && bIsRecentResident) return 1;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+
   // Count in-radius vs out-of-radius for potential UI separation
-  const inRadiusPulses = filteredPulses.filter(
+  const inRadiusPulses = boostedPulses.filter(
     (p) => p.distanceMiles !== null && p.distanceMiles <= RADIUS_CONFIG.PRIMARY_RADIUS_MILES
   );
-  const outOfRadiusPulses = filteredPulses.filter(
+  const outOfRadiusPulses = boostedPulses.filter(
     (p) => p.distanceMiles === null || p.distanceMiles > RADIUS_CONFIG.PRIMARY_RADIUS_MILES
   );
 

@@ -129,30 +129,12 @@ const WEATHER_TEMPLATES = {
 const GENERAL_TEMPLATES = {
   // NOTE: Weather judgments ("beautiful", "perfect") belong in WEATHER_TEMPLATES only.
   // General templates report temperature factually without claiming it's good or bad.
-  goodMorning: [
-    "☕ Good morning {city}! It's {temp}°F out there - how's everyone starting the day?",
-    "🌅 Rise and shine, {city}! {temp}°F this morning. What's on your agenda?",
-    "☕ Morning {city}! {temp}°F and {condition}. Grab that coffee and let's go.",
-    "🌤️ {city} morning check-in: {temp}°F, {traffic}. How's your commute?",
-  ],
-  afternoon: [
-    "📍 {city} afternoon check-in. How's your day going?",
-    "☕ Midday vibes in {city}. Anyone else need more coffee?",
-    "🏙️ {city} afternoon energy. What's everyone up to?",
-    "📍 Quick afternoon pulse check - how's {city} treating you today?",
-  ],
-  weekend: [
-    // Weather-neutral: focus on weekend vibes, not weather claims
-    "🎉 Happy weekend, {city}! What's everyone getting into?",
-    "🌳 Weekend vibes in {city}. {temp}°F outside - any plans?",
-    "📍 Saturday in {city}! What's the move today?",
-    "🍕 Lazy Sunday energy. {restaurant} or couch? Decisions, decisions.",
-  ],
-  lateNight: [
-    "🌙 Quiet night in {city}. Roads are clear. Safe travels!",
-    "🦉 Late night {city} crew - anyone else still up?",
-    "✨ Night owl update: {city} is peaceful. Drive safe out there.",
-  ],
+  // REMOVED: goodMorning, afternoon, weekend, lateNight — generic filler with zero informational value.
+  // AI posts should ONLY contain real data: weather, traffic, events.
+  goodMorning: [],
+  afternoon: [],
+  weekend: [],
+  lateNight: [],
 
 };
 
