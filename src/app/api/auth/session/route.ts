@@ -61,7 +61,14 @@ export async function POST(req: NextRequest) {
       }
 
       const supabase = createClient(supabaseUrl, supabaseAnonKey);
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://voxlo-theta.vercel.app";
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${siteUrl}/auth/callback`,
+        },
+      });
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 400 });

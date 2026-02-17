@@ -169,6 +169,41 @@ export function useAuth() {
     };
   }, []);
 
+  // Handle deep link from email verification (voxlo://auth/callback#access_token=...)
+  useEffect(() => {
+    let cleanup: (() => void) | undefined;
+    (async () => {
+      try {
+        const { App } = await import("@capacitor/app");
+        const listener = await App.addListener("appUrlOpen", async ({ url }) => {
+          if (url.includes("auth/callback")) {
+            const hashIndex = url.indexOf("#");
+            if (hashIndex !== -1) {
+              const hash = url.substring(hashIndex + 1);
+              const params = new URLSearchParams(hash);
+              const accessToken = params.get("access_token");
+              const refreshToken = params.get("refresh_token");
+              if (accessToken && refreshToken) {
+                const { error } = await supabase.auth.setSession({
+                  access_token: accessToken,
+                  refresh_token: refreshToken,
+                });
+                if (!error) {
+                  console.log("[Voxlo] Deep link auth success");
+                  window.location.reload();
+                }
+              }
+            }
+          }
+        });
+        cleanup = () => listener.remove();
+      } catch {
+        // Not in Capacitor environment — ignore
+      }
+    })();
+    return () => cleanup?.();
+  }, []);
+
   // Safety timeout: if profileLoading is stuck for >5 seconds, force it to complete
   useEffect(() => {
     if (profileLoading && authStatus === "signed_in" && sessionUser) {
@@ -223,6 +258,9 @@ export function useAuth() {
         const { data: signUpData, error: signUpError } = await authBridge.signUp({
           email,
           password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+          },
         });
 
         if (signUpError) {

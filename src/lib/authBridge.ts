@@ -48,7 +48,7 @@ export const authBridge = {
   /**
    * Sign up with email/password
    */
-  async signUp({ email, password }: { email: string; password: string }) {
+  async signUp({ email, password, options }: { email: string; password: string; options?: { emailRedirectTo?: string } }) {
     if (isCapacitor()) {
       try {
         const data = await serverAuth.signUp(email, password);
@@ -67,7 +67,7 @@ export const authBridge = {
         return { data: { user: null, session: null }, error: { message: err.message } };
       }
     }
-    return supabase.auth.signUp({ email, password });
+    return supabase.auth.signUp({ email, password, options });
   },
 
   /**
