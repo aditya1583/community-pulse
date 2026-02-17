@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { authBridge } from "@/lib/authBridge";
 import { moderateContent } from "@/lib/moderation";
+import { detectPII } from "@/lib/piiDetection";
 import {
   resetComposerAfterSuccessfulPost,
   writeOnboardingCompleted,
@@ -119,14 +120,23 @@ export function usePostPulse(opts: UsePostPulseOptions) {
       setValidationError("Please enter a message");
       hasErrors = true;
     } else {
-      const moderationResult = moderateContent(trimmed);
-      if (!moderationResult.allowed) {
+      // Check PII first (phone numbers, emails, SSNs, etc.)
+      const piiResult = detectPII(trimmed);
+      if (piiResult.blocked) {
         setValidationError(
-          moderationResult.reason || "Pulse contains disallowed language."
+          piiResult.reason || "Please don't share personal contact details."
         );
         hasErrors = true;
       } else {
-        setValidationError(null);
+        const moderationResult = moderateContent(trimmed);
+        if (!moderationResult.allowed) {
+          setValidationError(
+            moderationResult.reason || "Pulse contains disallowed language."
+          );
+          hasErrors = true;
+        } else {
+          setValidationError(null);
+        }
       }
     }
 
@@ -199,7 +209,7 @@ export function usePostPulse(opts: UsePostPulseOptions) {
         const msg = serverMsg || fallback;
         console.error("[Voxlo] Post failed:", res.status, res.statusText, "body:", JSON.stringify(data));
 
-        if (data?.code === "MODERATION_FAILED") {
+        if (data?.code === "MODERATION_FAILED" || data?.code === "PII_DETECTED") {
           setValidationError(msg);
           setShowValidationErrors(true);
           return;
@@ -338,14 +348,22 @@ export function usePostPulse(opts: UsePostPulseOptions) {
       setTabMessageValidationError("Please enter a message");
       hasErrors = true;
     } else {
-      const moderationResult = moderateContent(trimmed);
-      if (!moderationResult.allowed) {
+      const piiResult = detectPII(trimmed);
+      if (piiResult.blocked) {
         setTabMessageValidationError(
-          moderationResult.reason || "Pulse contains disallowed language."
+          piiResult.reason || "Please don't share personal contact details."
         );
         hasErrors = true;
       } else {
-        setTabMessageValidationError(null);
+        const moderationResult = moderateContent(trimmed);
+        if (!moderationResult.allowed) {
+          setTabMessageValidationError(
+            moderationResult.reason || "Pulse contains disallowed language."
+          );
+          hasErrors = true;
+        } else {
+          setTabMessageValidationError(null);
+        }
       }
     }
 
@@ -404,7 +422,7 @@ export function usePostPulse(opts: UsePostPulseOptions) {
         const msg = serverMsg || fallback;
         console.error("[Voxlo] Tab post failed:", res.status, res.statusText, "body:", JSON.stringify(data));
 
-        if (data?.code === "MODERATION_FAILED") {
+        if (data?.code === "MODERATION_FAILED" || data?.code === "PII_DETECTED") {
           setTabMessageValidationError(msg);
           setShowTabValidationErrors(true);
           setLoading(false);
