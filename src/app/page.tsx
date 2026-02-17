@@ -400,6 +400,7 @@ export default function Home() {
     tagValidationError, setTagValidationError,
     validationError, setValidationError,
     showValidationErrors,
+    postSuccess,
     handleAddPulse,
     trafficMood, setTrafficMood, trafficMessage, setTrafficMessage,
     eventsMood, setEventsMood, eventsMessage, setEventsMessage,
@@ -2002,6 +2003,16 @@ export default function Home() {
 
         {/* PWA Install Prompt */}
         <InstallPrompt />
+
+        {/* Post Success Toast */}
+        {postSuccess && (
+          <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[200] animate-in slide-in-from-top-4 fade-in duration-300">
+            <div className="bg-emerald-500 text-black font-bold text-sm px-6 py-3 rounded-2xl shadow-lg shadow-emerald-500/30 flex items-center gap-2">
+              <span>⚡</span>
+              <span>Pulse launched!</span>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

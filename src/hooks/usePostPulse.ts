@@ -54,6 +54,9 @@ export function usePostPulse(opts: UsePostPulseOptions) {
   const [localMood, setLocalMood] = useState("");
   const [localMessage, setLocalMessage] = useState("");
 
+  // Post success feedback
+  const [postSuccess, setPostSuccess] = useState(false);
+
   // Main form validation
   const [moodValidationError, setMoodValidationError] = useState<string | null>(null);
   const [tagValidationError, setTagValidationError] = useState<string | null>(null);
@@ -70,7 +73,7 @@ export function usePostPulse(opts: UsePostPulseOptions) {
       city, sessionUser, profile, username, identityReady,
       geolocationLat, geolocationLon, selectedCityLat, selectedCityLon,
       pulseCountResolved, userPulseCount, onboardingCompleted,
-      setPulses, setErrorMsg, setShowAuthModal, setShowPulseModal,
+      setPulses, setLoading, setErrorMsg, setShowAuthModal, setShowPulseModal,
       setPulseCountResolved, setUserPulseCount, setOnboardingCompleted,
       setShowFirstPulseModal, setHasShownOnboarding, setShowFirstPulseBadgeToast,
       loadStreak,
@@ -142,6 +145,7 @@ export function usePostPulse(opts: UsePostPulseOptions) {
 
     try {
       console.log("[Voxlo] Getting access token...");
+      setLoading(true);
       const accessToken = await authBridge.getAccessToken();
       console.log("[Voxlo] Access token:", accessToken ? `${accessToken.slice(0, 20)}...` : "NULL");
 
@@ -149,6 +153,7 @@ export function usePostPulse(opts: UsePostPulseOptions) {
         console.error("[Voxlo] No access token — showing sign-in");
         setErrorMsg("Sign in to post.");
         setShowAuthModal(true);
+        setLoading(false);
         return;
       }
 
@@ -193,16 +198,19 @@ export function usePostPulse(opts: UsePostPulseOptions) {
         if (data?.code === "MODERATION_FAILED") {
           setValidationError(msg);
           setShowValidationErrors(true);
+          setLoading(false);
           return;
         }
 
         if (res.status === 401) {
           setErrorMsg("Sign in to post.");
           setShowAuthModal(true);
+          setLoading(false);
           return;
         }
 
         setErrorMsg(msg);
+        setLoading(false);
         return;
       }
 
@@ -248,6 +256,11 @@ export function usePostPulse(opts: UsePostPulseOptions) {
       setShowValidationErrors(false);
 
       setShowPulseModal(false);
+      setLoading(false);
+
+      // Show success toast
+      setPostSuccess(true);
+      setTimeout(() => setPostSuccess(false), 3000);
 
       setPulseCountResolved(true);
       setUserPulseCount((prev) => prev + 1);
@@ -273,6 +286,7 @@ export function usePostPulse(opts: UsePostPulseOptions) {
       const errMsg = err instanceof Error ? err.message : String(err);
       console.error("Unexpected error creating pulse:", errMsg, err);
       setErrorMsg(`Network error: ${errMsg.slice(0, 80)}`);
+      setLoading(false);
       return;
     }
   };
@@ -494,6 +508,7 @@ export function usePostPulse(opts: UsePostPulseOptions) {
     tagValidationError, setTagValidationError,
     validationError, setValidationError,
     showValidationErrors,
+    postSuccess,
     handleAddPulse,
 
     // Tab-specific
