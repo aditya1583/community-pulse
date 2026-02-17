@@ -78,6 +78,25 @@ export async function GET(request: NextRequest) {
       return pulse.created_at >= twentyFourHoursAgo;
     });
 
+    // Sort: nearby posts first, then by recency within each distance band
+    // Posts within ~5 miles come before posts 5-12 miles away
+    if (lat != null && lon != null) {
+      const NEAR_THRESHOLD = 0.072; // ~5 miles in degrees
+      filtered.sort((a: { lat?: number; lon?: number; created_at: string }, b: { lat?: number; lon?: number; created_at: string }) => {
+        const distA = (a.lat != null && a.lon != null)
+          ? Math.abs(a.lat - lat) + Math.abs(a.lon - lon)
+          : 999;
+        const distB = (b.lat != null && b.lon != null)
+          ? Math.abs(b.lat - lat) + Math.abs(b.lon - lon)
+          : 999;
+        const nearA = distA <= NEAR_THRESHOLD ? 0 : 1;
+        const nearB = distB <= NEAR_THRESHOLD ? 0 : 1;
+        if (nearA !== nearB) return nearA - nearB; // nearby first
+        // Within same band, sort by recency
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+    }
+
     return NextResponse.json({ pulses: filtered, count: filtered.length });
   } catch (err) {
     console.error("[Feed API] Unexpected error:", err);
