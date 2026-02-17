@@ -305,23 +305,32 @@ export function useAuth() {
           setShowAuthModal(false);
         }
       } else {
-        const { data: signInData, error: signInError } = await authBridge.signInWithPassword({
+        const signInPromise = authBridge.signInWithPassword({
           email,
           password,
         });
+        
+        // Timeout after 15 seconds to prevent infinite hang
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Sign-in timed out. Please try again.")), 15000)
+        );
+        
+        const { data: signInData, error: signInError } = await Promise.race([signInPromise, timeoutPromise]) as any;
 
         if (signInError) {
           setAuthError(signInError.message || "Invalid email or password.");
           return;
         }
 
-        if (signInData.user) {
+        if (signInData?.user) {
           setSessionUser(signInData.user);
           setAuthStatus("signed_in");
           setAuthEmail("");
           setAuthPassword("");
           setAuthPasswordConfirm("");
           setShowAuthModal(false);
+        } else {
+          setAuthError("Sign-in failed. Please check your credentials.");
         }
       }
     } catch (err: unknown) {
