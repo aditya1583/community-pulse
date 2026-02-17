@@ -1,204 +1,172 @@
-export default function PrivacyPage() {
+import Link from "next/link";
+
+export const metadata = {
+  title: "Privacy Policy | Voxlo",
+  description: "Voxlo Privacy Policy",
+};
+
+export default function PrivacyPolicy() {
   return (
-    <div className="p-8 text-slate-100 max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold mb-4">Privacy Policy</h1>
-      <p className="text-sm text-slate-400 mb-6">Last updated: January 2026</p>
+    <main className="min-h-screen bg-black text-white font-[family-name:var(--font-outfit)]">
+      <div className="max-w-[800px] mx-auto px-6 py-12">
+        <Link href="/" className="text-gray-400 hover:text-white text-sm mb-8 inline-block">
+          ← Back to Voxlo
+        </Link>
 
-      <p className="mb-4">
-        Voxlo (&quot;the Service&quot;) values your privacy. This policy explains what information
-        we collect and how it is used.
-      </p>
+        <h1 className="text-4xl font-bold mb-2">Privacy Policy</h1>
+        <p className="text-gray-400 mb-10">Effective Date: February 17, 2026</p>
 
-      <h2 className="text-xl font-semibold mt-6 mb-2">1. Information We Collect</h2>
-      <p className="mb-4">
-        The Service stores content you submit, including text, tags, moods, and city selections.
-        We do not require account creation and do not collect personal identifiers unless you
-        voluntarily include them in a post.
-      </p>
+        <div className="space-y-8 text-gray-300 leading-relaxed">
+          <p>
+            Voxlo (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) operates a hyperlocal community application that connects nearby users through anonymous posts called &quot;pulses.&quot; This Privacy Policy explains how we collect, use, disclose, and protect your information when you use our mobile application and related services (collectively, the &quot;Service&quot;).
+          </p>
 
-      <h2 className="text-xl font-semibold mt-6 mb-2">2. How We Use Data</h2>
-      <p className="mb-4">
-        Your submissions are displayed publicly within the app. We may use aggregated,
-        non-personal data to improve functionality.
-      </p>
+          <section>
+            <h2 className="text-2xl font-semibold text-white mb-3">1. Information We Collect</h2>
 
-      <h2 className="text-xl font-semibold mt-6 mb-2">3. Third-Party Services</h2>
-      <p className="mb-4">
-        We use Supabase for data storage and Vercel for hosting. Their privacy policies also apply.
-      </p>
+            <h3 className="text-lg font-medium text-white mt-4 mb-2">Location Data</h3>
+            <p>We collect your device&apos;s GPS coordinates to deliver nearby content within an approximate 10-mile radius. Your precise location is used to determine your geographic area but is generalized before being stored. We do not maintain a continuous log of your movements.</p>
 
-      <h2 className="text-xl font-semibold mt-6 mb-2">4. No Tracking / No Ads</h2>
-      <p className="mb-4">
-        The Service does not use cookies, trackers, or advertising.
-      </p>
+            <h3 className="text-lg font-medium text-white mt-4 mb-2">User-Generated Content</h3>
+            <p>Posts (&quot;pulses&quot;), comments, and emoji reactions you create are stored on our servers along with the approximate location and timestamp of creation.</p>
 
-      <h2 className="text-xl font-semibold mt-6 mb-2">5. Data Removal</h2>
-      <p className="mb-4">
-        If you wish to remove content you submitted, you may contact us. We may remove content at
-        our discretion.
-      </p>
+            <h3 className="text-lg font-medium text-white mt-4 mb-2">Account Information</h3>
+            <p>Voxlo supports anonymous and pseudonymous accounts. We do not require your real name. We may collect an email address or third-party authentication token for account recovery purposes, along with a user-chosen display name or handle.</p>
 
-      <h2 className="text-xl font-semibold mt-6 mb-2">6. Changes to This Policy</h2>
-      <p className="mb-4">
-        This policy may change over time. Continued use of the Service means you accept updates.
-      </p>
+            <h3 className="text-lg font-medium text-white mt-4 mb-2">Device Information</h3>
+            <p>We automatically collect device type, operating system version, unique device identifiers, language settings, and app version to maintain and improve the Service.</p>
 
-      {/* GDPR Rights Section */}
-      <h2 className="text-xl font-semibold mt-8 mb-2 text-emerald-400">
-        7. Your Rights Under GDPR (European Union Users)
-      </h2>
-      <p className="mb-3">
-        If you are located in the European Economic Area (EEA), you have the following rights
-        regarding your personal data:
-      </p>
-      <ul className="list-disc list-inside mb-4 space-y-2 text-slate-300">
-        <li>
-          <strong>Right to Access:</strong> You can request a copy of the personal data we hold
-          about you.
-        </li>
-        <li>
-          <strong>Right to Rectification:</strong> You can request correction of inaccurate or
-          incomplete data.
-        </li>
-        <li>
-          <strong>Right to Erasure:</strong> You can request deletion of your personal data
-          (&quot;right to be forgotten&quot;).
-        </li>
-        <li>
-          <strong>Right to Restrict Processing:</strong> You can request that we limit how we use
-          your data.
-        </li>
-        <li>
-          <strong>Right to Data Portability:</strong> You can request your data in a
-          machine-readable format.
-        </li>
-        <li>
-          <strong>Right to Object:</strong> You can object to processing of your personal data.
-        </li>
-      </ul>
-      <p className="mb-4 text-slate-400 text-sm">
-        <strong>Legal Basis for Processing:</strong> We process data based on legitimate interest
-        for providing community features and maintaining service quality.
-      </p>
+            <h3 className="text-lg font-medium text-white mt-4 mb-2">Usage Data</h3>
+            <p>We collect information about how you interact with the Service, including features used, content viewed, session duration, and crash reports.</p>
+          </section>
 
-      {/* CCPA Rights Section */}
-      <h2 className="text-xl font-semibold mt-8 mb-2 text-emerald-400">
-        8. Your Rights Under CCPA (California Users)
-      </h2>
-      <p className="mb-3">
-        If you are a California resident, you have specific rights under the California Consumer
-        Privacy Act (CCPA):
-      </p>
-      <ul className="list-disc list-inside mb-4 space-y-2 text-slate-300">
-        <li>
-          <strong>Right to Know:</strong> You can request information about what personal data we
-          collect, use, and disclose.
-        </li>
-        <li>
-          <strong>Right to Delete:</strong> You can request deletion of your personal information.
-        </li>
-        <li>
-          <strong>Right to Opt-Out of Sale:</strong> We do not sell your personal information to
-          third parties.
-        </li>
-        <li>
-          <strong>Right to Non-Discrimination:</strong> You will not receive different treatment
-          for exercising your privacy rights.
-        </li>
-      </ul>
-      <p className="mb-4 text-slate-400 text-sm">
-        <strong>Notice:</strong> Voxlo does not sell, rent, or trade personal information. We never
-        have and never will.
-      </p>
+          <section>
+            <h2 className="text-2xl font-semibold text-white mb-3">2. How We Use Your Information</h2>
+            <ul className="list-disc list-inside space-y-2">
+              <li>Deliver location-relevant pulses, comments, and reactions from nearby users</li>
+              <li>Generate and display AI-powered community content (weather updates, traffic conditions, local events)</li>
+              <li>Moderate content to enforce our Community Guidelines and Terms of Service</li>
+              <li>Send push notifications about nearby activity and relevant updates</li>
+              <li>Improve, personalize, and optimize the Service</li>
+              <li>Detect and prevent fraud, abuse, and security incidents</li>
+              <li>Comply with legal obligations</li>
+            </ul>
+          </section>
 
-      {/* Data Retention */}
-      <h2 className="text-xl font-semibold mt-8 mb-2">9. Data Retention</h2>
-      <p className="mb-3">We retain different types of data for different periods:</p>
-      <ul className="list-disc list-inside mb-4 space-y-2 text-slate-300">
-        <li>
-          <strong>Pulses (Posts):</strong> Automatically removed after 7 days. This keeps content
-          fresh and relevant.
-        </li>
-        <li>
-          <strong>City Selection:</strong> Stored locally in your browser only. We do not track
-          your location on our servers.
-        </li>
-        <li>
-          <strong>Account Data:</strong> No accounts are required. We do not store login
-          credentials or personal profiles.
-        </li>
-      </ul>
+          <section>
+            <h2 className="text-2xl font-semibold text-white mb-3">3. AI-Generated Content</h2>
+            <p>Voxlo uses artificial intelligence to generate community content, including weather summaries, traffic updates, and local event highlights. This content is created by automated systems (&quot;bot posts&quot;) and is clearly labeled as such within the app. AI is also used to generate summaries and insights from aggregated, anonymized community activity. AI-generated content is provided for informational purposes only and should not be relied upon as professional advice.</p>
+          </section>
 
-      {/* Data Processors */}
-      <h2 className="text-xl font-semibold mt-8 mb-2">10. Data Processors</h2>
-      <p className="mb-3">
-        We use the following third-party services to operate Voxlo. Each maintains strict
-        data processing or usage agreements:
-      </p>
-      <ul className="list-disc list-inside mb-4 space-y-2 text-slate-300">
-        <li>
-          <strong>Supabase</strong> (Database & Auth) &ndash;{" "}
-          <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">Privacy Policy</a>
-        </li>
-        <li>
-          <strong>Vercel</strong> (Hosting & Analytics) &ndash;{" "}
-          <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">Privacy Policy</a>
-        </li>
-        <li>
-          <strong>TOMTOM</strong> (Traffic & Geolocation) &ndash;{" "}
-          <a href="https://www.tomtom.com/privacy/" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">Privacy Policy</a>
-        </li>
-        <li>
-          <strong>Foursquare</strong> (Local Business Data) &ndash;{" "}
-          <a href="https://foursquare.com/legal/privacy" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">Privacy Policy</a>
-        </li>
-        <li>
-          <strong>OpenAI & Anthropic</strong> (AI Analysis) &ndash;{" "}
-          <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">OpenAI Privacy</a> | <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">Anthropic Privacy</a>
-        </li>
-        <li>
-          <strong>Google Perspective</strong> (Content Safety) &ndash;{" "}
-          <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">Google Privacy</a>
-        </li>
-      </ul>
+          <section>
+            <h2 className="text-2xl font-semibold text-white mb-3">4. Content Moderation</h2>
+            <p>We use a combination of automated systems and manual review to moderate content on Voxlo. Automated moderation powered by AI scans posts and comments for violations of our Community Guidelines, including hate speech, threats, harassment, spam, and sharing of personally identifiable information. Content flagged by automated systems may be blocked, removed, or escalated for human review. If your content is moderated, you may appeal the decision through the in-app appeals process.</p>
+          </section>
 
-      {/* Contact for Privacy Requests */}
-      <h2 className="text-xl font-semibold mt-8 mb-2">11. Contact for Privacy Requests</h2>
-      <p className="mb-3">
-        To exercise any of your privacy rights or ask questions about this policy, contact us at:
-      </p>
-      <p className="mb-4">
-        <a
-          href="mailto:support@voxlo.app"
-          className="text-emerald-400 hover:underline font-medium"
-        >
-          support@voxlo.app
-        </a>
-      </p>
-      <p className="mb-4 text-slate-400 text-sm">
-        <strong>Response Timeline:</strong> We will respond to all privacy requests within 30 days,
-        as required by GDPR. For complex requests, we may extend this by an additional 60 days with
-        notice.
-      </p>
+          <section>
+            <h2 className="text-2xl font-semibold text-white mb-3">5. Third-Party Services</h2>
+            <p>We share limited data with the following third-party service providers to operate the Service:</p>
 
-      {/* Children's Privacy */}
-      <h2 className="text-xl font-semibold mt-8 mb-2">12. Children&apos;s Privacy (COPPA)</h2>
-      <p className="mb-4">
-        Voxlo is not intended for use by children under the age of 13. We do not knowingly collect
-        personal information from children under 13. If you are a parent or guardian and believe
-        your child has provided us with personal information, please contact us at{" "}
-        <a
-          href="mailto:support@voxlo.app"
-          className="text-emerald-400 hover:underline"
-        >
-          support@voxlo.app
-        </a>{" "}
-        and we will delete such information promptly.
-      </p>
+            <ul className="space-y-4 mt-4">
+              <li>
+                <strong className="text-white">Supabase</strong> — Provides our database infrastructure and authentication services. Stores account data, posts, and app data.
+              </li>
+              <li>
+                <strong className="text-white">TomTom</strong> — Provides traffic data for AI-generated traffic updates. Receives generalized location coordinates to return relevant traffic information.
+              </li>
+              <li>
+                <strong className="text-white">Ticketmaster</strong> — Provides local event data. Receives generalized location data to return nearby events.
+              </li>
+              <li>
+                <strong className="text-white">Google Places</strong> — Provides location and place data. Receives location coordinates to return nearby place information.
+              </li>
+              <li>
+                <strong className="text-white">OpenAI</strong> — Powers content moderation and AI-generated summaries. Receives post text for moderation analysis and aggregated data for content generation. We do not send your identity or precise location to OpenAI.
+              </li>
+              <li>
+                <strong className="text-white">Apple Push Notification Service (APNs)</strong> — Delivers push notifications to your device. Receives a device token and notification content.
+              </li>
+              <li>
+                <strong className="text-white">Vercel</strong> — Hosts our web application and serverless functions. Processes requests and may log IP addresses and request metadata.
+              </li>
+            </ul>
 
-      <p className="text-sm text-slate-500 mt-8 pt-4 border-t border-slate-700">
-        If you do not agree with this policy, please stop using the Service.
-      </p>
-    </div>
+            <p className="mt-4">Each third-party provider operates under its own privacy policy. We encourage you to review their policies.</p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-white mb-3">6. Data Retention</h2>
+            <p>User-generated posts, comments, and reactions are retained indefinitely unless you request deletion. When content is removed (by you or through moderation), it is archived and removed from public view but may be retained in our systems for legal compliance and abuse prevention purposes.</p>
+            <p className="mt-2">AI-generated bot posts (weather, traffic, events) are ephemeral and automatically expire after a set period, typically 24 to 72 hours.</p>
+            <p className="mt-2">Account data is retained for as long as your account is active. If you delete your account, we will remove your personal data within 30 days, except where retention is required by law.</p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-white mb-3">7. Your Rights</h2>
+            <p>Depending on your jurisdiction, you may have the right to:</p>
+            <ul className="list-disc list-inside space-y-2 mt-2">
+              <li><strong className="text-white">Access</strong> — Request a copy of the personal data we hold about you</li>
+              <li><strong className="text-white">Deletion</strong> — Request that we delete your personal data and account</li>
+              <li><strong className="text-white">Data Export</strong> — Request a portable copy of your data in a machine-readable format</li>
+              <li><strong className="text-white">Correction</strong> — Request correction of inaccurate personal data</li>
+              <li><strong className="text-white">Opt-Out</strong> — Opt out of push notifications or location tracking through your device settings</li>
+            </ul>
+            <p className="mt-2">To exercise any of these rights, contact us at <a href="mailto:info@voxlo.app" className="text-blue-400 hover:underline">info@voxlo.app</a>.</p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-white mb-3">8. Data Deletion Process</h2>
+            <p>To request deletion of your account and associated data:</p>
+            <ol className="list-decimal list-inside space-y-2 mt-2">
+              <li>Send an email to <a href="mailto:info@voxlo.app" className="text-blue-400 hover:underline">info@voxlo.app</a> from the email associated with your account, or include your username/account identifier</li>
+              <li>Include &quot;Data Deletion Request&quot; in the subject line</li>
+              <li>We will verify your identity and process the request within 30 days</li>
+              <li>You will receive confirmation once deletion is complete</li>
+            </ol>
+            <p className="mt-2">Please note that some data may be retained in anonymized or aggregated form, and certain data may be retained as required by law or for legitimate business purposes such as fraud prevention.</p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-white mb-3">9. Children&apos;s Privacy</h2>
+            <p>Voxlo is not intended for children under the age of 13. We do not knowingly collect personal information from children under 13. If we become aware that we have collected data from a child under 13, we will take steps to delete that information promptly. If you believe a child under 13 has provided us with personal information, please contact us at <a href="mailto:info@voxlo.app" className="text-blue-400 hover:underline">info@voxlo.app</a>.</p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-white mb-3">10. Location Data</h2>
+            <p>Location data is central to how Voxlo works. Here is how we handle it:</p>
+            <ul className="list-disc list-inside space-y-2 mt-2">
+              <li>We request location permission when you first use the app</li>
+              <li>Your GPS coordinates are used to determine which pulses to show you (within approximately a 10-mile radius)</li>
+              <li>Precise coordinates are generalized before storage — we do not store your exact GPS position with your posts</li>
+              <li>Location data is sent to third-party services (TomTom, Ticketmaster, Google Places) in generalized form to provide local content</li>
+              <li>You can revoke location permission at any time through your device settings, though this will limit the functionality of the Service</li>
+              <li>We do not sell your location data to third parties</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-white mb-3">11. Push Notifications</h2>
+            <p>We may send push notifications about nearby activity, new pulses, reactions to your content, and community updates. You can manage notification preferences within the app or disable them entirely through your device settings. Push notifications are delivered through Apple Push Notification Service (APNs), which requires a device token. This token does not reveal your personal identity.</p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-white mb-3">12. Changes to This Policy</h2>
+            <p>We may update this Privacy Policy from time to time. When we make material changes, we will notify you through the app or by other appropriate means. Your continued use of the Service after changes take effect constitutes your acceptance of the revised policy. We encourage you to review this page periodically.</p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-white mb-3">13. Contact Us</h2>
+            <p>If you have any questions or concerns about this Privacy Policy or our data practices, please contact us at:</p>
+            <p className="mt-2">
+              <a href="mailto:info@voxlo.app" className="text-blue-400 hover:underline">info@voxlo.app</a>
+            </p>
+          </section>
+        </div>
+
+        <div className="border-t border-gray-800 mt-12 pt-6 text-center text-gray-500 text-sm">
+          © 2026 Voxlo. All rights reserved.
+        </div>
+      </div>
+    </main>
   );
 }
