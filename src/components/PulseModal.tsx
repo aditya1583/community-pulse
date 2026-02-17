@@ -272,7 +272,10 @@ export default function PulseModal({
             </div>
 
             {showValidationErrors && messageValidationError && (
-              <p className="text-[11px] font-bold text-red-500 uppercase tracking-widest px-1">{messageValidationError}</p>
+              <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/30 rounded-2xl px-4 py-3 animate-in shake-x duration-300">
+                <span className="text-lg mt-0.5">🚫</span>
+                <p className="text-[13px] font-bold text-red-400 leading-snug">{messageValidationError}</p>
+              </div>
             )}
           </div>
 

@@ -266,7 +266,10 @@ const PulseInput = forwardRef<HTMLTextAreaElement, PulseInputProps>(
           </div>
 
           {showValidationErrors && messageValidationError && (
-            <p className="text-red-400 text-[10px] font-bold px-1">{messageValidationError}</p>
+            <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3">
+              <span className="text-base mt-0.5">🚫</span>
+              <p className="text-[13px] font-bold text-red-400 leading-snug">{messageValidationError}</p>
+            </div>
           )}
 
           {/* Location relevance warning */}

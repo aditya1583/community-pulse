@@ -1722,9 +1722,10 @@ export default function Home() {
                       />
                       {/* Moderation / error banner — below compose box */}
                       {errorMsg && (
-                        <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/40 rounded-lg px-3 py-2 mt-2 animate-pulse">
-                          {errorMsg}
-                        </p>
+                        <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 mt-2">
+                          <span className="text-base mt-0.5">🚫</span>
+                          <p className="text-[13px] font-bold text-red-400 leading-snug">{errorMsg}</p>
+                        </div>
                       )}
                     </div>
 
