@@ -61,10 +61,10 @@ function getCityCoordinates(cityName: string): { lat: number; lon: number } | nu
  * 2. The Promoter - Hypes up events, excited about local happenings
  * 3. The Helper - Warns about weather, shares safety tips, gives advice
  */
-// Single bot persona — all posts come from Pulse Bot
+// Single bot persona — all posts come from Voxlo AI
 function getBotName(_tag: string, city: string): string {
   const citySlug = city.split(",")[0].trim();
-  return `${citySlug} Pulse Bot 🤖`;
+  return `${citySlug} Voxlo AI 🤖`;
 }
 
 // Event-based post templates - THE PROMOTER personality (excited, hype!)

@@ -461,7 +461,7 @@ export async function generatePollPost(ctx: SituationContext): Promise<Engagemen
   return {
     message: pollFormats[Math.floor(Math.random() * pollFormats.length)],
     tag: "General", mood: context.emoji,
-    author: `${city.name} Pulse Bot 🤖`,
+    author: `${city.name} Voxlo AI 🤖`,
     is_bot: true, hidden: false, engagementType: "poll",
   };
 }
@@ -486,7 +486,7 @@ export async function generateRecommendationPost(ctx: SituationContext): Promise
   return {
     message: template.replace("{query}", query),
     tag: "General", mood: "🤔",
-    author: `${city.name} Pulse Bot 🤖`,
+    author: `${city.name} Voxlo AI 🤖`,
     is_bot: true, hidden: false, engagementType: "recommendation",
   };
 }
@@ -507,7 +507,7 @@ export async function generateSchoolAlertPost(ctx: SituationContext): Promise<En
   return {
     message: template.replace("{school}", school).replace(/{road}/g, road),
     tag: "Traffic", mood: "🏫",
-    author: `${city.name} Pulse Bot 🤖`,
+    author: `${city.name} Voxlo AI 🤖`,
     is_bot: true, hidden: false, engagementType: "school_alert",
   };
 }
@@ -534,7 +534,7 @@ export async function generateThisOrThatPost(ctx: SituationContext): Promise<Eng
     const selected = matchingTemplates[Math.floor(Math.random() * matchingTemplates.length)];
     let message = selected.template;
     for (const [key, value] of Object.entries(vars)) { message = message.replace(new RegExp(`\\{${key}\\}`, "g"), value); }
-    return { message, tag: "General", mood: "📊", author: `${city.name} Pulse Bot 🤖`, is_bot: true, hidden: false, engagementType: "this_or_that", options: [selected.optionA, selected.optionB] };
+    return { message, tag: "General", mood: "📊", author: `${city.name} Voxlo AI 🤖`, is_bot: true, hidden: false, engagementType: "this_or_that", options: [selected.optionA, selected.optionB] };
   }
 
   // Fallback
@@ -542,7 +542,7 @@ export async function generateThisOrThatPost(ctx: SituationContext): Promise<Eng
   const choice = fallback[Math.floor(Math.random() * fallback.length)];
   const template = THIS_OR_THAT_TEMPLATES[Math.floor(Math.random() * THIS_OR_THAT_TEMPLATES.length)];
   const message = template.replace("{a}", choice.a).replace("{b}", choice.b).replace("{city}", city.name);
-  return { message, tag: "General", mood: "⚔️", author: `${city.name} Pulse Bot 🤖`, is_bot: true, hidden: false, engagementType: "this_or_that", options: [choice.a, choice.b] };
+  return { message, tag: "General", mood: "⚔️", author: `${city.name} Voxlo AI 🤖`, is_bot: true, hidden: false, engagementType: "this_or_that", options: [choice.a, choice.b] };
 }
 
 export async function generateNeighborChallengePost(ctx: SituationContext): Promise<EngagementPost | null> {
@@ -553,7 +553,7 @@ export async function generateNeighborChallengePost(ctx: SituationContext): Prom
   return {
     message: fillEngagementTemplate(template, extendedVars),
     tag: "General", mood: "📣",
-    author: `${city.name} Pulse Bot 🤖`,
+    author: `${city.name} Voxlo AI 🤖`,
     is_bot: true, hidden: false, engagementType: "neighbor_challenge",
   };
 }
@@ -568,7 +568,7 @@ export async function generateWouldYouRatherPost(ctx: SituationContext): Promise
   const message = fillEngagementTemplate(template, { ...vars, optionA, optionB });
   return {
     message, tag: "General", mood: "🤔",
-    author: `${city.name} Pulse Bot 🤖`,
+    author: `${city.name} Voxlo AI 🤖`,
     is_bot: true, hidden: false, engagementType: "would_you_rather",
     options: [optionA, optionB],
   };
@@ -580,7 +580,7 @@ export async function generateConfessionBoothPost(ctx: SituationContext): Promis
   return {
     message: fillEngagementTemplate(pickRandom(CONFESSION_TEMPLATES), vars),
     tag: "General", mood: "🙈",
-    author: `${city.name} Pulse Bot 🤖`,
+    author: `${city.name} Voxlo AI 🤖`,
     is_bot: true, hidden: false, engagementType: "confession_booth",
   };
 }
@@ -660,7 +660,7 @@ export async function generatePredictionPost(
 
   return {
     message, tag, mood: "🔮",
-    author: `${city.name} Pulse Bot 🤖`,
+    author: `${city.name} Voxlo AI 🤖`,
     is_bot: true, hidden: false, engagementType: "prediction",
     options: [selected.optionA, selected.optionB],
     prediction: { resolvesAt, xpReward: selected.xpReward, category: selected.category, dataSource: selected.dataSource },
@@ -678,7 +678,7 @@ export async function generateCivicAlertPost(ctx: SituationContext): Promise<Eng
     return {
       message: `${message}\n\n💎 Correct guessers earn 50 XP! Resolution by ${deadlineStr}.`,
       tag: "General" as PostType, mood: "🏛️",
-      author: `${city.name} Pulse Bot 🤖`,
+      author: `${city.name} Voxlo AI 🤖`,
       is_bot: true, hidden: false, engagementType: "civic_alert",
       options: [template.optionA, template.optionB],
       prediction: { resolvesAt, xpReward: 50, category: "civic", dataSource: "manual" },
@@ -687,7 +687,7 @@ export async function generateCivicAlertPost(ctx: SituationContext): Promise<Eng
 
   return {
     message, tag: "General" as PostType, mood: "🏛️",
-    author: `${city.name} Pulse Bot 🤖`,
+    author: `${city.name} Voxlo AI 🤖`,
     is_bot: true, hidden: false, engagementType: "civic_alert",
     options: [template.optionA, template.optionB],
   };
@@ -730,7 +730,7 @@ export async function generateWeatherAlertPost(ctx: SituationContext): Promise<E
       mood = "🔥"; break;
   }
 
-  return { message, tag: "Weather", mood, author: `${city.name} Pulse Bot 🤖`, is_bot: true, hidden: false, engagementType: "weather_alert" };
+  return { message, tag: "Weather", mood, author: `${city.name} Voxlo AI 🤖`, is_bot: true, hidden: false, engagementType: "weather_alert" };
 }
 
 export async function generateFarmersMarketPost(ctx: SituationContext): Promise<EngagementPost | null> {
@@ -760,7 +760,7 @@ export async function generateFarmersMarketPost(ctx: SituationContext): Promise<
 
   return {
     message, tag: "Events", mood: "🥬",
-    author: `${city.name} Pulse Bot 🤖`,
+    author: `${city.name} Voxlo AI 🤖`,
     is_bot: true, hidden: false, engagementType: "farmers_market",
     action: { type: "directions", target: directionsUrl, label: "Get Directions", venue: { name: market.name, address: market.address, lat: market.lat, lon: market.lon, website: market.website ?? undefined } },
   };
@@ -783,7 +783,7 @@ export async function generateRoutePulsePost(ctx: SituationContext): Promise<Eng
 
   return {
     message, tag: "Traffic", mood: status === "clear" ? "✅" : "🚥",
-    author: `${city.name} Pulse Bot 🤖`,
+    author: `${city.name} Voxlo AI 🤖`,
     is_bot: true, hidden: false, engagementType: "route_pulse",
     action: { type: "traffic_check", target: "traffic", label: "Check Traffic Map" },
   };

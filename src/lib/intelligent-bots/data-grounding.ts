@@ -123,7 +123,14 @@ export const FABRICATING_ENGAGEMENT_TYPES = new Set([
  */
 export function addDataAttribution(message: string, sources: string[]): string {
   if (sources.length === 0) return message;
-  const timestamp = new Date().toISOString();
+  const now = new Date();
+  // Human-readable timestamp: "Mon 4:27 PM" format
+  const timestamp = now.toLocaleString("en-US", {
+    weekday: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Chicago",
+  });
   const sourceStr = sources.join(", ");
   return `${message}\n\n📡 Data: ${sourceStr} • ${timestamp}`;
 }

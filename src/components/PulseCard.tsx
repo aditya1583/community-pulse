@@ -388,6 +388,7 @@ export default function PulseCard({
             // Convert UTC timestamp in attribution to local time
             let attribution = attrMatch ? attrMatch[1] : null;
             if (attribution) {
+              // Handle "YYYY-MM-DD HH:MM:SS UTC" format
               attribution = attribution.replace(
                 /(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) UTC/,
                 (_match, date, time) => {
@@ -400,11 +401,37 @@ export default function PulseCard({
                   } catch { return `${date} ${time}`; }
                 }
               );
+              // Handle raw ISO timestamps like "2026-02-17T22:27:25.305Z"
+              attribution = attribution.replace(
+                /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g,
+                (isoStr) => {
+                  try {
+                    const d = new Date(isoStr);
+                    return d.toLocaleString(undefined, {
+                      weekday: "short",
+                      hour: "numeric", minute: "2-digit",
+                    });
+                  } catch { return isoStr; }
+                }
+              );
             }
+            // Also format ISO timestamps in main text
+            const formattedMainText = mainText.replace(
+              /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g,
+              (isoStr: string) => {
+                try {
+                  const d = new Date(isoStr);
+                  return d.toLocaleString(undefined, {
+                    weekday: "short",
+                    hour: "numeric", minute: "2-digit",
+                  });
+                } catch { return isoStr; }
+              }
+            );
             return (
               <>
                 <p className="text-[15px] text-white/90 leading-[1.6] mb-4 whitespace-pre-line font-medium tracking-tight text-balance">
-                  {mainText}
+                  {formattedMainText}
                 </p>
                 {attribution && (
                   <p className="text-[9px] text-white/20 mb-3 -mt-2 tracking-wide">{attribution}</p>

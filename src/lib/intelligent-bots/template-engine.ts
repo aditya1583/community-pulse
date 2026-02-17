@@ -251,8 +251,8 @@ interface BotPersona {
   emoji: string;
 }
 
-// Single bot persona — all posts come from "Pulse Bot 🤖"
-const PULSE_BOT: BotPersona = { name: "Pulse Bot", emoji: "🤖" };
+// Single bot persona — all posts come from "Voxlo AI 🤖"
+const PULSE_BOT: BotPersona = { name: "Voxlo AI", emoji: "🤖" };
 
 export function getBotPersona(_postType?: PostType | ExtendedPostType): BotPersona {
   return PULSE_BOT;
@@ -347,6 +347,11 @@ function maybeInjectFunFact(
   postType: PostType,
   forceInject: boolean = false
 ): string {
+  // NEVER inject trivia into traffic posts — traffic = data only
+  if (postType === "Traffic") {
+    return message;
+  }
+
   // Check injection rate (unless forced)
   if (!forceInject && Math.random() > FUN_FACT_INJECTION_RATE) {
     return message;
