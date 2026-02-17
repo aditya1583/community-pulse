@@ -97,6 +97,7 @@ async function fetchFeed(city: string, lat?: number, lon?: number, limit = 26) {
     .select("id, author, message, mood, tag, city, neighborhood, lat, lon, created_at, expires_at, is_bot, poll_options, user_id")
     .ilike("city", `${cityBase}%`)
     .or(`expires_at.is.null,expires_at.gt.${gracePeriod}`)
+    .order("is_bot", { ascending: true })
     .order("created_at", { ascending: false })
     .limit(limit);
 

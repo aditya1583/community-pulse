@@ -181,7 +181,7 @@ export function isPostEnabled(args: {
 }
 
 export function resetComposerAfterSuccessfulPost() {
-  return { mood: "", tag: "", message: "" };
+  return { mood: "", tag: "General", message: "" };
 }
 
 // ============================================================================
