@@ -1801,17 +1801,48 @@ export default function Home() {
                           <p className="text-sm font-bold text-slate-400">Loading the local vibe for {city}...</p>
                         </div>
                       ) : filteredPulses.length === 0 ? (
-                        <div className="bg-slate-800/40 border border-dashed border-slate-700/50 rounded-2xl p-10 text-center space-y-3">
-                          <p className="text-lg">📝</p>
-                          <p className="text-sm font-bold text-slate-300">Be the first to share what&apos;s happening in {city}!</p>
-                          <p className="text-xs text-slate-500">Your neighbors are waiting to hear from you</p>
-                          <button
-                            type="button"
-                            onClick={() => setShowPulseModal(true)}
-                            className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition"
-                          >
-                            Share a Pulse
-                          </button>
+                        <div className="bg-gradient-to-b from-slate-800/60 to-slate-900/80 border border-dashed border-slate-700/40 rounded-2xl p-8 sm:p-10 text-center space-y-5">
+                          {/* Illustration area */}
+                          <div className="flex justify-center items-center gap-3 text-4xl select-none">
+                            {pulses.length === 0 || tagFilter === "All" ? (
+                              <>
+                                <span className="animate-bounce" style={{ animationDelay: "0ms" }}>🏘️</span>
+                                <span className="animate-bounce" style={{ animationDelay: "150ms" }}>📡</span>
+                                <span className="animate-bounce" style={{ animationDelay: "300ms" }}>✨</span>
+                              </>
+                            ) : (
+                              <span className="animate-bounce text-5xl">🔍</span>
+                            )}
+                          </div>
+
+                          {/* Heading */}
+                          <h3 className="text-lg sm:text-xl font-bold text-white leading-snug">
+                            {pulses.length > 0 && tagFilter !== "All"
+                              ? `No ${tagFilter} pulses yet`
+                              : <>Be the first to drop a pulse in <span className="text-emerald-400">{city}</span>!</>}
+                          </h3>
+
+                          {/* Subtext */}
+                          <p className="text-sm text-slate-400 max-w-xs mx-auto leading-relaxed">
+                            {pulses.length > 0 && tagFilter !== "All"
+                              ? `Nobody has shared a ${tagFilter.toLowerCase()} update yet. Be the first to let your neighbors know!`
+                              : "Your neighborhood is quiet right now. Share what\u2019s happening \u2014 traffic, weather, events, or just the local vibe."}
+                          </p>
+
+                          {/* CTA Button with glow */}
+                          <div className="pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setShowPulseModal(true)}
+                              className="relative inline-flex items-center gap-2 px-7 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold tracking-wide transition-all duration-300 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.03] active:scale-[0.97]"
+                            >
+                              <span className="absolute inset-0 rounded-xl bg-emerald-400/20 animate-ping opacity-30 pointer-events-none" />
+                              Drop a Pulse ⚡
+                            </button>
+                          </div>
+
+                          {/* Secondary text */}
+                          <p className="text-[11px] text-slate-500">Your pulse will be seen by everyone nearby</p>
                         </div>
                       ) : (
                         <>
