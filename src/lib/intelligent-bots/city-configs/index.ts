@@ -144,6 +144,7 @@ export function hasIntelligentBotConfig(cityName: string): boolean {
  */
 export function getRandomRoad(config: CityConfig, type: "major" | "highways" | "schoolZones" = "major"): string {
   const roads = config.roads[type];
+  if (!roads || roads.length === 0) return "";
   return roads[Math.floor(Math.random() * roads.length)];
 }
 
@@ -153,6 +154,7 @@ export function getRandomRoad(config: CityConfig, type: "major" | "highways" | "
  */
 export function getRandomLandmark(config: CityConfig, type: "shopping" | "venues" | "restaurants" = "venues"): string {
   const landmarks = config.landmarks[type];
+  if (!landmarks || landmarks.length === 0) return "";
   const landmark = landmarks[Math.floor(Math.random() * landmarks.length)];
   return getLandmarkDisplay(landmark);
 }
@@ -162,6 +164,7 @@ export function getRandomLandmark(config: CityConfig, type: "shopping" | "venues
  */
 export function getRandomSchool(config: CityConfig, type: "high" | "middle" | "elementary" = "high"): string {
   const schools = config.schools[type];
+  if (!schools || schools.length === 0) return "";
   return schools[Math.floor(Math.random() * schools.length)];
 }
 

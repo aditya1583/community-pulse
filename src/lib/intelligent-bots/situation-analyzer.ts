@@ -110,6 +110,12 @@ export function analyzeForPost(ctx: SituationContext): PostDecision {
 function checkForTrafficPost(ctx: SituationContext): PostDecision {
   const { traffic, time, events } = ctx;
 
+  // Skip traffic posts if city has no configured roads (dynamic/international cities)
+  const hasRoads = ctx.city.roads?.major?.length > 0 || ctx.city.roads?.highways?.length > 0;
+  if (!hasRoads) {
+    return { shouldPost: false, postType: null, reason: "No roads configured for this city", priority: 0 };
+  }
+
   // High congestion (>30%) always warrants a post
   if (traffic.congestionLevel > 0.3) {
     return {

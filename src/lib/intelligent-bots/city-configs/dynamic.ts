@@ -51,25 +51,24 @@ export function generateDynamicCityConfig(
     coords,
     timezone,
 
-    // Generic road names - posts will use general descriptions instead
+    // Empty roads/landmarks/schools — dynamic cities should NOT generate
+    // traffic/school content with fake names. Only weather + general + events.
     roads: {
-      major: ["Main Street", "Downtown", "City Center"],
-      highways: ["Highway", "Interstate", "Main Route"],
-      schoolZones: ["School Zone"],
+      major: [],
+      highways: [],
+      schoolZones: [],
     },
 
-    // Generic landmarks - posts will focus on types rather than names
     landmarks: {
-      shopping: ["Local Shops", "Shopping Center", "Downtown Stores"],
-      venues: ["Community Center", "Local Park", "Downtown"],
-      restaurants: ["Local Restaurants", "Downtown Dining"],
+      shopping: [],
+      venues: [],
+      restaurants: [],
     },
 
-    // Generic schools - will not generate school-specific alerts
     schools: {
-      high: ["Local High School"],
-      middle: ["Local Middle School"],
-      elementary: ["Local Elementary"],
+      high: [],
+      middle: [],
+      elementary: [],
     },
 
     // Standard rush hours (universal for US cities)
