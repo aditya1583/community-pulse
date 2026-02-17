@@ -157,7 +157,7 @@ export async function GET(request: NextRequest) {
               const normalizedCity = cityInfo.city.split(",")[0].trim();
               const { data: recentPosts } = await supabase
                 .from("pulses")
-                .select("id, message, city, tag")
+                .select("id, message, city, tag, created_at")
                 .eq("is_bot", true)
                 .gte("created_at", twentyFourHrsAgo);
 
