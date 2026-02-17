@@ -24,7 +24,7 @@ export default function TermsOfService() {
           <section>
             <h2 className="mb-3 text-xl font-semibold text-emerald-500">1. Acceptance of Terms</h2>
             <p>
-              By accessing or using Voxlo (&quot;the Service&quot;), accessible at app.voxlo, you agree to be bound
+              By accessing or using Voxlo (&quot;the Service&quot;), accessible at voxlo.app, you agree to be bound
               by these Terms of Service (&quot;Terms&quot;). If you do not agree to these Terms, you may not use the
               Service. We reserve the right to update these Terms at any time. Continued use of the Service
               after changes constitutes acceptance of the revised Terms.

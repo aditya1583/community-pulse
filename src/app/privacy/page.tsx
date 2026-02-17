@@ -25,7 +25,7 @@ export default function PrivacyPolicy() {
             <h2 className="mb-3 text-xl font-semibold text-emerald-500">1. Introduction</h2>
             <p>
               Welcome to Voxlo (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;). Voxlo is a location-based community platform
-              accessible at app.voxlo. This Privacy Policy explains how we collect, use, disclose, and
+              accessible at voxlo.app. This Privacy Policy explains how we collect, use, disclose, and
               safeguard your information when you use our application. By using Voxlo, you agree to the
               collection and use of information in accordance with this policy.
             </p>
@@ -47,8 +47,7 @@ export default function PrivacyPolicy() {
               Voxlo uses your device&apos;s location to provide location-relevant content. Before storing any
               location data, coordinates are <strong className="text-white">rounded to 2 decimal places</strong>,
               providing approximately 1.1 km (~0.7 mile) precision. We do <strong className="text-white">not</strong>{" "}
-              store your exact location. This rounding is applied before the data leaves your device or is
-              written to our database.
+              store your exact location. This rounding is applied server-side before being written to our database, ensuring precise coordinates are never persisted.
             </p>
 
             <h3 className="mb-2 mt-4 text-lg font-medium text-white">2.3 User-Generated Content</h3>
