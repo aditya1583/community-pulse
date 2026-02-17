@@ -23,6 +23,8 @@ type UserProfileCardProps = {
   badges: UserBadge[];
   loading?: boolean;
   className?: string;
+  nameLocked?: boolean;
+  onRerollName?: () => void;
 };
 
 /**
@@ -45,6 +47,8 @@ export default function UserProfileCard({
   badges,
   loading = false,
   className = "",
+  nameLocked = true,
+  onRerollName,
 }: UserProfileCardProps) {
   if (loading) {
     return (
@@ -83,6 +87,15 @@ export default function UserProfileCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <span className="font-semibold text-white truncate">{username}</span>
+              {!nameLocked && onRerollName && (
+                <button
+                  onClick={onRerollName}
+                  className="text-lg hover:scale-110 active:scale-95 transition-transform"
+                  title="Change username"
+                >
+                  🎲
+                </button>
+              )}
               {tier.name !== "none" && (
                 <span className={`text-xs font-bold ${tier.badgeColor} px-2 py-0.5 rounded`}>
                   {tier.label}

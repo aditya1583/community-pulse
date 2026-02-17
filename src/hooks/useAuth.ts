@@ -77,6 +77,7 @@ export function useAuth() {
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authSuccess, setAuthSuccess] = useState<string | null>(null);
+  const [needsUsernameChoice, setNeedsUsernameChoice] = useState(false);
 
   // ========= LOAD SESSION + PROFILE =========
   useEffect(() => {
@@ -102,10 +103,12 @@ export function useAuth() {
 
         if (profileResult) {
           setProfile(profileResult);
+          if (!profileResult.name_locked) setNeedsUsernameChoice(true);
         } else if (token) {
           const anon = await generateUniqueUsername(supabase);
           profileResult = await createProfileServerSide(token, anon);
           setProfile(profileResult || { anon_name: anon, name_locked: false });
+          setNeedsUsernameChoice(true);
         }
       } catch (err) {
         console.error("[Voxlo] Profile load failed:", err);
@@ -129,10 +132,12 @@ export function useAuth() {
               let profileResult = token ? await loadProfileServerSide(token) : null;
               if (profileResult) {
                 setProfile(profileResult);
+                if (!profileResult.name_locked) setNeedsUsernameChoice(true);
               } else if (token) {
                 const anon = await generateUniqueUsername(supabase);
                 profileResult = await createProfileServerSide(token, anon);
                 setProfile(profileResult || { anon_name: anon, name_locked: false });
+                setNeedsUsernameChoice(true);
               }
             } catch (err) {
               console.error("[Voxlo] Profile load in onAuthStateChange failed:", err);
@@ -362,6 +367,8 @@ export function useAuth() {
     setAuthError,
     authSuccess,
     setAuthSuccess,
+    needsUsernameChoice,
+    setNeedsUsernameChoice,
     handleAuth,
     handleForgotPassword,
   };

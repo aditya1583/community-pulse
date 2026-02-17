@@ -26,6 +26,7 @@ import LocalTab from "@/components/LocalTab";
 import StatusTab from "@/components/StatusTab";
 import PulseInput from "@/components/PulseInput";
 import PulseModal from "@/components/PulseModal";
+import UsernameRoller from "@/components/UsernameRoller";
 import TrafficContent from "@/components/TrafficContent";
 // LiveVibes removed (dead feature)
 import { DASHBOARD_TABS, type TabId, type Pulse } from "@/components/types";
@@ -145,6 +146,7 @@ export default function Home() {
     authLoading, setAuthLoading,
     authError, setAuthError,
     authSuccess, setAuthSuccess,
+    needsUsernameChoice, setNeedsUsernameChoice,
     handleAuth,
     handleForgotPassword,
   } = useAuth();
@@ -1219,6 +1221,34 @@ export default function Home() {
           </div>
         )}
 
+        {/* Username Roller Modal */}
+        {needsUsernameChoice && profile && !profileLoading && (
+          <UsernameRoller
+            modal
+            initialUsername={profile.anon_name}
+            onConfirm={async (username) => {
+              try {
+                const token = await authBridge.getAccessToken();
+                if (token) {
+                  const res = await fetch(getApiUrl("/api/auth/profile"), {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ anon_name: username, name_locked: true }),
+                  });
+                  if (res.ok) {
+                    const data = await res.json();
+                    setProfile(data.profile || { anon_name: username, name_locked: true });
+                  }
+                }
+              } catch (err) {
+                console.error("[Voxlo] Username update failed:", err);
+              }
+              setNeedsUsernameChoice(false);
+            }}
+            onCancel={() => setNeedsUsernameChoice(false)}
+          />
+        )}
+
         {/* Auth Modal */}
         {showAuthModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowAuthModal(false)}>
@@ -1961,6 +1991,8 @@ export default function Home() {
                     <StatusTab
                       userId={sessionUser?.id ?? null}
                       city={city}
+                      nameLocked={profile?.name_locked ?? true}
+                      onRerollName={() => setNeedsUsernameChoice(true)}
                       onSignOut={() => {
                         removePushToken().catch(() => {});
                         localStorage.clear();

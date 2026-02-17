@@ -110,3 +110,55 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ profile });
 }
+
+export async function PATCH(req: NextRequest) {
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return NextResponse.json({ error: "Auth required" }, { status: 401 });
+  }
+
+  const user = await getUserFromToken(authHeader.slice(7));
+  if (!user) {
+    return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+  }
+
+  const body = await req.json().catch(() => null);
+  const anonName = body?.anon_name;
+  const nameLocked = body?.name_locked;
+
+  if (!anonName || typeof anonName !== "string") {
+    return NextResponse.json({ error: "anon_name required" }, { status: 400 });
+  }
+
+  // Moderate the display name
+  const modResult = await runModerationPipeline(anonName, {
+    endpoint: "/api/auth/profile",
+    userId: user.id,
+  });
+  if (!modResult.allowed) {
+    return NextResponse.json(
+      { error: modResult.reason || "Display name not allowed" },
+      { status: modResult.serviceError ? 503 : 400 }
+    );
+  }
+
+  const supabase = getServiceClient();
+
+  const updateData: { anon_name: string; name_locked?: boolean } = { anon_name: anonName };
+  if (typeof nameLocked === "boolean") {
+    updateData.name_locked = nameLocked;
+  }
+
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .update(updateData)
+    .eq("id", user.id)
+    .select()
+    .single();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ profile });
+}

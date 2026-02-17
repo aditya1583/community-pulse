@@ -13,6 +13,8 @@ type StatusTabProps = {
   city?: string;
   className?: string;
   onSignOut?: () => void;
+  nameLocked?: boolean;
+  onRerollName?: () => void;
 };
 
 /**
@@ -23,7 +25,7 @@ type StatusTabProps = {
  * - Weekly leaderboard for the current city
  * - Badge showcase
  */
-export default function StatusTab({ userId, city, className = "", onSignOut }: StatusTabProps) {
+export default function StatusTab({ userId, city, className = "", onSignOut, nameLocked, onRerollName }: StatusTabProps) {
   const {
     username,
     level,
@@ -113,6 +115,8 @@ export default function StatusTab({ userId, city, className = "", onSignOut }: S
         stats={stats}
         badges={badges}
         loading={loading}
+        nameLocked={nameLocked}
+        onRerollName={onRerollName}
       />
 
       {/* Leaderboard */}
