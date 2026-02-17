@@ -149,8 +149,8 @@ export default function PrivacyPolicy() {
             <p>
               You may request the deletion of your account and all associated data at any time by contacting
               us at{" "}
-              <a href="mailto:info@voxlo.app" className="text-emerald-500 hover:text-emerald-400 underline">
-                info@voxlo.app
+              <a href="mailto:contact@voxlo.app" className="text-emerald-500 hover:text-emerald-400 underline">
+                contact@voxlo.app
               </a>
               . Upon receiving a verified deletion request, we will remove your personal data from our
               systems within 30 days, except where retention is required by law.
@@ -174,8 +174,8 @@ export default function PrivacyPolicy() {
               information from children under 13. If we become aware that a child under 13 has provided us
               with personal information, we will take steps to delete that information promptly. If you
               believe a child under 13 has provided us with personal data, please contact us at{" "}
-              <a href="mailto:info@voxlo.app" className="text-emerald-500 hover:text-emerald-400 underline">
-                info@voxlo.app
+              <a href="mailto:contact@voxlo.app" className="text-emerald-500 hover:text-emerald-400 underline">
+                contact@voxlo.app
               </a>
               .
             </p>
@@ -196,8 +196,8 @@ export default function PrivacyPolicy() {
             <p>
               If you have any questions or concerns about this Privacy Policy or our data practices, please
               contact us at:{" "}
-              <a href="mailto:info@voxlo.app" className="text-emerald-500 hover:text-emerald-400 underline">
-                info@voxlo.app
+              <a href="mailto:contact@voxlo.app" className="text-emerald-500 hover:text-emerald-400 underline">
+                contact@voxlo.app
               </a>
             </p>
           </section>

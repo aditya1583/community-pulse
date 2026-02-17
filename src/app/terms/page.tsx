@@ -86,8 +86,8 @@ export default function TermsOfService() {
               our guidelines may be <strong className="text-white">rejected before publication</strong> or removed
               after the fact. Moderation decisions are automated and may not always be perfect; if you
               believe your content was incorrectly rejected, contact us at{" "}
-              <a href="mailto:info@voxlo.app" className="text-emerald-500 hover:text-emerald-400 underline">
-                info@voxlo.app
+              <a href="mailto:contact@voxlo.app" className="text-emerald-500 hover:text-emerald-400 underline">
+                contact@voxlo.app
               </a>
               .
             </p>
@@ -192,8 +192,8 @@ export default function TermsOfService() {
             <h2 className="mb-3 text-xl font-semibold text-emerald-500">13. Contact Us</h2>
             <p>
               If you have any questions about these Terms of Service, please contact us at:{" "}
-              <a href="mailto:info@voxlo.app" className="text-emerald-500 hover:text-emerald-400 underline">
-                info@voxlo.app
+              <a href="mailto:contact@voxlo.app" className="text-emerald-500 hover:text-emerald-400 underline">
+                contact@voxlo.app
               </a>
             </p>
           </section>

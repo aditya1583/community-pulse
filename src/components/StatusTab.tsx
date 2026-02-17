@@ -181,6 +181,9 @@ export default function StatusTab({ userId, city, className = "", onSignOut, nam
         currentStreak={stats?.currentStreakDays ?? 0}
       />
 
+      {/* About & Support */}
+      <AboutSection />
+
       {/* Sign Out */}
       {onSignOut && (
         <button
@@ -190,6 +193,36 @@ export default function StatusTab({ userId, city, className = "", onSignOut, nam
           Sign out
         </button>
       )}
+    </div>
+  );
+}
+
+function AboutSection() {
+  return (
+    <div className="glass-card premium-border rounded-3xl overflow-hidden">
+      <div className="px-6 py-4 border-b border-white/5 flex items-center gap-3 bg-white/2">
+        <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-xl">ℹ️</div>
+        <div>
+          <h3 className="text-[11px] font-black text-white uppercase tracking-widest leading-none">About & Support</h3>
+          <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-1">Voxlo v1.2.0</p>
+        </div>
+      </div>
+      <div className="p-6 space-y-4">
+        <div className="text-center">
+          <span className="text-emerald-400 text-lg font-black tracking-tighter">VOXLO</span>
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Hyperlocal Intelligence</p>
+        </div>
+        <div className="flex flex-col items-center gap-2 text-[11px] font-bold">
+          <a href="mailto:contact@voxlo.app" className="text-emerald-400 hover:text-emerald-300 transition-colors">
+            contact@voxlo.app
+          </a>
+          <div className="flex items-center gap-4">
+            <a href="/privacy" className="text-slate-400 hover:text-white transition-colors">Privacy Policy</a>
+            <span className="text-slate-600">·</span>
+            <a href="/terms" className="text-slate-400 hover:text-white transition-colors">Terms of Service</a>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
