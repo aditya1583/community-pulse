@@ -143,9 +143,9 @@ export function usePostPulse(opts: UsePostPulseOptions) {
 
     const authorName = profile!.anon_name || username || "Anonymous";
 
+    setLoading(true);
     try {
       console.log("[Voxlo] Getting access token...");
-      setLoading(true);
       const accessToken = await authBridge.getAccessToken();
       console.log("[Voxlo] Access token:", accessToken ? `${accessToken.slice(0, 20)}...` : "NULL");
 
@@ -153,7 +153,6 @@ export function usePostPulse(opts: UsePostPulseOptions) {
         console.error("[Voxlo] No access token — showing sign-in");
         setErrorMsg("Sign in to post.");
         setShowAuthModal(true);
-        setLoading(false);
         return;
       }
 
@@ -168,6 +167,9 @@ export function usePostPulse(opts: UsePostPulseOptions) {
       };
       console.log("[Voxlo] Posting pulse:", { ...postBody, message: postBody.message.slice(0, 30) });
 
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+
       const res = await fetch(getApiUrl("/api/pulses"), {
         method: "POST",
         headers: {
@@ -175,8 +177,10 @@ export function usePostPulse(opts: UsePostPulseOptions) {
           Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify(postBody),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeout);
       console.log("[Voxlo] POST /api/pulses response:", res.status, res.statusText);
 
       type CreatePulseResponse = { pulse?: unknown; error?: string; code?: string };
@@ -198,19 +202,16 @@ export function usePostPulse(opts: UsePostPulseOptions) {
         if (data?.code === "MODERATION_FAILED") {
           setValidationError(msg);
           setShowValidationErrors(true);
-          setLoading(false);
           return;
         }
 
         if (res.status === 401) {
-          setErrorMsg("Sign in to post.");
+          setErrorMsg("Session expired. Please sign in again.");
           setShowAuthModal(true);
-          setLoading(false);
           return;
         }
 
         setErrorMsg(msg);
-        setLoading(false);
         return;
       }
 
@@ -256,7 +257,6 @@ export function usePostPulse(opts: UsePostPulseOptions) {
       setShowValidationErrors(false);
 
       setShowPulseModal(false);
-      setLoading(false);
 
       // Show success toast
       setPostSuccess(true);
@@ -285,9 +285,13 @@ export function usePostPulse(opts: UsePostPulseOptions) {
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       console.error("Unexpected error creating pulse:", errMsg, err);
-      setErrorMsg(`Network error: ${errMsg.slice(0, 80)}`);
+      if (errMsg.includes("abort")) {
+        setErrorMsg("Post timed out. Check your connection and try again.");
+      } else {
+        setErrorMsg(`Network error: ${errMsg.slice(0, 80)}`);
+      }
+    } finally {
       setLoading(false);
-      return;
     }
   };
 

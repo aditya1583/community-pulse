@@ -289,7 +289,14 @@ export default function PulseModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-4 px-6 py-5 border-t border-white/5 bg-slate-900/80 backdrop-blur-xl sticky bottom-0">
+        <div className="flex flex-col gap-2 px-6 py-5 border-t border-white/5 bg-slate-900/80 backdrop-blur-xl sticky bottom-0">
+          {loading && (
+            <div className="flex items-center gap-2 justify-center text-emerald-400 text-xs font-bold uppercase tracking-widest animate-pulse">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              Launching...
+            </div>
+          )}
+          <div className="flex items-center justify-end gap-4">
           <button
             onClick={onClose}
             className="px-6 py-3 text-[11px] font-black text-slate-500 hover:text-white uppercase tracking-widest transition-colors duration-300"
@@ -299,12 +306,14 @@ export default function PulseModal({
           <button
             onClick={handleSubmit}
             disabled={!identityReady || loading}
-            className={`group inline-flex items-center gap-3 px-8 py-4 font-black text-[12px] uppercase tracking-[0.2em] rounded-2xl shadow-2xl transition-all duration-500 ${isPostEnabled
+            className={`group inline-flex items-center gap-3 px-8 py-4 font-black text-[12px] uppercase tracking-[0.2em] rounded-2xl shadow-2xl transition-all duration-500 ${loading
+              ? "bg-emerald-500/50 text-slate-950 animate-pulse"
+              : isPostEnabled
               ? "bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 text-slate-950 shadow-emerald-500/20 hover:scale-[1.02] active:scale-95"
               : "bg-slate-800 text-slate-600 cursor-not-allowed opacity-50 grayscale"
               }`}
           >
-            <span>{identityReady ? (isPostEnabled ? "Launch Pulse" : "Complete Pulse") : "Syncing..."}</span>
+            <span>{loading ? "Posting..." : identityReady ? (isPostEnabled ? "Launch Pulse" : "Complete Pulse") : "Syncing..."}</span>
             <svg
               className={`w-4 h-4 transition-transform duration-500 ${isPostEnabled ? "group-hover:translate-x-1" : ""}`}
               fill="none"
@@ -315,6 +324,7 @@ export default function PulseModal({
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
           </button>
+          </div>
         </div>
       </div>
     </div>
