@@ -82,23 +82,18 @@ function isWeatherDataReal(weather: WeatherData): boolean {
  * These either use real API data or ask generic community questions.
  */
 export const DATA_GROUNDED_ENGAGEMENT_TYPES = new Set([
-  // Uses real weather data from Open-Meteo
-  "prediction",         // XP predictions (uses real weather/traffic data)
-  "weather_alert",      // Forecast-based alerts (uses real forecast)
+  // FACTS ONLY — real data, no engagement bait, no fluff
+  "weather_alert",      // Real forecast data from Open-Meteo
+  "route_pulse",        // Real traffic congestion from TomTom
+  "school_alert",       // Real school dismissal times + traffic
 
-  // Uses real traffic data from TomTom
-  "route_pulse",        // Traffic + retail (uses real congestion data)
-  "school_alert",       // School dismissal traffic (time-based, real roads)
-
-  // Uses real market data from USDA/OSM
-  "farmers_market",     // Real market data with real addresses
-
-  // REMOVED: confession_booth, neighbor_challenge, would_you_rather, this_or_that, civic_alert
-  // These are engagement bait with zero informational value
-
-  // Polls that ask questions without claiming specific facts
-  "poll",               // "Best tacos in {city}?" - asks, doesn't claim
-  "recommendation",     // "Where's good for lunch?" - asks, doesn't claim
+  // DISABLED — all engagement bait, polls, predictions, recommendations:
+  // "prediction"       — crystal ball gimmick, same stale format
+  // "poll"             — "Best tacos?" repeated endlessly
+  // "recommendation"   — generic local recs with no real data
+  // "farmers_market"   — fabricated market info
+  // "civic_alert"      — too vague without real agenda data
+  // "confession_booth", "neighbor_challenge", "would_you_rather", "this_or_that"
 ]);
 
 /**

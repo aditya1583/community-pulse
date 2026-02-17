@@ -823,37 +823,13 @@ export function analyzeForEngagement(ctx: SituationContext): EngagementDecision 
     if (minutesToDismissal >= 10 && minutesToDismissal <= 30) return { shouldPost: true, engagementType: "school_alert", reason: "School dismissal approaching" };
   }
 
-  // CIVIC ALERTS (weekday evenings)
-  if (time.isWeekday && hour >= 16 && hour <= 19 && time.dayOfWeek >= 2 && time.dayOfWeek <= 4 && Math.random() < 0.25) {
-    return { shouldPost: true, engagementType: "civic_alert", reason: "Weekday evening civic meeting window" };
-  }
-
-  // PREDICTIONS
-  if ((hour >= 7 && hour <= 10) || (hour >= 18 && hour <= 21)) {
-    if (Math.random() < 0.3) return { shouldPost: true, engagementType: "prediction", reason: "Prime prediction window" };
-  } else if (Math.random() < 0.15) {
-    return { shouldPost: true, engagementType: "prediction", reason: "Prediction post" };
-  }
-
-  // CONFESSION BOOTH
-  if (Math.random() < 0.18) return { shouldPost: true, engagementType: "confession_booth", reason: "Confession booth" };
-
-  // NEIGHBOR CHALLENGES
-  if (Math.random() < 0.2) return { shouldPost: true, engagementType: "neighbor_challenge", reason: "Challenge CTA" };
-
-  // WOULD YOU RATHER
-  if (Math.random() < 0.2) return { shouldPost: true, engagementType: "would_you_rather", reason: "Would you rather" };
-
-  // THIS OR THAT
-  if (Math.random() < 0.25) return { shouldPost: true, engagementType: "this_or_that", reason: "This or That poll" };
-
-  // POLLS (meal times)
-  if (((hour >= 7 && hour <= 10) || (hour >= 11 && hour <= 14) || (hour >= 17 && hour <= 20)) && Math.random() < 0.18) {
-    return { shouldPost: true, engagementType: "poll", reason: "Meal time food poll" };
-  }
-
-  // RECOMMENDATION
-  if (Math.random() < 0.12) return { shouldPost: true, engagementType: "recommendation", reason: "Community recommendation" };
+  // ---- ALL FLUFF DISABLED ----
+  // Only weather_alert, route_pulse, school_alert survive the isAllowed gate above.
+  // Everything below is engagement bait — disabled until we have real innovative formats.
+  //
+  // civic_alert, prediction, confession_booth, neighbor_challenge,
+  // would_you_rather, this_or_that, poll, recommendation, farmers_market
+  // — ALL CUT. Facts only.
 
   return { shouldPost: false, engagementType: null, reason: "No engagement post needed" };
 }
