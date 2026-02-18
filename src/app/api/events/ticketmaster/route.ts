@@ -201,7 +201,7 @@ type CacheEntry = {
 // - Attribution required in UI ("Event data provided by Ticketmaster")
 //
 const eventCache = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes - compliant with ToS (< 24h)
+const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes - compliant with ToS (< 24h)
 
 function getCacheKey(params: {
   lat?: number;
@@ -553,17 +553,31 @@ export async function GET(req: NextRequest) {
       signal: AbortSignal.timeout(6000),
     });
 
-    // Handle rate limiting
+    // Handle rate limiting — retry once after 2s
     if (response.status === 429) {
-      console.warn("Ticketmaster API rate limited");
-      return NextResponse.json(
-        {
-          error: "Events service is busy. Please try again later.",
-          events: [],
-          rateLimited: true,
-        },
-        { status: 200 } // Return 200 for graceful degradation
-      );
+      console.warn("Ticketmaster API rate limited, retrying in 2s...");
+      await new Promise(r => setTimeout(r, 2000));
+      const retryResp = await fetch(url, {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(8000),
+      }).catch(() => null);
+      if (!retryResp || !retryResp.ok) {
+        console.warn("Ticketmaster API still unavailable after retry");
+        return NextResponse.json(
+          {
+            error: "Events service is busy. Please try again later.",
+            events: [],
+            rateLimited: true,
+          },
+          { status: 200 }
+        );
+      }
+      // Retry succeeded — continue processing with retry response
+      const retryData = await retryResp.json();
+      const retryEvents: TicketmasterEvent[] = (retryData?._embedded?.events || []).slice(0, 20);
+      const cacheKey = getCacheKey({ lat: parsedLat!, lng: parsedLng!, radius: parsedRadius });
+      setCachedEntry(cacheKey, retryEvents);
+      return NextResponse.json({ events: retryEvents, cached: false, total: retryData?.page?.totalElements }, { status: 200 });
     }
 
     if (!response.ok) {
