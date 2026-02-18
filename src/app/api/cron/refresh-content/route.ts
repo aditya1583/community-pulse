@@ -18,6 +18,94 @@ import {
 
 export const dynamic = "force-dynamic";
 // Vercel Pro: set to 60. Hobby: this is ignored (hard 10s limit).
+
+// ============================================================================
+// Event Dedup — Extract semantic fingerprint and match against recent posts
+// ============================================================================
+
+/** Stop words to strip when building fingerprint */
+const STOP_WORDS = new Set([
+  "the", "a", "an", "at", "in", "on", "for", "of", "to", "and", "or", "is",
+  "its", "gonna", "be", "been", "who", "else", "going", "this", "good", "get",
+  "lets", "let", "see", "yall", "there", "finally", "something", "fun",
+  "happening", "locally", "anyone", "need", "plus", "one", "waiting", "loud",
+  "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
+  "suites", "vs", "v", "from", "with", "how", "are", "you", "watching",
+]);
+
+/**
+ * Extract a normalized fingerprint from a post message.
+ * Keeps: proper nouns (capitalized words), venue names, dates.
+ * Returns sorted unique key words for order-independent matching.
+ */
+function extractEventFingerprint(message: string): string[] {
+  // Strip emoji and special chars, normalize whitespace
+  const clean = message
+    .replace(/[\u{1F000}-\u{1FFFF}]/gu, "")
+    .replace(/[^\w\s'-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+  const words = clean.split(" ").filter((w) => w.length > 1 && !STOP_WORDS.has(w));
+
+  // Extract date pattern (e.g., "20" from "feb 20")
+  const dateMatch = message.match(/(?:feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+(\d{1,2})/i);
+  if (dateMatch) words.push(`date${dateMatch[1]}`);
+
+  return [...new Set(words)].sort();
+}
+
+/**
+ * Calculate word overlap ratio between two fingerprints.
+ * Returns 0-1 where 1 = identical.
+ */
+function fingerprintOverlap(a: string[], b: string[]): number {
+  if (a.length === 0 || b.length === 0) return 0;
+  const setA = new Set(a);
+  const setB = new Set(b);
+  const intersection = [...setA].filter((w) => setB.has(w)).length;
+  const smaller = Math.min(setA.size, setB.size);
+  return intersection / smaller;
+}
+
+/**
+ * Check if a post is a duplicate of any recent bot post.
+ * Uses semantic fingerprint matching with 80% overlap threshold.
+ */
+async function checkEventDuplicate(
+  supabase: ReturnType<typeof createClient>,
+  city: string,
+  message: string,
+  tag: string
+): Promise<boolean> {
+  const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+
+  // Fetch all recent bot posts for this city with the same tag
+  const { data: recentPosts } = await supabase
+    .from("pulses")
+    .select("id, message")
+    .eq("city", city)
+    .eq("is_bot", true)
+    .eq("tag", tag)
+    .gte("created_at", twoDaysAgo);
+
+  if (!recentPosts || recentPosts.length === 0) return false;
+
+  const newFP = extractEventFingerprint(message);
+  if (newFP.length < 3) return false; // too short to fingerprint
+
+  for (const post of recentPosts) {
+    const existingFP = extractEventFingerprint(post.message);
+    const overlap = fingerprintOverlap(newFP, existingFP);
+    if (overlap >= 0.8) {
+      console.log(`[Dedup] 🚫 ${overlap.toFixed(2)} overlap with post ${post.id}: "${post.message.slice(0, 50)}..."`);
+      return true;
+    }
+  }
+
+  return false;
+}
 export const maxDuration = 60;
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -334,23 +422,15 @@ export async function POST(request: NextRequest) {
       });
 
       if (result.posted && result.post) {
-        // DB-level dedup: skip if a similar bot post exists in the last 24h
-        // Extract first 60 chars of message as a fingerprint (covers event name + venue)
-        const fingerprint = result.post.message.replace(/[^\w\s]/g, "").slice(0, 60).trim();
-        if (fingerprint.length > 10) {
-          const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-          const { data: existing } = await supabase
-            .from("pulses")
-            .select("id")
-            .eq("city", targetCity)
-            .eq("is_bot", true)
-            .gte("created_at", oneDayAgo)
-            .ilike("message", `%${fingerprint.slice(0, 40)}%`)
-            .limit(1);
-          if (existing && existing.length > 0) {
-            console.log(`[RefreshContent] Skipping duplicate: "${fingerprint.slice(0, 40)}..."`);
-            continue;
-          }
+        // DB-level dedup: extract key nouns from the message and check against
+        // ALL bot posts from the last 48 hours. This catches the same event
+        // posted with different template wording.
+        const isDuplicate = await checkEventDuplicate(
+          supabase, targetCity, result.post.message, result.post.tag
+        );
+        if (isDuplicate) {
+          console.log(`[RefreshContent] Skipping duplicate event post`);
+          continue;
         }
 
         const expirationHours = getExpirationHours(result.post.tag);
