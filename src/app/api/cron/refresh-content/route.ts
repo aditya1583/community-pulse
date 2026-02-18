@@ -334,6 +334,25 @@ export async function POST(request: NextRequest) {
       });
 
       if (result.posted && result.post) {
+        // DB-level dedup: skip if a similar bot post exists in the last 24h
+        // Extract first 60 chars of message as a fingerprint (covers event name + venue)
+        const fingerprint = result.post.message.replace(/[^\w\s]/g, "").slice(0, 60).trim();
+        if (fingerprint.length > 10) {
+          const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+          const { data: existing } = await supabase
+            .from("pulses")
+            .select("id")
+            .eq("city", targetCity)
+            .eq("is_bot", true)
+            .gte("created_at", oneDayAgo)
+            .ilike("message", `%${fingerprint.slice(0, 40)}%`)
+            .limit(1);
+          if (existing && existing.length > 0) {
+            console.log(`[RefreshContent] Skipping duplicate: "${fingerprint.slice(0, 40)}..."`);
+            continue;
+          }
+        }
+
         const expirationHours = getExpirationHours(result.post.tag);
         const { error } = await supabase.from("pulses").insert({
           city: targetCity,
