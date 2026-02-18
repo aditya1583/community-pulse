@@ -67,28 +67,28 @@ function getBotName(_tag: string, city: string): string {
   return `${citySlug} Voxlo AI 🤖`;
 }
 
-// Event-based post templates - THE PROMOTER personality (excited, hype!)
+// Event-based post templates - FACTS ONLY, no engagement bait
 // In-radius events (within 10 miles) - LOCAL EVENTS with date
 const EVENT_TEMPLATES = [
-  { mood: "🤩", template: (name: string, venue: string, date: string) => `🎟️ ${name} on ${date} @ ${venue}! Who else is going?! This is gonna be GOOD 🔥` },
-  { mood: "🎉", template: (name: string, venue: string, date: string) => `📅 ${date}: ${name} at ${venue}! Finally something fun happening locally! Anyone need a plus one?` },
-  { mood: "🤩", template: (name: string, venue: string, date: string) => `Just found out about ${name} at ${venue} on ${date} - why didn't anyone tell me sooner?! Who's in?` },
-  { mood: "🎉", template: (name: string, venue: string, date: string) => `🎫 ${name} @ ${venue} - ${date}! Been waiting for this. See y'all there! 🙌` },
+  { mood: "📅", template: (name: string, venue: string, date: string) => `📅 ${date}: ${name} at ${venue}.` },
+  { mood: "📅", template: (name: string, venue: string, date: string) => `🎟️ ${name} — ${date} @ ${venue}.` },
+  { mood: "📅", template: (name: string, venue: string, date: string) => `Upcoming: ${name} on ${date} at ${venue}.` },
+  { mood: "📅", template: (name: string, venue: string, date: string) => `${date}: ${name} @ ${venue}.` },
 ];
 
 // Out-of-radius events (10-50 miles) - include date AND distance callout
 const DISTANT_EVENT_TEMPLATES = [
-  { mood: "🤩", template: (name: string, venue: string, date: string, distance: string) => `🎟️ ${name} on ${date} @ ${venue} (${distance} away) - might be worth the drive! Anyone going? 🚗` },
-  { mood: "🎉", template: (name: string, venue: string, date: string, distance: string) => `📅 ${date}: ${name} at ${venue} (${distance} away). Road trip anyone?` },
-  { mood: "🤩", template: (name: string, venue: string, date: string, distance: string) => `${name} at ${venue} on ${date} is ${distance} away but looks amazing! Who's down to make the trip?` },
-  { mood: "🎉", template: (name: string, venue: string, date: string, distance: string) => `🎫 ${date}: ${name} @ ${venue} - ${distance} drive but could be worth it! 🎶` },
+  { mood: "📅", template: (name: string, venue: string, date: string, distance: string) => `📅 ${date}: ${name} at ${venue} (${distance} away).` },
+  { mood: "📅", template: (name: string, venue: string, date: string, distance: string) => `🎟️ ${name} — ${date} @ ${venue}, ${distance} away.` },
+  { mood: "📅", template: (name: string, venue: string, date: string, distance: string) => `Upcoming: ${name} on ${date} at ${venue} (${distance}).` },
+  { mood: "📅", template: (name: string, venue: string, date: string, distance: string) => `${date}: ${name} @ ${venue} — ${distance} away.` },
 ];
 
-// Farmers market templates - ask for recommendations
+// Farmers market templates - facts only
 const MARKET_TEMPLATES = [
-  { mood: "🤩", template: (name: string, day: string) => `${name} on ${day} - what vendors should I check out first?` },
-  { mood: "😊", template: (name: string, day: string) => `Anyone know the best time to hit ${name}? Want to beat the crowds!` },
-  { mood: "☀️", template: (name: string, day: string) => `${name} every ${day} - favorite thing to buy there? I'm new to the area.` },
+  { mood: "📍", template: (name: string, day: string) => `${name} is open ${day}.` },
+  { mood: "📍", template: (name: string, day: string) => `${name} — every ${day}.` },
+  { mood: "📍", template: (name: string, day: string) => `📍 ${name} runs ${day}.` },
 ];
 
 // Weather-based templates - THE HELPER personality (warnings, tips, helpful advice)
@@ -97,86 +97,83 @@ const WEATHER_TEMPLATES: Record<string, { mood: string; templates: string[] }> =
   clear: {
     mood: "☀️",
     templates: [
-      "PSA: Beautiful weather today! Great day to get outside. Don't forget sunscreen if you're out long! ☀️",
-      "Heads up: Clear skies and nice conditions today. If you've been putting off outdoor errands, today's the day!",
-      "Tip: Clear skies all day. Great time to check those outdoor tasks off your list!",
+      "☀️ Clear skies today.",
+      "Weather: Clear and sunny.",
+      "Clear skies, no precipitation expected.",
     ],
   },
   clouds: {
     mood: "☁️",
     templates: [
-      "FYI: Overcast today - good for outdoor activities without the harsh sun. Layer up!",
-      "Weather update: Cloudy skies but no rain expected. Good day for errands.",
-      "Tip: Gray skies today but staying dry. Not bad for getting things done! ☁️",
+      "☁️ Overcast, no rain expected.",
+      "Weather: Cloudy skies, staying dry.",
+      "Cloudy today, no precipitation in the forecast.",
     ],
   },
   clouds_cold: {
     mood: "🥶",
     templates: [
-      "☁️ Overcast and chilly today - grab a jacket if you're heading out!",
-      "Weather check: Cloudy and cold. Hot coffee sounds perfect right now. ☕",
-      "FYI: Gray skies and cool temps today. Stay warm out there! 🧥",
+      "☁️ Overcast and cold today.",
+      "Weather: Cloudy and chilly.",
+      "Cold and overcast conditions today.",
     ],
   },
   rain: {
     mood: "🌧️",
     templates: [
-      "🌧️ Rain alert! If you're driving, remember to slow down. Some streets flood around here!",
-      "Heads up: Getting wet out there! Don't forget your umbrella if you're heading out. ☔",
-      "FYI: Rainy day - perfect excuse to support a local coffee shop. Stay dry everyone! 🌧️",
+      "🌧️ Rain in the area.",
+      "Weather: Rain expected. Some streets may flood.",
+      "Rainy conditions today.",
     ],
   },
   cold: {
     mood: "🥶",
     templates: [
-      "Brrr! ❄️ Bundle up if you're heading out! Don't forget to check on elderly neighbors too.",
-      "Cold weather alert: Make sure pets aren't left outside too long! Stay warm everyone.",
-      "FYI: Chilly one today. Hot drinks at local cafes are calling! Any favorites to recommend? ☕",
+      "❄️ Cold weather today.",
+      "Weather: Below-average temperatures today.",
+      "Cold conditions expected today.",
     ],
   },
   hot: {
     mood: "🥵",
     templates: [
-      "🔥 Heat advisory vibes! Stay hydrated and check on neighbors who might not have AC.",
-      "Hot weather tip: Avoid being outside 12-3pm if possible. Take care of yourselves!",
-      "PSA: It's a scorcher! Make sure to drink water and give pets shade. Stay cool! 💧",
+      "🔥 High heat today. Stay hydrated.",
+      "Weather: Above-average temperatures. Limit outdoor activity 12-3pm.",
+      "Hot conditions today.",
     ],
   },
 };
 
-// Traffic time-based templates - THE COMPLAINER personality (venting, relatable frustration)
+// Traffic time-based templates - facts only
 const TRAFFIC_TEMPLATES: Record<string, { mood: string; templates: string[] }> = {
   morning_rush: {
-    mood: "😤",
+    mood: "🚗",
     templates: [
-      "Ugh, already backed up on the main road. WHY does everyone leave at the same time?! 🙄",
-      "This morning commute is killing me. There's gotta be a better route... anyone?",
-      "Stuck behind the slowest driver ever. Of course. How's everyone else's commute going?",
+      "🚗 Morning rush: Heavy congestion on main roads.",
+      "Morning commute: Expect delays on major routes.",
+      "🚗 Rush hour traffic — congestion building on main corridors.",
     ],
   },
   evening_rush: {
-    mood: "😤",
+    mood: "🚗",
     templates: [
-      "5pm traffic is NO JOKE today. I've moved 2 blocks in 15 minutes. Send help. 😩",
-      "Why is there ALWAYS an accident right at rush hour?! Anyone know what happened?",
-      "Bumper to bumper on every single road. This city needs better traffic planning fr fr",
+      "🚗 Evening rush: Heavy traffic on main roads.",
+      "Evening commute: Expect delays through 6:30 PM.",
+      "🚗 Rush hour congestion on major routes.",
     ],
   },
   light: {
-    mood: "😌",
+    mood: "🟢",
     templates: [
-      "Finally! Roads are actually clear for once. Quick, go run your errands NOW before it gets bad again!",
-      "Wow traffic is weirdly light right now. Is there a holiday I don't know about? 🤔",
-      "Smooth driving today! Enjoy it while it lasts, y'all know it won't stay this way 😅",
+      "🟢 Traffic is light. Roads are clear.",
+      "Traffic update: Light flow on all major roads.",
+      "🟢 Roads clear, no significant delays.",
     ],
   },
 };
 
-// General local interest templates - THE HELPER personality
-const LOCAL_TEMPLATES = [
-  { mood: "😊", message: "Tip: Support local businesses this week! Drop your favorite small shops below 👇" },
-  { mood: "😊", message: "PSA: Friendly reminder to keep an eye out for package thieves this time of year! Stay safe neighbors." },
-  { mood: "☀️", message: "FYI: If anyone's new to the area, feel free to ask questions! We're a helpful bunch around here 🙂" },
+// General local interest templates - DISABLED (no facts-backed local content yet)
+const LOCAL_TEMPLATES: { mood: string; message: string }[] = [
 ];
 
 type EventData = {

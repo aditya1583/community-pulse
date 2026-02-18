@@ -287,8 +287,14 @@ const PulseInput = forwardRef<HTMLTextAreaElement, PulseInputProps>(
             </div>
           )}
 
+          {/* Community guidelines note */}
+          <p className="text-[10px] text-slate-600 pt-2 leading-relaxed">
+            Keep it local, keep it real.{" "}
+            <a href="/terms" className="text-emerald-600 underline underline-offset-2">Community Guidelines</a>
+          </p>
+
           {/* Submit row */}
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center justify-between pt-1">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">

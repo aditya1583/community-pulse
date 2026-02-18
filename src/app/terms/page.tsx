@@ -42,21 +42,40 @@ export default function TermsOfService() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-emerald-500">3. Accounts &amp; Registration</h2>
-            <h3 className="mb-2 mt-4 text-lg font-medium text-white">3.1 Anonymous Accounts</h3>
+            <h2 className="mb-3 text-xl font-semibold text-emerald-500">3. Content Disclaimer</h2>
+            <p className="mb-4">
+              Voxlo is a community forum — a place for neighbors to share what&apos;s happening around them.
+              <strong className="text-white"> Nothing on Voxlo represents the views, opinions, or endorsements of Voxlo, its creators, or its operators.</strong>
+            </p>
+            <ul className="list-disc space-y-2 pl-6">
+              <li><strong className="text-white">User posts</strong> are created entirely by community members. We don&apos;t edit, curate, or endorse them.</li>
+              <li><strong className="text-white">AI-generated content</strong> (weather, traffic, events) is pulled from third-party data sources and presented for informational purposes only. It may be inaccurate, outdated, or incomplete.</li>
+              <li><strong className="text-white">Nothing here is professional advice.</strong> Don&apos;t rely on Voxlo for emergency information, medical guidance, legal advice, or any decisions where accuracy is critical.</li>
+            </ul>
+            <p className="mt-4">
+              Think of Voxlo like a neighborhood bulletin board — useful, fun, but not official. Use your own judgment.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="mb-3 text-xl font-semibold text-emerald-500">4. Accounts &amp; Registration</h2>
+            <p className="mb-4">
+              <strong className="text-white">You must be at least 13 years old to use Voxlo.</strong> By creating an account, you confirm that you meet this age requirement.
+            </p>
+            <h3 className="mb-2 mt-4 text-lg font-medium text-white">4.1 Anonymous Accounts</h3>
             <p>
               Voxlo assigns each user an auto-generated anonymous username. You are not required to provide
               your real name. Your email address is collected solely for authentication purposes.
             </p>
 
-            <h3 className="mb-2 mt-4 text-lg font-medium text-white">3.2 Username Changes</h3>
+            <h3 className="mb-2 mt-4 text-lg font-medium text-white">4.2 Username Changes</h3>
             <p>
               Username changes are limited in frequency to prevent abuse. All usernames are subject to an
               automated profanity filter. Usernames that contain offensive, misleading, or inappropriate
               language may be rejected or reset.
             </p>
 
-            <h3 className="mb-2 mt-4 text-lg font-medium text-white">3.3 Account Security</h3>
+            <h3 className="mb-2 mt-4 text-lg font-medium text-white">4.3 Account Security</h3>
             <p>
               You are responsible for maintaining the security of your account credentials. You agree to
               notify us immediately of any unauthorized use of your account.
@@ -64,8 +83,8 @@ export default function TermsOfService() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-emerald-500">4. User-Generated Content</h2>
-            <h3 className="mb-2 mt-4 text-lg font-medium text-white">4.1 Ownership</h3>
+            <h2 className="mb-3 text-xl font-semibold text-emerald-500">5. User-Generated Content</h2>
+            <h3 className="mb-2 mt-4 text-lg font-medium text-white">5.1 Ownership</h3>
             <p>
               You retain ownership of all content you create and post on Voxlo. By posting content, you
               grant Voxlo a worldwide, non-exclusive, royalty-free, transferable license to use, display,
@@ -73,13 +92,13 @@ export default function TermsOfService() {
               promoting the Service.
             </p>
 
-            <h3 className="mb-2 mt-4 text-lg font-medium text-white">4.2 Public Visibility</h3>
+            <h3 className="mb-2 mt-4 text-lg font-medium text-white">5.2 Public Visibility</h3>
             <p>
               All pulses (user posts) are public within the Voxlo app and visible to other users in the
               relevant geographic area. Do not post content you wish to keep private.
             </p>
 
-            <h3 className="mb-2 mt-4 text-lg font-medium text-white">4.3 Content Moderation</h3>
+            <h3 className="mb-2 mt-4 text-lg font-medium text-white">5.3 Content Moderation</h3>
             <p>
               All user-generated content is subject to AI-powered content moderation. Posts are reviewed
               automatically across 10 content categories to enforce community standards. Posts that violate
@@ -94,7 +113,7 @@ export default function TermsOfService() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-emerald-500">5. Prohibited Content &amp; Conduct</h2>
+            <h2 className="mb-3 text-xl font-semibold text-emerald-500">6. Prohibited Content &amp; Conduct</h2>
             <p className="mb-4">You agree not to use the Service to post, transmit, or facilitate any content that:</p>
             <ul className="list-disc space-y-2 pl-6">
               <li>Constitutes <strong className="text-white">hate speech</strong> or promotes discrimination based on race, ethnicity, gender, religion, sexual orientation, disability, or any other protected characteristic</li>
@@ -111,7 +130,7 @@ export default function TermsOfService() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-emerald-500">6. Termination</h2>
+            <h2 className="mb-3 text-xl font-semibold text-emerald-500">7. Termination</h2>
             <p>
               We reserve the right to suspend or terminate your account, without prior notice, if we
               reasonably believe you have violated these Terms. This includes, but is not limited to,
@@ -126,7 +145,7 @@ export default function TermsOfService() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-emerald-500">7. Intellectual Property</h2>
+            <h2 className="mb-3 text-xl font-semibold text-emerald-500">8. Intellectual Property</h2>
             <p>
               The Voxlo name, logo, design, and all original content, features, and functionality of the
               Service are owned by Voxlo and are protected by copyright, trademark, and other intellectual
@@ -136,7 +155,7 @@ export default function TermsOfService() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-emerald-500">8. Disclaimer of Warranties</h2>
+            <h2 className="mb-3 text-xl font-semibold text-emerald-500">9. Disclaimer of Warranties</h2>
             <p>
               The Service is provided on an <strong className="text-white">&quot;AS IS&quot;</strong> and{" "}
               <strong className="text-white">&quot;AS AVAILABLE&quot;</strong> basis, without warranties of any kind,
@@ -148,7 +167,7 @@ export default function TermsOfService() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-emerald-500">9. Limitation of Liability</h2>
+            <h2 className="mb-3 text-xl font-semibold text-emerald-500">10. Limitation of Liability</h2>
             <p>
               To the fullest extent permitted by applicable law, Voxlo and its operators, employees, and
               affiliates shall not be liable for any indirect, incidental, special, consequential, or
@@ -159,7 +178,7 @@ export default function TermsOfService() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-emerald-500">10. Indemnification</h2>
+            <h2 className="mb-3 text-xl font-semibold text-emerald-500">11. Indemnification</h2>
             <p>
               You agree to indemnify, defend, and hold harmless Voxlo and its operators from and against any
               claims, liabilities, damages, losses, and expenses (including reasonable attorney&apos;s fees)
@@ -169,7 +188,7 @@ export default function TermsOfService() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-emerald-500">11. Governing Law</h2>
+            <h2 className="mb-3 text-xl font-semibold text-emerald-500">12. Governing Law</h2>
             <p>
               These Terms shall be governed by and construed in accordance with the laws of the{" "}
               <strong className="text-white">State of Texas</strong>, United States, without regard to its conflict
@@ -180,7 +199,7 @@ export default function TermsOfService() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-emerald-500">12. Severability</h2>
+            <h2 className="mb-3 text-xl font-semibold text-emerald-500">13. Severability</h2>
             <p>
               If any provision of these Terms is found to be unenforceable or invalid by a court of
               competent jurisdiction, that provision shall be limited or eliminated to the minimum extent
@@ -189,7 +208,7 @@ export default function TermsOfService() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-emerald-500">13. Contact Us</h2>
+            <h2 className="mb-3 text-xl font-semibold text-emerald-500">14. Contact Us</h2>
             <p>
               If you have any questions about these Terms of Service, please contact us at:{" "}
               <a href="mailto:contact@voxlo.app" className="text-emerald-500 hover:text-emerald-400 underline">
@@ -200,7 +219,7 @@ export default function TermsOfService() {
         </div>
 
         <div className="mt-16 border-t border-slate-800 pt-8 text-center text-sm text-slate-600">
-          © 2026 Voxlo. All rights reserved.
+          © 2026 rinirvtech LLC. All rights reserved. Voxlo is a product of rinirvtech LLC.
         </div>
       </div>
     </main>
