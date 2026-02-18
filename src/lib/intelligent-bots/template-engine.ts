@@ -288,28 +288,16 @@ function getRandomFact(city: CityConfig, category: FactCategory): string | null 
  */
 function maybeInjectFunFact(
   message: string,
-  city: CityConfig,
-  postType: PostType,
-  forceInject: boolean = false
+  _city: CityConfig,
+  _postType: PostType,
+  _forceInject: boolean = false
 ): string {
-  // NEVER inject trivia into traffic posts — traffic = data only
-  if (postType === "Traffic") {
-    return message;
-  }
+  // DISABLED: Facts-only policy — no trivia, fun facts, or BTW injections
+  return message;
 
-  // Check injection rate (unless forced)
-  if (!forceInject && Math.random() > FUN_FACT_INJECTION_RATE) {
-    return message;
-  }
-
-  const category = getFactCategoryForPostType(postType);
-  const fact = getRandomFact(city, category);
-
-  if (!fact) return message;
-
-  // Format the fun fact nicely
+  // Dead code below kept for reference
   const factPrefixes = ["💡 Fun fact:", "🤓 Did you know?", "📚 Trivia:", "✨ BTW:"];
-  const prefix = factPrefixes[Math.floor(Math.random() * factPrefixes.length)];
+  const prefix = factPrefixes[0];
 
   return `${message}\n\n${prefix} ${fact}`;
 }

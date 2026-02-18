@@ -469,39 +469,30 @@ export async function POST(req: NextRequest) {
         // FILTER DUPLICATES: Check against existing messages
         const existingMessages = new Set((existingPulses || []).map(p => p.message?.toLowerCase() || ""));
 
+        // Fingerprint dedup helper (same logic as refresh-content)
+        function extractFP(msg: string): string[] {
+          const cleaned = msg.replace(/[^\w\s]/g, " ").toLowerCase();
+          const stops = new Set(["the","a","an","at","in","on","is","and","or","for","to","of","its","was","has","have","been","are","this","that","with","from","your","but","not","all","can","had","her","his","how","its","may","new","now","old","our","own","say","she","too","use"]);
+          return [...new Set(cleaned.split(/\s+/).filter(w => w.length > 2 && !stops.has(w)))].sort();
+        }
+        function fpOverlap(a: string[], b: string[]): number {
+          if (a.length === 0 || b.length === 0) return 0;
+          const setB = new Set(b);
+          const inter = a.filter(w => setB.has(w)).length;
+          return inter / Math.min(a.length, b.length);
+        }
+
         const uniquePosts = result.posts.filter(post => {
           const postMsg = post.message.toLowerCase();
-          const postTag = post.tag;
+          const postFP = extractFP(post.message);
 
-          // Check for exact match or significant overlap
+          // Fingerprint-based dedup (80% overlap = duplicate)
           let isDuplicate = Array.from(existingMessages).some(existing => {
-            const existingLower = existing.toLowerCase();
-            // 1. Strict containment or overlap
-            if (existingLower.includes(postMsg) || postMsg.includes(existingLower)) return true;
-
-            // 2. Significant prefix/suffix match (20 chars)
-            if (existingLower.length > 20 && postMsg.length > 20) {
-              if (existingLower.slice(0, 20) === postMsg.slice(0, 20)) return true;
-            }
-
-            // 3. SPECIAL CASE: Weather alerts (prevent multiple alerts for same condition)
-            if (postTag === "Weather") {
-              const keywords = ["snow", "freeze", "heat", "storm", "rain", "ice"];
-              for (const kw of keywords) {
-                if (postMsg.includes(kw) && existingLower.includes(kw)) {
-                  console.log(`[Auto-Seed] Skipping redundant weather alert for "${kw}"`);
-                  return true;
-                }
-              }
-            }
-
-            // 4. SPECIAL CASE: Events (prevent multiple alerts for same event name)
-            if (postTag === "Events") {
-              // Extract potential event names (words over 4 chars starting with capital)
-              // Or just check if significant part of the message matches
-              if (existingLower.includes(postMsg.slice(0, 15))) return true;
-            }
-
+            // Quick exact/containment check
+            if (existing.includes(postMsg) || postMsg.includes(existing)) return true;
+            // Fingerprint overlap
+            const existFP = extractFP(existing);
+            if (fpOverlap(postFP, existFP) >= 0.7) return true;
             return false;
           });
 

@@ -81,13 +81,12 @@ async function checkEventDuplicate(
 ): Promise<boolean> {
   const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
 
-  // Fetch all recent bot posts for this city with the same tag
+  // Fetch all recent bot posts for this city (ANY tag — same event can be tagged differently)
   const { data: recentPosts } = await supabase
     .from("pulses")
     .select("id, message")
     .eq("city", city)
     .eq("is_bot", true)
-    .eq("tag", tag)
     .gte("created_at", twoDaysAgo);
 
   if (!recentPosts || recentPosts.length === 0) return false;
