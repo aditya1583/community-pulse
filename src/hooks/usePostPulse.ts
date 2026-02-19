@@ -73,7 +73,7 @@ export function usePostPulse(opts: UsePostPulseOptions) {
   const handleAddPulse = async () => {
     const {
       city, sessionUser, profile, username, identityReady,
-      geolocationLat, geolocationLon, selectedCityLat, selectedCityLon,
+      geolocationLat, geolocationLon, selectedCityLat, selectedCityLon, useManualLocation,
       pulseCountResolved, userPulseCount, onboardingCompleted,
       setPulses, setLoading, setErrorMsg, setShowAuthModal, setShowPulseModal,
       setPulseCountResolved, setUserPulseCount, setOnboardingCompleted,
@@ -173,14 +173,14 @@ export function usePostPulse(opts: UsePostPulseOptions) {
         tag: resolvedTag,
         message: trimmed,
         author: authorName,
-        lat: options.useManualLocation
+        lat: useManualLocation
           ? (selectedCityLat ?? geolocationLat ?? null)
           : (geolocationLat ?? selectedCityLat ?? null),
-        lon: options.useManualLocation
+        lon: useManualLocation
           ? (selectedCityLon ?? geolocationLon ?? null)
           : (geolocationLon ?? selectedCityLon ?? null),
       };
-      console.log("[Voxlo] Posting pulse:", { ...postBody, message: postBody.message.slice(0, 30), manualLocation: options.useManualLocation });
+      console.log("[Voxlo] Posting pulse:", { ...postBody, message: postBody.message.slice(0, 30), manualLocation: useManualLocation });
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
@@ -319,7 +319,7 @@ export function usePostPulse(opts: UsePostPulseOptions) {
   ) => {
     const {
       city, sessionUser, profile, username, identityReady,
-      geolocationLat, geolocationLon, selectedCityLat, selectedCityLon,
+      geolocationLat, geolocationLon, selectedCityLat, selectedCityLon, useManualLocation,
       pulseCountResolved, userPulseCount, onboardingCompleted,
       setPulses, setLoading, setErrorMsg, setShowAuthModal,
       setPulseCountResolved, setUserPulseCount, setOnboardingCompleted,
@@ -408,10 +408,10 @@ export function usePostPulse(opts: UsePostPulseOptions) {
           tag: tabCategory,
           message: trimmed,
           author: authorName,
-          lat: options.useManualLocation
+          lat: useManualLocation
             ? (selectedCityLat ?? geolocationLat ?? null)
             : (geolocationLat ?? selectedCityLat ?? null),
-          lon: options.useManualLocation
+          lon: useManualLocation
             ? (selectedCityLon ?? geolocationLon ?? null)
             : (geolocationLon ?? selectedCityLon ?? null),
         }),

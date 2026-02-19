@@ -1084,9 +1084,13 @@ export default function Home() {
   }, [pulses]);
 
   const localState = selectedCity?.state ?? lastValidCity.state ?? "";
-  // Prefer exact GPS coordinates over city center for Local tab (closer results)
-  const localLat = geolocation.lat ?? selectedCity?.lat ?? lastValidCity.lat;
-  const localLon = geolocation.lon ?? selectedCity?.lon ?? lastValidCity.lon;
+  // When user manually selected a city, use that city's coords; otherwise prefer GPS
+  const localLat = useManualLocation
+    ? (selectedCity?.lat ?? geolocation.lat ?? lastValidCity.lat)
+    : (geolocation.lat ?? selectedCity?.lat ?? lastValidCity.lat);
+  const localLon = useManualLocation
+    ? (selectedCity?.lon ?? geolocation.lon ?? lastValidCity.lon)
+    : (geolocation.lon ?? selectedCity?.lon ?? lastValidCity.lon);
 
   // Force GPS refresh when switching to Local tab for accurate nearby results
   useEffect(() => {
