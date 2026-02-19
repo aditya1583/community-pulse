@@ -167,27 +167,35 @@ export default function Home() {
   }, [authStatus, sessionUser, setSessionUser]);
 
   // Initialize push notifications when signed in
+  const [pushDebug, setPushDebug] = useState<string>("");
   useEffect(() => {
     if (authStatus === "signed_in" && sessionUser) {
       console.log("[Push] Auth status signed_in, attempting push init for user:", sessionUser.id);
+      setPushDebug("Push: getting token...");
       authBridge.getAccessToken().then((token) => {
         if (token) {
           console.log("[Push] Got access token, calling initPushNotifications...");
+          setPushDebug("Push: calling init...");
           initPushNotifications(token, (data) => {
-            // Handle notification tap navigation
             if (data.pulseId) {
               setActiveTab("pulse");
             }
           }).then((result) => {
             console.log("[Push] initPushNotifications result:", result);
+            setPushDebug(`Push: ${result ? "OK ✅" : "FAILED ❌"}`);
+            // Clear debug after 10s
+            setTimeout(() => setPushDebug(""), 10000);
           }).catch((err) => {
             console.error("[Push] initPushNotifications FAILED:", err);
+            setPushDebug(`Push ERR: ${String(err).slice(0, 50)}`);
           });
         } else {
           console.warn("[Push] No access token available — push init skipped");
+          setPushDebug("Push: no auth token ❌");
         }
       }).catch((err) => {
         console.error("[Push] getAccessToken FAILED:", err);
+        setPushDebug(`Push token ERR: ${String(err).slice(0, 50)}`);
       });
     }
   }, [authStatus, sessionUser]);
@@ -1135,6 +1143,7 @@ export default function Home() {
   if (showLocationLoading) {
     return (
       <div className="min-h-screen neon-grid-bg text-slate-50 flex flex-col items-center justify-center">
+        {pushDebug && <div className="fixed top-0 left-0 right-0 z-[9999] bg-yellow-600 text-black text-xs text-center py-1 font-mono">{pushDebug}</div>}
         <div className="text-center space-y-4">
           <div className="animate-pulse">
             <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/20 flex items-center justify-center">
@@ -1157,6 +1166,7 @@ export default function Home() {
       <div className="fixed inset-0 bg-black -z-50" aria-hidden="true" />
 
       <div className="min-h-screen neon-grid-bg text-slate-50 flex flex-col">
+        {pushDebug && <div className="fixed top-0 left-0 right-0 z-[9999] bg-yellow-600 text-black text-xs text-center py-1 font-mono">{pushDebug}</div>}
         {/* First-Time User Onboarding Modal */}
         {showFirstPulseModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
