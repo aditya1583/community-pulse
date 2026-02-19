@@ -249,8 +249,8 @@ export async function POST(req: NextRequest) {
     // Hard-block categories: threats, violence, hate speech, sexual content involving minors
     // Soft-block (needs_review): profanity, spam, misinformation, etc.
     const HARD_BLOCK_REASONS = [
-      "violence", "threat", "self-harm", "hate", "sexual/minors",
-      "harassment", "bomb", "shoot", "attack", "terrorism",
+      "violence", "threat", "self-harm", "hate", "sexual/minors", "sexual",
+      "harassment", "bomb", "shoot", "attack", "terrorism", "solicitation",
     ];
     try {
       const moderationResult = await runModerationPipeline(trimmedMessage);
