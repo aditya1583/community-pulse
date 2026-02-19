@@ -25,6 +25,7 @@ import { getApiUrl } from "@/lib/api-config";
 
 let initialized = false;
 let currentToken: string | null = null;
+let pendingAccessToken: string | null = null;
 
 // ============================================================================
 // INITIALIZATION
@@ -54,22 +55,28 @@ export async function initPushNotifications(
     return true;
   }
   // Allow re-init with real auth token to register with backend
-  if (initialized && accessToken !== "__anonymous__" && currentToken) {
-    console.log("[notifications] Re-registering existing token with auth...");
-    try {
-      const url = getApiUrl("/api/notifications/register");
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ token: currentToken, platform: "ios" }),
-      });
-      const body = await res.json().catch(() => ({}));
-      console.log("[notifications] Re-registration response:", res.status, JSON.stringify(body));
-    } catch (err) {
-      console.error("[notifications] Re-registration failed:", err);
+  if (initialized && accessToken !== "__anonymous__") {
+    if (currentToken) {
+      console.log("[notifications] Re-registering existing token with auth...");
+      try {
+        const url = getApiUrl("/api/notifications/register");
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ token: currentToken, platform: "ios" }),
+        });
+        const body = await res.json().catch(() => ({}));
+        console.log("[notifications] Re-registration response:", res.status, JSON.stringify(body));
+      } catch (err) {
+        console.error("[notifications] Re-registration failed:", err);
+      }
+    } else {
+      console.log("[notifications] Token not yet available from APNs — storing auth for deferred registration");
+      // Store the access token so the registration listener can use it when the APNs token arrives
+      pendingAccessToken = accessToken;
     }
     return true;
   }
@@ -103,7 +110,11 @@ export async function initPushNotifications(
       currentToken = token.value;
 
       // Register token with our backend (only if we have a real auth token)
-      if (accessToken && accessToken !== "__anonymous__") {
+      // Use pendingAccessToken if the initial call was anonymous but user signed in since
+      const effectiveToken = (accessToken && accessToken !== "__anonymous__") ? accessToken : pendingAccessToken;
+      if (effectiveToken) {
+        // Clear pending since we're using it now
+        pendingAccessToken = null;
         try {
           const url = getApiUrl("/api/notifications/register");
           console.log("[notifications] Registering token with backend:", url);
@@ -111,7 +122,7 @@ export async function initPushNotifications(
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${accessToken}`,
+              Authorization: `Bearer ${effectiveToken}`,
             },
             body: JSON.stringify({
               token: token.value,
