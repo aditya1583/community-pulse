@@ -542,7 +542,10 @@ export async function POST(req: NextRequest) {
           }
 
           const createdAt = new Date(now - cumulativeOffset).toISOString();
-          const expiresAt = new Date(now + 24 * 60 * 60 * 1000).toISOString();
+          // Expiration by category: Weather/Traffic 3h, Events 12h, General 8h
+          const expirationMs = tag === "Weather" || tag === "Traffic" ? 3 * 60 * 60 * 1000
+            : tag === "Events" ? 12 * 60 * 60 * 1000 : 8 * 60 * 60 * 1000;
+          const expiresAt = new Date(now + expirationMs).toISOString();
 
           return {
             city: body.city,
@@ -655,7 +658,11 @@ export async function POST(req: NextRequest) {
       }
 
       const createdAt = new Date(now - cumulativeOffset).toISOString();
-      const expiresAt = new Date(now + 24 * 60 * 60 * 1000).toISOString(); // 24 hours from now
+      // Expiration by category: Weather/Traffic 3h, Events 12h, General 8h
+      const tagLower = (weatherPost.tag || "").toLowerCase();
+      const expirationMs2 = tagLower === "weather" || tagLower === "traffic" ? 3 * 60 * 60 * 1000
+        : tagLower === "events" ? 12 * 60 * 60 * 1000 : 8 * 60 * 60 * 1000;
+      const expiresAt = new Date(now + expirationMs2).toISOString();
 
       return {
         city: body.city,
