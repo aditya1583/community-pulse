@@ -30,7 +30,11 @@ const STOP_WORDS = new Set([
   "lets", "let", "see", "yall", "there", "finally", "something", "fun",
   "happening", "locally", "anyone", "need", "plus", "one", "waiting", "loud",
   "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
+  "january", "february", "march", "april", "june", "july", "august",
+  "september", "october", "november", "december",
   "suites", "vs", "v", "from", "with", "how", "are", "you", "watching",
+  "today", "tomorrow", "tonight", "near", "update", "traffic", "weather",
+  "alert", "closed", "clear", "mph", "congestion", "data", "open-meteo",
 ]);
 
 /**
@@ -39,19 +43,17 @@ const STOP_WORDS = new Set([
  * Returns sorted unique key words for order-independent matching.
  */
 function extractEventFingerprint(message: string): string[] {
-  // Strip emoji and special chars, normalize whitespace
+  // Strip emoji, special chars, and date prefixes like "Feb 19:" or "Feb 20:"
   const clean = message
     .replace(/[\u{1F000}-\u{1FFFF}]/gu, "")
+    .replace(/(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+\d{1,2}:?\s*/gi, "")
+    .replace(/\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/g, "") // strip MM/DD or MM/DD/YYYY
     .replace(/[^\w\s'-]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
 
-  const words = clean.split(" ").filter((w) => w.length > 1 && !STOP_WORDS.has(w));
-
-  // Extract date pattern (e.g., "20" from "feb 20")
-  const dateMatch = message.match(/(?:feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+(\d{1,2})/i);
-  if (dateMatch) words.push(`date${dateMatch[1]}`);
+  const words = clean.split(" ").filter((w) => w.length > 1 && !STOP_WORDS.has(w) && !/^\d+$/.test(w));
 
   return [...new Set(words)].sort();
 }
@@ -81,23 +83,34 @@ async function checkEventDuplicate(
 ): Promise<boolean> {
   const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
 
-  // Fetch all recent bot posts for this city (ANY tag — same event can be tagged differently)
+  // Normalize city to base name (e.g., "Austin" from "Austin, Texas" or "Austin, TX, US")
+  const normalizedCity = city.split(",")[0].trim();
+
+  // Fetch ALL recent bot posts and filter by normalized city name
+  // (can't use .eq() because city names vary: "Austin, Texas" vs "Austin, TX, US")
   const { data: recentPosts } = await supabase
     .from("pulses")
-    .select("id, message")
-    .eq("city", city)
+    .select("id, message, city")
     .eq("is_bot", true)
     .gte("created_at", twoDaysAgo);
 
   if (!recentPosts || recentPosts.length === 0) return false;
 
+  // Filter to same normalized city
+  const cityPosts = recentPosts.filter(p =>
+    p.city.split(",")[0].trim().toLowerCase() === normalizedCity.toLowerCase()
+  );
+
+  if (cityPosts.length === 0) return false;
+
   const newFP = extractEventFingerprint(message);
   if (newFP.length < 3) return false; // too short to fingerprint
 
-  for (const post of recentPosts) {
+  for (const post of cityPosts) {
     const existingFP = extractEventFingerprint(post.message);
     const overlap = fingerprintOverlap(newFP, existingFP);
-    if (overlap >= 0.8) {
+    // 60% overlap = duplicate (lowered from 80% — catches "at" vs "@", date variations)
+    if (overlap >= 0.6) {
       console.log(`[Dedup] 🚫 ${overlap.toFixed(2)} overlap with post ${post.id}: "${post.message.slice(0, 50)}..."`);
       return true;
     }

@@ -430,27 +430,33 @@ export async function POST(req: NextRequest) {
       // Check for recent posts first (fetch messages for deduplication)
       // Use 24-hour window to catch duplicates from previous day
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      // Fetch recent bot posts and filter by normalized city name
+      // (city names vary: "Austin, Texas" vs "Austin, TX, US")
+      const normalizedCityName = (body.city || cityName).split(",")[0].trim().toLowerCase();
       const { data: existingPulses } = await supabase
         .from("pulses")
-        .select("id, message")
-        .eq("city", body.city)
+        .select("id, message, city")
+        .eq("is_bot", true)
         .gte("created_at", twentyFourHoursAgo)
-        .limit(30); // Check up to 30 recent posts for duplicates
+        .limit(100);
+      const cityExistingPulses = (existingPulses || []).filter(p =>
+        p.city.split(",")[0].trim().toLowerCase() === normalizedCityName
+      );
 
       // Skip ONLY if we have enough pulses (>= 5) AND we're not forcing
-      if (existingPulses && existingPulses.length >= 5 && !body.force) {
+      if (cityExistingPulses && cityExistingPulses.length >= 5 && !body.force) {
         return NextResponse.json({
           success: true,
           message: "City already has recent pulses, skipping seed",
           created: 0,
-          existingCount: existingPulses.length,
+          existingCount: cityExistingPulses.length,
           pulses: [],
         });
       }
 
       // Use intelligent bot system with coords for universal support
       // TOP-UP LOGIC: Only generate enough to reach the 5-post threshold
-      const existingCount = existingPulses?.length || 0;
+      const existingCount = cityExistingPulses?.length || 0;
       const countToGenerate = Math.max(1, 5 - existingCount);
 
       console.log(`[Auto-Seed] Intelligent Bot: Active (Existing: ${existingCount}, Top-up: ${countToGenerate})`);
@@ -467,13 +473,16 @@ export async function POST(req: NextRequest) {
         // Fall through to generic system below
       } else {
         // FILTER DUPLICATES: Check against existing messages
-        const existingMessages = new Set((existingPulses || []).map(p => p.message?.toLowerCase() || ""));
+        const existingMessages = new Set((cityExistingPulses || []).map(p => p.message?.toLowerCase() || ""));
 
         // Fingerprint dedup helper (same logic as refresh-content)
         function extractFP(msg: string): string[] {
-          const cleaned = msg.replace(/[^\w\s]/g, " ").toLowerCase();
-          const stops = new Set(["the","a","an","at","in","on","is","and","or","for","to","of","its","was","has","have","been","are","this","that","with","from","your","but","not","all","can","had","her","his","how","its","may","new","now","old","our","own","say","she","too","use"]);
-          return [...new Set(cleaned.split(/\s+/).filter(w => w.length > 2 && !stops.has(w)))].sort();
+          const cleaned = msg
+            .replace(/(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+\d{1,2}:?\s*/gi, "")
+            .replace(/\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/g, "")
+            .replace(/[^\w\s]/g, " ").toLowerCase();
+          const stops = new Set(["the","a","an","at","in","on","is","and","or","for","to","of","its","was","has","have","been","are","this","that","with","from","your","but","not","all","can","had","her","his","how","its","may","new","now","old","our","own","say","she","too","use","today","tomorrow","tonight","near","update","traffic","weather","alert","closed","clear","mph","congestion"]);
+          return [...new Set(cleaned.split(/\s+/).filter(w => w.length > 2 && !stops.has(w) && !/^\d+$/.test(w)))].sort();
         }
         function fpOverlap(a: string[], b: string[]): number {
           if (a.length === 0 || b.length === 0) return 0;
@@ -486,13 +495,13 @@ export async function POST(req: NextRequest) {
           const postMsg = post.message.toLowerCase();
           const postFP = extractFP(post.message);
 
-          // Fingerprint-based dedup (80% overlap = duplicate)
+          // Fingerprint-based dedup (60% overlap = duplicate — aggressive to prevent redundancy)
           let isDuplicate = Array.from(existingMessages).some(existing => {
             // Quick exact/containment check
             if (existing.includes(postMsg) || postMsg.includes(existing)) return true;
             // Fingerprint overlap
             const existFP = extractFP(existing);
-            if (fpOverlap(postFP, existFP) >= 0.7) return true;
+            if (fpOverlap(postFP, existFP) >= 0.6) return true;
             return false;
           });
 
