@@ -251,8 +251,8 @@ const PulseInput = forwardRef<HTMLTextAreaElement, PulseInputProps>(
                   onMessageChange(value);
                 }
               }}
-              rows={3}
-              className={`w-full rounded-xl bg-slate-900/80 border p-4 text-[15px] text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 transition-all duration-300 resize-none font-medium leading-relaxed ${showValidationErrors && messageValidationError
+              rows={2}
+              className={`w-full rounded-xl bg-slate-900/80 border p-3 text-[15px] text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 transition-all duration-300 resize-none font-medium leading-normal ${showValidationErrors && messageValidationError
                 ? "border-red-500/60 shadow-[0_0_10px_rgba(239,68,68,0.1)]"
                 : "border-white/5 shadow-inner"
                 }`}

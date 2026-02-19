@@ -1583,28 +1583,61 @@ export default function Home() {
                   {/* City display — GPS auto-resolves, search icon to override */}
                   <div className="relative z-50">
                     {!showCitySearch ? (
-                      /* Default: show resolved city name + search icon */
+                      /* Default: show resolved city name + search icon + optional GPS reset */
                       <div className="flex items-center justify-between h-12 bg-slate-900/60 border border-white/5 rounded-2xl px-4">
-                        <div className="flex items-center gap-2">
-                          <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <svg className="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
                             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
                           </svg>
-                          <span className="text-sm font-bold text-white">{city || "Detecting location..."}</span>
+                          <span className="text-sm font-bold text-white truncate">{city || "Detecting location..."}</span>
                         </div>
-                        <button
-                          onClick={() => {
-                            setShowCitySearch(true);
-                            setCityInput("");
-                            setTimeout(() => cityInputRef.current?.focus(), 100);
-                          }}
-                          className="p-2 text-slate-400 hover:text-emerald-400 transition-colors active:scale-90"
-                          title="Search a different city"
-                        >
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                          </svg>
-                        </button>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {/* Show "back to GPS" button when user manually switched city */}
+                          {useManualLocation && geolocation.displayName && (
+                            <button
+                              onClick={() => {
+                                setUseManualLocation(false);
+                                try { sessionStorage.removeItem("cp-use-manual-location"); } catch {}
+                                // Snap back to GPS location
+                                const geoCity = {
+                                  id: `geo-${geolocation.lat}-${geolocation.lon}`,
+                                  name: geolocation.cityName || "Near You",
+                                  state: geolocation.stateCode || undefined,
+                                  lat: geolocation.lat!,
+                                  lon: geolocation.lon!,
+                                  displayName: geolocation.displayName,
+                                };
+                                applySuggestionSelection(geoCity);
+                                setCity(geoCity.displayName);
+                                setSelectedCity(geoCity);
+                                setLastValidCity(geoCity);
+                                setShowCitySuggestions(false);
+                                clearSuggestions();
+                              }}
+                              className="p-2 text-blue-400 hover:text-blue-300 transition-colors active:scale-90"
+                              title="Back to my location"
+                            >
+                              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                <circle cx="12" cy="12" r="3" />
+                                <path strokeLinecap="round" d="M12 2v4m0 12v4m10-10h-4M6 12H2" />
+                              </svg>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setShowCitySearch(true);
+                              setCityInput("");
+                              setTimeout(() => cityInputRef.current?.focus(), 100);
+                            }}
+                            className="p-2 text-slate-400 hover:text-emerald-400 transition-colors active:scale-90"
+                            title="Search a different city"
+                          >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       /* Search mode: input + dropdown + close button */
