@@ -24,6 +24,7 @@ interface UsePostPulseOptions {
   geolocationLon: number | null;
   selectedCityLat?: number | null;
   selectedCityLon?: number | null;
+  useManualLocation?: boolean;
   pulseCountResolved: boolean;
   userPulseCount: number;
   onboardingCompleted: boolean;
@@ -172,10 +173,14 @@ export function usePostPulse(opts: UsePostPulseOptions) {
         tag: resolvedTag,
         message: trimmed,
         author: authorName,
-        lat: geolocationLat ?? selectedCityLat ?? null,
-        lon: geolocationLon ?? selectedCityLon ?? null,
+        lat: options.useManualLocation
+          ? (selectedCityLat ?? geolocationLat ?? null)
+          : (geolocationLat ?? selectedCityLat ?? null),
+        lon: options.useManualLocation
+          ? (selectedCityLon ?? geolocationLon ?? null)
+          : (geolocationLon ?? selectedCityLon ?? null),
       };
-      console.log("[Voxlo] Posting pulse:", { ...postBody, message: postBody.message.slice(0, 30) });
+      console.log("[Voxlo] Posting pulse:", { ...postBody, message: postBody.message.slice(0, 30), manualLocation: options.useManualLocation });
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
@@ -403,8 +408,12 @@ export function usePostPulse(opts: UsePostPulseOptions) {
           tag: tabCategory,
           message: trimmed,
           author: authorName,
-          lat: geolocationLat ?? selectedCityLat ?? null,
-          lon: geolocationLon ?? selectedCityLon ?? null,
+          lat: options.useManualLocation
+            ? (selectedCityLat ?? geolocationLat ?? null)
+            : (geolocationLat ?? selectedCityLat ?? null),
+          lon: options.useManualLocation
+            ? (selectedCityLon ?? geolocationLon ?? null)
+            : (geolocationLon ?? selectedCityLon ?? null),
         }),
       });
 

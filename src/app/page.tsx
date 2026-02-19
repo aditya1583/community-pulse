@@ -458,6 +458,7 @@ export default function Home() {
     geolocationLon: geolocation.lon,
     selectedCityLat: selectedCity?.lat,
     selectedCityLon: selectedCity?.lon,
+    useManualLocation,
     pulseCountResolved,
     userPulseCount,
     onboardingCompleted,
