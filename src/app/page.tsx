@@ -169,6 +169,7 @@ export default function Home() {
   // Initialize push notifications — request permission immediately on app load,
   // then register token with backend once auth is available
   const [pushDebug, setPushDebug] = useState<string>("");
+  const [showCitySearch, setShowCitySearch] = useState(false);
   const pushInitAttempted = useRef(false);
   useEffect(() => {
     if (pushInitAttempted.current) return;
@@ -1166,7 +1167,7 @@ export default function Home() {
   if (showLocationLoading) {
     return (
       <div className="min-h-screen neon-grid-bg text-slate-50 flex flex-col items-center justify-center">
-        {pushDebug && <div className="fixed top-0 left-0 right-0 z-[9999] bg-yellow-600 text-black text-xs text-center py-1 font-mono">{pushDebug}</div>}
+        
         <div className="text-center space-y-4">
           <div className="animate-pulse">
             <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/20 flex items-center justify-center">
@@ -1189,7 +1190,7 @@ export default function Home() {
       <div className="fixed inset-0 bg-black -z-50" aria-hidden="true" />
 
       <div className="min-h-screen neon-grid-bg text-slate-50 flex flex-col">
-        {pushDebug && <div className="fixed top-0 left-0 right-0 z-[9999] bg-yellow-600 text-black text-xs text-center py-1 font-mono">{pushDebug}</div>}
+        
         {/* First-Time User Onboarding Modal */}
         {showFirstPulseModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -1579,68 +1580,109 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {/* City selector */}
+                  {/* City display — GPS auto-resolves, search icon to override */}
                   <div className="relative z-50">
-                    <div className="group relative">
-                      <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                        <svg
-                          className="w-4 h-4 text-slate-500 group-focus-within:text-emerald-500 transition-colors"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2.5}
+                    {!showCitySearch ? (
+                      /* Default: show resolved city name + search icon */
+                      <div className="flex items-center justify-between h-12 bg-slate-900/60 border border-white/5 rounded-2xl px-4">
+                        <div className="flex items-center gap-2">
+                          <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                          </svg>
+                          <span className="text-sm font-bold text-white">{city || "Detecting location..."}</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setShowCitySearch(true);
+                            setCityInput("");
+                            setTimeout(() => cityInputRef.current?.focus(), 100);
+                          }}
+                          className="p-2 text-slate-400 hover:text-emerald-400 transition-colors active:scale-90"
+                          title="Search a different city"
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                          />
-                        </svg>
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                        </button>
                       </div>
-                      <input
-                        ref={cityInputRef}
-                        type="text"
-                        className="w-full h-14 bg-slate-900/80 border border-white/5 rounded-2xl pl-12 pr-4 text-sm font-bold text-white placeholder:text-slate-600 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500/30 transition-all"
-                        placeholder="Switch city or neighborhood..."
-                        value={cityInput}
-                        onChange={handleCityInputChange}
-                        onKeyDown={handleCityInputKeyDown}
-                      />
-                      {citySuggestionsLoading && (
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-500">
-                          Searching...
-                        </span>
-                      )}
-
-                      {renderCitySuggestionsMenu && (
-                        <>
-                          <div
-                            aria-hidden="true"
-                            className={`fixed inset-0 z-40 transition-opacity duration-150 ${cityDropdownOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
-                            onClick={() => {
+                    ) : (
+                      /* Search mode: input + dropdown + close button */
+                      <div className="group relative">
+                        <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                          <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                        </div>
+                        <input
+                          ref={cityInputRef}
+                          type="text"
+                          className="w-full h-12 bg-slate-900/80 border border-emerald-500/30 rounded-2xl pl-12 pr-12 text-sm font-bold text-white placeholder:text-slate-500 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                          placeholder="Search city..."
+                          value={cityInput}
+                          onChange={handleCityInputChange}
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape") {
+                              setShowCitySearch(false);
                               setShowCitySuggestions(false);
                               clearSuggestions();
-                            }}
-                          />
+                              return;
+                            }
+                            handleCityInputKeyDown(e);
+                          }}
+                        />
+                        <button
+                          onClick={() => {
+                            setShowCitySearch(false);
+                            setShowCitySuggestions(false);
+                            clearSuggestions();
+                          }}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white transition-colors"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                        {citySuggestionsLoading && (
+                          <span className="absolute right-10 top-1/2 -translate-y-1/2 text-[11px] text-slate-500">
+                            Searching...
+                          </span>
+                        )}
 
-                          <div
-                            ref={cityDropdownRef}
-                            className={`absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 bg-slate-900 border border-slate-700/50 rounded-lg shadow-xl max-h-64 overflow-y-auto transform transition duration-150 origin-top ${cityDropdownOpen ? "opacity-100 translate-y-0 scale-100" : "opacity-0 -translate-y-1 scale-[0.98] pointer-events-none"}`}
-                          >
-                            {citySuggestions.map((suggestion, idx) => (
-                              <button
-                                key={suggestion.id}
-                                type="button"
-                                onClick={() => handleCitySelect(suggestion)}
-                                className={`w-full px-4 py-3 text-left text-sm transition border-b border-slate-800 last:border-b-0 ${highlightedIndex === idx ? "bg-slate-800 text-emerald-200" : "text-slate-100"}`}
-                              >
-                                {suggestion.displayName}
-                              </button>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
+                        {renderCitySuggestionsMenu && (
+                          <>
+                            <div
+                              aria-hidden="true"
+                              className={`fixed inset-0 z-40 transition-opacity duration-150 ${cityDropdownOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
+                              onClick={() => {
+                                setShowCitySuggestions(false);
+                                clearSuggestions();
+                                setShowCitySearch(false);
+                              }}
+                            />
+
+                            <div
+                              ref={cityDropdownRef}
+                              className={`absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 bg-slate-900 border border-slate-700/50 rounded-lg shadow-xl max-h-64 overflow-y-auto transform transition duration-150 origin-top ${cityDropdownOpen ? "opacity-100 translate-y-0 scale-100" : "opacity-0 -translate-y-1 scale-[0.98] pointer-events-none"}`}
+                            >
+                              {citySuggestions.map((suggestion, idx) => (
+                                <button
+                                  key={suggestion.id}
+                                  type="button"
+                                  onClick={() => {
+                                    handleCitySelect(suggestion);
+                                    setShowCitySearch(false);
+                                  }}
+                                  className={`w-full px-4 py-3 text-left text-sm transition border-b border-slate-800 last:border-b-0 ${highlightedIndex === idx ? "bg-slate-800 text-emerald-200" : "text-slate-100"}`}
+                                >
+                                  {suggestion.displayName}
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Current Vibe Card */}
@@ -1689,7 +1731,7 @@ export default function Home() {
                           description: "Hyperlocal content depends on it.",
                           completed: !!selectedCity,
                           actionLabel: "Set Location",
-                          action: () => cityInputRef.current?.focus(),
+                          action: () => { setShowCitySearch(true); setTimeout(() => cityInputRef.current?.focus(), 100); },
                         },
                         {
                           id: "profile",
