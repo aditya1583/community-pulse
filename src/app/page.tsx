@@ -166,37 +166,57 @@ export default function Home() {
     }
   }, [authStatus, sessionUser, setSessionUser]);
 
-  // Initialize push notifications when signed in
+  // Initialize push notifications — request permission immediately on app load,
+  // then register token with backend once auth is available
   const [pushDebug, setPushDebug] = useState<string>("");
+  const pushInitAttempted = useRef(false);
+  useEffect(() => {
+    if (pushInitAttempted.current) return;
+    pushInitAttempted.current = true;
+
+    console.log("[Push] Attempting push init (auth-independent)...");
+    setPushDebug("Push: initializing...");
+
+    // Try to get auth token if available, but don't require it
+    const getToken = async (): Promise<string | null> => {
+      try {
+        return await authBridge.getAccessToken();
+      } catch {
+        return null;
+      }
+    };
+
+    getToken().then((accessToken) => {
+      console.log("[Push] Access token:", accessToken ? "available" : "not available (will retry on sign-in)");
+      setPushDebug(accessToken ? "Push: has auth, calling init..." : "Push: no auth, calling init anyway...");
+
+      initPushNotifications(accessToken || "__anonymous__", (data) => {
+        if (data.pulseId) {
+          setActiveTab("pulse");
+        }
+      }).then((result) => {
+        console.log("[Push] initPushNotifications result:", result);
+        setPushDebug(`Push: ${result ? "OK ✅" : "FAILED ❌ (check native?)"}`);
+        setTimeout(() => setPushDebug(""), 10000);
+      }).catch((err) => {
+        console.error("[Push] initPushNotifications FAILED:", err);
+        setPushDebug(`Push ERR: ${String(err).slice(0, 60)}`);
+        // Don't clear error — keep it visible
+      });
+    });
+  }, []);
+
+  // Re-register push token when user signs in (associate token with user)
   useEffect(() => {
     if (authStatus === "signed_in" && sessionUser) {
-      console.log("[Push] Auth status signed_in, attempting push init for user:", sessionUser.id);
-      setPushDebug("Push: getting token...");
       authBridge.getAccessToken().then((token) => {
         if (token) {
-          console.log("[Push] Got access token, calling initPushNotifications...");
-          setPushDebug("Push: calling init...");
+          console.log("[Push] User signed in, re-registering push token with auth...");
           initPushNotifications(token, (data) => {
-            if (data.pulseId) {
-              setActiveTab("pulse");
-            }
-          }).then((result) => {
-            console.log("[Push] initPushNotifications result:", result);
-            setPushDebug(`Push: ${result ? "OK ✅" : "FAILED ❌"}`);
-            // Clear debug after 10s
-            setTimeout(() => setPushDebug(""), 10000);
-          }).catch((err) => {
-            console.error("[Push] initPushNotifications FAILED:", err);
-            setPushDebug(`Push ERR: ${String(err).slice(0, 50)}`);
-          });
-        } else {
-          console.warn("[Push] No access token available — push init skipped");
-          setPushDebug("Push: no auth token ❌");
+            if (data.pulseId) setActiveTab("pulse");
+          }).catch(() => {});
         }
-      }).catch((err) => {
-        console.error("[Push] getAccessToken FAILED:", err);
-        setPushDebug(`Push token ERR: ${String(err).slice(0, 50)}`);
-      });
+      }).catch(() => {});
     }
   }, [authStatus, sessionUser]);
 

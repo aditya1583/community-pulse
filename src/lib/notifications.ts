@@ -49,8 +49,28 @@ export async function initPushNotifications(
     return false;
   }
 
-  if (initialized) {
-    console.log("[notifications] Already initialized");
+  if (initialized && accessToken === "__anonymous__") {
+    console.log("[notifications] Already initialized (anonymous)");
+    return true;
+  }
+  // Allow re-init with real auth token to register with backend
+  if (initialized && accessToken !== "__anonymous__" && currentToken) {
+    console.log("[notifications] Re-registering existing token with auth...");
+    try {
+      const url = getApiUrl("/api/notifications/register");
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ token: currentToken, platform: "ios" }),
+      });
+      const body = await res.json().catch(() => ({}));
+      console.log("[notifications] Re-registration response:", res.status, JSON.stringify(body));
+    } catch (err) {
+      console.error("[notifications] Re-registration failed:", err);
+    }
     return true;
   }
 
@@ -82,28 +102,32 @@ export async function initPushNotifications(
       console.log("[notifications] APNs token received:", token.value.substring(0, 10) + "...");
       currentToken = token.value;
 
-      // Register token with our backend
-      try {
-        const url = getApiUrl("/api/notifications/register");
-        console.log("[notifications] Registering token with backend:", url);
-        const res = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({
-            token: token.value,
-            platform: "ios",
-          }),
-        });
-        const body = await res.json().catch(() => ({}));
-        console.log("[notifications] Backend registration response:", res.status, JSON.stringify(body));
-        if (!res.ok) {
-          console.error("[notifications] Backend registration failed:", res.status, body);
+      // Register token with our backend (only if we have a real auth token)
+      if (accessToken && accessToken !== "__anonymous__") {
+        try {
+          const url = getApiUrl("/api/notifications/register");
+          console.log("[notifications] Registering token with backend:", url);
+          const res = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({
+              token: token.value,
+              platform: "ios",
+            }),
+          });
+          const body = await res.json().catch(() => ({}));
+          console.log("[notifications] Backend registration response:", res.status, JSON.stringify(body));
+          if (!res.ok) {
+            console.error("[notifications] Backend registration failed:", res.status, body);
+          }
+        } catch (err) {
+          console.error("[notifications] Failed to register token with backend:", err);
         }
-      } catch (err) {
-        console.error("[notifications] Failed to register token with backend:", err);
+      } else {
+        console.log("[notifications] Skipping backend registration (no auth token) — will register on sign-in");
       }
     });
 
