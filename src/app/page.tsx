@@ -577,13 +577,12 @@ export default function Home() {
     }
     storageRestorationAttempted.current = true;
 
-    // 1. Restore manual location flag FIRST (BEFORE anything else can run)
+    // 1. CLEAR manual location flag on cold start — GPS should always get a fresh shot.
+    // The flag is only set when the user actively searches and picks a city THIS session.
+    // WKWebView preserves sessionStorage across app restarts, so we must clear it ourselves.
     try {
-      const savedManualFlag = sessionStorage.getItem("cp-use-manual-location");
-      if (savedManualFlag === "true") {
-        setUseManualLocation(true);
-        console.log("[Storage Restore] Manual location flag restored: true");
-      }
+      sessionStorage.removeItem("cp-use-manual-location");
+      console.log("[Storage Restore] Cleared manual location flag (fresh start → GPS priority)");
     } catch {
       // Ignore storage errors
     }

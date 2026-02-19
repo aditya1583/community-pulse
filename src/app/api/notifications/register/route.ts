@@ -65,6 +65,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Server error" }, { status: 500 });
     }
 
+    console.log("[notifications/register] Registering push token for user:", user.id, "platform:", platform, "token:", token.substring(0, 10) + "...");
+
     // Upsert token
     const { error } = await supabase
       .from("push_tokens")
@@ -79,9 +81,11 @@ export async function POST(req: NextRequest) {
       );
 
     if (error) {
-      console.error("[notifications/register] Upsert error:", error);
-      return NextResponse.json({ error: "Failed to register token" }, { status: 500 });
+      console.error("[notifications/register] Upsert FAILED:", JSON.stringify(error));
+      return NextResponse.json({ error: "Failed to register token", detail: error.message }, { status: 500 });
     }
+
+    console.log("[notifications/register] Token registered successfully for user:", user.id);
 
     // Also ensure default notification preferences exist
     await supabase

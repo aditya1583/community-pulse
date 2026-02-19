@@ -73,12 +73,14 @@ export async function initPushNotifications(
 
     // Listen for registration success
     PushNotifications.addListener("registration", async (token) => {
-      console.log("[notifications] Registered with token:", token.value.substring(0, 10) + "...");
+      console.log("[notifications] APNs token received:", token.value.substring(0, 10) + "...");
       currentToken = token.value;
 
       // Register token with our backend
       try {
-        await fetch(getApiUrl("/api/notifications/register"), {
+        const url = getApiUrl("/api/notifications/register");
+        console.log("[notifications] Registering token with backend:", url);
+        const res = await fetch(url, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -89,14 +91,19 @@ export async function initPushNotifications(
             platform: "ios",
           }),
         });
+        const body = await res.json().catch(() => ({}));
+        console.log("[notifications] Backend registration response:", res.status, JSON.stringify(body));
+        if (!res.ok) {
+          console.error("[notifications] Backend registration failed:", res.status, body);
+        }
       } catch (err) {
-        console.error("[notifications] Failed to register token:", err);
+        console.error("[notifications] Failed to register token with backend:", err);
       }
     });
 
     // Listen for registration errors
     PushNotifications.addListener("registrationError", (err) => {
-      console.error("[notifications] Registration error:", err.error);
+      console.error("[notifications] APNs registration FAILED:", JSON.stringify(err));
     });
 
     // Handle foreground notifications (show as in-app toast or badge)

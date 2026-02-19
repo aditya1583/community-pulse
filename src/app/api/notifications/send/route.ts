@@ -51,7 +51,9 @@ function getAPNsConfig() {
   const teamId = process.env.APNS_TEAM_ID;
   const keyBase64 = process.env.APNS_KEY_BASE64;
   const bundleId = process.env.APNS_BUNDLE_ID || "app.voxlo";
-  const environment = process.env.APNS_ENVIRONMENT || "production";
+  // TestFlight and App Store builds ALWAYS use production APNs.
+  // Only use sandbox for local dev builds installed via Xcode.
+  const environment = process.env.APNS_ENVIRONMENT === "development" ? "development" : "production";
 
   if (!keyId || !teamId || !keyBase64) {
     return null;
@@ -292,9 +294,10 @@ export async function POST(req: NextRequest) {
       data,
     });
 
-    // --- Send via APNs (async, don't block response) ---
+    // --- Send via APNs ---
     const apnsConfig = getAPNsConfig();
     if (apnsConfig) {
+      console.log("[notifications/send] APNs configured, environment:", apnsConfig.environment, "bundleId:", apnsConfig.bundleId);
       // Get user's iOS push tokens
       const { data: tokens } = await supabase
         .from("push_tokens")
@@ -302,21 +305,27 @@ export async function POST(req: NextRequest) {
         .eq("user_id", userId)
         .eq("platform", "ios");
 
+      console.log("[notifications/send] Found", tokens?.length ?? 0, "push tokens for user", userId);
+
       if (tokens && tokens.length > 0) {
-        // Fire and forget - don't await
-        Promise.all(
-          tokens.map((t) =>
-            sendAPNs(t.token, title, notifBody, data, apnsConfig).then((result) => {
-              if (!result.success && result.error?.includes("BadDeviceToken")) {
-                // Clean up invalid tokens
-                supabase.from("push_tokens").delete().eq("token", t.token).then(() => {});
-              }
-            })
-          )
-        ).catch((err) => console.error("[notifications/send] APNs batch error:", err));
+        // Actually await so we can log results
+        const results = await Promise.allSettled(
+          tokens.map(async (t) => {
+            const result = await sendAPNs(t.token, title, notifBody, data, apnsConfig);
+            console.log("[notifications/send] APNs result for token", t.token.substring(0, 10) + "...:", JSON.stringify(result));
+            if (!result.success && result.error?.includes("BadDeviceToken")) {
+              await supabase.from("push_tokens").delete().eq("token", t.token);
+              console.log("[notifications/send] Cleaned up bad token:", t.token.substring(0, 10) + "...");
+            }
+            return result;
+          })
+        );
+        console.log("[notifications/send] APNs send complete:", results.length, "tokens processed");
+      } else {
+        console.log("[notifications/send] No push tokens found for user — notification stored in DB only");
       }
     } else {
-      console.warn("[notifications/send] APNs not configured - notification stored but not pushed");
+      console.warn("[notifications/send] APNs NOT configured — missing APNS_KEY_ID, APNS_TEAM_ID, or APNS_KEY_BASE64");
     }
 
     // Mark batch entry as sent

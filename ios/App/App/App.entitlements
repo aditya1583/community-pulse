@@ -6,7 +6,9 @@
 	<string>production</string>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
+		<string>applinks:voxlo.app</string>
 		<string>applinks:voxlo-theta.vercel.app</string>
+		<string>webcredentials:voxlo.app</string>
 		<string>webcredentials:voxlo-theta.vercel.app</string>
 	</array>
 </dict>
