@@ -22,13 +22,13 @@ export function useGeocodingAutocomplete(options: Options = {}) {
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
 
   const lastRequestId = useRef(0);
-  // Flag to skip the next search (used when setting input programmatically)
-  const skipNextSearch = useRef(false);
+  // Flag to skip searches (used when setting input programmatically via geo/selection)
+  // Uses a timestamp so it persists across multiple rapid re-renders
+  const skipSearchUntil = useRef(0);
 
   useEffect(() => {
     // Check if we should skip this search (programmatic input)
-    if (skipNextSearch.current) {
-      skipNextSearch.current = false;
+    if (Date.now() < skipSearchUntil.current) {
       return;
     }
 
@@ -106,14 +106,13 @@ export function useGeocodingAutocomplete(options: Options = {}) {
   }, [inputValue, minLength, debounceMs, limit]);
 
   const selectCity = useCallback((city: GeocodedCity) => {
-    // Skip the search that would be triggered by setInputValue
-    skipNextSearch.current = true;
+    // Skip searches for 1 second — prevents debounced searches from reopening dropdown
+    skipSearchUntil.current = Date.now() + 1000;
     setInputValue(city.displayName);
     setSuggestions([]);
     setNotFound(false);
     setHighlightedIndex(-1);
     setOpen(false);
-    // Ensure loading state is cleared when a city is selected
     setLoading(false);
     setError(null);
   }, []);
