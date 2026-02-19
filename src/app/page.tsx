@@ -735,6 +735,9 @@ export default function Home() {
     setCity(geoCity.displayName);
     setSelectedCity(geoCity);
     setLastValidCity(geoCity);
+    // Explicitly close dropdown — geo-set cities should never show suggestions
+    setShowCitySuggestions(false);
+    clearSuggestions();
   }, [
     storageRestored,
     useManualLocation,
