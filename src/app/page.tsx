@@ -169,18 +169,26 @@ export default function Home() {
   // Initialize push notifications when signed in
   useEffect(() => {
     if (authStatus === "signed_in" && sessionUser) {
+      console.log("[Push] Auth status signed_in, attempting push init for user:", sessionUser.id);
       authBridge.getAccessToken().then((token) => {
         if (token) {
+          console.log("[Push] Got access token, calling initPushNotifications...");
           initPushNotifications(token, (data) => {
             // Handle notification tap navigation
             if (data.pulseId) {
-              // Navigate to pulse tab and scroll to pulse
-              // For now, just switch to pulse tab
               setActiveTab("pulse");
             }
-          }).catch(() => {});
+          }).then((result) => {
+            console.log("[Push] initPushNotifications result:", result);
+          }).catch((err) => {
+            console.error("[Push] initPushNotifications FAILED:", err);
+          });
+        } else {
+          console.warn("[Push] No access token available — push init skipped");
         }
-      }).catch(() => {});
+      }).catch((err) => {
+        console.error("[Push] getAccessToken FAILED:", err);
+      });
     }
   }, [authStatus, sessionUser]);
 

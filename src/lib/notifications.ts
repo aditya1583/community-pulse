@@ -42,7 +42,9 @@ export async function initPushNotifications(
   onNavigate?: (data: Record<string, string>) => void
 ): Promise<boolean> {
   // Only works on native platforms
-  if (!Capacitor.isNativePlatform()) {
+  const isNative = Capacitor.isNativePlatform();
+  console.log("[notifications] Platform check — isNativePlatform:", isNative, "platform:", Capacitor.getPlatform());
+  if (!isNative) {
     console.log("[notifications] Not a native platform, skipping push init");
     return false;
   }
@@ -55,20 +57,24 @@ export async function initPushNotifications(
   try {
     // Check current permission status
     const permStatus = await PushNotifications.checkPermissions();
+    console.log("[notifications] Current permission status:", JSON.stringify(permStatus));
 
     if (permStatus.receive === "prompt") {
       // Request permission
+      console.log("[notifications] Requesting permission...");
       const result = await PushNotifications.requestPermissions();
+      console.log("[notifications] Permission result:", JSON.stringify(result));
       if (result.receive !== "granted") {
-        console.log("[notifications] Permission denied");
+        console.log("[notifications] Permission denied by user");
         return false;
       }
     } else if (permStatus.receive !== "granted") {
-      console.log("[notifications] Permission not granted:", permStatus.receive);
+      console.log("[notifications] Permission not granted (status:", permStatus.receive, ") — user may have denied previously");
       return false;
     }
 
     // Register for push notifications (triggers APNs registration)
+    console.log("[notifications] Calling PushNotifications.register()...");
     await PushNotifications.register();
 
     // Listen for registration success
