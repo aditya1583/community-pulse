@@ -20,11 +20,11 @@ export interface CooldownState extends CooldownStateBase {
 const cooldownStates = new Map<string, CooldownState>();
 
 const COOLDOWN_CONFIG = {
-  // Minimum time between any posts (30 minutes)
-  minTimeBetweenPosts: 30 * 60 * 1000,
+  // Minimum time between any posts (2 minutes — cron generates bursts, DB dedup handles real duplication)
+  minTimeBetweenPosts: 2 * 60 * 1000,
 
-  // Minimum time between same-type posts (2 hours)
-  minTimeBetweenSameType: 2 * 60 * 60 * 1000,
+  // Minimum time between same-type posts (30 minutes — allows variety within a cron run)
+  minTimeBetweenSameType: 30 * 60 * 1000,
 
   // ANTI-DUPLICATE: Minimum time between exact same type/engagement posts
   // Even if forced, we don't want two posts about the same thing in 5 mins

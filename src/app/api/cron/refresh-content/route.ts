@@ -123,9 +123,9 @@ export const maxDuration = 60;
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const MAX_CITIES_PER_RUN = 2;
-const POSTS_PER_CITY = 1;
-const MAX_BOT_POSTS_PER_CITY = 5;
+const MAX_CITIES_PER_RUN = 3;
+const POSTS_PER_CITY = 3;
+const MAX_BOT_POSTS_PER_CITY = 7;
 
 function getExpirationHours(tag: string): number {
   const t = tag.toLowerCase();
