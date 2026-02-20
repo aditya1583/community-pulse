@@ -152,6 +152,47 @@ export async function GET(request: NextRequest) {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
   const start = Date.now();
 
+  // On-demand seed for a specific city (triggered by empty feed)
+  const seedCity = request.nextUrl.searchParams.get("seedCity");
+  const seedLat = request.nextUrl.searchParams.get("seedLat");
+  const seedLon = request.nextUrl.searchParams.get("seedLon");
+  if (seedCity && seedLat && seedLon) {
+    try {
+      const { generateIntelligentPost } = await import("@/lib/intelligent-bots");
+      const results = [];
+      const postedTags: string[] = [];
+      for (let i = 0; i < 3; i++) {
+        const result = await generateIntelligentPost(seedCity, {
+          force: true,
+          coords: { lat: parseFloat(seedLat), lon: parseFloat(seedLon) },
+          excludeTypes: postedTags,
+        });
+        if (result.posted && result.post) {
+          const expiresAt = new Date(Date.now() + getExpirationHours(result.post.tag) * 60 * 60 * 1000).toISOString();
+          const { error } = await supabase.from("pulses").insert({
+            city: `${seedCity}, ${result.post.tag === "Events" ? "Texas, US" : "Texas, US"}`,
+            message: result.post.message,
+            mood: result.post.mood,
+            tag: result.post.tag,
+            author: result.post.author || "Voxlo AI",
+            is_bot: true,
+            lat: parseFloat(seedLat),
+            lon: parseFloat(seedLon),
+            expires_at: expiresAt,
+          });
+          if (!error) {
+            postedTags.push(result.post.tag);
+            results.push(result.post.tag);
+          }
+        }
+      }
+      return NextResponse.json({ success: true, seedCity, postsCreated: results.length, tags: results, durationMs: Date.now() - start });
+    } catch (err) {
+      console.error("[Cron] Seed city error:", err);
+      return NextResponse.json({ error: "Seed failed", details: String(err) }, { status: 500 });
+    }
+  }
+
   try {
     // ONLY refresh cities with REAL USER activity in last 48 hours.
     // No user posts = no seeding. We don't waste resources on dormant cities.

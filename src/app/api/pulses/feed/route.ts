@@ -48,8 +48,13 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(limit);
 
-    if (lat != null && lon != null) {
-      // Bounding box: ~12 miles
+    // ALWAYS filter by city name — prevents cross-city bleed from bounding box
+    // Lat/lon used only for distance sorting below
+    if (city) {
+      const cityBase = city.split(",")[0].trim();
+      query = query.ilike("city", `${cityBase}%`);
+    } else if (lat != null && lon != null) {
+      // No city name — fall back to bounding box (rare: GPS-only, no reverse geocode)
       const latDelta = 0.175;
       const lonDelta = 0.21;
       query = query
@@ -57,10 +62,6 @@ export async function GET(request: NextRequest) {
         .lte("lat", lat + latDelta)
         .gte("lon", lon - lonDelta)
         .lte("lon", lon + lonDelta);
-    } else {
-      // City name match (fuzzy — first 2 segments)
-      const cityBase = city.split(",").slice(0, 2).join(",").trim();
-      query = query.ilike("city", `${cityBase}%`);
     }
 
     const { data, error } = await query;
@@ -95,6 +96,20 @@ export async function GET(request: NextRequest) {
         // Within same band, sort by recency
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
+    }
+
+    // On-demand content generation: if feed is empty and we have coords, trigger async seeding
+    // Don't block the response — seed in background so next refresh has content
+    if (filtered.length === 0 && city && lat != null && lon != null) {
+      const cityBase = city.split(",")[0].trim();
+      // Fire-and-forget: generate content for this city
+      const seedUrl = new URL("/api/cron/refresh-content", request.url);
+      seedUrl.searchParams.set("manual", "true");
+      seedUrl.searchParams.set("seedCity", cityBase);
+      seedUrl.searchParams.set("seedLat", String(lat));
+      seedUrl.searchParams.set("seedLon", String(lon));
+      fetch(seedUrl.toString()).catch(() => {/* fire and forget */});
+      console.log(`[Feed API] Empty feed for "${cityBase}" — triggered background seed`);
     }
 
     return NextResponse.json({ pulses: filtered, count: filtered.length });
