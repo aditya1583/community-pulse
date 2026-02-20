@@ -100,9 +100,9 @@ export async function initPushNotifications(
       return false;
     }
 
-    // Register for push notifications (triggers APNs registration)
-    console.log("[notifications] Calling PushNotifications.register()...");
-    await PushNotifications.register();
+    // CRITICAL: Add listeners BEFORE calling register()
+    // On iOS, APNs token can arrive synchronously — if listener isn't ready, token is lost
+    console.log("[notifications] Adding registration listeners...");
 
     // Listen for registration success
     PushNotifications.addListener("registration", async (token) => {
@@ -163,6 +163,11 @@ export async function initPushNotifications(
         onNavigate(data);
       }
     });
+
+    // NOW register — listeners are ready to catch the token
+    console.log("[notifications] Calling PushNotifications.register()...");
+    await PushNotifications.register();
+    console.log("[notifications] register() completed — waiting for APNs token callback");
 
     initialized = true;
     return true;
