@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { VENUE_VIBE_TYPES, VenueVibeAggregate, getVibeTypeInfo, VenueVibeType } from "./types";
 
 type LocalPlace = {
@@ -133,7 +132,6 @@ export default function LocalDealsSection({
   isSignedIn = false,
   onSignInClick,
 }: LocalDealsSectionProps) {
-  const router = useRouter();
   const [places, setPlaces] = useState<LocalPlace[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -324,36 +322,11 @@ export default function LocalDealsSection({
     return cached?.vibes?.[0] || null;
   };
 
-  // Navigate to venue detail page (requires sign-in to share vibes)
+  // Venue detail page removed — sign-in prompt only
   const openVenueDetail = (place: LocalPlace) => {
-    // Check if user is signed in first
-    if (!isSignedIn) {
-      // Prompt to sign in instead of navigating
-      if (onSignInClick) {
-        onSignInClick();
-      }
-      return;
+    if (!isSignedIn && onSignInClick) {
+      onSignInClick();
     }
-
-    // Create URL-friendly slug from venue name
-    const slug = place.name
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, "")
-      .replace(/\s+/g, "-")
-      .replace(/-+/g, "-")
-      .trim();
-
-    // Pass venue data via URL params for venues not in DB
-    const params = new URLSearchParams({
-      id: slug,
-      name: place.name,
-      category: place.category || "",
-      address: place.address || "",
-      lat: place.lat?.toString() || "",
-      lon: place.lon?.toString() || "",
-    });
-
-    router.push(`/venue/?${params.toString()}`);
   };
 
   const formatDistance = (meters: number | null) => {
