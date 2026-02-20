@@ -116,10 +116,14 @@ function buildDataPayload(ctx: SituationContext, decision: PostDecision): DataPa
     payload.traffic = {
       congestion: ctx.traffic.congestionLevel,
       speed: ctx.traffic.averageSpeed,
-      road: roads[Math.floor(Math.random() * roads.length)] || "Main St",
-      landmark: landmarks[Math.floor(Math.random() * landmarks.length)] || "downtown",
+      road: roads.length > 0 ? roads[Math.floor(Math.random() * roads.length)] : undefined,
+      landmark: landmarks.length > 0 ? landmarks[Math.floor(Math.random() * landmarks.length)] : undefined,
       incidents: ctx.traffic.incidents?.map((i: { description?: string }) => i.description).filter(Boolean) as string[] || [],
     };
+    // Skip traffic if we have no local road data AND no incidents — would produce generic garbage
+    if (!payload.traffic.road && !payload.traffic.landmark && (!payload.traffic.incidents || payload.traffic.incidents.length === 0)) {
+      delete payload.traffic;
+    }
   }
 
   if (ctx.events?.length > 0) {
