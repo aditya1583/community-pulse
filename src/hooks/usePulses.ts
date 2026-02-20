@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import {
   isInRecentWindow,
@@ -67,6 +67,7 @@ export function usePulses({ city, selectedCity, geolocation }: UsePulsesParams) 
   const [authorStats, setAuthorStats] = useState<Record<string, { level: number; rank: number | null }>>({});
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const retryAttempted = useRef(false);
 
   // ========= REAL-TIME FEED =========
   useEffect(() => {
@@ -156,6 +157,18 @@ export function usePulses({ city, selectedCity, geolocation }: UsePulsesParams) 
       const result = await res.json();
       const rawData: DBPulse[] = result.pulses || [];
       console.log(`[Pulses] API returned ${rawData.length} pulses`);
+
+      // Auto-retry if backend is seeding content for a new city
+      if (result.seeding && result.retryAfterMs && !retryAttempted.current) {
+        retryAttempted.current = true;
+        console.log(`[Pulses] City being seeded — auto-retrying in ${result.retryAfterMs}ms`);
+        setTimeout(() => {
+          retryAttempted.current = false;
+          fetchPulses();
+        }, result.retryAfterMs);
+      } else {
+        retryAttempted.current = false;
+      }
 
       const data: DBPulse[] | null = rawData;
       const error: { message: string } | null = null;

@@ -110,6 +110,8 @@ export async function GET(request: NextRequest) {
       seedUrl.searchParams.set("seedLon", String(lon));
       fetch(seedUrl.toString()).catch(() => {/* fire and forget */});
       console.log(`[Feed API] Empty feed for "${cityBase}" — triggered background seed`);
+      // Tell client to auto-retry in a few seconds
+      return NextResponse.json({ pulses: [], count: 0, seeding: true, retryAfterMs: 5000 });
     }
 
     return NextResponse.json({ pulses: filtered, count: filtered.length });
