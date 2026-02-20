@@ -259,8 +259,28 @@ export async function generateIntelligentPost(
     };
   }
 
+  // Fetch recent bot posts for this city to avoid repetition
+  let recentPostMessages: string[] = [];
+  try {
+    const { createClient } = await import("@supabase/supabase-js");
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    const { data: recentRows } = await supabase
+      .from("pulses")
+      .select("message")
+      .eq("is_bot", true)
+      .ilike("city", `${cityName}%`)
+      .order("created_at", { ascending: false })
+      .limit(5);
+    recentPostMessages = (recentRows || []).map((r: { message: string }) => r.message);
+  } catch {
+    // Non-critical — continue without
+  }
+
   // Generate the post
-  const post = await generatePost(ctx, decision);
+  const post = await generatePost(ctx, decision, { recentPosts: recentPostMessages });
 
   if (!post) {
     return {

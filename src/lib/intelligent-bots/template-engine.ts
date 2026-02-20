@@ -479,17 +479,36 @@ function fillTemplateStandard(template: string, variables: TemplateVariables): s
 export async function generatePost(
   ctx: SituationContext,
   decision: PostDecision,
-  options: { injectFunFact?: boolean; useAIFacts?: boolean } = {}
+  options: { injectFunFact?: boolean; useAIFacts?: boolean; recentPosts?: string[] } = {}
 ): Promise<GeneratedPost | null> {
   if (!decision.shouldPost || !decision.postType) {
     return null;
   }
 
+  // PRIMARY: Try AI-generated post (witty, personality-driven)
+  try {
+    const { aiGeneratePost } = await import("./ai-writer");
+    const aiResult = await aiGeneratePost(ctx, decision, options.recentPosts);
+    if (aiResult) {
+      console.log(`[TemplateEngine] AI-generated ${decision.postType} post for ${ctx.city.name}`);
+      return {
+        message: aiResult.message,
+        tag: decision.postType,
+        mood: aiResult.mood,
+        author: getBotName(decision.postType, ctx.city.name),
+        is_bot: true,
+        hidden: false,
+      };
+    }
+  } catch (err) {
+    console.warn("[TemplateEngine] AI writer failed, falling back to templates:", err);
+  }
+
+  // FALLBACK: Template-based posts
   const variables = buildVariables(ctx);
   let message: string;
-  let mood: string;
+  const mood: string = getMood(decision.templateCategory);
 
-  // Use standard templates
   const templates = getTemplates(decision.postType, decision.templateCategory);
   if (templates.length === 0) {
     console.warn(`[TemplateEngine] No templates for ${decision.postType}/${decision.templateCategory}`);
@@ -497,31 +516,8 @@ export async function generatePost(
   }
   const template = selectTemplate(templates);
   message = fillTemplateStandard(template, variables);
-  mood = getMood(decision.templateCategory);
 
-  // Should we add a fun fact?
-  const shouldInjectFact = options.injectFunFact || Math.random() < FUN_FACT_INJECTION_RATE;
-
-  if (shouldInjectFact) {
-    // Try AI-generated fact first (if enabled or by default)
-    const useAI = options.useAIFacts !== false; // Default to true
-
-    if (useAI) {
-      const aiFact = await getAIFunFact(ctx, decision.postType, variables);
-      if (aiFact) {
-        message = `${message}\n\n${formatFunFact(aiFact.fact)}`;
-        console.log(`[TemplateEngine] Added AI fact: "${aiFact.fact}"`);
-      } else {
-        // Fall back to static facts if AI fails
-        message = maybeInjectFunFact(message, ctx.city, decision.postType, true);
-      }
-    } else {
-      // Use static facts
-      message = maybeInjectFunFact(message, ctx.city, decision.postType, true);
-    }
-  }
-
-  // Add data source attribution for freshness auditing
+  // Add data source attribution
   const sources = getPostDataSources(decision.postType);
   if (sources.length > 0) {
     message = addDataAttribution(message, sources);
