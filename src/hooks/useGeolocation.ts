@@ -79,8 +79,8 @@ export function useGeolocation(): GeolocationState & GeolocationActions {
     if (stored) {
       try {
         const parsed: StoredLocation = JSON.parse(stored);
-        // Check if cache is still valid (24 hours — location persists across sessions)
-        const STALE_MS = 24 * 60 * 60 * 1000;
+        // Check if cache is still valid (15 minutes — user may have moved)
+        const STALE_MS = 15 * 60 * 1000;
         const isValid = Date.now() - parsed.timestamp < STALE_MS;
         // Invalidate cache if cityName is a known bad value from previous bugs
         // Also invalidate coordinate-format strings (e.g. "37.8°N, 122.4°W") from geocode failures
@@ -108,21 +108,24 @@ export function useGeolocation(): GeolocationState & GeolocationActions {
             }
           }
 
-          // Always show cached data immediately (no loading spinner)
-          setState({
-            lat: parsed.lat,
-            lon: parsed.lon,
-            cityName: parsed.cityName,
-            stateCode: parsed.stateCode,
-            displayName: parsed.displayName,
-            loading: false,
-            error: null,
-            permissionStatus: "granted",
-          });
-          // If stale, trigger background refresh
-          if (!isValid) {
-            requestLocationInternal();
+          if (isValid) {
+            // Fresh cache — use immediately
+            setState({
+              lat: parsed.lat,
+              lon: parsed.lon,
+              cityName: parsed.cityName,
+              stateCode: parsed.stateCode,
+              displayName: parsed.displayName,
+              loading: false,
+              error: null,
+              permissionStatus: "granted",
+            });
+            return;
           }
+          // Stale cache — don't show stale city name, get fresh GPS
+          // Keep lat/lon for instant map positioning but refresh city via geocode
+          setState(prev => ({ ...prev, permissionStatus: "granted", loading: true }));
+          requestLocationInternal();
           return;
         }
         // Bad cache - clear it and re-geocode
