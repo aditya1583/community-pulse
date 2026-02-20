@@ -242,13 +242,15 @@ export async function GET(request: NextRequest) {
           continue;
         }
 
-        // Generate posts (each call fetches real data internally)
+        // Generate posts — track posted tags to force variety across iterations
+        const postedTagsThisRun: string[] = [];
         for (let i = 0; i < POSTS_PER_CITY; i++) {
           try {
             const result = await generateIntelligentPost(cityName, {
               force: true,
               coords: { lat, lon },
               includeEngagement: true,
+              excludeTypes: postedTagsThisRun,
             });
 
             if (result.posted && result.post) {
@@ -265,8 +267,8 @@ export async function GET(request: NextRequest) {
                 p.city.split(",")[0].trim().toLowerCase() === normalizedCity.toLowerCase()
               );
 
-              // Check 1: Same tag in last 6 hours = skip
-              const sixHrsAgo = Date.now() - 6 * 60 * 60 * 1000;
+              // Check 1: Same tag in last 3 hours = skip (aligned with expiration times)
+              const sixHrsAgo = Date.now() - 3 * 60 * 60 * 1000;
               const sameTagRecent = cityPosts.filter(p => 
                 p.tag === result.post.tag && new Date(p.created_at || 0).getTime() > sixHrsAgo
               );
@@ -343,6 +345,7 @@ export async function GET(request: NextRequest) {
               if (!insertError) {
                 postsCreated++;
                 totalCreated++;
+                postedTagsThisRun.push(result.post.tag);
               }
             }
           } catch (postErr) {

@@ -76,7 +76,7 @@ export function buildTimeContext(now: Date, city: CityConfig): TimeContext {
 /**
  * Analyze situation and decide what (if anything) to post
  */
-export function analyzeForPost(ctx: SituationContext): PostDecision {
+export function analyzeForPost(ctx: SituationContext, excludeTypes?: string[]): PostDecision {
   // Check each category in priority order
   const decisions = [
     checkForTrafficPost(ctx),
@@ -85,9 +85,9 @@ export function analyzeForPost(ctx: SituationContext): PostDecision {
     checkForGeneralPost(ctx),
   ];
 
-  // Find highest priority post that should be made
+  // Find highest priority post that should be made (excluding already-posted types)
   const bestDecision = decisions
-    .filter((d) => d.shouldPost)
+    .filter((d) => d.shouldPost && (!excludeTypes || !excludeTypes.includes(d.postType!)))
     .sort((a, b) => b.priority - a.priority)[0];
 
   if (bestDecision) {

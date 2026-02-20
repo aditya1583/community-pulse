@@ -158,7 +158,7 @@ export interface IntelligentPostResult {
  */
 export async function generateIntelligentPost(
   cityName: string,
-  options: { force?: boolean; coords?: CityCoords; includeEngagement?: boolean } = {}
+  options: { force?: boolean; coords?: CityCoords; includeEngagement?: boolean; excludeTypes?: string[] } = {}
 ): Promise<IntelligentPostResult> {
   // UNIVERSAL CONFIG: Get pre-configured OR generate dynamic config
   let config = getCityConfig(cityName) ||
@@ -227,7 +227,7 @@ export async function generateIntelligentPost(
   }
 
   // Analyze what to post (regular informational posts)
-  const decision = analyzeForPost(ctx);
+  const decision = analyzeForPost(ctx, options.excludeTypes);
 
   if (!decision.shouldPost || !decision.postType) {
     return {
