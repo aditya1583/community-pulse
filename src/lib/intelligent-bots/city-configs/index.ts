@@ -70,10 +70,14 @@ export function getOrCreateCityConfig(
     return preconfigured;
   }
 
-  // Try finding nearby pre-configured city
+  // Try finding nearby pre-configured city — borrow its roads/landmarks but use OUR city name
   const nearby = getCityConfigByCoords(coords);
   if (nearby) {
-    return nearby;
+    return {
+      ...nearby,
+      name: cityName,
+      coords,
+    };
   }
 
   // Generate dynamic config for this city
