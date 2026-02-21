@@ -127,7 +127,18 @@ function buildDataPayload(ctx: SituationContext, decision: PostDecision): DataPa
   }
 
   if (ctx.events?.length > 0) {
-    const event = ctx.events[Math.floor(Math.random() * ctx.events.length)];
+    // Filter out events already mentioned in recent posts to prevent duplicates
+    const recentLower = (recentPosts || []).map(p => p.toLowerCase());
+    const unusedEvents = ctx.events.filter(e => {
+      const nameLower = (e.name || "").toLowerCase();
+      // Skip if any recent post mentions this event name (or first 3+ words of it)
+      const nameWords = nameLower.split(/\s+/).filter(w => w.length > 2).slice(0, 4);
+      return !recentLower.some(post => 
+        nameWords.length >= 2 && nameWords.filter(w => post.includes(w)).length >= Math.ceil(nameWords.length * 0.6)
+      );
+    });
+    const pool = unusedEvents.length > 0 ? unusedEvents : ctx.events;
+    const event = pool[Math.floor(Math.random() * pool.length)];
     payload.event = {
       name: event.name,
       venue: event.venue,
