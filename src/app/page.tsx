@@ -1524,7 +1524,13 @@ export default function Home() {
           weather={weather}
         />
 
-        <PullToRefresh onRefresh={handlePullToRefresh} disabled={loading}>
+        <PullToRefresh onRefresh={async () => {
+          // Refresh GPS location if not in manual mode
+          if (!useManualLocation && geolocation.permissionStatus === "granted") {
+            geolocation.requestLocation();
+          }
+          await handlePullToRefresh();
+        }} disabled={loading}>
           {/* Main Content Area */}
           <main className="flex-1 flex justify-center px-4 pb-6" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
             <div className="w-full max-w-lg space-y-6">
