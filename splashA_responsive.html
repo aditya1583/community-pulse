@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  html, body {
+    width: 100%;
+    height: 100%;
+    background: #020a06;
+    overflow: hidden;
+    font-family: 'Orbitron', sans-serif;
+  }
+
+  .container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Deep ambient glow */
+  .ambient {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: 
+      radial-gradient(ellipse 80vw 80vw at 50% 42%, rgba(16,185,129,0.08) 0%, transparent 70%),
+      radial-gradient(ellipse 40vw 60vw at 30% 35%, rgba(5,150,105,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 40vw 60vw at 70% 50%, rgba(52,211,153,0.04) 0%, transparent 60%);
+  }
+
+  /* Radar rings */
+  .radar-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -52%);
+  }
+
+  .radar-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 1.5px solid rgba(16,185,129,0.12);
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 20px rgba(16,185,129,0.03), inset 0 0 20px rgba(16,185,129,0.02);
+  }
+  .radar-ring.r1 { width: 22vmin; height: 22vmin; border-color: rgba(16,185,129,0.35); box-shadow: 0 0 30px rgba(16,185,129,0.08); }
+  .radar-ring.r2 { width: 37vmin; height: 37vmin; border-color: rgba(16,185,129,0.22); }
+  .radar-ring.r3 { width: 52vmin; height: 52vmin; border-color: rgba(16,185,129,0.14); }
+  .radar-ring.r4 { width: 67vmin; height: 67vmin; border-color: rgba(16,185,129,0.08); }
+  .radar-ring.r5 { width: 82vmin; height: 82vmin; border-color: rgba(16,185,129,0.04); }
+
+  /* Sweep arc */
+  .sweep {
+    position: absolute;
+    width: 41vmin;
+    height: 41vmin;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: conic-gradient(
+      from 0deg,
+      transparent 0deg,
+      rgba(16,185,129,0.15) 30deg,
+      rgba(16,185,129,0.08) 60deg,
+      transparent 90deg
+    );
+    animation: sweep-rotate 4s linear infinite;
+  }
+  @keyframes sweep-rotate {
+    from { transform: translate(-50%, -50%) rotate(0deg); }
+    to { transform: translate(-50%, -50%) rotate(360deg); }
+  }
+
+  /* Signal blips */
+  .blip {
+    position: absolute;
+    border-radius: 50%;
+    background: #10b981;
+    animation: blip-pulse 2s ease-in-out infinite;
+  }
+  .blip::after {
+    content: '';
+    position: absolute;
+    width: 200%;
+    height: 200%;
+    top: -50%; left: -50%;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(16,185,129,0.4) 0%, transparent 70%);
+  }
+  .b1 { width: 8px; height: 8px; top: 28%; left: 62%; animation-delay: 0s; }
+  .b2 { width: 6px; height: 6px; top: 58%; left: 30%; animation-delay: 0.7s; }
+  .b3 { width: 7px; height: 7px; top: 24%; left: 38%; animation-delay: 1.3s; }
+  .b4 { width: 5px; height: 5px; top: 48%; left: 72%; animation-delay: 0.4s; }
+  .b5 { width: 8px; height: 8px; top: 64%; left: 58%; animation-delay: 1.8s; }
+  @keyframes blip-pulse {
+    0%, 100% { opacity: 0.3; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.5); }
+  }
+
+  /* === LOGO MARK === */
+  .logo-mark {
+    position: relative;
+    z-index: 20;
+    width: 18vmin;
+    height: 18vmin;
+    min-width: 100px;
+    min-height: 100px;
+    max-width: 200px;
+    max-height: 200px;
+    margin-bottom: 5vh;
+  }
+
+  .logo-mark svg {
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 0 30px rgba(16,185,129,0.6)) drop-shadow(0 0 60px rgba(16,185,129,0.3));
+  }
+
+  /* Center ping */
+  .center-ping {
+    position: absolute;
+    top: 36%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 20px #10b981, 0 0 40px rgba(16,185,129,0.6), 0 0 80px rgba(16,185,129,0.3);
+    z-index: 25;
+  }
+  .center-ping::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid rgba(16,185,129,0.4);
+    animation: ping-expand 2s ease-out infinite;
+  }
+  @keyframes ping-expand {
+    0% { width: 14px; height: 14px; opacity: 1; }
+    100% { width: 80px; height: 80px; opacity: 0; }
+  }
+
+  /* === WORDMARK === */
+  .wordmark-area {
+    position: relative;
+    z-index: 20;
+    text-align: center;
+  }
+
+  .wordmark {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(48px, 10vw, 144px);
+    font-weight: 900;
+    letter-spacing: clamp(8px, 2vw, 24px);
+    color: #f0fdf4;
+    text-shadow: 
+      0 0 20px rgba(16,185,129,0.3),
+      0 0 40px rgba(16,185,129,0.15);
+  }
+  .wordmark .glow-letter {
+    color: #10b981;
+    text-shadow: 
+      0 0 20px rgba(16,185,129,0.8),
+      0 0 40px rgba(16,185,129,0.5),
+      0 0 80px rgba(16,185,129,0.3);
+  }
+
+  /* Underline accent */
+  .accent-line {
+    width: clamp(200px, 50vw, 600px);
+    height: 3px;
+    margin: 3vh auto 0;
+    background: linear-gradient(90deg, transparent, #10b981 30%, #34d399 50%, #10b981 70%, transparent);
+    box-shadow: 0 0 20px rgba(16,185,129,0.6), 0 0 40px rgba(16,185,129,0.3);
+    border-radius: 2px;
+  }
+
+  /* Tagline */
+  .tagline {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: clamp(14px, 3.5vw, 48px);
+    font-weight: 500;
+    letter-spacing: clamp(4px, 1.5vw, 22px);
+    color: rgba(52,211,153,0.7);
+    text-transform: uppercase;
+    margin-top: 3vh;
+    text-shadow: 0 0 15px rgba(16,185,129,0.3);
+  }
+
+  /* Tech footer */
+  .tech-footer {
+    position: absolute;
+    bottom: 5vh;
+    display: flex;
+    gap: 40px;
+    z-index: 20;
+  }
+  .tech-label {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: clamp(10px, 1.5vw, 20px);
+    letter-spacing: 6px;
+    color: rgba(16,185,129,0.25);
+    text-transform: uppercase;
+  }
+
+  /* Corner brackets */
+  .bracket {
+    position: absolute;
+    width: 35px;
+    height: 35px;
+    z-index: 20;
+  }
+  .bracket svg { width: 100%; height: 100%; }
+  .bracket.tl { top: 5vh; left: 5vw; }
+  .bracket.tr { top: 5vh; right: 5vw; transform: scaleX(-1); }
+  .bracket.bl { bottom: 5vh; left: 5vw; transform: scaleY(-1); }
+  .bracket.br { bottom: 5vh; right: 5vw; transform: scale(-1,-1); }
+
+  /* Noise grain overlay */
+  .grain {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 256px;
+    z-index: 30;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="ambient"></div>
+  <div class="grain"></div>
+
+  <div class="radar-container">
+    <div class="radar-ring r5"></div>
+    <div class="radar-ring r4"></div>
+    <div class="radar-ring r3"></div>
+    <div class="radar-ring r2"></div>
+    <div class="radar-ring r1"></div>
+    <div class="sweep"></div>
+  </div>
+
+  <div class="blip b1"></div>
+  <div class="blip b2"></div>
+  <div class="blip b3"></div>
+  <div class="blip b4"></div>
+  <div class="blip b5"></div>
+
+  <!-- Logo: Signal tower / broadcast icon -->
+  <div class="logo-mark">
+    <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M100 160 L100 80" stroke="#10b981" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="100" cy="72" r="12" fill="#10b981"/>
+      <path d="M70 110 Q100 70 130 110" stroke="#10b981" stroke-width="3.5" stroke-linecap="round" fill="none" opacity="0.9"/>
+      <path d="M54 130 Q100 55 146 130" stroke="#10b981" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.6"/>
+      <path d="M38 150 Q100 40 162 150" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.35"/>
+      <path d="M80 160 L120 160" stroke="#10b981" stroke-width="5" stroke-linecap="round"/>
+      <path d="M70 175 L130 175" stroke="#10b981" stroke-width="4" stroke-linecap="round" opacity="0.5"/>
+    </svg>
+    <div class="center-ping"></div>
+  </div>
+
+  <div class="wordmark-area">
+    <div class="wordmark">V<span class="glow-letter">O</span>XL<span class="glow-letter">O</span></div>
+    <div class="accent-line"></div>
+    <div class="tagline">Hyperlocal Intelligence</div>
+  </div>
+
+  <!-- Corner brackets -->
+  <div class="bracket tl"><svg viewBox="0 0 50 50"><path d="M0 50 L0 0 L50 0" fill="none" stroke="rgba(16,185,129,0.25)" stroke-width="1.5"/></svg></div>
+  <div class="bracket tr"><svg viewBox="0 0 50 50"><path d="M0 50 L0 0 L50 0" fill="none" stroke="rgba(16,185,129,0.25)" stroke-width="1.5"/></svg></div>
+  <div class="bracket bl"><svg viewBox="0 0 50 50"><path d="M0 50 L0 0 L50 0" fill="none" stroke="rgba(16,185,129,0.25)" stroke-width="1.5"/></svg></div>
+  <div class="bracket br"><svg viewBox="0 0 50 50"><path d="M0 50 L0 0 L50 0" fill="none" stroke="rgba(16,185,129,0.25)" stroke-width="1.5"/></svg></div>
+
+  <div class="tech-footer">
+    <div class="tech-label">Austin · TX</div>
+    <div class="tech-label">v1.0</div>
+  </div>
+</div>
+</body>
+</html>

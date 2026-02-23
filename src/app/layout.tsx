@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Outfit } from "next/font/google";
+import { Outfit, Orbitron, Rajdhani } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { CapacitorProvider } from "@/components/CapacitorProvider";
@@ -8,6 +8,18 @@ import { CapacitorProvider } from "@/components/CapacitorProvider";
 const outfit = Outfit({
   subsets: ["latin"],
   variable: "--font-outfit",
+});
+
+const orbitron = Orbitron({
+  subsets: ["latin"],
+  weight: ["400", "700", "900"],
+  variable: "--font-orbitron",
+});
+
+const rajdhani = Rajdhani({
+  subsets: ["latin"],
+  weight: ["300", "500", "700"],
+  variable: "--font-rajdhani",
 });
 
 export const metadata: Metadata = {
@@ -55,7 +67,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
-        className={`${outfit.variable} font-sans antialiased bg-black text-slate-50`}
+        className={`${outfit.variable} ${orbitron.variable} ${rajdhani.variable} font-sans antialiased bg-black text-slate-50`}
       >
         <CapacitorProvider>
           <ServiceWorkerRegister />

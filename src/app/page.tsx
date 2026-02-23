@@ -48,6 +48,7 @@ import { RADIUS_CONFIG } from "@/lib/constants/radius";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
 import InstallPrompt from "@/components/InstallPrompt";
 import PullToRefresh from "@/components/PullToRefresh";
+import SplashScreen from "@/components/SplashScreen";
 import { getApiUrl } from "@/lib/api-config";
 
 // EVENTS
@@ -1191,6 +1192,7 @@ export default function Home() {
 
   return (
     <>
+      <SplashScreen />
       {/* Fixed background that extends into iOS safe areas */}
       <div className="fixed inset-0 bg-black -z-50" aria-hidden="true" />
 
