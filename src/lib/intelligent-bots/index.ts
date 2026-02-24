@@ -192,39 +192,9 @@ export async function generateIntelligentPost(
   const ctx = buildSituationContext(config, traffic, weather, events, farmersMarkets);
   const situationSummary = getSituationSummary(ctx);
 
-  // Check for engagement post opportunity first (if enabled)
-  if (options.includeEngagement !== false) {
-    const engagementDecision = analyzeForEngagement(ctx);
-
-    if (engagementDecision.shouldPost && engagementDecision.engagementType) {
-      // Check cooldown for engagement posts
-      // Note: We ALWAYS check cooldown even with force:true to prevent instant duplicates in loops
-      const cooldown = checkCooldown(
-        cityName,
-        "General", // Engagement posts are usually "General" tag
-        options.force ? 10 : 5, // Force = high priority
-        engagementDecision.engagementType
-      );
-
-      if (cooldown.allowed) {
-        const engagementPost = await generateEngagementPost(ctx, engagementDecision.engagementType);
-        if (engagementPost) {
-          // Record the post in cooldown state
-          recordPost(cityName, engagementPost.tag as PostType || "General", engagementDecision.engagementType);
-
-          return {
-            success: true,
-            posted: true,
-            reason: engagementDecision.reason,
-            post: engagementPost,
-            situationSummary,
-          };
-        }
-      } else {
-        console.log(`[IntelligentPost] Engagement ${engagementDecision.engagementType} blocked: ${cooldown.reason}`);
-      }
-    }
-  }
+  // Engagement posts DISABLED — all AI content must come from real APIs only
+  // (Open-Meteo weather, TomTom traffic, Ticketmaster events)
+  // No fabricated content. No "General" tag posts. Ever.
 
   // Analyze what to post (regular informational posts)
   const decision = analyzeForPost(ctx, options.excludeTypes);
@@ -380,16 +350,14 @@ export async function generateColdStartPosts(
   const ctx = buildSituationContext(config, traffic, weather, events, farmersMarkets);
   const situationSummary = getSituationSummary(ctx);
 
-  // Generate varied posts (now with AI-powered fun facts!)
-  const regularPosts = await generateSeedPosts(ctx, Math.ceil(count * 0.6)); // 60% regular posts
+  // Generate posts from REAL API DATA ONLY (weather, traffic, events)
+  // No engagement posts, no "General" category, no fabricated content
+  const regularPosts = await generateSeedPosts(ctx, count);
 
-  // Generate engagement posts if enabled
-  let engagementPosts: EngagementPost[] = [];
-  if (includeEngagement) {
-    engagementPosts = await generateEngagementSeedPosts(ctx, Math.ceil(count * 0.4)); // 40% engagement
-  }
+  // Engagement posts DISABLED — zero fabricated content allowed
+  const engagementPosts: EngagementPost[] = [];
 
-  const allPosts = [...regularPosts, ...engagementPosts];
+  const allPosts = [...regularPosts];
 
   if (allPosts.length === 0) {
     return {

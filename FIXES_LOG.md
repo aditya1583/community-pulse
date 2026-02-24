@@ -485,3 +485,29 @@ This enables freshness auditing — you can see exactly what data backed each po
 
 ### Build Status
 ✅ `npm run build` passes clean
+
+---
+
+## Commit: (2026-02-24) — Kill General tag, API-only content, splash fix
+
+### FIX 1: Remove "General" post type entirely ✅
+**Files:** `src/lib/intelligent-bots/types.ts`, `src/lib/intelligent-bots/situation-analyzer.ts`, `src/lib/intelligent-bots/index.ts`, `src/lib/intelligent-bots/template-engine.ts`
+**What changed:** PostType no longer includes "General". checkForGeneralPost() removed from decision engine. Engagement posts disabled. Template engine no longer generates General seed posts. ALL AI content now must come from real APIs (Open-Meteo, TomTom, Ticketmaster).
+**Why:** AI fabricated a fake "Siam Garden" Thai restaurant in Leander. Credibility-killing. General/engagement content has no API backing = hallucination risk.
+
+### FIX 2: Nuked fabricated seed pulses from DB ✅
+**What changed:** Deleted 8 fabricated bot pulses (4 General: fake restaurant, fake construction, fake school news, fake HEB expansion; 4 Events: fake library craft hour, fake park cleanup, fake farmers market, fake food truck friday). Only kept API-sourced content (Ticketmaster events, Open-Meteo weather, TomTom traffic).
+
+### FIX 3: Splash screen — remove "Austin, TX" footer ✅
+**Files:** `src/components/SplashScreen.tsx`
+**What changed:** Footer changed from "Austin · TX" / "v1.0" to "Hyperlocal · Intelligence" / "v1.2"
+
+### FIX 4: Native iOS splash — plain dark background ✅
+**Files:** `ios/App/App/Base.lproj/LaunchScreen.storyboard`
+**What changed:** Removed Splash image from native launch screen. Now shows plain dark background (matching animated splash BG) so the transition feels seamless — one splash, not two.
+
+### New File: AI_CONTENT_RULES.md ✅
+Permanent reference document for AI content generation rules.
+
+### Build/Test Status
+✅ `npm run build` clean

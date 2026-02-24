@@ -130,7 +130,7 @@ const SplashScreen: React.FC = () => {
 
         {/* Tech footer */}
         <div style={{ position: "absolute", bottom: "5vh", display: "flex", gap: 40, zIndex: 20 }}>
-          {["Austin · TX", "v1.0"].map((label) => (
+          {["Hyperlocal · Intelligence", "v1.2"].map((label) => (
             <div key={label} style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: "clamp(10px, 1.5vw, 20px)", letterSpacing: 6, color: "rgba(16,185,129,0.25)", textTransform: "uppercase" as const }}>
               {label}
             </div>

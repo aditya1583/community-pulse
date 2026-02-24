@@ -173,7 +173,8 @@ export interface SituationContext {
   time: TimeContext;
 }
 
-export type PostType = 'Traffic' | 'Weather' | 'Events' | 'General';
+// General REMOVED — all AI content must be grounded in real API data
+export type PostType = 'Traffic' | 'Weather' | 'Events';
 
 export interface PostDecision {
   shouldPost: boolean;

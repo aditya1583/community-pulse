@@ -82,7 +82,9 @@ export function analyzeForPost(ctx: SituationContext, excludeTypes?: string[]): 
     checkForTrafficPost(ctx),
     checkForWeatherPost(ctx),
     checkForEventPost(ctx),
-    checkForGeneralPost(ctx),
+    // General posts REMOVED — all AI content must be grounded in real API data
+    // (weather from Open-Meteo, traffic from TomTom, events from Ticketmaster)
+    // NO fabricated restaurant openings, construction updates, or school news
   ];
 
   // Find highest priority post that should be made (excluding already-posted types)

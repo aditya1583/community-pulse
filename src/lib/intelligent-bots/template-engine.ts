@@ -590,11 +590,8 @@ export async function generateSeedPosts(
     ...(ctx.events.length > 0 ? [{ type: "Events" as PostType, category: getEventCategory(ctx.events[0]), eventIndex: 0 }] : []),
     // Events: Second event (if different) - this will be farther away
     ...(ctx.events.length > 1 ? [{ type: "Events" as PostType, category: getEventCategory(ctx.events[1]), eventIndex: 1 }] : []),
-    // General - only if NOT already posting weather (to avoid redundancy)
-    // Skip during normal hours when weather post already covers the vibe
-    ...(
-      !getWeatherCategory(ctx) ? [{ type: "General" as PostType, category: getGeneralCategory(ctx) }] : []
-    ),
+    // General REMOVED — all AI content must come from real API data only
+    // No fabricated restaurants, construction updates, or school news
     // School zone as alternative to general traffic (only during dismissal)
     ...(ctx.time.isSchoolDismissal ? [{ type: "Traffic" as PostType, category: "schoolZone" }] : []),
   ];
