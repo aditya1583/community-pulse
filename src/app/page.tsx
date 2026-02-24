@@ -1017,11 +1017,9 @@ export default function Home() {
   });
 
   // Count in-radius vs out-of-radius for potential UI separation
+  // Only show in-radius pulses (null distance = local/no coords = treat as in-radius)
   const inRadiusPulses = boostedPulses.filter(
-    (p) => p.distanceMiles !== null && p.distanceMiles <= RADIUS_CONFIG.PRIMARY_RADIUS_MILES
-  );
-  const outOfRadiusPulses = boostedPulses.filter(
-    (p) => p.distanceMiles === null || p.distanceMiles > RADIUS_CONFIG.PRIMARY_RADIUS_MILES
+    (p) => p.distanceMiles === null || p.distanceMiles <= RADIUS_CONFIG.PRIMARY_RADIUS_MILES
   );
 
   // Traffic-tagged pulses for traffic tab (also filter expired)
@@ -2017,30 +2015,7 @@ export default function Home() {
                               return [card];
                             })}
 
-                          {/* Out-of-radius Content */}
-                          {outOfRadiusPulses.length > 0 && (
-                            <div className="relative py-4">
-                              <div className="absolute inset-0 flex items-center px-4"><div className="w-full border-t border-dashed border-amber-500/20" /></div>
-                              <div className="relative flex justify-center">
-                                <span className="bg-slate-950 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-amber-500/80 border border-amber-500/20 rounded-full">Beyond 10 Miles</span>
-                              </div>
-                            </div>
-                          )}
-
-                          {outOfRadiusPulses.map((pulse) => (
-                            <PulseCard
-                              key={pulse.id}
-                              pulse={pulse}
-                              isOwnPulse={sessionUser?.id === pulse.user_id}
-                              isFavorite={favoritePulseIds.includes(pulse.id)}
-                              onToggleFavorite={handleToggleFavorite}
-                              onDelete={handleDeletePulse}
-                              reporterId={sessionUser?.id}
-                              userIdentifier={sessionUser ? displayName : undefined}
-                              authorRank={pulse.user_id ? authorStats[pulse.user_id]?.rank : null}
-                              authorLevel={pulse.user_id ? authorStats[pulse.user_id]?.level : undefined}
-                            />
-                          ))}
+                          {/* Out-of-radius content removed — feed only shows in-radius pulses */}
 
                           {hasMorePulses && tagFilter === "All" && (
                             <button
