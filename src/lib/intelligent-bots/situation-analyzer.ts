@@ -472,24 +472,22 @@ function checkForEventPost(ctx: SituationContext): PostDecision {
     };
   }
 
-  // Also check for events happening today (broader awareness)
-  const todayEvents = events.filter((e) => {
-    const today = new Date(timestamp);
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return toDate(e.startTime) >= today && toDate(e.startTime) < tomorrow;
+  // Check for events happening today or tomorrow (48h window)
+  const twoDaysOut = new Date(timestamp.getTime() + 48 * 60 * 60 * 1000);
+  const upcomingEvents = events.filter((e) => {
+    const start = toDate(e.startTime);
+    return start >= timestamp && start < twoDaysOut;
   });
 
-  if (todayEvents.length > 0 && Math.random() < 0.3) {
-    // 30% chance to post about today's events
-    const event = todayEvents[Math.floor(Math.random() * todayEvents.length)];
+  if (upcomingEvents.length > 0) {
+    // Always post about upcoming events — the feed needs content
+    const event = upcomingEvents[0]; // Closest event first
     const templateCategory = getEventTemplateCategory(event);
 
     return {
       shouldPost: true,
       postType: "Events",
-      reason: `Event happening today: ${event.name}`,
+      reason: `Upcoming event: ${event.name}`,
       priority: 4,
       templateCategory,
     };

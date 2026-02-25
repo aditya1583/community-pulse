@@ -123,8 +123,8 @@ export function checkCooldown(
     }
   }
 
-  // HARD LIMIT: max 1 Weather, 1 Traffic per day per city (Events can have 2)
-  const maxPerDay: Record<string, number> = { Weather: 1, Traffic: 2, Events: 4 };
+  // HARD LIMIT per day per city: Weather refreshes every 2h (expiry), Traffic 2, Events 4
+  const maxPerDay: Record<string, number> = { Weather: 3, Traffic: 2, Events: 4 };
   const dailyLimit = maxPerDay[postType] ?? 2;
   const typeCount = state.postsByType[postType] || 0;
   if (typeCount >= dailyLimit) {
