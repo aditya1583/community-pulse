@@ -123,6 +123,18 @@ export function checkCooldown(
     }
   }
 
+  // HARD LIMIT: max 1 Weather, 1 Traffic per day per city (Events can have 2)
+  const maxPerDay: Record<string, number> = { Weather: 1, Traffic: 2, Events: 4 };
+  const dailyLimit = maxPerDay[postType] ?? 2;
+  const typeCount = state.postsByType[postType] || 0;
+  if (typeCount >= dailyLimit) {
+    return {
+      allowed: false,
+      reason: `Daily limit for ${postType}: ${typeCount}/${dailyLimit}`,
+      waitTimeMs: 60 * 60 * 1000,
+    };
+  }
+
   // High priority posts can bypass remaining cooldowns
   if (priority >= COOLDOWN_CONFIG.priorityBypassThreshold) {
     return { allowed: true, reason: "High priority bypass", waitTimeMs: 0 };

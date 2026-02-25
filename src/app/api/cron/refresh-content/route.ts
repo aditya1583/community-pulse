@@ -308,13 +308,16 @@ export async function GET(request: NextRequest) {
                 p.city.split(",")[0].trim().toLowerCase() === normalizedCity.toLowerCase()
               );
 
-              // Check 1: Same tag in last 3 hours = skip (aligned with expiration times)
-              const sixHrsAgo = Date.now() - 3 * 60 * 60 * 1000;
+              // Check 1: HARD LIMIT — only 1 Weather post per city at any time
+              // For Events: max 2 non-redundant. For Traffic: max 1 recent.
+              const maxByTag: Record<string, number> = { Weather: 1, Traffic: 1, Events: 2 };
+              const tagLimit = maxByTag[result.post.tag] ?? 1;
+              const twoHrsAgoMs = Date.now() - 2 * 60 * 60 * 1000;
               const sameTagRecent = cityPosts.filter(p => 
-                p.tag === result.post.tag && new Date(p.created_at || 0).getTime() > sixHrsAgo
+                p.tag === result.post.tag && new Date(p.created_at || 0).getTime() > twoHrsAgoMs
               );
-              if (sameTagRecent.length > 0) {
-                console.log(`[Cron] Skipping: ${result.post.tag} already posted for ${normalizedCity} within 6h`);
+              if (sameTagRecent.length >= tagLimit) {
+                console.log(`[Cron] Skipping: ${result.post.tag} at limit (${sameTagRecent.length}/${tagLimit}) for ${normalizedCity}`);
                 continue;
               }
 

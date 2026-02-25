@@ -68,7 +68,7 @@ type EventItem = {
 // Saved Favorites
 type FavoritePulseId = number;
 
-const TAGS = ["All", "Traffic", "Weather", "Events", "General"];
+const TAGS = ["All", "Traffic", "Weather", "Events"];
 
 const DEFAULT_CITY: GeocodedCity = {
   id: "austin-tx-us",
