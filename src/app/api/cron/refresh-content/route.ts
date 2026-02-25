@@ -124,8 +124,10 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const MAX_CITIES_PER_RUN = 3;
+// CONTENT RULES (etched in stone):
+// 1 weather thought (witty/wise) + max 2 non-redundant events = 3 max per cycle
 const POSTS_PER_CITY = 3;
-const MAX_BOT_POSTS_PER_CITY = 7;
+const MAX_BOT_POSTS_PER_CITY = 3;
 
 function getExpirationHours(tag: string): number {
   const t = tag.toLowerCase();

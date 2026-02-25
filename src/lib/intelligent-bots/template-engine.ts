@@ -70,29 +70,30 @@ const WEATHER_TEMPLATES = {
     "⚠️ Severe weather in {city}.",
   ],
   heat: [
-    "🥵 {temp}°F in {city}. Feels like {feelsLike}°F.",
-    "🥵 High heat: {temp}°F in {city}. Limit outdoor activity.",
+    "🥵 {temp}°F in {city}. Feels like {feelsLike}°F. Hydrate or hibernate.",
+    "🥵 It's {temp}°F in {city}. The pavement is judging your shoe choices.",
   ],
   cold: [
-    "🥶 {temp}°F in {city}.",
-    "❄️ Cold: {temp}°F. {bridge} may be icy.",
+    "🥶 {temp}°F in {city}. Layer up — your future self will thank you.",
+    "❄️ {temp}°F out there. {bridge} might be icy, take it slow.",
   ],
   fog: [
-    "🌫️ Fog in {city}. Low visibility on {highway}.",
+    "🌫️ Foggy in {city}. Drive like you can't see, because you can't.",
   ],
   uvAlert: [
-    "☀️ UV index: {uvIndex}.",
+    "☀️ UV index hitting {uvIndex} today. Sunscreen isn't optional.",
   ],
   perfectWeather: [
-    "☀️ {temp}°F and clear in {city}.",
-    "🌤️ Clear skies, {temp}°F in {city}.",
+    "☀️ {temp}°F and sunny in {city}. Your lunch break wants to be outside today.",
+    "🌤️ {temp}°F, clear skies in {city}. This is the weather you moved to Texas for.",
+    "☀️ {temp}°F in {city}. Perfect day to touch grass. Literally.",
   ],
   snow: [
-    "❄️ Snow in {city}. {highway} conditions deteriorating.",
+    "❄️ Snow in {city}?! Yes, really. {highway} getting slippery — drive like your grandma's watching.",
   ],
   forecast: [
-    "🌡️ Forecast: {forecastDay} — {forecastCondition}, high {forecastHigh}°F, low {forecastLow}°F.",
-    "📅 {forecastDay}: {forecastCondition}, {forecastHigh}°F/{forecastLow}°F.",
+    "🌡️ Tomorrow in {city}: {forecastCondition}, {forecastHigh}°F/{forecastLow}°F. Plan accordingly.",
+    "📅 Heads up — {forecastDay} is looking {forecastCondition} with a high of {forecastHigh}°F in {city}.",
   ],
 };
 
