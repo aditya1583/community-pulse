@@ -1842,7 +1842,7 @@ export default function Home() {
                         <p className="text-sm font-bold text-white truncate">
                           {(() => {
                             const closure = trafficIncidents?.find(i => i.type === "closure");
-                            if (closure?.roadName) return `${closure.roadName}: ${closure.description || "Closed"}`;
+                            if (closure?.roadName) return `${closure.roadName}: ${closure.description || "Possible restrictions"}`;
                             if (hasRoadClosure) return "Road closures nearby";
                             const severe = trafficIncidents?.find(i => i.severity >= 3);
                             if (severe?.roadName) return `${severe.roadName}: ${severe.description || "Major incident"}`;

@@ -196,15 +196,20 @@ async function fetchTraffic(city: string, lat?: number, lon?: number) {
         for (const inc of (data.incidents as IncidentItem[]).slice(0, 10)) {
           const props = inc.properties || {};
           const events = props.events || [];
-          const description = events.length > 0
+          let description = events.length > 0
             ? events.map((e) => e.description || "").join("; ")
             : "Traffic incident reported";
+          // Soften "Road closed" — TomTom reports partial closures the same way
+          if (/road closed/i.test(description) && !(/fully closed|all lanes/i.test(description))) {
+            description = description.replace(/road closed/i, "Lane restrictions or partial closure");
+          }
 
           const iconCat = props.iconCategory || 0;
           let incType = "other";
           if (iconCat === 2) incType = "accident";
           else if (iconCat === 7) incType = "congestion";
           else if (iconCat === 8 || iconCat === 9) { incType = "closure"; hasRoadClosure = true; }
+          else if (iconCat === 6) incType = "roadwork";
           else if (iconCat === 10) incType = "roadwork";
 
           const mag = props.magnitudeOfDelay || 0;
