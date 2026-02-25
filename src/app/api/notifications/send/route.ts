@@ -136,14 +136,14 @@ async function sendAPNs(
   data: Record<string, unknown>,
   config: NonNullable<ReturnType<typeof getAPNsConfig>>
 ): Promise<{ success: boolean; error?: string }> {
-  const jwt = generateAPNsJWT(config.keyId, config.teamId, config.keyBase64);
+  const jwtToken = generateAPNsJWT(config.keyId, config.teamId, config.keyBase64);
 
   const host =
     config.environment === "production"
-      ? "https://api.push.apple.com"
-      : "https://api.sandbox.push.apple.com";
+      ? "api.push.apple.com"
+      : "api.sandbox.push.apple.com";
 
-  const apnsPayload = {
+  const apnsPayload = JSON.stringify({
     aps: {
       alert: { title, body },
       sound: "default",
@@ -151,34 +151,71 @@ async function sendAPNs(
       "mutable-content": 1,
     },
     ...data,
-  };
+  });
 
-  try {
-    const res = await fetch(`${host}/3/device/${deviceToken}`, {
-      method: "POST",
-      headers: {
-        authorization: `bearer ${jwt}`,
-        "apns-topic": config.bundleId,
-        "apns-push-type": "alert",
-        "apns-priority": "10",
-        "apns-expiration": "0",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(apnsPayload),
+  // APNs REQUIRES HTTP/2 — Node.js fetch may not negotiate it.
+  // Use the native http2 module for guaranteed HTTP/2 support.
+  const http2 = await import("http2");
+
+  return new Promise((resolve) => {
+    const client = http2.connect(`https://${host}`);
+
+    client.on("error", (err) => {
+      console.error("[APNs] HTTP/2 connection error:", err);
+      client.close();
+      resolve({ success: false, error: `Connection error: ${String(err)}` });
     });
 
-    if (res.ok) {
-      return { success: true };
-    }
+    const req = client.request({
+      ":method": "POST",
+      ":path": `/3/device/${deviceToken}`,
+      "authorization": `bearer ${jwtToken}`,
+      "apns-topic": config.bundleId,
+      "apns-push-type": "alert",
+      "apns-priority": "10",
+      "apns-expiration": "0",
+      "content-type": "application/json",
+      "content-length": Buffer.byteLength(apnsPayload),
+    });
 
-    const errBody = await res.text();
-    console.error(`[APNs] Failed (${res.status}):`, errBody);
+    let responseData = "";
+    let statusCode = 0;
 
-    return { success: false, error: `APNs ${res.status}: ${errBody}` };
-  } catch (err) {
-    console.error("[APNs] Fetch error:", err);
-    return { success: false, error: String(err) };
-  }
+    req.on("response", (headers) => {
+      statusCode = headers[":status"] as number;
+    });
+
+    req.on("data", (chunk: Buffer) => {
+      responseData += chunk.toString();
+    });
+
+    req.on("end", () => {
+      client.close();
+      if (statusCode === 200) {
+        console.log("[APNs] ✅ Push delivered to", deviceToken.substring(0, 10) + "...");
+        resolve({ success: true });
+      } else {
+        console.error(`[APNs] ❌ Failed (${statusCode}):`, responseData);
+        resolve({ success: false, error: `APNs ${statusCode}: ${responseData}` });
+      }
+    });
+
+    req.on("error", (err) => {
+      client.close();
+      console.error("[APNs] Request error:", err);
+      resolve({ success: false, error: String(err) });
+    });
+
+    // Set timeout
+    req.setTimeout(10000, () => {
+      req.close();
+      client.close();
+      resolve({ success: false, error: "APNs request timeout (10s)" });
+    });
+
+    req.write(apnsPayload);
+    req.end();
+  });
 }
 
 // ============================================================================
