@@ -220,7 +220,7 @@ export default function TrafficContent({
       const desc = closure?.description || "Closure reported";
       return {
         icon: "🚧",
-        type: "CLOSURE",
+        type: "ROADWORK",
         message: closure?.roadName ? `${closure.roadName}: ${desc}` : desc,
         severity: "high" as const,
       };
