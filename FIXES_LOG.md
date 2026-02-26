@@ -2,7 +2,28 @@
 
 ---
 
-## Commit: f5fd602 (2026-02-26) — Event dedup: seed path + same-run race condition
+## Commit: 4041c06 (2026-02-26) — CENTRALIZED BOT DEDUP GATEKEEPER (insertBotPulse)
+
+### REFACTOR: Single gatekeeper for ALL bot pulse inserts ✅
+**Files:** `src/lib/insertBotPulse.ts` (NEW), `src/app/api/cron/refresh-content/route.ts`, `src/app/api/auto-seed/route.ts`
+**Root cause:** Dedup logic was copy-pasted across 3 entry points (seed path, main cron, auto-seed POST), each with different implementations and gaps. Every fix patched one path while another leaked duplicates.
+**What changed:**
+- Created `src/lib/insertBotPulse.ts` — THE single function every bot insert must use
+- **Gate 1**: In-memory buffer dedup (catches same-run, same-cycle, rapid successive calls)
+- **Gate 2**: Per-tag limits (Weather: 1, Traffic: 1, Events: 2 per 2h window) — combined local + DB count
+- **Gate 3**: DB fingerprint dedup (48h window, 60% word overlap threshold)
+- **Gate 4**: Auto-cleanup of excess bot posts per city (max 3)
+- Removed ~100 lines of inline dedup from refresh-content route
+- Removed bulk insert + manual dedup from auto-seed route
+- **If you bypass insertBotPulse to insert a bot pulse, YOU are the bug**
+**Impact:** No entry point can produce duplicates anymore. Period.
+
+### Build Status
+✅ `npm run build` clean, pushed to apple/main, Vercel auto-deploying
+
+---
+
+## Commit: f5fd602 (2026-02-26) — Event dedup: seed path + same-run race condition (SUPERSEDED by 4041c06)
 
 ### FIX 1: Seed path had ZERO dedup ✅
 **Files:** `src/app/api/cron/refresh-content/route.ts`
