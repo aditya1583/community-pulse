@@ -163,7 +163,7 @@ export default function PulseModal({
                       : "bg-white/5 border border-white/5 text-slate-500 hover:text-white hover:bg-white/10"
                       }`}
                   >
-                    {category}
+                    {category === "General" ? "Local" : category}
                   </button>
                 );
               })}
