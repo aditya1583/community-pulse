@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { hasIntelligentBotConfig, generateColdStartPosts, getCityConfig } from "@/lib/intelligent-bots";
 import { RADIUS_CONFIG } from "@/lib/constants/radius";
+import { insertBotPulse } from "@/lib/insertBotPulse";
 // formatDistance removed — no longer showing distant events
 
 export const dynamic = "force-dynamic";
@@ -483,67 +484,43 @@ export async function POST(req: NextRequest) {
           });
         }
 
-        // Insert intelligent bot posts with natural timing variation
-        // Real users don't post at exact intervals - add organic randomness
-        const now = Date.now();
-        let cumulativeOffset = 0;
-
-        // Use provided coords or fall back to city lookup
+        // Insert via gatekeeper — handles all dedup, tag limits, cleanup
         const cityCoords = hasCoords
           ? { lat: body.lat!, lon: body.lon! }
           : getCityCoordinates(body.city);
 
-        const records = uniquePosts.map((post, index) => {
-          // First post is "now", subsequent posts are staggered backwards in time
-          // Each post is 3-7 minutes apart (varies per post) to feel organic
-          if (index > 0) {
-            const minGapMs = 3 * 60 * 1000; // 3 minutes minimum
-            const maxGapMs = 7 * 60 * 1000; // 7 minutes maximum
-            const randomGap = minGapMs + Math.random() * (maxGapMs - minGapMs);
-            cumulativeOffset += randomGap;
+        const now = Date.now();
+        let cumulativeOffset = 0;
+        let created = 0;
+
+        for (let i = 0; i < uniquePosts.length; i++) {
+          const post = uniquePosts[i];
+          // Stagger timestamps for organic feel
+          if (i > 0) {
+            cumulativeOffset += 3 * 60 * 1000 + Math.random() * 4 * 60 * 1000;
           }
 
-          const createdAt = new Date(now - cumulativeOffset).toISOString();
-          // Expiration by category: Weather/Traffic 3h, Events 12h, General 8h
-          const expirationMs = tag === "Weather" || tag === "Traffic" ? 3 * 60 * 60 * 1000
-            : tag === "Events" ? 12 * 60 * 60 * 1000 : 8 * 60 * 60 * 1000;
-          const expiresAt = new Date(now + expirationMs).toISOString();
-
-          return {
+          const insertResult = await insertBotPulse(supabase, {
             city: body.city,
             message: post.message,
             tag: post.tag,
             mood: post.mood,
             author: post.author,
-            user_id: null,
-            is_bot: true,
-            hidden: false,
-            created_at: createdAt,
-            expires_at: expiresAt,
-            poll_options: post.options || null,
             lat: cityCoords?.lat ?? null,
             lon: cityCoords?.lon ?? null,
-          };
-        });
+            pollOptions: post.options || null,
+            createdAt: new Date(now - cumulativeOffset).toISOString(),
+          });
 
-        const { data, error } = await supabase
-          .from("pulses")
-          .insert(records)
-          .select("id, city, message, tag, mood, created_at, poll_options");
-
-        if (error) {
-          console.error("[Auto-Seed] Intelligent bot insert error:", error);
-          return NextResponse.json(
-            { error: "Failed to create pulses", details: error.message },
-            { status: 500 }
-          );
+          if (insertResult.success) created++;
+          else console.log(`[Auto-Seed] Gatekeeper rejected (${insertResult.reason}): "${post.message.slice(0, 40)}..."`);
         }
 
-        console.log(`[Auto-Seed] SUCCESS! Created ${data.length} intelligent bot pulses for ${body.city} (${mode})`);
+        console.log(`[Auto-Seed] SUCCESS! Created ${created}/${uniquePosts.length} intelligent bot pulses for ${body.city} (${mode})`);
         return NextResponse.json({
           success: true,
-          created: data.length,
-          pulses: data,
+          created,
+          pulses: [],
           mode: "intelligent",
           intelligentMode: mode,
           situationSummary: result.situationSummary,
@@ -598,78 +575,37 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Create posts with natural timing variation
-    // Posts should feel like they were written by different people at different times
-    const now = Date.now();
-    let cumulativeOffset = 0;
-
-    // Get city coordinates for distance-based filtering
-    // Prefer user-provided coordinates over hardcoded lookup
+    // Insert via gatekeeper — handles all dedup, tag limits, cleanup
     const cityCoords = hasCoords
       ? { lat: body.lat!, lon: body.lon! }
       : getCityCoordinates(body.city);
 
-    const records = posts.map((post, index) => {
-      // Stagger posts backwards in time with natural variation
-      // Each post is 4-12 minutes apart (wider variance for non-intelligent seeds)
-      if (index > 0) {
-        const minGapMs = 4 * 60 * 1000;  // 4 minutes minimum
-        const maxGapMs = 12 * 60 * 1000; // 12 minutes maximum
-        const randomGap = minGapMs + Math.random() * (maxGapMs - minGapMs);
-        cumulativeOffset += randomGap;
+    const now = Date.now();
+    let cumulativeOffset = 0;
+    let created = 0;
+
+    for (let i = 0; i < posts.length; i++) {
+      const post = posts[i];
+      if (i > 0) {
+        cumulativeOffset += 4 * 60 * 1000 + Math.random() * 8 * 60 * 1000;
       }
 
-      const createdAt = new Date(now - cumulativeOffset).toISOString();
-      // Expiration by category: Weather/Traffic 3h, Events 12h, General 8h
-      const tagLower = (weatherPost.tag || "").toLowerCase();
-      const expirationMs2 = tagLower === "weather" || tagLower === "traffic" ? 3 * 60 * 60 * 1000
-        : tagLower === "events" ? 12 * 60 * 60 * 1000 : 8 * 60 * 60 * 1000;
-      const expiresAt = new Date(now + expirationMs2).toISOString();
-
-      return {
+      const insertResult = await insertBotPulse(supabase, {
         city: body.city,
         message: post.message,
         tag: post.tag,
         mood: post.mood,
         author: getBotName(post.tag, body.city),
-        user_id: null, // Bot pulses don't have a user - identified by is_bot flag
-        is_bot: true,
-        hidden: false, // Explicitly set to ensure RLS allows reading
-        created_at: createdAt,
-        expires_at: expiresAt,
         lat: cityCoords?.lat ?? null,
         lon: cityCoords?.lon ?? null,
-      };
-    });
+        createdAt: new Date(now - cumulativeOffset).toISOString(),
+      });
 
-    // DEDUPLICATION: Remove posts where same tag was posted in last 2 hours
-    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-    const { data: recentByTag } = await supabase
-      .from("pulses")
-      .select("tag, message")
-      .eq("city", body.city)
-      .eq("is_bot", true)
-      .gte("created_at", twoHoursAgo);
+      if (insertResult.success) created++;
+      else console.log(`[Auto-Seed] Gatekeeper rejected (${insertResult.reason}): "${post.message.slice(0, 40)}..."`);
+    }
 
-    const recentTags = new Set((recentByTag || []).map(p => p.tag.toLowerCase()));
-    const recentMessages = new Set((recentByTag || []).map(p => p.message?.toLowerCase().slice(0, 40) || ""));
-
-    const dedupedRecords = records.filter(r => {
-      // Skip if same tag already posted recently
-      if (recentTags.has(r.tag.toLowerCase())) {
-        console.log(`[Auto-Seed] Skipping duplicate tag: ${r.tag}`);
-        return false;
-      }
-      // Skip if very similar message prefix
-      const prefix = r.message.toLowerCase().slice(0, 40);
-      if (recentMessages.has(prefix)) {
-        console.log(`[Auto-Seed] Skipping duplicate message prefix`);
-        return false;
-      }
-      return true;
-    });
-
-    if (dedupedRecords.length === 0) {
+    if (created === 0) {
       return NextResponse.json({
         success: true,
         message: "All posts were duplicates of recent content",
@@ -678,34 +614,12 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    console.log(`[Auto-Seed] Creating ${dedupedRecords.length} posts for ${body.city} (${records.length - dedupedRecords.length} deduped)`);
-
-    // Insert into database
-    const { data, error } = await supabase
-      .from("pulses")
-      .insert(dedupedRecords)
-      .select("id, city, message, tag, mood, created_at");
-
-    if (error) {
-      console.error("[Auto-Seed] Database insert error:", error);
-      console.error("[Auto-Seed] Error details - code:", error.code, "message:", error.message);
-      return NextResponse.json(
-        {
-          error: "Failed to create pulses",
-          details: error.message,
-          code: error.code,
-          hint: error.code === "23503" ? "Foreign key constraint - check if user_id is valid" : undefined
-        },
-        { status: 500 }
-      );
-    }
-
-    console.log(`[Auto-Seed] SUCCESS! Created ${data.length} pulses for ${body.city}`);
+    console.log(`[Auto-Seed] SUCCESS! Created ${created}/${posts.length} pulses for ${body.city}`);
 
     return NextResponse.json({
       success: true,
-      created: data.length,
-      pulses: data,
+      created,
+      pulses: [],
     });
 
   } catch (err) {
