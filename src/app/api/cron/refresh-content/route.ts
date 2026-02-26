@@ -163,6 +163,7 @@ export async function GET(request: NextRequest) {
       const { generateIntelligentPost } = await import("@/lib/intelligent-bots");
       const results = [];
       const postedTags: string[] = [];
+      const postedMessages: string[] = []; // Track messages inserted this run for dedup
       for (let i = 0; i < 3; i++) {
         const result = await generateIntelligentPost(seedCity, {
           force: true,
@@ -170,9 +171,23 @@ export async function GET(request: NextRequest) {
           excludeTypes: postedTags,
         });
         if (result.posted && result.post) {
+          // Dedup: check against DB + posts inserted in this same run
+          const isDupDB = await checkEventDuplicate(supabase, seedCity, result.post.message, result.post.tag);
+          const isDupLocal = postedMessages.some(msg => {
+            const overlap = fingerprintOverlap(
+              extractEventFingerprint(result.post!.message),
+              extractEventFingerprint(msg)
+            );
+            return overlap >= 0.6;
+          });
+          if (isDupDB || isDupLocal) {
+            console.log(`[Cron] Seed dedup: skipping duplicate for ${seedCity}`);
+            continue;
+          }
+
           const expiresAt = new Date(Date.now() + getExpirationHours(result.post.tag) * 60 * 60 * 1000).toISOString();
           const { error } = await supabase.from("pulses").insert({
-            city: `${seedCity}, ${result.post.tag === "Events" ? "Texas, US" : "Texas, US"}`,
+            city: `${seedCity}, Texas, US`,
             message: result.post.message,
             mood: result.post.mood,
             tag: result.post.tag,
@@ -184,6 +199,7 @@ export async function GET(request: NextRequest) {
           });
           if (!error) {
             postedTags.push(result.post.tag);
+            postedMessages.push(result.post.message);
             results.push(result.post.tag);
           }
         }
@@ -285,8 +301,9 @@ export async function GET(request: NextRequest) {
           continue;
         }
 
-        // Generate posts — track posted tags to force variety across iterations
+        // Generate posts — track posted tags + messages for same-run dedup
         const postedTagsThisRun: string[] = [];
+        const postedMessagesThisRun: string[] = [];
         for (let i = 0; i < POSTS_PER_CITY; i++) {
           try {
             const result = await generateIntelligentPost(cityName, {
@@ -297,6 +314,19 @@ export async function GET(request: NextRequest) {
             });
 
             if (result.posted && result.post) {
+              // DEDUP CHECK 0: Same-run local dedup (catches identical events generated in same cycle)
+              const isDupLocal = postedMessagesThisRun.some(msg => {
+                const overlap = fingerprintOverlap(
+                  extractEventFingerprint(result.post!.message),
+                  extractEventFingerprint(msg)
+                );
+                return overlap >= 0.6;
+              });
+              if (isDupLocal) {
+                console.log(`[Cron] Same-run dedup: skipping duplicate for ${cityInfo.city}`);
+                continue;
+              }
+
               // DEDUP: Check last 24h bot posts for same city — tag match OR content similarity
               const twentyFourHrsAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
               const normalizedCity = cityInfo.city.split(",")[0].trim();
@@ -392,6 +422,7 @@ export async function GET(request: NextRequest) {
                 postsCreated++;
                 totalCreated++;
                 postedTagsThisRun.push(result.post.tag);
+                postedMessagesThisRun.push(result.post.message);
               }
             }
           } catch (postErr) {
