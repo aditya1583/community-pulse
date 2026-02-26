@@ -2,6 +2,26 @@
 
 ---
 
+## Commit: f5fd602 (2026-02-26) — Event dedup: seed path + same-run race condition
+
+### FIX 1: Seed path had ZERO dedup ✅
+**Files:** `src/app/api/cron/refresh-content/route.ts`
+**Root cause:** The `?seedCity=` code path (triggered when feed is empty) generated 3 posts and inserted them directly with no duplicate checking at all. If Ticketmaster only had 1 event nearby, the same event got inserted multiple times.
+**What changed:** Added both DB-level dedup (`checkEventDuplicate()`) and local same-run dedup (fingerprint overlap ≥0.6 against posts already inserted in same cycle).
+
+### FIX 2: Main cron loop same-run race condition ✅
+**Files:** `src/app/api/cron/refresh-content/route.ts`
+**Root cause:** The main loop queried DB for duplicates but didn't track posts inserted *in the same run cycle*. When Ticketmaster returned the same event for consecutive iterations, the first insert hadn't been "seen" by the second iteration's DB query (or the query found it but the fingerprint check was only against older posts).
+**What changed:** Added `postedMessagesThisRun[]` array. Before any DB dedup checks, new posts are fingerprinted against all posts already inserted in the current cycle. ≥60% word overlap = skip.
+
+### FIX 3: Cleaned 2 duplicate DB entries ✅
+**What changed:** Deleted 2 duplicate "The Bends w/ Smoked Honey at Antone's Nightclub" posts (IDs 3645, 3646), kept newest (3648).
+
+### Build Status
+✅ `npm run build` clean, pushed to apple/main
+
+---
+
 ## Commit: (2026-02-16) — Push Notifications Infrastructure
 
 ### FEATURE 1: Capacitor Push Notifications Plugin ✅
