@@ -1933,8 +1933,27 @@ export default function Home() {
                       {/* Debug overlay removed — feed fix confirmed working */}
 
                       {(loading || !initialPulsesFetched) && pulses.length === 0 ? (
-                        <div className="bg-slate-800/40 border border-dashed border-slate-700/50 rounded-2xl p-10 text-center">
-                          <p className="text-sm font-bold text-slate-400">Loading the local vibe for {city}...</p>
+                        <div className="space-y-3">
+                          {[1, 2, 3].map((i) => (
+                            <div key={i} className="bg-slate-800/50 rounded-2xl p-4 space-y-3 animate-pulse">
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-full bg-slate-700/60" />
+                                <div className="space-y-1.5 flex-1">
+                                  <div className="h-3.5 bg-slate-700/60 rounded-full w-28" />
+                                  <div className="h-2.5 bg-slate-700/40 rounded-full w-20" />
+                                </div>
+                                <div className="h-5 w-14 bg-slate-700/40 rounded-full" />
+                              </div>
+                              <div className="space-y-2">
+                                <div className="h-3 bg-slate-700/50 rounded-full w-full" />
+                                <div className="h-3 bg-slate-700/40 rounded-full w-3/4" />
+                              </div>
+                              <div className="flex gap-3 pt-1">
+                                <div className="h-7 w-16 bg-slate-700/30 rounded-full" />
+                                <div className="h-7 w-16 bg-slate-700/30 rounded-full" />
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       ) : filteredPulses.length === 0 ? (
                         <div className="bg-gradient-to-b from-slate-800/60 to-slate-900/80 border border-dashed border-slate-700/40 rounded-2xl p-8 sm:p-10 text-center space-y-5">
