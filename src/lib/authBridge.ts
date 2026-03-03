@@ -178,15 +178,12 @@ export const authBridge = {
   async signInWithApple() {
     if (isCapacitor()) {
       try {
-        // Use native Sign in with Apple via Capacitor plugin
-        const { SignInWithApple } = await import("@capacitor-community/apple-sign-in");
-        const result = await SignInWithApple.authorize({
-          clientId: "app.voxlo",
-          redirectURI: "https://voxlo.app",
-          scopes: "email name",
-        });
+        // Use native Sign in with Apple via local Capacitor plugin
+        const { registerPlugin } = await import("@capacitor/core");
+        const AppleSignIn = registerPlugin<{ authorize: () => Promise<any> }>("AppleSignIn");
+        const result = await AppleSignIn.authorize();
 
-        if (!result.response?.identityToken) {
+        if (!result?.identityToken) {
           return { data: { user: null, session: null }, error: { message: "Apple sign-in failed — no identity token" } };
         }
 
@@ -195,10 +192,9 @@ export const authBridge = {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            id_token: result.response.identityToken,
-            nonce: "nonce", // Apple handles nonce internally for native
-            full_name: result.response.givenName
-              ? `${result.response.givenName} ${result.response.familyName || ""}`.trim()
+            id_token: result.identityToken,
+            full_name: result.givenName
+              ? `${result.givenName} ${result.familyName || ""}`.trim()
               : undefined,
           }),
         });
