@@ -105,8 +105,18 @@ export function useHomeData({ city, lat, lon }: UseHomeDataOptions) {
 
     run();
 
+    // Re-fetch when app returns to foreground
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        console.log("[HomeData] App foregrounded — refreshing weather/traffic");
+        run();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [city, lat, lon]);
 

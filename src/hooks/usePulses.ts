@@ -236,6 +236,18 @@ export function usePulses({ city, selectedCity, geolocation }: UsePulsesParams) 
     }
   }, [city, fetchPulses]);
 
+  // Re-fetch when app returns to foreground (WKWebView caches page state)
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && city) {
+        console.log("[Pulses] App foregrounded — refreshing feed");
+        fetchPulses();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [city, fetchPulses]);
+
   // ========= PULL-TO-REFRESH HANDLER =========
   const handlePullToRefresh = useCallback(async () => {
     console.log("[PullToRefresh] Triggered manual refresh");
