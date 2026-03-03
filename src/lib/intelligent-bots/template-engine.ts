@@ -144,8 +144,8 @@ const EVENT_TEMPLATES = {
 // ============================================================================
 
 const MOOD_BY_CATEGORY: Record<string, string[]> = {
-  "rushHour.morning": ["😤", "☕", "🙄", "😅"],
-  "rushHour.evening": ["😩", "🏠", "😤", "🙄"],
+  "rushHour.morning": ["😤", "☕", "🚗", "😅"],
+  "rushHour.evening": ["🏠", "😌", "😤", "🚗"],
   schoolZone: ["🚸", "📚", "🏫", "⚠️"],
   event: ["🎉", "🎸", "🎭", "😊"],
   incident: ["⚠️", "😬", "🚨", "😟"],
