@@ -64,6 +64,9 @@ const MOOD_TO_EMOTION: Record<string, string> = {
   "😡": "Angry",
   "😴": "Sleepy",
   "🤩": "Thrilled",
+  "🙄": "Over It",
+  "😩": "Drained",
+  "☕": "Caffeinated",
 };
 
 // Tag-specific headline vocabulary - maps tags + sentiment to descriptive words
