@@ -173,6 +173,66 @@ export const authBridge = {
   },
 
   /**
+   * Sign in with Apple (native on iOS, OAuth on web)
+   */
+  async signInWithApple() {
+    if (isCapacitor()) {
+      try {
+        // Use native Sign in with Apple via Capacitor plugin
+        const { SignInWithApple } = await import("@capacitor-community/apple-sign-in");
+        const result = await SignInWithApple.authorize({
+          clientId: "app.voxlo",
+          redirectURI: "https://voxlo.app",
+          scopes: "email name",
+        });
+
+        if (!result.response?.identityToken) {
+          return { data: { user: null, session: null }, error: { message: "Apple sign-in failed — no identity token" } };
+        }
+
+        // Exchange the Apple identity token with Supabase via server
+        const res = await fetch(getApiUrl("/api/auth/apple"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id_token: result.response.identityToken,
+            nonce: "nonce", // Apple handles nonce internally for native
+            full_name: result.response.givenName
+              ? `${result.response.givenName} ${result.response.familyName || ""}`.trim()
+              : undefined,
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: "Apple sign-in server error" }));
+          return { data: { user: null, session: null }, error: { message: err.error || "Server error" } };
+        }
+
+        const data = await res.json();
+        const user = { id: data.user.id, email: data.user.email } as any;
+        // Store tokens for serverAuth
+        if (data.access_token) {
+          serverAuth.setSession(data);
+        }
+        authBridge._notifyListeners("SIGNED_IN", { user });
+        return { data: { user, session: { access_token: data.access_token } as any }, error: null };
+      } catch (err: any) {
+        // User cancelled or plugin error
+        if (err?.message?.includes("canceled") || err?.message?.includes("cancelled")) {
+          return { data: { user: null, session: null }, error: null }; // User cancelled — not an error
+        }
+        return { data: { user: null, session: null }, error: { message: err.message || "Apple sign-in failed" } };
+      }
+    }
+
+    // Web: use Supabase OAuth flow
+    return supabase.auth.signInWithOAuth({
+      provider: "apple",
+      options: { redirectTo: window.location.origin },
+    });
+  },
+
+  /**
    * Check if signed in (synchronous, no network)
    */
   isSignedIn(): boolean {

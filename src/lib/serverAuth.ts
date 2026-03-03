@@ -32,6 +32,16 @@ function clearStored() {
   localStorage.removeItem(STORAGE_KEY);
 }
 
+/** Store session data from external auth flows (e.g., Apple Sign In) */
+export function setSession(data: { access_token: string; refresh_token: string; expires_at?: number; user: { id: string; email: string } }) {
+  setStored({
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_at: data.expires_at || Math.floor(Date.now() / 1000) + 3600,
+    user: data.user,
+  });
+}
+
 async function callAuth(body: Record<string, unknown>) {
   const res = await fetch(getApiUrl("/api/auth/session"), {
     method: "POST",

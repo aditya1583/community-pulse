@@ -1468,6 +1468,42 @@ export default function Home() {
                         : "Sign In"}
                 </button>
 
+                {authMode !== "forgot" && (
+                  <>
+                    <div className="flex items-center gap-3 my-1">
+                      <div className="flex-1 h-px bg-slate-700/50" />
+                      <span className="text-[11px] text-slate-500 uppercase tracking-wider">or</span>
+                      <div className="flex-1 h-px bg-slate-700/50" />
+                    </div>
+                    <button
+                      type="button"
+                      disabled={authLoading}
+                      onClick={async () => {
+                        setAuthLoading(true);
+                        setAuthError(null);
+                        try {
+                          const result = await authBridge.signInWithApple();
+                          if (result.error) {
+                            setAuthError(result.error.message);
+                          } else if (result.data?.user) {
+                            setShowAuthModal(false);
+                          }
+                        } catch (err: any) {
+                          setAuthError(err.message || "Apple sign-in failed");
+                        } finally {
+                          setAuthLoading(false);
+                        }
+                      }}
+                      className="w-full px-4 py-2.5 bg-white text-black font-medium text-sm rounded-lg flex items-center justify-center gap-2 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    >
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                      </svg>
+                      Continue with Apple
+                    </button>
+                  </>
+                )}
+
                 {authMode === "forgot" && (
                   <button
                     type="button"
