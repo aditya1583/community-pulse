@@ -204,7 +204,7 @@ export default function PrivacyPolicy() {
         </div>
 
         <div className="mt-16 border-t border-slate-800 pt-8 text-center text-sm text-slate-600">
-          © 2026 Voxlo. All rights reserved.
+          © 2026 rinirvtech LLC. All rights reserved. Voxlo is a product of rinirvtech LLC.
         </div>
       </div>
     </main>
