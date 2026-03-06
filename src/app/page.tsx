@@ -49,6 +49,7 @@ import OnboardingChecklist from "@/components/OnboardingChecklist";
 import InstallPrompt from "@/components/InstallPrompt";
 import PullToRefresh from "@/components/PullToRefresh";
 import TermsAgreementModal from "@/components/TermsAgreementModal";
+import CommunityVibeBanner from "@/components/CommunityVibeBanner";
 import SplashScreen from "@/components/SplashScreen";
 import { getApiUrl } from "@/lib/api-config";
 
@@ -1937,6 +1938,11 @@ export default function Home() {
 
                   {/* Secondary Bottom Navigation (Tab Chips) */}
                   <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} secondaryOnly />
+
+                  {/* Community Vibe Banner — consensus summary from user posts */}
+                  {activeTab === "pulse" && (
+                    <CommunityVibeBanner pulses={pulses} />
+                  )}
 
                   {/* AI Summary Stories */}
                   <AISummaryStories
