@@ -552,3 +552,32 @@ Permanent reference document for AI content generation rules.
 
 ### Build/Test Status
 ✅ `npm run build` clean
+
+---
+
+## Commit: (2026-03-06) — Apple Review Rejection Fixes (1.2 + 5.1.1v)
+
+### FIX 1: EULA/Terms Agreement Gate (Apple 1.2) ✅
+**Files:** `src/components/TermsAgreementModal.tsx`, `src/app/api/accept-terms/route.ts`, `src/app/page.tsx`, `src/hooks/useAuth.ts`
+**What changed:** Users must accept Terms of Service before their first post. Modal shows community guidelines with zero-tolerance language. Acceptance recorded in `profiles.terms_accepted_at`. All submit handlers (traffic, events, local, pulse modal) gated behind `requireTermsAcceptance()`. Once accepted, no further prompts.
+
+### FIX 2: Block User Feature (Apple 1.2) ✅
+**Files:** `src/components/BlockUserButton.tsx`, `src/app/api/block-user/route.ts`, `src/components/PulseCard.tsx`, `src/app/page.tsx`
+**What changed:** Block button (🚫 icon) on every non-bot, non-own pulse card. Blocking: inserts into `blocked_users` table, logs to `ops_moderation_log` for dev notification (Apple requirement), instantly removes blocked user's posts from feed via client-side filter. Unblock via DELETE endpoint. List blocked users via GET endpoint.
+**DB:** Created `blocked_users` table with RLS policies.
+
+### FIX 3: Report Auto-Hide + Dev Notification (Apple 1.2) ✅
+**Files:** `src/app/api/report-pulse/route.ts`
+**What changed:** When a pulse reaches 3+ reports, it's automatically hidden (`hidden: true`, `hidden_reason` set). All reports logged with `[MODERATION]` prefix for monitoring. Reports also logged to `ops_moderation_log` table for developer review within 24 hours (Apple requirement).
+
+### FIX 4: Account Deletion (Apple 5.1.1v) ✅
+**Files:** `src/components/DeleteAccountButton.tsx`, `src/app/api/account/delete/route.ts`, `src/components/StatusTab.tsx`
+**What changed:** "Delete Account" button in StatusTab below Sign Out. Multi-step confirmation (2 screens) prevents accidental deletion. API endpoint deletes all user data across 20+ tables, anonymizes posts (author → "[deleted]"), deletes auth.users record via admin API. Redirects to home after deletion.
+
+### FIX 5: Terms of Service Updates ✅
+**Files:** `src/app/terms/page.tsx`
+**What changed:** Added explicit "Zero Tolerance Policy" heading under 5.3. Added language about reporting, blocking, 24-hour review, and permanent banning. Added Section 7.1 "Account Deletion" describing the deletion process and what gets erased.
+
+### Build/Test Status
+✅ `npm run build` clean
+✅ Pushed to GitHub → Vercel auto-deploy triggered
