@@ -327,7 +327,7 @@ export default function PulseComments({
                         <button
                           type="button"
                           onClick={() => setActiveMenu(isMenuOpen ? null : comment.id)}
-                          className="p-1 text-slate-500 hover:text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="p-1 text-slate-500 hover:text-slate-300 transition-opacity"
                           aria-label="Comment actions"
                         >
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
