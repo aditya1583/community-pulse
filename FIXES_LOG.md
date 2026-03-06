@@ -581,3 +581,49 @@ Permanent reference document for AI content generation rules.
 ### Build/Test Status
 ✅ `npm run build` clean
 ✅ Pushed to GitHub → Vercel auto-deploy triggered
+
+---
+
+## Commit: (2026-03-06) — Apple App Store Review Rejection Fixes
+
+### Rejection 1: Guideline 1.2 — Safety: User-Generated Content
+
+**FIX 1: EULA/Terms Agreement Gate ✅**
+**Files:** `src/components/TermsAgreementModal.tsx`, `src/app/api/accept-terms/route.ts`, `src/app/page.tsx`, `src/hooks/useAuth.ts`
+**What changed:** Users must accept Terms of Service before their first post. Modal appears when user attempts to post without prior acceptance. Acceptance is recorded in `profiles.terms_accepted_at`. Subsequent posts skip the modal.
+**Apple requirement:** "Require that users agree to terms (EULA)"
+
+**FIX 2: Block User Feature ✅**
+**Files:** `src/components/BlockUserButton.tsx`, `src/app/api/block-user/route.ts`, `src/components/PulseCard.tsx`, `src/app/page.tsx`
+**What changed:** Block button (🚫 icon) on every non-bot, non-own pulse card. Blocking: creates record in `blocked_users` table, logs to `ops_moderation_log` for dev notification, instantly removes blocked user's posts from feed client-side. Unblock via API available.
+**Apple requirement:** "Mechanism for users to block abusive users. Blocking should notify developer and remove content from feed instantly."
+
+**FIX 3: Report Auto-Hide + Developer Notification ✅**
+**Files:** `src/app/api/report-pulse/route.ts`
+**What changed:** After 3+ reports, pulse is automatically hidden (`hidden = true, hidden_reason = 'auto-hidden: N reports'`). Every report logs to console and `ops_moderation_log` for developer review.
+**Apple requirement:** "Developer must act on objectionable content reports within 24 hours"
+
+**FIX 4: Terms of Service Updated ✅**
+**Files:** `src/app/terms/page.tsx`
+**What changed:** Added "5.3 Content Moderation & Zero Tolerance Policy" section with explicit zero-tolerance language. Added "7.1 Account Deletion" section documenting the deletion process.
+**Apple requirement:** "Terms must make clear there is no tolerance for objectionable content or abusive users"
+
+### Rejection 2: Guideline 5.1.1(v) — Account Deletion
+
+**FIX 5: Account Deletion ✅**
+**Files:** `src/components/DeleteAccountButton.tsx`, `src/app/api/account/delete/route.ts`, `src/components/StatusTab.tsx`
+**What changed:** "Delete Account" button in StatusTab (below Sign Out). Two-step confirmation. Deletes all user data from Supabase (posts anonymized to "[deleted]", profile/stats/badges/comments/reactions/reports all deleted), then deletes auth.users record via admin API. Immediate and irreversible.
+**Apple requirement:** "Apps that support account creation must also offer account deletion"
+
+### Database Schema Changes ✅
+- Created `blocked_users` table with RLS policies (blocker_id, blocked_id, reason, created_at)
+- Added `terms_accepted_at` column to `profiles`
+- Added `hidden_reason` column to `pulses`
+
+### Build/Test Status
+✅ `npm run build` clean
+✅ All new API endpoints deployed and responding correctly (auth required)
+✅ Existing endpoints (pulses/feed, terms, privacy) still working
+✅ Database schema verified
+✅ Terms page contains required zero-tolerance language
+✅ Terms page contains account deletion section
