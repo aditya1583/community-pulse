@@ -70,8 +70,26 @@ export default function PulseComments({
 
   // Refs
   const inputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const lastSubmitTime = useRef<number>(0);
   const DEBOUNCE_MS = 1000;
+
+  // Close menu when tapping outside
+  useEffect(() => {
+    if (!activeMenu) return;
+    const handleTap = (e: MouseEvent | TouchEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setActiveMenu(null);
+        setReportingComment(null);
+      }
+    };
+    document.addEventListener("mousedown", handleTap);
+    document.addEventListener("touchstart", handleTap);
+    return () => {
+      document.removeEventListener("mousedown", handleTap);
+      document.removeEventListener("touchstart", handleTap);
+    };
+  }, [activeMenu]);
 
   // Fetch comments when expanded
   const fetchComments = useCallback(async () => {
@@ -323,7 +341,7 @@ export default function PulseComments({
                       </div>
 
                       {/* Action Menu Button */}
-                      <div className="relative">
+                      <div className="relative" ref={isMenuOpen || reportingComment === comment.id ? menuRef : undefined}>
                         <button
                           type="button"
                           onClick={() => setActiveMenu(isMenuOpen ? null : comment.id)}
