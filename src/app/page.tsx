@@ -48,6 +48,7 @@ import { RADIUS_CONFIG } from "@/lib/constants/radius";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
 import InstallPrompt from "@/components/InstallPrompt";
 import PullToRefresh from "@/components/PullToRefresh";
+import TermsAgreementModal from "@/components/TermsAgreementModal";
 import SplashScreen from "@/components/SplashScreen";
 import { getApiUrl } from "@/lib/api-config";
 
@@ -132,6 +133,9 @@ export default function Home() {
   // across app restarts, so restoring would override the intended default.
   // Storage restoration removed — no longer needed
   const [showPulseModal, setShowPulseModal] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [termsLoading, setTermsLoading] = useState(false);
+  const [blockedUserIds, setBlockedUserIds] = useState<string[]>([]);
 
   // Auth + anon profile (extracted to useAuth hook)
   const {
@@ -476,6 +480,91 @@ export default function Home() {
     setShowFirstPulseBadgeToast,
     loadStreak,
   });
+
+  // Terms acceptance handler — gate posting behind EULA agreement (Apple 1.2)
+  const pendingSubmitRef = useRef<(() => void) | null>(null);
+
+  const requireTermsAcceptance = useCallback((submitFn: () => void) => {
+    // If terms already accepted, proceed directly
+    if (profile?.terms_accepted_at) {
+      submitFn();
+      return;
+    }
+    // Otherwise show terms modal and save the pending submit
+    pendingSubmitRef.current = submitFn;
+    setShowTermsModal(true);
+  }, [profile?.terms_accepted_at]);
+
+  const handleAcceptTerms = useCallback(async () => {
+    setTermsLoading(true);
+    try {
+      const token = await authBridge.getAccessToken();
+      if (!token) return;
+
+      const res = await fetch(getApiUrl("/api/accept-terms"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        // Update local profile state
+        setProfile((prev) => prev ? { ...prev, terms_accepted_at: data.acceptedAt } : prev);
+        setShowTermsModal(false);
+        // Execute the pending submit
+        if (pendingSubmitRef.current) {
+          pendingSubmitRef.current();
+          pendingSubmitRef.current = null;
+        }
+      }
+    } catch (err) {
+      console.error("[Terms] Accept error:", err);
+    } finally {
+      setTermsLoading(false);
+    }
+  }, [setProfile]);
+
+  // Terms-gated submit wrappers
+  const gatedTrafficSubmit = useCallback(() => {
+    requireTermsAcceptance(handleTrafficPulseSubmit);
+  }, [requireTermsAcceptance, handleTrafficPulseSubmit]);
+
+  const gatedEventsSubmit = useCallback(() => {
+    requireTermsAcceptance(handleEventsPulseSubmit);
+  }, [requireTermsAcceptance, handleEventsPulseSubmit]);
+
+  const gatedLocalSubmit = useCallback(() => {
+    requireTermsAcceptance(handleLocalPulseSubmit);
+  }, [requireTermsAcceptance, handleLocalPulseSubmit]);
+
+  // Block user handler — adds to local block list for instant feed filtering
+  const handleBlockUser = useCallback((userId: string) => {
+    setBlockedUserIds((prev) => [...prev, userId]);
+  }, []);
+
+  // Load blocked users on auth
+  useEffect(() => {
+    if (!sessionUser) return;
+    const loadBlocked = async () => {
+      try {
+        const token = await authBridge.getAccessToken();
+        if (!token) return;
+        const res = await fetch(getApiUrl("/api/block-user"), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setBlockedUserIds((data.blockedUsers || []).map((b: { blocked_id: string }) => b.blocked_id));
+        }
+      } catch {
+        // Silently fail — blocked list is supplementary
+      }
+    };
+    loadBlocked();
+  }, [sessionUser?.id]);
 
   // Reset first-pulse modal state on user change
   useEffect(() => {
@@ -1003,8 +1092,13 @@ export default function Home() {
 
   // handleGenerateUsername, handleRevertUsername — extracted to useUsername hook
 
-  // Apply tag filter
-  const filteredPulses = pulsesWithDistance.filter((p) => tagFilter === "All" || p.tag === tagFilter);
+  // Apply tag filter + blocked user filter
+  const filteredPulses = pulsesWithDistance.filter((p) => {
+    if (tagFilter !== "All" && p.tag !== tagFilter) return false;
+    // Hide posts from blocked users
+    if (p.user_id && blockedUserIds.includes(p.user_id)) return false;
+    return true;
+  });
 
   // Boost resident posts: recent resident posts (<2h) float to top, rest chronological
   const boostedPulses = [...filteredPulses].sort((a, b) => {
@@ -1556,7 +1650,7 @@ export default function Home() {
             setMessage(m);
             setValidationError(null);
           }}
-          onSubmit={handleAddPulse}
+          onSubmit={() => requireTermsAcceptance(handleAddPulse)}
           weather={weather}
         />
 
@@ -1962,6 +2056,7 @@ export default function Home() {
                             userIdentifier={sessionUser ? displayName : undefined}
                             authorRank={happeningNowPulse.user_id ? authorStats[happeningNowPulse.user_id]?.rank : null}
                             authorLevel={happeningNowPulse.user_id ? authorStats[happeningNowPulse.user_id]?.level : undefined}
+                            onBlockUser={handleBlockUser}
                           />
                         </div>
                       )}
@@ -2052,6 +2147,7 @@ export default function Home() {
                                   userIdentifier={sessionUser ? displayName : undefined}
                                   authorRank={pulse.user_id ? authorStats[pulse.user_id]?.rank : null}
                                   authorLevel={pulse.user_id ? authorStats[pulse.user_id]?.level : undefined}
+                                  onBlockUser={handleBlockUser}
                                 />
                               );
                               if (idx > 0 && idx % 5 === 4) {
@@ -2133,7 +2229,7 @@ export default function Home() {
                       showValidationErrors={showTabValidationErrors}
                       onMoodChange={(m) => { setEventsMood(m); setTabMoodValidationError(null); }}
                       onMessageChange={(m) => { setEventsMessage(m); setTabMessageValidationError(null); }}
-                      onSubmit={handleEventsPulseSubmit}
+                      onSubmit={gatedEventsSubmit}
                       onSignInClick={() => setShowAuthModal(true)}
                     />
                   )}
@@ -2158,7 +2254,7 @@ export default function Home() {
                       showValidationErrors={showTabValidationErrors}
                       onMoodChange={(m) => { setTrafficMood(m); setTabMoodValidationError(null); }}
                       onMessageChange={(m) => { setTrafficMessage(m); setTabMessageValidationError(null); }}
-                      onSubmit={handleTrafficPulseSubmit}
+                      onSubmit={gatedTrafficSubmit}
                       onSignInClick={() => setShowAuthModal(true)}
                     />
                   )}
@@ -2182,7 +2278,7 @@ export default function Home() {
                       showValidationErrors={showTabValidationErrors}
                       onMoodChange={(m) => { setLocalMood(m); setTabMoodValidationError(null); }}
                       onMessageChange={(m) => { setLocalMessage(m); setTabMessageValidationError(null); }}
-                      onSubmit={handleLocalPulseSubmit}
+                      onSubmit={gatedLocalSubmit}
                     />
                   )}
 
@@ -2235,6 +2331,18 @@ export default function Home() {
 
         {/* PWA Install Prompt */}
         <InstallPrompt />
+
+        {/* Terms Agreement Modal — Apple Review requirement 1.2 */}
+        {showTermsModal && (
+          <TermsAgreementModal
+            onAccept={handleAcceptTerms}
+            onCancel={() => {
+              setShowTermsModal(false);
+              pendingSubmitRef.current = null;
+            }}
+            loading={termsLoading}
+          />
+        )}
 
         {/* Post Success Toast */}
         {postSuccess && (

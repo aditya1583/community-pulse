@@ -190,6 +190,38 @@ export async function POST(req: NextRequest) {
 
     const reportCount = count || 1;
 
+    // Auto-hide pulse if 3+ reports (Apple requirement: act on reports within 24h)
+    if (reportCount >= 3) {
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (serviceKey) {
+        const adminClient = createClient(supabaseUrl!, serviceKey);
+        await adminClient
+          .from("pulses")
+          .update({ hidden: true, hidden_reason: `auto-hidden: ${reportCount} reports` })
+          .eq("id", pulseId);
+
+        // Log for developer notification
+        console.log(`[MODERATION] Pulse ${pulseId} auto-hidden after ${reportCount} reports`);
+
+        // Log to ops_moderation_log for developer review
+        await adminClient.from("ops_moderation_log").insert({
+          action: "pulse_auto_hidden",
+          details: JSON.stringify({
+            pulse_id: pulseId,
+            report_count: reportCount,
+            latest_reason: reason,
+            reporter_id: user.id,
+          }),
+        }).catch(() => {});
+      }
+    }
+
+    // Also immediately hide from reporter's feed (even before 3 reports)
+    // This is handled client-side by the block/report UI
+
+    // Log all reports for developer notification (Apple: developer must be notified)
+    console.log(`[MODERATION] Report #${reportCount} on pulse ${pulseId} by user ${user.id}. Reason: ${reason}`);
+
     const response: ReportResponse = {
       success: true,
       reportCount,

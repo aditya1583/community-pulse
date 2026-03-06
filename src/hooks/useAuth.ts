@@ -11,6 +11,7 @@ import type { AuthStatus } from "@/lib/pulses";
 export type Profile = {
   anon_name: string;
   name_locked?: boolean | null;
+  terms_accepted_at?: string | null;
 };
 
 /** Load profile via server-side endpoint (works in WKWebView) or Supabase JS fallback */

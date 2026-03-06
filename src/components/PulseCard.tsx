@@ -9,6 +9,7 @@ import PollVoting from "@/components/PollVoting";
 import PredictionCard, { type PredictionData } from "@/components/PredictionCard";
 import PulseComments from "@/components/PulseComments";
 import ReportPulseButton from "@/components/ReportPulseButton";
+import BlockUserButton from "@/components/BlockUserButton";
 import StatusRing from "@/components/StatusRing";
 import { StatusIndicator } from "@/components/StatusRing";
 import DistanceBadge from "@/components/DistanceBadge";
@@ -190,6 +191,8 @@ type PulseCardProps = {
   authorRank?: number | null;
   /** Optional: author's level */
   authorLevel?: number;
+  /** Callback when user blocks the pulse author */
+  onBlockUser?: (userId: string) => void;
 };
 
 /**
@@ -253,6 +256,7 @@ export default function PulseCard({
   userIdentifier,
   authorRank,
   authorLevel,
+  onBlockUser,
 }: PulseCardProps) {
   // Track expiry countdown for visual decay
   const { remainingText, opacity, isExpiringSoon, isFading, isExpired } =
@@ -505,7 +509,17 @@ export default function PulseCard({
 
             <div className="flex items-center gap-3 flex-shrink-0">
               {reporterId ? (
-                <ReportPulseButton pulseId={pulse.id} reporterId={reporterId} />
+                <>
+                  <ReportPulseButton pulseId={pulse.id} reporterId={reporterId} />
+                  {/* Block user — only show on other users' posts (not bot posts, not own posts) */}
+                  {!isOwnPulse && !pulse.is_bot && pulse.user_id && (
+                    <BlockUserButton
+                      targetUserId={pulse.user_id}
+                      targetUsername={pulse.author}
+                      onBlocked={onBlockUser}
+                    />
+                  )}
+                </>
               ) : (
                 <button
                   type="button"

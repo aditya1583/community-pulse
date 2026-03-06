@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Leaderboard from "./Leaderboard";
 import UserProfileCard from "./UserProfileCard";
 import { BadgeShowcase } from "./BadgeDisplay";
+import DeleteAccountButton from "./DeleteAccountButton";
 import { useGamification } from "@/hooks/useGamification";
 import { getApiUrl } from "@/lib/api-config";
 import type { BadgeDefinition } from "@/lib/gamification";
@@ -193,6 +194,13 @@ export default function StatusTab({ userId, city, className = "", onSignOut, nam
           Sign out
         </button>
       )}
+
+      {/* Delete Account — Apple requirement 5.1.1(v) */}
+      <DeleteAccountButton
+        onDeleted={() => {
+          onSignOut?.();
+        }}
+      />
     </div>
   );
 }

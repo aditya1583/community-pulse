@@ -98,12 +98,22 @@ export default function TermsOfService() {
               relevant geographic area. Do not post content you wish to keep private.
             </p>
 
-            <h3 className="mb-2 mt-4 text-lg font-medium text-white">5.3 Content Moderation</h3>
-            <p>
+            <h3 className="mb-2 mt-4 text-lg font-medium text-white">5.3 Content Moderation &amp; Zero Tolerance Policy</h3>
+            <p className="mb-4">
+              <strong className="text-white">Voxlo has zero tolerance for objectionable content or abusive users.</strong>{" "}
               All user-generated content is subject to AI-powered content moderation. Posts are reviewed
               automatically across 10 content categories to enforce community standards. Posts that violate
               our guidelines may be <strong className="text-white">rejected before publication</strong> or removed
-              after the fact. Moderation decisions are automated and may not always be perfect; if you
+              after the fact.
+            </p>
+            <p className="mb-4">
+              Users may <strong className="text-white">report objectionable content</strong> using the flag icon on any post.
+              Users may also <strong className="text-white">block abusive users</strong>, which immediately removes their
+              content from your feed and notifies the developer. All reports are reviewed within 24 hours.
+              Content that violates these terms will be removed, and the offending user may be permanently banned.
+            </p>
+            <p>
+              Moderation decisions are automated and may not always be perfect; if you
               believe your content was incorrectly rejected, contact us at{" "}
               <a href="mailto:contact@voxlo.app" className="text-emerald-500 hover:text-emerald-400 underline">
                 contact@voxlo.app
@@ -142,6 +152,20 @@ export default function TermsOfService() {
               </Link>
               .
             </p>
+          </section>
+
+          <section>
+            <h2 className="mb-3 text-xl font-semibold text-emerald-500">7.1 Account Deletion</h2>
+            <p>
+              You may permanently delete your account at any time from the Status tab in the app.
+              Account deletion is immediate and irreversible. When you delete your account:
+            </p>
+            <ul className="list-disc space-y-2 pl-6 mt-2">
+              <li>Your profile and personal data will be permanently erased</li>
+              <li>Your posts will be anonymized (author name replaced with &quot;[deleted]&quot;)</li>
+              <li>Your comments, reactions, badges, and stats will be removed</li>
+              <li>Your authentication credentials will be deleted</li>
+            </ul>
           </section>
 
           <section>
