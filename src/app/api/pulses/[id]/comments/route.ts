@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { runModerationPipeline } from "@/lib/moderationPipeline";
+import { detectPII } from "@/lib/piiDetection";
 import { notifyComment } from "@/lib/notificationTriggers";
 
 export const dynamic = "force-dynamic";
@@ -230,6 +231,15 @@ export async function POST(
     // Check if pulse is expired
     if (isPulseExpired(pulse.expires_at)) {
       return NextResponse.json({ error: "Cannot comment on expired pulses" }, { status: 410 });
+    }
+
+    // PII detection — block personal addresses, phone numbers, etc.
+    const piiResult = detectPII(message);
+    if (piiResult.blocked) {
+      return NextResponse.json(
+        { error: piiResult.reason || "Comment contains personal information", code: "PII_DETECTED" },
+        { status: 400 }
+      );
     }
 
     // Content moderation (full pipeline with AI for multilingual support)

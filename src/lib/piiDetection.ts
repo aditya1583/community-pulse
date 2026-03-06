@@ -216,7 +216,7 @@ const ADDRESS_CONTEXT_PHRASES: RegExp[] = [
  * Street suffixes for address detection
  */
 const STREET_SUFFIXES =
-  /\b(?:st(?:reet)?|rd|road|ave(?:nue)?|blvd|boulevard|ln|lane|dr(?:ive)?|ct|court|hwy|highway|pkwy|parkway|way|pl(?:ace)?|cir(?:cle)?|ter(?:race)?)\b/i;
+  /\b(?:st(?:reet)?|rd|road|ave(?:nue)?|blvd|boulevard|ln|lane|dr(?:ive)?|ct|court|hwy|highway|pkwy|parkway|way|pl(?:ace)?|cir(?:cle)?|ter(?:race)?|pass|trail|trl|loop|lp|crossing|xing|ridge|run|path|bend|cove|cv|glen|holw|hollow|knl|knoll|mnr|manor|vis(?:ta)?|walk|aly|alley|crk|creek|frk|fork|pt|point|spg|spring|vly|valley)\b/i;
 
 /**
  * Apartment/unit markers
@@ -228,7 +228,7 @@ const UNIT_MARKERS = /\b(?:apt|apartment|unit|suite|ste|#)\s*[a-z0-9]+/i;
  * Only blocks when combined with context phrases
  */
 const ADDRESS_LIKE_PATTERN =
-  /\b\d{1,5}\s+(?:[NSEW]\.?(?:\s+))?[a-zA-Z][a-zA-Z\s]{1,30}\s+(?:st(?:reet)?|rd|road|ave(?:nue)?|blvd|boulevard|ln|lane|dr(?:ive)?|ct|court|hwy|highway|pkwy|parkway|way|pl(?:ace)?|cir(?:cle)?|ter(?:race)?)\b/i;
+  /\b\d{1,5}\s+(?:[NSEW]\.?(?:\s+))?[a-zA-Z][a-zA-Z\s]{1,30}\s+(?:st(?:reet)?|rd|road|ave(?:nue)?|blvd|boulevard|ln|lane|dr(?:ive)?|ct|court|hwy|highway|pkwy|parkway|way|pl(?:ace)?|cir(?:cle)?|ter(?:race)?|pass|trail|trl|loop|lp|crossing|xing|ridge|run|path|bend|cove|cv|glen|holw|hollow|knl|knoll|mnr|manor|vis(?:ta)?|walk|aly|alley)\b/i;
 
 /**
  * Self-identification phrases
