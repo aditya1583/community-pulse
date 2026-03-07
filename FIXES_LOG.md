@@ -627,3 +627,22 @@ Permanent reference document for AI content generation rules.
 ✅ Database schema verified
 ✅ Terms page contains required zero-tolerance language
 ✅ Terms page contains account deletion section
+
+---
+
+## 2026-03-07: Build 86 Bug Fixes
+
+### FIX 6: Terms modal bypass on inline PulseInput ✅
+**Files:** `src/app/page.tsx` (line ~2020)
+**Root cause:** Two PulseInput instances in page.tsx. The PulseModal version had `requireTermsAcceptance` gate, but the inline PulseInput (Pulse tab) called `handleAddPulse` directly, bypassing terms check.
+**Fix:** Wrapped inline PulseInput's `onSubmit` with `requireTermsAcceptance(handleAddPulse)`.
+
+### FIX 7: Report modal trapped inside PulseCard ✅
+**Files:** `src/components/ReportPulseButton.tsx`
+**Root cause:** PulseCard has `overflow-hidden` + `transition-all` which creates a CSS containing block. The report modal's `position: fixed` was trapped inside the card, rendering inline rather than as a fullscreen overlay. Submit/cancel buttons were invisible.
+**Fix:** Wrapped modal JSX in `createPortal(…, document.body)` to render at document root, escaping the card's stacking context.
+
+### FIX 8: Push notification permission racing with LocationPrompt ✅
+**Files:** `src/app/page.tsx`
+**Root cause:** Push notification init ran on mount (useEffect with no deps), triggering iOS permission dialog immediately. This competed with LocationPrompt on fresh install — user saw both prompts simultaneously, and dismissing the iOS dialog caused LocationPrompt to vanish.
+**Fix:** Deferred push init until `city` state is resolved (location setup complete). Push permission dialog now appears only after user has set their location.

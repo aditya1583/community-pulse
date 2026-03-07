@@ -1264,10 +1264,22 @@ export default function Home() {
     );
   }
 
-  // Show loading screen while determining location
+  // Show loading screen while determining location — with timeout escape hatch
+  const [locationLoadingElapsed, setLocationLoadingElapsed] = useState(0);
+  useEffect(() => {
+    if (!showLocationLoading) {
+      setLocationLoadingElapsed(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setLocationLoadingElapsed((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [showLocationLoading]);
+
   if (showLocationLoading) {
     return (
-      <div className="min-h-screen neon-grid-bg text-slate-50 flex flex-col items-center justify-center">
+      <div className="min-h-screen neon-grid-bg text-slate-50 flex flex-col items-center justify-center p-6">
         
         <div className="text-center space-y-4">
           <div className="animate-pulse">
@@ -1280,6 +1292,29 @@ export default function Home() {
           </div>
           <h2 className="text-xl font-semibold text-emerald-400">Finding your location...</h2>
           <p className="text-slate-400 text-sm">Getting hyperlocal content for your area</p>
+
+          {/* Escape hatch after 5 seconds */}
+          {locationLoadingElapsed >= 5 && (
+            <div className="pt-4 space-y-3 animate-in fade-in duration-300">
+              <p className="text-xs text-slate-500">Taking longer than expected?</p>
+              <button
+                onClick={() => {
+                  setUseManualLocation(true);
+                  try {
+                    sessionStorage.setItem("cp-use-manual-location", "true");
+                  } catch {
+                    // Ignore
+                  }
+                }}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-sm font-semibold text-slate-300 transition-all active:scale-95"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                </svg>
+                Enter City Manually
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
