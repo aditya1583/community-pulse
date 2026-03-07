@@ -2017,7 +2017,7 @@ export default function Home() {
                           setMessage(m);
                           setValidationError(null);
                         }}
-                        onSubmit={handleAddPulse}
+                        onSubmit={() => requireTermsAcceptance(handleAddPulse)}
                         onSignInClick={() => setShowAuthModal(true)}
                         weather={weather}
                         cityName={city}
