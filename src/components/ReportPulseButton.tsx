@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "../../lib/supabaseClient";
 import { getApiUrl } from "@/lib/api-config";
 
@@ -125,8 +126,8 @@ export default function ReportPulseButton({
         </svg>
       </button>
 
-      {/* Modal */}
-      {isModalOpen && (
+      {/* Modal — portaled to document.body to escape PulseCard overflow-hidden */}
+      {isModalOpen && typeof document !== "undefined" && createPortal(
         <div
           className="fixed inset-0 z-[200] flex items-center justify-center p-4"
           onClick={handleClose}
@@ -136,7 +137,7 @@ export default function ReportPulseButton({
 
           {/* Modal Content */}
           <div
-            className="relative z-[201] bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 shadow-xl max-h-[90vh] overflow-y-auto"
+            className="relative z-[201] bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 shadow-xl max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {submitted ? (
@@ -234,7 +235,8 @@ export default function ReportPulseButton({
               </>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

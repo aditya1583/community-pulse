@@ -172,19 +172,22 @@ export default function Home() {
     }
   }, [authStatus, sessionUser, setSessionUser]);
 
-  // Initialize push notifications — request permission immediately on app load,
-  // then register token with backend once auth is available
+  // Initialize push notifications — deferred until location is established
+  // to avoid iOS notification permission dialog racing with LocationPrompt
   const [pushDebug, setPushDebug] = useState<string>("");
   const [showCitySearch, setShowCitySearch] = useState(false);
   const pushInitAttempted = useRef(false);
+
+  // Deferred push init — waits until city is resolved (location setup done)
+  // so the iOS notification permission dialog doesn't race with LocationPrompt
   useEffect(() => {
     if (pushInitAttempted.current) return;
-    pushInitAttempted.current = true;
+    if (!city) return; // Wait for location to be established first
 
-    console.log("[Push] Attempting push init (auth-independent)...");
+    pushInitAttempted.current = true;
+    console.log("[Push] Location established, attempting push init...");
     setPushDebug("Push: initializing...");
 
-    // Try to get auth token if available, but don't require it
     const getToken = async (): Promise<string | null> => {
       try {
         return await authBridge.getAccessToken();
@@ -208,10 +211,9 @@ export default function Home() {
       }).catch((err) => {
         console.error("[Push] initPushNotifications FAILED:", err);
         setPushDebug(`Push ERR: ${String(err).slice(0, 60)}`);
-        // Don't clear error — keep it visible
       });
     });
-  }, []);
+  }, [city]);
 
   // Re-register push token when user signs in (associate token with user)
   useEffect(() => {
