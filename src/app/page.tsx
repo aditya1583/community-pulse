@@ -1702,7 +1702,7 @@ export default function Home() {
           await handlePullToRefresh();
         }} disabled={loading}>
           {/* Main Content Area */}
-          <main className="flex-1 flex justify-center px-4 pb-6" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+          <main className="flex-1 flex justify-center px-4 pb-6">
             <div className="w-full max-w-lg space-y-6">
 
               {/* VIEW BRANCHING: Dashboard (Pulse) vs Dedicated Tabs (Traffic/Events/Local/Status) */}
@@ -1710,7 +1710,7 @@ export default function Home() {
                 /* --- DASHBOARD VIEW (HOME) --- */
                 <div key="dashboard-tab" className="space-y-6">
                   {/* Top Bar: Header + Auth Action — sticky so it pins on scroll */}
-                  <div className="sticky top-0 z-30 -mx-4 px-4 pt-[env(safe-area-inset-top,0px)] pb-2 bg-black/90 backdrop-blur-md border-b border-white/5">
+                  <div className="sticky top-0 z-30 -mx-4 px-4 pt-[max(env(safe-area-inset-top,0px),8px)] pb-2 bg-black/90 backdrop-blur-md border-b border-white/5">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1 overflow-hidden">
                       <Header cityName={city} isLive={!loading} />
