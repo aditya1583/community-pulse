@@ -1702,15 +1702,14 @@ export default function Home() {
           await handlePullToRefresh();
         }} disabled={loading}>
           {/* Main Content Area */}
-          <main className="flex-1 flex justify-center px-4 pb-6">
+          <main className="flex-1 flex justify-center px-4 pb-6" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
             <div className="w-full max-w-lg space-y-6">
 
               {/* VIEW BRANCHING: Dashboard (Pulse) vs Dedicated Tabs (Traffic/Events/Local/Status) */}
               {activeTab === "pulse" ? (
                 /* --- DASHBOARD VIEW (HOME) --- */
                 <div key="dashboard-tab" className="space-y-6">
-                  {/* Top Bar: Header + Auth Action — sticky so it pins on scroll */}
-                  <div className="sticky z-30 -mx-4 px-4 pb-2 bg-black/90 backdrop-blur-md border-b border-white/5" style={{ top: "env(safe-area-inset-top, 0px)" }}>
+                  {/* Top Bar: Header + Auth Action */}
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1 overflow-hidden">
                       <Header cityName={city} isLive={!loading} />
@@ -1899,8 +1898,6 @@ export default function Home() {
                       </div>
                     )}
                   </div>
-
-                  </div>{/* end sticky header */}
 
                   {/* Current Vibe Card */}
                   <CurrentVibeCard
