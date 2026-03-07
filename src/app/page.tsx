@@ -1242,6 +1242,19 @@ export default function Home() {
       (geolocation.permissionStatus === "granted" && !geolocation.displayName)
     );
 
+  // Location loading elapsed timer — must be declared before early returns (React hooks rules)
+  const [locationLoadingElapsed, setLocationLoadingElapsed] = useState(0);
+  useEffect(() => {
+    if (!showLocationLoading) {
+      setLocationLoadingElapsed(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setLocationLoadingElapsed((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [showLocationLoading]);
+
   // If we need location prompt, show it instead of main app
   if (showLocationPrompt) {
     return (
@@ -1263,19 +1276,6 @@ export default function Home() {
       />
     );
   }
-
-  // Show loading screen while determining location — with timeout escape hatch
-  const [locationLoadingElapsed, setLocationLoadingElapsed] = useState(0);
-  useEffect(() => {
-    if (!showLocationLoading) {
-      setLocationLoadingElapsed(0);
-      return;
-    }
-    const interval = setInterval(() => {
-      setLocationLoadingElapsed((prev) => prev + 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [showLocationLoading]);
 
   if (showLocationLoading) {
     return (
