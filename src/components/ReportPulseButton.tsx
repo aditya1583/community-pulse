@@ -127,15 +127,18 @@ export default function ReportPulseButton({
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+          onClick={handleClose}
+        >
           {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={handleClose}
-          />
+          <div className="absolute inset-0 bg-black/60" />
 
           {/* Modal Content */}
-          <div className="relative bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 shadow-xl">
+          <div
+            className="relative z-[201] bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             {submitted ? (
               /* Success State */
               <div className="text-center py-4">

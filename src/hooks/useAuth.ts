@@ -15,7 +15,7 @@ export type Profile = {
 };
 
 /** Load profile via server-side endpoint (works in WKWebView) or Supabase JS fallback */
-async function loadProfileServerSide(accessToken: string): Promise<{ anon_name: string; name_locked: boolean } | null> {
+async function loadProfileServerSide(accessToken: string): Promise<Profile | null> {
   try {
     const res = await fetch(getApiUrl("/api/auth/profile"), {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -23,7 +23,11 @@ async function loadProfileServerSide(accessToken: string): Promise<{ anon_name: 
     if (!res.ok) return null;
     const data = await res.json();
     if (data.profile) {
-      return { anon_name: data.profile.anon_name, name_locked: data.profile.name_locked ?? false };
+      return {
+        anon_name: data.profile.anon_name,
+        name_locked: data.profile.name_locked ?? false,
+        terms_accepted_at: data.profile.terms_accepted_at ?? null,
+      };
     }
     return null;
   } catch {
@@ -31,7 +35,7 @@ async function loadProfileServerSide(accessToken: string): Promise<{ anon_name: 
   }
 }
 
-async function createProfileServerSide(accessToken: string, anonName: string): Promise<{ anon_name: string; name_locked: boolean } | null> {
+async function createProfileServerSide(accessToken: string, anonName: string): Promise<Profile | null> {
   try {
     const res = await fetch(getApiUrl("/api/auth/profile"), {
       method: "POST",
@@ -41,7 +45,11 @@ async function createProfileServerSide(accessToken: string, anonName: string): P
     if (!res.ok) return null;
     const data = await res.json();
     if (data.profile) {
-      return { anon_name: data.profile.anon_name, name_locked: data.profile.name_locked ?? false };
+      return {
+        anon_name: data.profile.anon_name,
+        name_locked: data.profile.name_locked ?? false,
+        terms_accepted_at: data.profile.terms_accepted_at ?? null,
+      };
     }
     return null;
   } catch {
