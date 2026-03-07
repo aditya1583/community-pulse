@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Voxlo',
   webDir: 'out',
   ios: {
-    contentInset: 'automatic',
+    contentInset: 'never',
     backgroundColor: '#000000',
     allowsLinkPreview: false,
     preferredContentMode: 'mobile',
