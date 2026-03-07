@@ -172,48 +172,10 @@ export default function Home() {
     }
   }, [authStatus, sessionUser, setSessionUser]);
 
-  // Initialize push notifications — deferred until location is established
-  // to avoid iOS notification permission dialog racing with LocationPrompt
+  // Push notification state — init deferred until after location setup
   const [pushDebug, setPushDebug] = useState<string>("");
   const [showCitySearch, setShowCitySearch] = useState(false);
   const pushInitAttempted = useRef(false);
-
-  // Deferred push init — waits until city is resolved (location setup done)
-  // so the iOS notification permission dialog doesn't race with LocationPrompt
-  useEffect(() => {
-    if (pushInitAttempted.current) return;
-    if (!city) return; // Wait for location to be established first
-
-    pushInitAttempted.current = true;
-    console.log("[Push] Location established, attempting push init...");
-    setPushDebug("Push: initializing...");
-
-    const getToken = async (): Promise<string | null> => {
-      try {
-        return await authBridge.getAccessToken();
-      } catch {
-        return null;
-      }
-    };
-
-    getToken().then((accessToken) => {
-      console.log("[Push] Access token:", accessToken ? "available" : "not available (will retry on sign-in)");
-      setPushDebug(accessToken ? "Push: has auth, calling init..." : "Push: no auth, calling init anyway...");
-
-      initPushNotifications(accessToken || "__anonymous__", (data) => {
-        if (data.pulseId) {
-          setActiveTab("pulse");
-        }
-      }).then((result) => {
-        console.log("[Push] initPushNotifications result:", result);
-        setPushDebug(`Push: ${result ? "OK ✅" : "FAILED ❌ (check native?)"}`);
-        setTimeout(() => setPushDebug(""), 10000);
-      }).catch((err) => {
-        console.error("[Push] initPushNotifications FAILED:", err);
-        setPushDebug(`Push ERR: ${String(err).slice(0, 60)}`);
-      });
-    });
-  }, [city]);
 
   // Re-register push token when user signs in (associate token with user)
   useEffect(() => {
@@ -256,6 +218,46 @@ export default function Home() {
   } = usePulses({ city, selectedCity, geolocation });
   // Initialize with false to avoid hydration mismatch - restored in useEffect
   const [useManualLocation, setUseManualLocation] = useState(false);
+
+  // Deferred push init — waits until location setup is truly done
+  // (geolocation resolved OR manual mode active) so the iOS notification
+  // permission dialog doesn't race with LocationPrompt on fresh install.
+  const locationEstablished = useManualLocation || (!!geolocation.lat && !!geolocation.lon);
+  useEffect(() => {
+    if (pushInitAttempted.current) return;
+    if (!locationEstablished) return;
+
+    pushInitAttempted.current = true;
+    console.log("[Push] Location established, attempting push init...");
+    setPushDebug("Push: initializing...");
+
+    const getToken = async (): Promise<string | null> => {
+      try {
+        return await authBridge.getAccessToken();
+      } catch {
+        return null;
+      }
+    };
+
+    getToken().then((accessToken) => {
+      console.log("[Push] Access token:", accessToken ? "available" : "not available");
+      setPushDebug(accessToken ? "Push: has auth, calling init..." : "Push: no auth, calling init anyway...");
+
+      initPushNotifications(accessToken || "__anonymous__", (data) => {
+        if (data.pulseId) {
+          setActiveTab("pulse");
+        }
+      }).then((result) => {
+        console.log("[Push] initPushNotifications result:", result);
+        setPushDebug(`Push: ${result ? "OK ✅" : "FAILED ❌ (check native?)"}`);
+        setTimeout(() => setPushDebug(""), 10000);
+      }).catch((err) => {
+        console.error("[Push] initPushNotifications FAILED:", err);
+        setPushDebug(`Push ERR: ${String(err).slice(0, 60)}`);
+      });
+    });
+  }, [locationEstablished]);
+
   // Track if we've restored state from storage (prevents geolocation race)
   const [storageRestored, setStorageRestored] = useState(false);
   // Ref to ensure storage restoration only happens once (survives re-renders and StrictMode)

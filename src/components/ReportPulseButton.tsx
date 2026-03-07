@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { supabase } from "../../lib/supabaseClient";
 import { getApiUrl } from "@/lib/api-config";
+import { authBridge } from "@/lib/authBridge";
 
 type ReportReason = "spam" | "harassment" | "inappropriate" | "misinformation" | "other";
 
@@ -43,11 +43,9 @@ export default function ReportPulseButton({
     setError(null);
 
     try {
-      const { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
+      const accessToken = await authBridge.getAccessToken();
 
-      if (sessionError || !accessToken) {
+      if (!accessToken) {
         throw new Error("Sign in to report");
       }
 
