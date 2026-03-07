@@ -1710,7 +1710,7 @@ export default function Home() {
                 /* --- DASHBOARD VIEW (HOME) --- */
                 <div key="dashboard-tab" className="space-y-6">
                   {/* Top Bar: Header + Auth Action — sticky so it pins on scroll */}
-                  <div className="sticky top-0 z-30 -mx-4 px-4 pt-[max(env(safe-area-inset-top,0px),8px)] pb-2 bg-black/90 backdrop-blur-md border-b border-white/5">
+                  <div className="sticky z-30 -mx-4 px-4 pb-2 bg-black/90 backdrop-blur-md border-b border-white/5" style={{ top: "env(safe-area-inset-top, 0px)" }}>
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1 overflow-hidden">
                       <Header cityName={city} isLive={!loading} />
