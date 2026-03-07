@@ -509,19 +509,27 @@ function detectCreditCard(text: string): boolean {
 }
 
 /**
- * Check for address patterns WITH context phrases
+ * Check for address patterns
+ *
+ * Two tiers:
+ * 1. Strong pattern (house number + street name + suffix) — always block
+ * 2. Weak pattern (street suffix + any number) — only block with context phrase
  */
 function detectAddress(text: string): boolean {
+  // Tier 1: Strong address pattern — block even without context
+  // e.g. "1812 Arapaho mountain pass", "456 Oak Trail", "123 Main Street"
+  if (ADDRESS_LIKE_PATTERN.test(text)) return true;
+
+  // Unit/apartment markers are always strong signals
+  if (UNIT_MARKERS.test(text) && /\b\d+\b/.test(text)) return true;
+
+  // Tier 2: Weak patterns — only block with context phrase
   const hasContextPhrase = ADDRESS_CONTEXT_PHRASES.some((pattern) =>
     pattern.test(text)
   );
   if (!hasContextPhrase) return false;
 
-  // Address-like content
-  if (ADDRESS_LIKE_PATTERN.test(text)) return true;
-  if (UNIT_MARKERS.test(text)) return true;
-
-  // Any street suffix + any number
+  // Any street suffix + any number (with context)
   if (STREET_SUFFIXES.test(text) && /\b\d+\b/.test(text)) return true;
 
   return false;
