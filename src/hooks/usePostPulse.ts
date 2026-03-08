@@ -167,10 +167,32 @@ export function usePostPulse(opts: UsePostPulseOptions) {
         return;
       }
 
+      // Auto-tag: if user didn't pick a specific tag (defaulted to "General"),
+      // use AI to classify the post into the right category
+      let finalTag = resolvedTag;
+      if (resolvedTag === "General" || !tag) {
+        try {
+          const tagRes = await fetch(getApiUrl("/api/auto-tag"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: trimmed }),
+          });
+          if (tagRes.ok) {
+            const { tag: aiTag } = await tagRes.json();
+            if (aiTag && aiTag !== "General") {
+              finalTag = aiTag;
+              console.log(`[AutoTag] Classified as: ${aiTag}`);
+            }
+          }
+        } catch {
+          // Silent fail — keep original tag
+        }
+      }
+
       const postBody = {
         city,
         mood,
-        tag: resolvedTag,
+        tag: finalTag,
         message: trimmed,
         author: authorName,
         lat: useManualLocation

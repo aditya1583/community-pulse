@@ -1980,7 +1980,7 @@ export default function Home() {
 
                   {/* Community Vibe Banner — consensus summary from user posts */}
                   {activeTab === "pulse" && (
-                    <CommunityVibeBanner pulses={pulses} />
+                    <CommunityVibeBanner cityName={city} userPulseCount={pulses.filter(p => !p.is_bot).length} />
                   )}
 
                   {/* AI Summary Stories */}

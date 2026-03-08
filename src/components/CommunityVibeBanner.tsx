@@ -1,127 +1,70 @@
 "use client";
 
-import React, { useMemo } from "react";
-import type { Pulse } from "./types";
+import React, { useState, useEffect } from "react";
+import { getApiUrl } from "@/lib/api-config";
 
 type CommunityVibeBannerProps = {
-  pulses: Pulse[];
+  cityName: string;
+  /** Number of recent user pulses — banner only shows if > 0 */
+  userPulseCount: number;
   className?: string;
 };
 
 /**
  * Community Vibe Banner
  *
- * Shows a one-line consensus summary of what the community is talking about.
- * Analyzes user posts (not bot posts) to surface trending topics and vibes.
+ * Shows an AI-generated one-line summary of what the community is talking about.
+ * Fetches from /api/community-summary which uses GPT-4o-mini to summarize
+ * recent user posts into a natural, warm sentence.
  *
  * Examples:
- * - "🍓 Strawberry picking is the vibe today"
- * - "🚗 Everyone's talking about traffic on 183"
- * - "☀️ Neighbors are loving the weather"
- * - "📢 3 neighbors shared thoughts today"
+ * - "🍓 Leander neighbors are buzzing about brunch spots and strawberry picking"
+ * - "🚗 Traffic on 183 and late-night work vibes in Leander today"
+ * - "💬 3 neighbors shared updates in Austin today"
  */
-export default function CommunityVibeBanner({ pulses, className = "" }: CommunityVibeBannerProps) {
-  const banner = useMemo(() => {
-    // Only consider recent user posts (not bot posts), last 24h
-    const now = Date.now();
-    const oneDayAgo = now - 24 * 60 * 60 * 1000;
+export default function CommunityVibeBanner({ cityName, userPulseCount, className = "" }: CommunityVibeBannerProps) {
+  const [summary, setSummary] = useState<{ text: string; emoji: string } | null>(null);
+  const [loading, setLoading] = useState(false);
 
-    const recentUserPulses = pulses.filter(
-      (p) => !p.is_bot && new Date(p.createdAt).getTime() > oneDayAgo
-    );
-
-    if (recentUserPulses.length === 0) return null;
-
-    // Extract keywords and patterns from messages
-    const allText = recentUserPulses.map((p) => p.message.toLowerCase()).join(" ");
-    const moods = recentUserPulses.map((p) => p.mood).filter(Boolean);
-
-    // Find the dominant mood emoji
-    const moodCounts: Record<string, number> = {};
-    for (const m of moods) {
-      moodCounts[m] = (moodCounts[m] || 0) + 1;
-    }
-    const dominantMood = Object.entries(moodCounts).sort(
-      (a, b) => b[1] - a[1]
-    )[0]?.[0];
-
-    // Topic detection — look for common themes
-    const topicPatterns: { pattern: RegExp; emoji: string; label: string }[] = [
-      { pattern: /strawberr/i, emoji: "🍓", label: "Strawberry picking" },
-      { pattern: /farmer'?s?\s*market/i, emoji: "🌽", label: "Farmers market" },
-      { pattern: /traffic|accident|road|closure|183|29|1431/i, emoji: "🚗", label: "Traffic" },
-      { pattern: /weather|rain|storm|tornado|heat|cold|freeze/i, emoji: "⛅", label: "Weather" },
-      { pattern: /food\s*truck|restaurant|eat|lunch|dinner|brunch/i, emoji: "🍽️", label: "Food spots" },
-      { pattern: /hike|trail|park|outdoor|walk/i, emoji: "🥾", label: "Outdoor activities" },
-      { pattern: /school|kid|parent|family/i, emoji: "🏫", label: "Family & schools" },
-      { pattern: /music|concert|live|show|band/i, emoji: "🎵", label: "Live music" },
-      { pattern: /dog|pet|cat|animal/i, emoji: "🐕", label: "Pets" },
-      { pattern: /open|new|just\s+opened|grand\s+opening/i, emoji: "🆕", label: "New openings" },
-      { pattern: /sale|deal|discount|free/i, emoji: "💰", label: "Deals & sales" },
-      { pattern: /help|volunteer|community|neighbor/i, emoji: "🤝", label: "Community help" },
-      { pattern: /water|lake|pool|swim/i, emoji: "💧", label: "Water activities" },
-      { pattern: /bbq|grill|barbecue|cookout/i, emoji: "🔥", label: "BBQ & cookouts" },
-      { pattern: /game|sport|watch\s*party|football|soccer|basketball/i, emoji: "🏈", label: "Sports" },
-    ];
-
-    // Find matching topics
-    const matchedTopics = topicPatterns.filter((t) => t.pattern.test(allText));
-
-    // Tag distribution
-    const tagCounts: Record<string, number> = {};
-    for (const p of recentUserPulses) {
-      const tag = p.tag || "General";
-      tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+  useEffect(() => {
+    if (userPulseCount === 0 || !cityName) {
+      setSummary(null);
+      return;
     }
 
-    // Build the banner text
-    let emoji: string;
-    let text: string;
+    let cancelled = false;
+    setLoading(true);
 
-    if (matchedTopics.length > 0) {
-      // Use the most-mentioned topic
-      const topTopic = matchedTopics[0];
-      const count = recentUserPulses.filter((p) =>
-        topTopic.pattern.test(p.message)
-      ).length;
+    fetch(getApiUrl(`/api/community-summary?city=${encodeURIComponent(cityName)}`))
+      .then(res => res.json())
+      .then(data => {
+        if (!cancelled && data.summary) {
+          setSummary({ text: data.summary, emoji: data.emoji || "💬" });
+        }
+      })
+      .catch(() => {
+        // Silently fail — banner just won't show
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
-      emoji = topTopic.emoji;
-      if (count >= 3) {
-        text = `${topTopic.label} is trending — ${count} neighbors talking about it`;
-      } else if (count >= 2) {
-        text = `${topTopic.label} is catching interest nearby`;
-      } else {
-        text = `${topTopic.label} vibes in the neighborhood`;
-      }
-    } else if (recentUserPulses.length >= 3) {
-      // No specific topic — use general vibe
-      emoji = dominantMood || "📢";
-      const topTag = Object.entries(tagCounts).sort((a, b) => b[1] - a[1])[0];
-      text = `${recentUserPulses.length} neighbors shared thoughts today${topTag ? ` — mostly ${topTag[0].toLowerCase()}` : ""}`;
-    } else if (recentUserPulses.length >= 1) {
-      emoji = dominantMood || "💬";
-      text = `${recentUserPulses.length === 1 ? "A neighbor" : `${recentUserPulses.length} neighbors`} dropped a pulse today`;
-    } else {
-      return null;
-    }
+    return () => { cancelled = true; };
+  }, [cityName, userPulseCount]);
 
-    return { emoji, text };
-  }, [pulses]);
-
-  if (!banner) return null;
+  if (!summary && !loading) return null;
+  if (loading) return null; // Don't show skeleton — just appear when ready
 
   return (
     <div
       className={`relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-500/10 via-cyan-500/5 to-transparent border border-emerald-500/10 px-4 py-3 ${className}`}
     >
       <div className="flex items-center gap-3">
-        <span className="text-2xl flex-shrink-0 animate-bounce-subtle">{banner.emoji}</span>
+        <span className="text-2xl flex-shrink-0 animate-bounce-subtle">{summary?.emoji}</span>
         <p className="text-sm font-bold text-slate-200 tracking-tight leading-snug">
-          {banner.text}
+          {summary?.text}
         </p>
       </div>
-      {/* Subtle glow effect */}
-      <div className="absolute -top-4 -right-4 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none" />
     </div>
   );
 }
