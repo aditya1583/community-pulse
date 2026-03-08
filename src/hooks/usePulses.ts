@@ -128,7 +128,10 @@ export function usePulses({ city, selectedCity, geolocation }: UsePulsesParams) 
 
   // ========= PULSES FETCH =========
   const fetchPulses = useCallback(async () => {
-    setLoading(true);
+    // Only show skeleton loaders on initial fetch, not re-fetches/refreshes
+    if (pulses.length === 0) {
+      setLoading(true);
+    }
     setErrorMsg(null);
     setHasMorePulses(false);
 
