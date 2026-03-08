@@ -201,12 +201,15 @@ export default function StatusTab({ userId, city, className = "", onSignOut, nam
         <AdminModerationPanel userId={userId} />
       )}
 
-      {/* Delete Account — Apple requirement 5.1.1(v) */}
-      <DeleteAccountButton
-        onDeleted={() => {
-          onSignOut?.();
-        }}
-      />
+      {/* Account Management — Apple requirement 5.1.1(v) */}
+      <div className="mt-6 pt-6 border-t border-slate-700/50">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Account Management</h3>
+        <DeleteAccountButton
+          onDeleted={() => {
+            onSignOut?.();
+          }}
+        />
+      </div>
     </div>
   );
 }

@@ -79,9 +79,9 @@ export default function DeleteAccountButton({ onDeleted }: DeleteAccountButtonPr
     return (
       <button
         onClick={() => setStep("confirm1")}
-        className="w-full py-3 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:text-red-400 transition-colors"
+        className="w-full py-4 mt-4 text-sm font-bold text-red-400 border border-red-500/20 rounded-2xl hover:bg-red-500/10 transition-all"
       >
-        Delete Account
+        🗑️ Delete Account
       </button>
     );
   }
