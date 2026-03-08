@@ -157,8 +157,8 @@ export default function AISummaryStories({
       id: "local",
       icon: "📍",
       title: "Local",
-      value: "Gas & More",
-      subtitle: `Essentials in ${displayCity}`,
+      value: "Explore",
+      subtitle: `Places in ${displayCity}`,
       color: "text-cyan-400",
       bgGradient: "from-cyan-500/20 to-cyan-600/10",
     });
