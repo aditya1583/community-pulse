@@ -622,6 +622,14 @@ export async function generateSeedPosts(
     const variables = buildVariables(ctx, option.eventIndex ?? 0);
     
     let message: string = fillTemplateStandard(template, variables);
+
+    // Validate: skip posts with unfilled placeholders or empty fields
+    // e.g. "Traffic update: near ." means road/landmark data was missing
+    if (/\{[a-zA-Z]+\}/.test(message) || /: near \.|:  near|update:  ?\.|: \.$/.test(message) || message.trim().length < 15) {
+      console.warn(`[TemplateEngine] Skipping malformed post: "${message}"`);
+      continue;
+    }
+
     let postMood: string = getMood(option.category);
 
     // Inject fun facts into seed posts more frequently (~40% for variety)
