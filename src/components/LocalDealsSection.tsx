@@ -361,22 +361,18 @@ export default function LocalDealsSection({
 
       {/* Loading State */}
       {loading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 animate-pulse"
-            >
-              <div className="flex gap-3">
-                <div className="w-16 h-16 bg-slate-700/50 rounded-lg shrink-0" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 w-3/4 bg-slate-700/50 rounded" />
-                  <div className="h-3 w-1/2 bg-slate-700/50 rounded" />
-                  <div className="h-3 w-2/3 bg-slate-700/50 rounded" />
-                </div>
-              </div>
+        <div className="flex flex-col items-center justify-center py-12 space-y-5">
+          <div className="relative w-16 h-16">
+            <div className="absolute inset-0 rounded-full border-2 border-cyan-500/30 animate-ping" style={{ animationDuration: "2s" }} />
+            <div className="absolute inset-2 rounded-full border-2 border-cyan-500/20 animate-ping" style={{ animationDuration: "2s", animationDelay: "0.6s" }} />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-2xl">📍</span>
             </div>
-          ))}
+          </div>
+          <div className="text-center space-y-1">
+            <p className="text-sm font-bold text-slate-300">Finding places nearby...</p>
+            <p className="text-xs text-slate-500">Checking what&apos;s around you</p>
+          </div>
         </div>
       )}
 
