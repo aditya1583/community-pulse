@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getApiUrl } from "@/lib/api-config";
 import type { WeatherInfo, TrafficLevel, Pulse } from "@/components/types";
 
@@ -25,9 +25,22 @@ export function useSummary({ city, pulses, ticketmasterEvents, trafficLevel, wea
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
 
+  // Stabilize pulses reference — only re-trigger when IDs actually change
+  const pulsesFingerprint = useMemo(
+    () => pulses.filter(p => !p.is_bot).map(p => p.id).sort((a, b) => a - b).join(","),
+    [pulses]
+  );
+  const stableUserPulses = useMemo(
+    () => pulses.filter(p => !p.is_bot),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pulsesFingerprint]
+  );
+
+  // Keep previous summary visible during re-fetch (no flash to "Loading...")
+  const prevSummaryRef = useRef<string | null>(null);
+
   useEffect(() => {
-    // Filter out bot posts — only real user posts go to AI summary
-    const userPulses = pulses.filter(p => !p.is_bot);
+    const userPulses = stableUserPulses;
     // Need at least some data to generate a summary
     const hasData = userPulses.length > 0 || ticketmasterEvents.length > 0 || trafficLevel || weather;
 
@@ -42,7 +55,10 @@ export function useSummary({ city, pulses, ticketmasterEvents, trafficLevel, wea
 
     const run = async () => {
       try {
-        setSummaryLoading(true);
+        // Only show loading state on first fetch — keep stale data visible on refresh
+        if (!prevSummaryRef.current) {
+          setSummaryLoading(true);
+        }
         setSummaryError(null);
 
         // Prepare events data for the summary (deduplicated by normalized name)
@@ -106,6 +122,7 @@ export function useSummary({ city, pulses, ticketmasterEvents, trafficLevel, wea
         }
 
         setSummary(data.summary);
+        prevSummaryRef.current = data.summary;
       } catch {
         if (!cancelled) {
           setSummaryError("Unable to summarize right now.");
@@ -123,7 +140,7 @@ export function useSummary({ city, pulses, ticketmasterEvents, trafficLevel, wea
     return () => {
       cancelled = true;
     };
-  }, [city, pulses, ticketmasterEvents, trafficLevel, weather]);
+  }, [city, stableUserPulses, ticketmasterEvents, trafficLevel, weather]);
 
   return { summary, summaryLoading, summaryError };
 }
