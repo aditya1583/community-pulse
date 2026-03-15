@@ -68,6 +68,9 @@ export function usePulses({ city, selectedCity, geolocation }: UsePulsesParams) 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const retryAttempted = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const selectedCityRef = useRef(selectedCity);
+  selectedCityRef.current = selectedCity;
 
   // ========= REAL-TIME FEED =========
   useEffect(() => {
@@ -128,8 +131,13 @@ export function usePulses({ city, selectedCity, geolocation }: UsePulsesParams) 
 
   // ========= PULSES FETCH =========
   const fetchPulses = useCallback(async () => {
+    // Cancel any in-flight request
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     // Only show skeleton loaders on initial fetch, not re-fetches/refreshes
-    if (pulses.length === 0) {
+    if (!initialPulsesFetched) {
       setLoading(true);
     }
     setErrorMsg(null);
@@ -138,8 +146,8 @@ export function usePulses({ city, selectedCity, geolocation }: UsePulsesParams) 
     console.log("[Pulses] fetchPulses called for city:", city);
 
     try {
-      const userLat = selectedCity?.lat;
-      const userLon = selectedCity?.lon;
+      const userLat = selectedCityRef.current?.lat;
+      const userLon = selectedCityRef.current?.lon;
       const params = new URLSearchParams();
       if (userLat != null && userLon != null) {
         params.set("lat", String(userLat));
@@ -150,7 +158,9 @@ export function usePulses({ city, selectedCity, geolocation }: UsePulsesParams) 
 
       const apiUrl = `${getApiUrl("/api/pulses/feed")}?${params}`;
       console.log(`[Pulses] Fetching via API: ${apiUrl}`);
-      const res = await fetch(apiUrl, { signal: AbortSignal.timeout(15000) });
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      const res = await fetch(apiUrl, { signal: controller.signal });
+      clearTimeout(timeout);
 
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({ error: res.statusText }));
@@ -221,21 +231,28 @@ export function usePulses({ city, selectedCity, geolocation }: UsePulsesParams) 
       setLoading(false);
       setInitialPulsesFetched(true);
     }
-  }, [city, selectedCity?.lat, selectedCity?.lon]);
+  }, [city, initialPulsesFetched]);
 
   // Initial load + auto-refresh interval
   useEffect(() => {
     setInitialPulsesFetched(false);
 
     if (city) {
-      fetchPulses();
+      // Debounce: wait for city to stabilize before fetching
+      const debounce = setTimeout(() => {
+        fetchPulses();
+      }, 300);
 
       const refreshInterval = setInterval(() => {
         console.log("[Pulses] Safety-net refresh (Realtime is primary)...");
         fetchPulses();
       }, 5 * 60 * 1000);
 
-      return () => clearInterval(refreshInterval);
+      return () => {
+        clearTimeout(debounce);
+        clearInterval(refreshInterval);
+        abortRef.current?.abort();
+      };
     }
   }, [city, fetchPulses]);
 
