@@ -39,6 +39,9 @@ import { useGeolocation } from "@/hooks/useGeolocation";
 import { useHomeData } from "@/hooks/useHomeData";
 import { useSummary } from "@/hooks/useSummary";
 import { useCityMood } from "@/hooks/useCityMood";
+import { useUniversalData } from "@/hooks/useUniversalData";
+import NWSAlertBanner from "@/components/NWSAlertBanner";
+import NewsCard from "@/components/NewsCard";
 import { useStreak } from "@/hooks/useStreak";
 import { useUsername } from "@/hooks/useUsername";
 import { useAutoSeed } from "@/hooks/useAutoSeed";
@@ -335,6 +338,18 @@ export default function Home() {
   const { cityMood, cityMoodLoading, cityMoodError } = useCityMood({
     city, lat: selectedCity?.lat, lon: selectedCity?.lon,
     ticketmasterEvents, trafficLevel, weather, pulsesLength: pulses.length,
+  });
+
+  // Universal Data Layer (NWS alerts, AQI, local news)
+  const {
+    nwsAlerts, nwsLoading,
+    airQuality, aqiLoading,
+    localNews, newsLoading,
+  } = useUniversalData({
+    lat: selectedCity?.lat ?? null,
+    lon: selectedCity?.lon ?? null,
+    city: selectedCity?.name ?? city.split(",")[0].trim(),
+    state: selectedCity?.state ?? "",
   });
 
   // Gas Prices (for quick view in Current Vibe section)
@@ -2001,7 +2016,16 @@ export default function Home() {
                     vibeHeadline={cityMood?.vibeHeadline}
                     vibeEmoji={cityMood?.dominantMood ?? undefined}
                     temperature={weather?.temp}
+                    airQuality={airQuality}
+                    aqiLoading={aqiLoading}
                   />
+
+                  {/* NWS Weather Alerts */}
+                  {nwsAlerts.length > 0 && (
+                    <div className="mb-4">
+                      <NWSAlertBanner alerts={nwsAlerts} />
+                    </div>
+                  )}
 
                   {/* Traffic Flash Alert Banner */}
                   {(hasRoadClosure || (trafficIncidents && trafficIncidents.some(i => i.severity >= 3))) && (
@@ -2205,6 +2229,19 @@ export default function Home() {
                             })}
 
                           {/* Out-of-radius content removed — feed only shows in-radius pulses */}
+
+                          {/* Local News */}
+                          {tagFilter === "All" && localNews.length > 0 && (
+                            <div className="space-y-2 pt-2">
+                              <div className="flex items-center gap-2 px-1 pb-1">
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400">Local News</span>
+                                <div className="flex-1 h-px bg-blue-500/20" />
+                              </div>
+                              {localNews.slice(0, 5).map((item, idx) => (
+                                <NewsCard key={`news-${idx}`} item={item} />
+                              ))}
+                            </div>
+                          )}
 
                           {hasMorePulses && tagFilter === "All" && (
                             <button
