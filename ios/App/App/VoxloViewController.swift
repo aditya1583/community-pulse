@@ -5,6 +5,7 @@ import Capacitor
 class VoxloViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(AppleSignInPlugin())
+        bridge?.registerPluginInstance(InAppReviewPlugin())
     }
 
     override func viewDidLoad() {

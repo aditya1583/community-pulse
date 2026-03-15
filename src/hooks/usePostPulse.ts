@@ -9,6 +9,7 @@ import {
   writeOnboardingCompleted,
 } from "@/lib/pulses";
 import { getApiUrl } from "@/lib/api-config";
+import { maybeRequestReview } from "@/lib/inAppReview";
 import type { Pulse } from "@/components/types";
 import type { Profile } from "@/hooks/useAuth";
 
@@ -301,6 +302,8 @@ export function usePostPulse(opts: UsePostPulseOptions) {
 
       setPulseCountResolved(true);
       setUserPulseCount((prev) => prev + 1);
+      // Request in-app review after 3rd pulse
+      maybeRequestReview(userPulseCount + 1);
 
       if (wasFirstPulse) {
         writeOnboardingCompleted(window.localStorage, sessionUser.id);
@@ -514,6 +517,8 @@ export function usePostPulse(opts: UsePostPulseOptions) {
 
       setPulseCountResolved(true);
       setUserPulseCount((prev) => prev + 1);
+      // Request in-app review after 3rd pulse
+      maybeRequestReview(userPulseCount + 1);
 
       if (wasFirstPulse) {
         writeOnboardingCompleted(window.localStorage, sessionUser.id);
