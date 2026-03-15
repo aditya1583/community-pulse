@@ -3,6 +3,7 @@
 import React, { useState, useRef, useCallback, useMemo } from "react";
 import type { TicketmasterEvent } from "@/hooks/useEvents";
 import type { TabId, TrafficLevel } from "./types";
+import type { AQIResult } from "@/hooks/useUniversalData";
 /** Strip markdown bold/italic formatting */
 function stripMarkdown(text: string): string {
   return text
@@ -42,10 +43,14 @@ type AISummaryStoriesProps = {
   vibeHeadline?: string;
   vibeEmoji?: string;
   temperature?: number;
+  airQuality?: AQIResult | null;
+  aqiLoading?: boolean;
 };
 
+type StoryCardId = TabId | "share" | "air-quality";
+
 type StoryCard = {
-  id: TabId | "share";
+  id: StoryCardId;
   icon: string;
   title: string;
   value: string;
@@ -77,6 +82,8 @@ export default function AISummaryStories({
   vibeHeadline,
   vibeEmoji,
   temperature,
+  airQuality,
+  aqiLoading,
 }: AISummaryStoriesProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -135,6 +142,70 @@ export default function AISummaryStories({
           : "from-emerald-500/20 to-emerald-600/10",
     });
 
+    // Air Quality card
+    const aqiNum = airQuality?.aqi ?? null;
+    const aqiIsLoading = aqiLoading ?? false;
+
+    const aqiIcon = aqiIsLoading
+      ? "🌫️"
+      : aqiNum === null
+        ? "🌫️"
+        : aqiNum <= 50
+          ? "🟢"
+          : aqiNum <= 100
+            ? "🟡"
+            : aqiNum <= 150
+              ? "🟠"
+              : aqiNum <= 200
+                ? "🔴"
+                : aqiNum <= 300
+                  ? "🟣"
+                  : "⚫";
+
+    const aqiColor =
+      aqiNum === null
+        ? "text-slate-400"
+        : aqiNum <= 50
+          ? "text-emerald-400"
+          : aqiNum <= 100
+            ? "text-yellow-400"
+            : aqiNum <= 150
+              ? "text-orange-400"
+              : aqiNum <= 200
+                ? "text-red-400"
+                : aqiNum <= 300
+                  ? "text-purple-400"
+                  : "text-slate-300";
+
+    const aqiGradient =
+      aqiNum === null
+        ? "from-slate-500/20 to-slate-600/10"
+        : aqiNum <= 50
+          ? "from-emerald-500/20 to-emerald-600/10"
+          : aqiNum <= 100
+            ? "from-yellow-500/20 to-yellow-600/10"
+            : aqiNum <= 150
+              ? "from-orange-500/20 to-orange-600/10"
+              : aqiNum <= 200
+                ? "from-red-500/20 to-red-600/10"
+                : aqiNum <= 300
+                  ? "from-purple-500/20 to-purple-600/10"
+                  : "from-slate-500/20 to-slate-600/10";
+
+    cards.push({
+      id: "air-quality",
+      icon: aqiIcon,
+      title: "Air Quality",
+      value: aqiIsLoading ? "..." : aqiNum !== null ? String(aqiNum) : "N/A",
+      subtitle: aqiIsLoading
+        ? "Checking air..."
+        : airQuality?.error
+          ? "Unavailable"
+          : airQuality?.category || "No data",
+      color: aqiColor,
+      bgGradient: aqiGradient,
+    });
+
     // Events card
     cards.push({
       id: "events",
@@ -169,6 +240,7 @@ export default function AISummaryStories({
     trafficLevel, trafficLoading, trafficError,
     uniqueEvents, eventsLoading, eventsError,
     displayCity,
+    airQuality, aqiLoading,
   ]);
 
   // Handle scroll to update active indicator
@@ -180,12 +252,14 @@ export default function AISummaryStories({
     setActiveIndex(Math.min(newIndex, stories.length - 1));
   }, [stories.length]);
 
-  // Handle card tap
+  // Handle card tap — only navigate for actual TabId cards
+  const navigableTabs = new Set<StoryCardId>(["pulse", "traffic", "events", "local", "status"]);
   const handleCardTap = useCallback((card: StoryCard) => {
-    if (card.id !== "share" && onNavigateTab) {
+    if (navigableTabs.has(card.id) && onNavigateTab) {
       onNavigateTab(card.id as TabId);
     }
-  }, [onNavigateTab]);
+    // "air-quality" and "share" are informational — no navigation
+  }, [onNavigateTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-4">
