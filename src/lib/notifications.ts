@@ -77,6 +77,44 @@ export async function initPushNotifications(
       console.log("[notifications] Token not yet available from APNs — storing auth for deferred registration");
       // Store the access token so the registration listener can use it when the APNs token arrives
       pendingAccessToken = accessToken;
+
+      // Retry loop: APNs token may arrive shortly after this call
+      // (e.g. if register() just completed but the callback hasn't fired yet).
+      // Poll every 500ms for up to 10s; once currentToken appears, register immediately.
+      const retryStart = Date.now();
+      const retryInterval = setInterval(async () => {
+        if (currentToken) {
+          clearInterval(retryInterval);
+          // Only proceed if pendingAccessToken is still ours (wasn't consumed by the listener)
+          if (pendingAccessToken === accessToken) {
+            pendingAccessToken = null;
+            console.log("[notifications] Deferred: APNs token arrived via retry loop, registering now...");
+            try {
+              const url = getApiUrl("/api/notifications/register");
+              const res = await fetch(url, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${accessToken}`,
+                },
+                body: JSON.stringify({ token: currentToken, platform: "ios" }),
+              });
+              const body = await res.json().catch(() => ({}));
+              console.log("[notifications] Deferred registration response:", res.status, JSON.stringify(body));
+              if (!res.ok) {
+                console.error("[notifications] Deferred registration failed:", res.status, body);
+              }
+            } catch (err) {
+              console.error("[notifications] Deferred registration error:", err);
+            }
+          } else {
+            console.log("[notifications] Deferred: token already consumed by registration listener, skipping retry");
+          }
+        } else if (Date.now() - retryStart > 10000) {
+          clearInterval(retryInterval);
+          console.log("[notifications] Deferred registration timed out — APNs token never arrived in 10s");
+        }
+      }, 500);
     }
     return true;
   }
