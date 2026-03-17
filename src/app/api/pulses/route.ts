@@ -362,16 +362,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Fire-and-forget: notify nearby users about the new post
+    // Notify nearby users about the new post
+    // Must await — Vercel serverless kills pending async after response is sent
     if (data && data.lat && data.lon && data.user_id) {
-      notifyNearbyUsers(
-        data.lat,
-        data.lon,
-        10,
-        data.message?.substring(0, 80) || "New post",
-        data.id,
-        data.user_id
-      ).catch(() => {});
+      try {
+        await notifyNearbyUsers(
+          data.lat,
+          data.lon,
+          10,
+          data.message?.substring(0, 80) || "New post",
+          data.id,
+          data.user_id
+        );
+      } catch (err) {
+        console.error("[PulsesAPI] Notification failed:", err);
+      }
     }
 
     return NextResponse.json({ pulse: data, needsReview });

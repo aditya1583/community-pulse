@@ -88,15 +88,18 @@ export async function notifyNearbyUsers(
   // (Simple approach: notify all registered users for now, let preferences filter)
   const truncatedPreview = preview.length > 80 ? preview.substring(0, 77) + "..." : preview;
 
-  for (const userId of userIds) {
-    sendNotification(
-      userId,
-      "New post near you",
-      truncatedPreview,
-      "nearby_post",
-      { pulseId: String(postId) }
-    ).catch(() => {}); // Fire and forget
-  }
+  // Must await — Vercel serverless kills pending async after response
+  await Promise.allSettled(
+    userIds.map((userId) =>
+      sendNotification(
+        userId,
+        "New post near you",
+        truncatedPreview,
+        "nearby_post",
+        { pulseId: String(postId) }
+      )
+    )
+  );
 }
 
 // ============================================================================
@@ -120,13 +123,13 @@ export async function notifyReaction(
   };
   const emoji = emojiMap[reactionType] || reactionType;
 
-  sendNotification(
+  await sendNotification(
     postAuthorUserId,
     `${reactorName} reacted ${emoji}`,
     postPreview.substring(0, 80),
     "reaction",
     { pulseId: String(postId), reactionType }
-  ).catch(() => {});
+  );
 }
 
 // ============================================================================
@@ -144,13 +147,13 @@ export async function notifyComment(
 ): Promise<void> {
   const truncated = commentPreview.length > 80 ? commentPreview.substring(0, 77) + "..." : commentPreview;
 
-  sendNotification(
+  await sendNotification(
     postAuthorUserId,
     `${commenterName} commented`,
     truncated,
     "comment",
     { pulseId: String(postId) }
-  ).catch(() => {});
+  );
 }
 
 // ============================================================================
@@ -177,9 +180,11 @@ export async function notifyTrafficAlert(
   const userIds = [...new Set(tokens.map((t) => t.user_id))];
   const title = severity === "severe" ? "🚨 Major Traffic Alert" : "🚗 Traffic Update";
 
-  for (const userId of userIds) {
-    sendNotification(userId, title, description, "traffic_alert", { city }).catch(() => {});
-  }
+  await Promise.allSettled(
+    userIds.map((userId) =>
+      sendNotification(userId, title, description, "traffic_alert", { city })
+    )
+  );
 }
 
 // ============================================================================
@@ -195,11 +200,11 @@ export async function notifyEventReminder(
   eventId: string,
   startsIn: string
 ): Promise<void> {
-  sendNotification(
+  await sendNotification(
     userId,
     `🎉 ${eventName} starts ${startsIn}`,
     "Don't miss it!",
     "event",
     { eventId }
-  ).catch(() => {});
+  );
 }

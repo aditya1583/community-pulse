@@ -276,14 +276,19 @@ export async function POST(
       return NextResponse.json({ error: "Failed to add comment" }, { status: 500 });
     }
 
-    // Notify the post author about the comment (fire and forget)
+    // Notify the post author about the comment
+    // Must await — Vercel serverless kills pending async after response is sent
     if (pulse.user_id) {
-      notifyComment(
-        pulse.user_id,
-        userIdentifier,
-        message,
-        pulseId
-      ).catch(() => {});
+      try {
+        await notifyComment(
+          pulse.user_id,
+          userIdentifier,
+          message,
+          pulseId
+        );
+      } catch (err) {
+        console.error("[CommentsAPI] Notification failed:", err);
+      }
     }
 
     // Get updated comment count
