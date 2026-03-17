@@ -169,6 +169,19 @@ function scoreItem(item: NewsItem, cityLower: string, countyName: string): numbe
     }
   }
 
+  // Name-only title detection (likely obituary)
+  // Pattern: 2-4 words, all capitalized, no common news verbs/nouns
+  const words = item.title.trim().split(/\s+/);
+  if (words.length >= 2 && words.length <= 4) {
+    const allCapitalized = words.every((w) => /^[A-Z][a-z]+$/.test(w) || /^[A-Z]\.$/.test(w));
+    const noNewsWords = !titleLower.match(
+      /\b(police|fire|school|city|council|vote|crash|arrest|open|close|win|lose|game|new|plan|build|road|water|tax|budget|storm|flood|election|update|report|crime|traffic|weather|park|library|hospital|downtown|office|business|store)\b/
+    );
+    if (allCapitalized && noNewsWords) {
+      score -= 8; // Almost certainly an obituary or person profile
+    }
+  }
+
   return score;
 }
 
