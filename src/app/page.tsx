@@ -181,6 +181,12 @@ export default function Home() {
   const [showCitySearch, setShowCitySearch] = useState(false);
   const pushInitAttempted = useRef(false);
 
+  // Notification deep link: tracks which pulse to scroll to after a notification tap
+  const [notificationPulseId, setNotificationPulseId] = useState<string | null>(null);
+
+  // Foreground notification toast
+  const [foregroundNotification, setForegroundNotification] = useState<{ title?: string; body?: string } | null>(null);
+
   // Re-register push token when user signs in (associate token with user)
   useEffect(() => {
     if (authStatus === "signed_in" && sessionUser) {
@@ -188,12 +194,16 @@ export default function Home() {
         if (token) {
           console.log("[Push] User signed in, re-registering push token with auth...");
           initPushNotifications(token, (data) => {
-            if (data.pulseId) setActiveTab("pulse");
+            if (data.pulseId) {
+              setNotificationPulseId(data.pulseId);
+              setActiveTab("pulse");
+              handlePullToRefresh().catch(() => {});
+            }
           }).catch(() => {});
         }
       }).catch(() => {});
     }
-  }, [authStatus, sessionUser]);
+  }, [authStatus, sessionUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // User gamification stats (level, XP, tier)
   const {
@@ -249,8 +259,14 @@ export default function Home() {
 
       initPushNotifications(accessToken || "__anonymous__", (data) => {
         if (data.pulseId) {
+          setNotificationPulseId(data.pulseId);
           setActiveTab("pulse");
+          handlePullToRefresh().catch(() => {});
         }
+      }, (notification) => {
+        // Foreground notification — show in-app toast
+        setForegroundNotification({ title: notification.title, body: notification.body });
+        setTimeout(() => setForegroundNotification(null), 4000);
       }).then((result) => {
         console.log("[Push] initPushNotifications result:", result);
         setPushDebug(`Push: ${result ? "OK ✅" : "FAILED ❌ (check native?)"}`);
@@ -386,6 +402,45 @@ export default function Home() {
     const t = setTimeout(() => setErrorMsg(null), 6000);
     return () => clearTimeout(t);
   }, [errorMsg, setErrorMsg]);
+
+  // Deep link: scroll to and highlight a specific pulse after notification tap
+  // Waits until: we have a notificationPulseId, the pulse tab is active, and pulses are loaded
+  useEffect(() => {
+    if (!notificationPulseId) return;
+    if (activeTab !== "pulse") return;
+    if (loading || !initialPulsesFetched) return;
+
+    const targetId = `pulse-${notificationPulseId}`;
+
+    // Retry scroll loop — element may not be in DOM immediately after tab switch
+    let attempts = 0;
+    const maxAttempts = 20;
+
+    const tryScroll = () => {
+      const el = document.getElementById(targetId);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("animate-notification-ring");
+        // Remove animation class after it completes (2s), then clear the pulse ID
+        const cleanup = setTimeout(() => {
+          el.classList.remove("animate-notification-ring");
+          setNotificationPulseId(null);
+        }, 2500);
+        return () => clearTimeout(cleanup);
+      }
+
+      attempts++;
+      if (attempts < maxAttempts) {
+        window.setTimeout(tryScroll, 100);
+      } else {
+        // Element never appeared — clear anyway to avoid stale state
+        setNotificationPulseId(null);
+      }
+      return undefined;
+    };
+
+    window.setTimeout(tryScroll, 150);
+  }, [notificationPulseId, activeTab, loading, initialPulsesFetched]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -2120,7 +2175,7 @@ export default function Home() {
                     <div className="space-y-3 pb-20">
                       {/* Happening Now Banner */}
                       {happeningNowPulse && tagFilter === "All" && (
-                        <div className="mb-4">
+                        <div id={`pulse-${happeningNowPulse.id}`} className="mb-4">
                           <PulseCard
                             pulse={happeningNowPulse}
                             isOwnPulse={sessionUser?.id === happeningNowPulse.user_id}
@@ -2204,19 +2259,20 @@ export default function Home() {
                             .filter((pulse) => !happeningNowPulse || pulse.id !== happeningNowPulse.id)
                             .flatMap((pulse, idx) => {
                               const card = (
-                                <PulseCard
-                                  key={pulse.id}
-                                  pulse={pulse}
-                                  isOwnPulse={sessionUser?.id === pulse.user_id}
-                                  isFavorite={favoritePulseIds.includes(pulse.id)}
-                                  onToggleFavorite={handleToggleFavorite}
-                                  onDelete={handleDeletePulse}
-                                  reporterId={sessionUser?.id}
-                                  userIdentifier={sessionUser ? displayName : undefined}
-                                  authorRank={pulse.user_id ? authorStats[pulse.user_id]?.rank : null}
-                                  authorLevel={pulse.user_id ? authorStats[pulse.user_id]?.level : undefined}
-                                  onBlockUser={handleBlockUser}
-                                />
+                                <div key={pulse.id} id={`pulse-${pulse.id}`}>
+                                  <PulseCard
+                                    pulse={pulse}
+                                    isOwnPulse={sessionUser?.id === pulse.user_id}
+                                    isFavorite={favoritePulseIds.includes(pulse.id)}
+                                    onToggleFavorite={handleToggleFavorite}
+                                    onDelete={handleDeletePulse}
+                                    reporterId={sessionUser?.id}
+                                    userIdentifier={sessionUser ? displayName : undefined}
+                                    authorRank={pulse.user_id ? authorStats[pulse.user_id]?.rank : null}
+                                    authorLevel={pulse.user_id ? authorStats[pulse.user_id]?.level : undefined}
+                                    onBlockUser={handleBlockUser}
+                                  />
+                                </div>
                               );
                               if (idx > 0 && idx % 5 === 4) {
                                 return [
@@ -2423,6 +2479,33 @@ export default function Home() {
             }}
             loading={termsLoading}
           />
+        )}
+
+        {/* Foreground Push Notification Toast */}
+        {foregroundNotification && (
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] animate-in slide-in-from-top-4 fade-in duration-300 w-[calc(100%-2rem)] max-w-sm">
+            <div className="bg-slate-800/95 border border-emerald-500/30 backdrop-blur-sm text-white text-sm px-4 py-3 rounded-2xl shadow-lg shadow-black/40 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <span className="text-base">🔔</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                {foregroundNotification.title && (
+                  <p className="font-semibold text-white truncate">{foregroundNotification.title}</p>
+                )}
+                {foregroundNotification.body && (
+                  <p className="text-slate-300 text-xs mt-0.5 line-clamp-2">{foregroundNotification.body}</p>
+                )}
+              </div>
+              <button
+                onClick={() => setForegroundNotification(null)}
+                className="text-slate-400 hover:text-white transition-colors flex-shrink-0"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Post Success Toast */}

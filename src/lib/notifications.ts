@@ -37,10 +37,13 @@ let pendingAccessToken: string | null = null;
  * @param accessToken - User's auth token for API calls
  * @param onNavigate - Callback for handling notification tap navigation
  *                     Receives { type, pulseId?, eventId? }
+ * @param onForegroundNotification - Optional callback for notifications received while app is open
+ *                                   Receives { title, body, data }
  */
 export async function initPushNotifications(
   accessToken: string,
-  onNavigate?: (data: Record<string, string>) => void
+  onNavigate?: (data: Record<string, string>) => void,
+  onForegroundNotification?: (notification: { title?: string; body?: string; data: Record<string, string> }) => void
 ): Promise<boolean> {
   // Only works on native platforms
   const isNative = Capacitor.isNativePlatform();
@@ -190,7 +193,13 @@ export async function initPushNotifications(
       console.log("[notifications] Foreground notification:", notification.title);
       // Foreground notifications are handled by the app's UI
       // The notification is NOT shown in the system tray automatically
-      // You could show an in-app toast here
+      if (onForegroundNotification) {
+        onForegroundNotification({
+          title: notification.title ?? undefined,
+          body: notification.body ?? undefined,
+          data: (notification.data ?? {}) as Record<string, string>,
+        });
+      }
     });
 
     // Handle notification tap (app opened from notification)
