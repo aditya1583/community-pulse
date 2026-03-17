@@ -81,7 +81,7 @@ export default function RadarPulse({
           {radiusMiles}-Mile Radius
         </span>
         <span className="text-[10px] text-emerald-500/70 font-mono uppercase tracking-wide">
-          {isScanning ? "Scanning" : "Paused"}
+          {isScanning ? "Scanning" : "Active"}
         </span>
       </div>
     </div>

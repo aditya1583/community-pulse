@@ -1783,7 +1783,7 @@ export default function Home() {
                   {/* Top Bar: Header + Auth Action */}
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1 overflow-hidden">
-                      <Header cityName={city} isLive={!loading} />
+                      <Header cityName={city} isLive={true} />
                     </div>
 
                     <div className="flex-shrink-0">
