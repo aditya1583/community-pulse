@@ -7,7 +7,8 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { notifyReaction } from "@/lib/notificationTriggers";
+// Reaction notifications removed — too noisy. Only comments/nearby/traffic notify.
+// import { notifyReaction } from "@/lib/notificationTriggers";
 
 export const dynamic = "force-dynamic";
 // Valid reaction types
@@ -171,21 +172,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
         );
       }
 
-      // Notify the post author about the reaction
-      // Must await — Vercel serverless kills pending async after response is sent
-      if (pulse.user_id && pulse.user_id !== trimmedUserIdentifier) {
-        try {
-          await notifyReaction(
-            pulse.user_id,
-            reactionType,
-            trimmedUserIdentifier,
-            pulse.message || "",
-            pulseId
-          );
-        } catch (err) {
-          console.error("[/api/pulses/[id]/react] Notification failed:", err);
-        }
-      }
+      // Reaction notifications disabled — too noisy for users
     }
 
     // Get updated reaction counts
