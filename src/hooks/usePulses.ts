@@ -235,7 +235,12 @@ export function usePulses({ city, selectedCity, geolocation }: UsePulsesParams) 
 
   // Initial load + auto-refresh interval
   useEffect(() => {
-    setInitialPulsesFetched(false);
+    // Only reset to "not fetched" if we have no cached pulses.
+    // This prevents the "Scanning..." loading screen from flickering
+    // when the city hasn't changed but the effect re-runs.
+    if (pulses.length === 0) {
+      setInitialPulsesFetched(false);
+    }
 
     if (city) {
       // Debounce: wait for city to stabilize before fetching
