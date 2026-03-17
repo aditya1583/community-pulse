@@ -2,13 +2,18 @@
  * Notification Triggers
  *
  * Helper functions to send notifications from various code paths.
- * All functions are async and non-blocking — they fire and forget.
+ * All functions are properly awaited — Vercel serverless kills pending
+ * promises after the response returns, so fire-and-forget is NOT safe here.
+ *
+ * Calls sendNotificationDirect() directly (no internal HTTP fetch), which
+ * avoids the silent failure that occurs with internal fetch() on Vercel.
  *
  * Usage:
  *   import { notifyNearbyUsers, notifyReaction, notifyComment } from '@/lib/notificationTriggers';
  */
 
 import { createClient } from "@supabase/supabase-js";
+import { sendNotificationDirect } from "./sendNotificationDirect";
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -17,32 +22,6 @@ function getServiceClient() {
   return createClient(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
-}
-
-// Internal base URL for server-to-server calls
-function getInternalUrl(): string {
-  return process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : "http://localhost:3000";
-}
-
-async function sendNotification(
-  userId: string,
-  title: string,
-  body: string,
-  type: string,
-  data: Record<string, unknown> = {}
-): Promise<void> {
-  try {
-    const baseUrl = getInternalUrl();
-    await fetch(`${baseUrl}/api/notifications/send`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, title, body, type, data }),
-    });
-  } catch (err) {
-    console.error(`[notificationTriggers] Failed to send ${type}:`, err);
-  }
 }
 
 // ============================================================================
@@ -86,12 +65,13 @@ export async function notifyNearbyUsers(
 
   // For each user, check if they have recent activity near this location
   // (Simple approach: notify all registered users for now, let preferences filter)
-  const truncatedPreview = preview.length > 80 ? preview.substring(0, 77) + "..." : preview;
+  const truncatedPreview =
+    preview.length > 80 ? preview.substring(0, 77) + "..." : preview;
 
   // Must await — Vercel serverless kills pending async after response
   await Promise.allSettled(
     userIds.map((userId) =>
-      sendNotification(
+      sendNotificationDirect(
         userId,
         "New post near you",
         truncatedPreview,
@@ -123,7 +103,7 @@ export async function notifyReaction(
   };
   const emoji = emojiMap[reactionType] || reactionType;
 
-  await sendNotification(
+  await sendNotificationDirect(
     postAuthorUserId,
     `${reactorName} reacted ${emoji}`,
     postPreview.substring(0, 80),
@@ -145,9 +125,12 @@ export async function notifyComment(
   commentPreview: string,
   postId: number | string
 ): Promise<void> {
-  const truncated = commentPreview.length > 80 ? commentPreview.substring(0, 77) + "..." : commentPreview;
+  const truncated =
+    commentPreview.length > 80
+      ? commentPreview.substring(0, 77) + "..."
+      : commentPreview;
 
-  await sendNotification(
+  await sendNotificationDirect(
     postAuthorUserId,
     `${commenterName} commented`,
     truncated,
@@ -171,9 +154,7 @@ export async function notifyTrafficAlert(
   const supabase = getServiceClient();
   if (!supabase) return;
 
-  const { data: tokens } = await supabase
-    .from("push_tokens")
-    .select("user_id");
+  const { data: tokens } = await supabase.from("push_tokens").select("user_id");
 
   if (!tokens || tokens.length === 0) return;
 
@@ -182,7 +163,7 @@ export async function notifyTrafficAlert(
 
   await Promise.allSettled(
     userIds.map((userId) =>
-      sendNotification(userId, title, description, "traffic_alert", { city })
+      sendNotificationDirect(userId, title, description, "traffic_alert", { city })
     )
   );
 }
@@ -200,7 +181,7 @@ export async function notifyEventReminder(
   eventId: string,
   startsIn: string
 ): Promise<void> {
-  await sendNotification(
+  await sendNotificationDirect(
     userId,
     `🎉 ${eventName} starts ${startsIn}`,
     "Don't miss it!",
