@@ -123,20 +123,26 @@ export default function PulseComments({
     }
   }, [pulseId, hasFetched, comments.length]);
 
-  // Fetch count on mount (lightweight - just need the count)
+  // Fetch count + latest comment on mount (for collapsed preview)
   useEffect(() => {
     async function fetchCount() {
       try {
-        const res = await fetch(`/api/pulses/${pulseId}/comments?limit=0`);
+        // Fetch the last comment (limit=1) so we can show a preview when collapsed
+        const res = await fetch(`/api/pulses/${pulseId}/comments?limit=1`);
         if (res.ok) {
           const data = await res.json();
           setTotalCount(data.totalCount || 0);
+          // Pre-populate the latest comment for collapsed preview without marking hasFetched
+          if (data.comments?.length > 0 && !hasFetched) {
+            setComments(data.comments);
+          }
         }
       } catch {
         // Silently fail - count will update when expanded
       }
     }
     fetchCount();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pulseId]);
 
   // Fetch full comments when expanded
@@ -308,6 +314,24 @@ export default function PulseComments({
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
+
+      {/* Collapsed preview: latest comment snippet when count > 1 */}
+      {!isExpanded && totalCount > 1 && comments.length > 0 && (() => {
+        const latest = comments[comments.length - 1];
+        const preview = latest.message.length > 80
+          ? latest.message.substring(0, 80) + "…"
+          : latest.message;
+        return (
+          <div
+            className="mt-1.5 text-xs text-slate-500 truncate cursor-pointer"
+            onClick={toggleExpanded}
+            aria-hidden="true"
+          >
+            <span className="font-semibold text-slate-400">{latest.user_identifier}</span>
+            {": \u201C"}{preview}{"\u201D"}
+          </div>
+        );
+      })()}
 
       {/* Expanded Content */}
       {isExpanded && (

@@ -9,7 +9,7 @@
  * avoids the silent failure that occurs with internal fetch() on Vercel.
  *
  * Usage:
- *   import { notifyNearbyUsers, notifyReaction, notifyComment } from '@/lib/notificationTriggers';
+ *   import { notifyNearbyUsers, notifyComment } from '@/lib/notificationTriggers';
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -79,36 +79,6 @@ export async function notifyNearbyUsers(
         { pulseId: String(postId) }
       )
     )
-  );
-}
-
-// ============================================================================
-// TRIGGER: Reaction on your post
-// ============================================================================
-
-/**
- * Notify a post author that someone reacted to their post.
- */
-export async function notifyReaction(
-  postAuthorUserId: string,
-  reactionType: string,
-  reactorName: string,
-  postPreview: string,
-  postId: number | string
-): Promise<void> {
-  const emojiMap: Record<string, string> = {
-    fire: "🔥",
-    eyes: "👀",
-    check: "✅",
-  };
-  const emoji = emojiMap[reactionType] || reactionType;
-
-  await sendNotificationDirect(
-    postAuthorUserId,
-    `${reactorName} reacted ${emoji}`,
-    postPreview.substring(0, 80),
-    "reaction",
-    { pulseId: String(postId), reactionType }
   );
 }
 
