@@ -319,7 +319,7 @@ export default function PulseComments({
 
           {/* Comments List */}
           {!isLoading && comments.length > 0 && (
-            <div className="space-y-2" role="list" aria-label="Comment list">
+            <div className="space-y-2" role="list" aria-label="Comment list" data-comments-list>
               {comments.map((comment) => {
                 const isOwnComment = comment.user_identifier === userIdentifier;
                 const isMenuOpen = activeMenu === comment.id;

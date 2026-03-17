@@ -419,8 +419,15 @@ export default function Home() {
     const tryScroll = () => {
       const el = document.getElementById(targetId);
       if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
         el.classList.add("animate-notification-ring");
+        // Scroll comments list to bottom so newest comment is visible
+        const commentsEl = el.querySelector("[data-comments-list]");
+        if (commentsEl) {
+          setTimeout(() => {
+            commentsEl.scrollTop = commentsEl.scrollHeight;
+          }, 600);
+        }
         // Remove animation class after it completes (2s), then clear the pulse ID
         const cleanup = setTimeout(() => {
           el.classList.remove("animate-notification-ring");
