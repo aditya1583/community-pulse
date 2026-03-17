@@ -236,7 +236,7 @@ export async function GET(req: NextRequest) {
   const city = searchParams.get("city") ?? "";
 
   const cacheHeaders = {
-    "Cache-Control": "public, s-maxage=7200, stale-while-revalidate=14400",
+    "Cache-Control": "public, s-maxage=21600, stale-while-revalidate=43200",
   };
 
   if (!city.trim()) {
