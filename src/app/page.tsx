@@ -2194,6 +2194,8 @@ export default function Home() {
                             authorRank={happeningNowPulse.user_id ? authorStats[happeningNowPulse.user_id]?.rank : null}
                             authorLevel={happeningNowPulse.user_id ? authorStats[happeningNowPulse.user_id]?.level : undefined}
                             onBlockUser={handleBlockUser}
+                            forceExpandComments={notificationPulseId === String(happeningNowPulse.id)}
+                            commentsRefreshKey={notificationPulseId === String(happeningNowPulse.id) ? Date.now() : 0}
                           />
                         </div>
                       )}
@@ -2278,6 +2280,8 @@ export default function Home() {
                                     authorRank={pulse.user_id ? authorStats[pulse.user_id]?.rank : null}
                                     authorLevel={pulse.user_id ? authorStats[pulse.user_id]?.level : undefined}
                                     onBlockUser={handleBlockUser}
+                                    forceExpandComments={notificationPulseId === String(pulse.id)}
+                                    commentsRefreshKey={notificationPulseId === String(pulse.id) ? Date.now() : 0}
                                   />
                                 </div>
                               );

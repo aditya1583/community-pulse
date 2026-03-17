@@ -193,6 +193,10 @@ type PulseCardProps = {
   authorLevel?: number;
   /** Callback when user blocks the pulse author */
   onBlockUser?: (userId: string) => void;
+  /** Force comments open + refresh (used by notification deep link) */
+  forceExpandComments?: boolean;
+  /** Increment to bust comment cache on notification tap */
+  commentsRefreshKey?: number;
 };
 
 /**
@@ -257,6 +261,8 @@ export default function PulseCard({
   authorRank,
   authorLevel,
   onBlockUser,
+  forceExpandComments = false,
+  commentsRefreshKey = 0,
 }: PulseCardProps) {
   // Track expiry countdown for visual decay
   const { remainingText, opacity, isExpiringSoon, isFading, isExpired } =
@@ -555,6 +561,8 @@ export default function PulseCard({
             pulseId={pulse.id}
             userIdentifier={userIdentifier}
             reporterId={reporterId}
+            forceExpand={forceExpandComments}
+            refreshKey={commentsRefreshKey}
           />
         </div>
       </div>

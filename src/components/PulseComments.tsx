@@ -17,6 +17,10 @@ interface PulseCommentsProps {
   reporterId?: string;
   /** Initial comment count to show before expanding */
   initialCount?: number;
+  /** When set, force-expand comments and refresh (used by notification deep link) */
+  forceExpand?: boolean;
+  /** Increment to force a re-fetch even if already fetched */
+  refreshKey?: number;
 }
 
 // Format relative time (e.g., "2m ago", "1h ago", "3d ago")
@@ -54,6 +58,8 @@ export default function PulseComments({
   userIdentifier,
   reporterId,
   initialCount = 0,
+  forceExpand = false,
+  refreshKey = 0,
 }: PulseCommentsProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -139,6 +145,14 @@ export default function PulseComments({
       fetchComments();
     }
   }, [isExpanded, hasFetched, fetchComments]);
+
+  // Force expand + re-fetch when notification deep link targets this pulse
+  useEffect(() => {
+    if (forceExpand) {
+      setIsExpanded(true);
+      setHasFetched(false); // bust cache so fetchComments re-runs
+    }
+  }, [forceExpand, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Toggle expand/collapse
   const toggleExpanded = useCallback(() => {
