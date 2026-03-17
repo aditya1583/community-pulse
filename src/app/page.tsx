@@ -53,6 +53,7 @@ import InstallPrompt from "@/components/InstallPrompt";
 import PullToRefresh from "@/components/PullToRefresh";
 import TermsAgreementModal from "@/components/TermsAgreementModal";
 import CommunityVibeBanner from "@/components/CommunityVibeBanner";
+import SignUpBanner from "@/components/SignUpBanner";
 import SplashScreen from "@/components/SplashScreen";
 import { getApiUrl } from "@/lib/api-config";
 
@@ -1913,6 +1914,11 @@ export default function Home() {
                       </div>
                     )}
                   </div>
+
+                  {/* Sign-up banner for anonymous users */}
+                  {!sessionUser && (
+                    <SignUpBanner onSignUpClick={() => setShowAuthModal(true)} />
+                  )}
 
                   {/* Current Vibe Card */}
                   <CurrentVibeCard

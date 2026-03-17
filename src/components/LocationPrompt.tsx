@@ -116,6 +116,11 @@ export default function LocationPrompt({
             Enter City Manually
           </button>
 
+          {/* Notification expectation-setter */}
+          <p className="text-xs text-slate-400/70 text-center mt-4">
+            📍 We&apos;ll also send you alerts when something happens nearby
+          </p>
+
           {/* Footnote */}
           <p className="text-[10px] text-slate-500 text-center mt-8 uppercase tracking-[0.2em] font-black">
             Hyperlocal Trust Verified
