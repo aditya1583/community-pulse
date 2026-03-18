@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 
 interface Comment {
   id: string;
@@ -140,6 +141,39 @@ export default function PulseComments({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [forceExpand, refreshKey]);
+
+  // Re-fetch comments when app returns to foreground (keeps comment counts fresh)
+  useEffect(() => {
+    // Web fallback: visibilitychange
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && hasFetched) {
+        fetchComments(true);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    // Capacitor native: appStateChange (more reliable in WKWebView/iOS)
+    let appListener: { remove: () => void } | null = null;
+    if (Capacitor.isNativePlatform()) {
+      import("@capacitor/app").then(({ App }) => {
+        App.addListener("appStateChange", ({ isActive }) => {
+          if (isActive && hasFetched) {
+            fetchComments(true);
+          }
+        }).then((handle) => {
+          appListener = handle;
+        });
+      }).catch(() => {
+        // @capacitor/app not available — web build, no-op
+      });
+    }
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      if (appListener) appListener.remove();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasFetched, fetchComments]);
 
   // Derived: which comments to actually display
   const hasMoreThanPreview = comments.length > PREVIEW_LIMIT;

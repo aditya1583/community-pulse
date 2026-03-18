@@ -12,6 +12,7 @@ import { RADIUS_CONFIG } from "@/lib/constants/radius";
 import { getApiUrl } from "@/lib/api-config";
 import type { Pulse } from "@/components/types";
 import type { GeocodedCity } from "@/lib/geocoding";
+import { Capacitor } from "@capacitor/core";
 
 // Real-time Live Updates
 type DBPulse = {
@@ -263,14 +264,36 @@ export function usePulses({ city, selectedCity, geolocation }: UsePulsesParams) 
 
   // Re-fetch when app returns to foreground (WKWebView caches page state)
   useEffect(() => {
+    // Web fallback: visibilitychange
     const handleVisibility = () => {
       if (document.visibilityState === "visible" && city) {
-        console.log("[Pulses] App foregrounded — refreshing feed");
+        console.log("[Pulses] App foregrounded (visibilitychange) — refreshing feed");
         fetchPulses();
       }
     };
     document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
+
+    // Capacitor native: appStateChange (more reliable in WKWebView/iOS)
+    let appListener: { remove: () => void } | null = null;
+    if (Capacitor.isNativePlatform()) {
+      import("@capacitor/app").then(({ App }) => {
+        App.addListener("appStateChange", ({ isActive }) => {
+          if (isActive && city) {
+            console.log("[Pulses] App foregrounded (appStateChange) — refreshing feed");
+            fetchPulses();
+          }
+        }).then((handle) => {
+          appListener = handle;
+        });
+      }).catch(() => {
+        // @capacitor/app not available — web build, no-op
+      });
+    }
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      if (appListener) appListener.remove();
+    };
   }, [city, fetchPulses]);
 
   // ========= PULL-TO-REFRESH HANDLER =========
