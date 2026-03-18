@@ -514,10 +514,10 @@ export async function generatePost(
 
   // FALLBACK: Template-based posts
 
-  // Skip traffic posts when congestion is < 10% and no incidents (nothing to report)
+  // Skip traffic posts when congestion is < 15% and no incidents (nothing to report)
   if (decision.postType === "Traffic") {
     const congestionPct = Math.round(ctx.traffic.congestionLevel * 100);
-    if (congestionPct < 10 && ctx.traffic.incidents.length === 0) {
+    if (congestionPct < 15 && ctx.traffic.incidents.length === 0) {
       console.log(`[TemplateEngine] Skipping traffic post — congestion only ${congestionPct}% with no incidents`);
       return null;
     }
@@ -600,9 +600,9 @@ export async function generateSeedPosts(
   // Rule: Only ONE post per type (except Events can have 2 if different events)
   // Events are now sorted by distance, so events[0] is always the closest/most local
   const congestionPct = Math.round(ctx.traffic.congestionLevel * 100);
-  const hasInterestingTraffic = congestionPct >= 10 || ctx.traffic.incidents.length > 0;
+  const hasInterestingTraffic = congestionPct >= 15 || ctx.traffic.incidents.length > 0;
   const categoryOptions: Array<{ type: PostType; category: string; eventIndex?: number }> = [
-    // Traffic - only one, and only if congestion >= 10% or there are real incidents
+    // Traffic - only one, and only if congestion >= 15% or there are real incidents
     ...(hasInterestingTraffic ? [{ type: "Traffic" as PostType, category: ctx.time.isRushHour ? `rushHour.${ctx.time.rushHourType}` : (ctx.traffic.incidents.length > 0 ? "incident" : "general") }] : []),
     // Weather - only one, skip if conditions are unremarkable
     ...(getWeatherCategory(ctx) ? [{ type: "Weather" as PostType, category: getWeatherCategory(ctx) }] : []),
