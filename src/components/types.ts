@@ -126,6 +126,7 @@ export const PULSE_LIFESPAN_HOURS: Record<PulseCategory, number> = {
   Weather: 4,
   Events: 24,
   General: 24,
+  Local: 24,
 };
 
 /**
@@ -182,16 +183,16 @@ export type TrafficIncident = {
 export const MOODS = ["😊", "😐", "😢", "😡", "😴", "🤩"] as const;
 export type Mood = (typeof MOODS)[number];
 
-export const TAGS = ["All", "Traffic", "Weather", "Events", "General"] as const;
+export const TAGS = ["All", "Traffic", "Weather", "Events", "General", "Local"] as const;
 export type Tag = (typeof TAGS)[number];
 
-export const POST_TAGS = ["Traffic", "Weather", "Events", "General"] as const;
+export const POST_TAGS = ["Traffic", "Weather", "Events", "General", "Local"] as const;
 export type PostTag = (typeof POST_TAGS)[number];
 
 /**
  * Category-specific mood mappings for pulse creation
  */
-export type PulseCategory = "Traffic" | "Weather" | "Events" | "General";
+export type PulseCategory = "Traffic" | "Weather" | "Events" | "General" | "Local";
 
 export const CATEGORY_MOODS: Record<PulseCategory, { emoji: string; label: string }[]> = {
   Traffic: [
@@ -217,6 +218,13 @@ export const CATEGORY_MOODS: Record<PulseCategory, { emoji: string; label: strin
     { emoji: "🎉", label: "Excited" },
     { emoji: "😤", label: "Frustrated" },
     { emoji: "😴", label: "Tired" },
+  ],
+  Local: [
+    { emoji: "📍", label: "Nearby" },
+    { emoji: "🏘️", label: "Community" },
+    { emoji: "🛍️", label: "Shopping" },
+    { emoji: "🍽️", label: "Dining" },
+    { emoji: "🎉", label: "Excited" },
   ],
 };
 

@@ -307,7 +307,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate tag is from allowed list
-    const ALLOWED_TAGS = ["Traffic", "Weather", "Events", "General"];
+    const ALLOWED_TAGS = ["Traffic", "Weather", "Events", "General", "Local"];
     if (!ALLOWED_TAGS.includes(tag)) {
       return NextResponse.json(
         { error: "Invalid tag" },

@@ -72,7 +72,8 @@ export default function BottomNavigation({
 }: BottomNavigationProps) {
   return (
     <nav
-      className="fixed left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-md bottom-[max(1.5rem,calc(env(safe-area-inset-bottom)+0.5rem))]"
+      className="fixed left-1/2 z-50 w-[calc(100%-2rem)] max-w-md bottom-[max(1.5rem,calc(env(safe-area-inset-bottom)+0.5rem))]"
+      style={{ WebkitTransform: "translateX(-50%) translateZ(0)", transform: "translateX(-50%) translateZ(0)" }}
     >
       <div className="glass-card premium-border rounded-2xl shadow-2xl overflow-hidden px-2 py-1">
         <div className="flex items-center justify-around relative">
