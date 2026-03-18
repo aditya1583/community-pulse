@@ -23,7 +23,7 @@ interface PulseCommentsProps {
   refreshKey?: number;
 }
 
-const PREVIEW_LIMIT = 5;
+const PREVIEW_LIMIT = 1;
 
 // Format relative time (e.g., "2m ago", "1h ago", "3d ago")
 function formatRelativeTime(dateString: string): string {
