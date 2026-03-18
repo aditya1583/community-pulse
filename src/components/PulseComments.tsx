@@ -23,6 +23,8 @@ interface PulseCommentsProps {
   refreshKey?: number;
 }
 
+const PREVIEW_LIMIT = 5;
+
 // Format relative time (e.g., "2m ago", "1h ago", "3d ago")
 function formatRelativeTime(dateString: string): string {
   const date = new Date(dateString);
@@ -44,14 +46,12 @@ function formatRelativeTime(dateString: string): string {
 /**
  * PulseComments Component
  *
- * Collapsible comment section for pulses.
- * Features:
- * - Tap header to expand/collapse
- * - Shows comment count
- * - Relative timestamps
- * - Add new comment input
- * - Rate limiting and moderation handled by API
- * - Accessible with ARIA attributes
+ * Comment section for pulses.
+ * - Always shows last 5 comments (or all if ≤5)
+ * - "View X more comments" link expands to show all
+ * - Chevron toggles between preview (last 5) and all comments
+ * - Comment input always visible
+ * - forceExpand/refreshKey for deep link support
  */
 export default function PulseComments({
   pulseId,
@@ -61,7 +61,8 @@ export default function PulseComments({
   forceExpand = false,
   refreshKey = 0,
 }: PulseCommentsProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  // showAll: false = show last 5 (or all if ≤5); true = show everything
+  const [showAll, setShowAll] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [totalCount, setTotalCount] = useState(initialCount);
   const [isLoading, setIsLoading] = useState(false);
@@ -72,7 +73,6 @@ export default function PulseComments({
   const [hasFetched, setHasFetched] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [reportingComment, setReportingComment] = useState<string | null>(null);
-  const [reportReason, setReportReason] = useState<string | null>(null);
 
   // Refs
   const inputRef = useRef<HTMLInputElement>(null);
@@ -97,15 +97,15 @@ export default function PulseComments({
     };
   }, [activeMenu]);
 
-  // Fetch comments when expanded
-  const fetchComments = useCallback(async () => {
-    if (hasFetched && comments.length > 0) return; // Don't refetch if we have comments
+  // Fetch all comments (up to 200)
+  const fetchComments = useCallback(async (bustCache = false) => {
+    if (!bustCache && hasFetched && comments.length > 0) return;
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const res = await fetch(`/api/pulses/${pulseId}/comments`);
+      const res = await fetch(`/api/pulses/${pulseId}/comments?limit=200`);
       if (!res.ok) {
         setError("Failed to load comments");
         return;
@@ -123,46 +123,34 @@ export default function PulseComments({
     }
   }, [pulseId, hasFetched, comments.length]);
 
-  // Fetch count + latest comment on mount (for collapsed preview)
+  // Fetch on mount — always load comments so they're visible immediately
   useEffect(() => {
-    async function fetchCount() {
-      try {
-        // Fetch the last comment (limit=1) so we can show a preview when collapsed
-        const res = await fetch(`/api/pulses/${pulseId}/comments?limit=1`);
-        if (res.ok) {
-          const data = await res.json();
-          setTotalCount(data.totalCount || 0);
-          // Pre-populate the latest comment for collapsed preview without marking hasFetched
-          if (data.comments?.length > 0 && !hasFetched) {
-            setComments(data.comments);
-          }
-        }
-      } catch {
-        // Silently fail - count will update when expanded
-      }
-    }
-    fetchCount();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pulseId]);
-
-  // Fetch full comments when expanded
-  useEffect(() => {
-    if (isExpanded && !hasFetched) {
+    if (!hasFetched) {
       fetchComments();
     }
-  }, [isExpanded, hasFetched, fetchComments]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pulseId]);
 
   // Force expand + re-fetch when notification deep link targets this pulse
   useEffect(() => {
     if (forceExpand) {
-      setIsExpanded(true);
-      setHasFetched(false); // bust cache so fetchComments re-runs
+      setShowAll(true);
+      setHasFetched(false);
+      fetchComments(true);
     }
-  }, [forceExpand, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forceExpand, refreshKey]);
 
-  // Toggle expand/collapse
-  const toggleExpanded = useCallback(() => {
-    setIsExpanded((prev) => !prev);
+  // Derived: which comments to actually display
+  const hasMoreThanPreview = comments.length > PREVIEW_LIMIT;
+  const visibleComments = showAll || !hasMoreThanPreview
+    ? comments
+    : comments.slice(comments.length - PREVIEW_LIMIT);
+  const hiddenCount = hasMoreThanPreview ? comments.length - PREVIEW_LIMIT : 0;
+
+  // Toggle chevron (expand/collapse when >5 comments)
+  const toggleShowAll = useCallback(() => {
+    setShowAll((prev) => !prev);
   }, []);
 
   // Handle submit comment
@@ -225,7 +213,6 @@ export default function PulseComments({
     }
   }, [pulseId, userIdentifier, newComment]);
 
-
   // Delete a comment (own comments only)
   const handleDeleteComment = useCallback(async (commentId: string) => {
     if (!userIdentifier) return;
@@ -274,7 +261,6 @@ export default function PulseComments({
       }
 
       setReportingComment(null);
-      setReportReason(null);
       setActiveMenu(null);
       // Show success briefly
       setError("Report submitted. Thank you!");
@@ -291,282 +277,276 @@ export default function PulseComments({
 
   return (
     <div className="mt-3 border-t border-slate-700/50 pt-3">
-      {/* Collapsible Header */}
+      {/* Header — always visible */}
       <button
         type="button"
-        onClick={toggleExpanded}
-        className="flex items-center gap-2 text-sm text-slate-400 hover:text-slate-300 transition-colors w-full"
-        aria-expanded={isExpanded}
+        onClick={hasMoreThanPreview ? toggleShowAll : undefined}
+        className={`flex items-center gap-2 text-sm text-slate-400 transition-colors w-full ${hasMoreThanPreview ? "hover:text-slate-300 cursor-pointer" : "cursor-default"}`}
+        aria-expanded={hasMoreThanPreview ? showAll : undefined}
         aria-controls={`comments-${pulseId}`}
       >
         <span className="text-base">💬</span>
         <span>
           {totalCount === 0 ? "Comments" : `Comments (${totalCount})`}
         </span>
-        <svg
-          className={`w-4 h-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-          aria-hidden="true"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {/* Collapsed preview: latest comment snippet when count > 1 */}
-      {!isExpanded && totalCount > 1 && comments.length > 0 && (() => {
-        const latest = comments[comments.length - 1];
-        const preview = latest.message.length > 80
-          ? latest.message.substring(0, 80) + "…"
-          : latest.message;
-        return (
-          <div
-            className="mt-1.5 text-xs text-slate-500 truncate cursor-pointer"
-            onClick={toggleExpanded}
+        {/* Chevron only shown when there are more than PREVIEW_LIMIT comments */}
+        {hasMoreThanPreview && (
+          <svg
+            className={`w-4 h-4 transition-transform ${showAll ? "rotate-180" : ""}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
             aria-hidden="true"
           >
-            <span className="font-semibold text-slate-400">{latest.user_identifier}</span>
-            {": \u201C"}{preview}{"\u201D"}
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        )}
+      </button>
+
+      {/* Comments section — always rendered */}
+      <div
+        id={`comments-${pulseId}`}
+        className="mt-3 space-y-3"
+        role="region"
+        aria-label="Comments section"
+      >
+        {/* Loading State */}
+        {isLoading && (
+          <div className="space-y-2" role="status" aria-label="Loading comments">
+            {[1, 2].map((i) => (
+              <div
+                key={`skeleton-${i}`}
+                className="h-16 bg-slate-700/30 rounded-lg animate-pulse"
+                aria-hidden="true"
+              />
+            ))}
+            <span className="sr-only">Loading comments...</span>
           </div>
-        );
-      })()}
+        )}
 
-      {/* Expanded Content */}
-      {isExpanded && (
-        <div
-          id={`comments-${pulseId}`}
-          className="mt-3 space-y-3"
-          role="region"
-          aria-label="Comments section"
-        >
-          {/* Loading State */}
-          {isLoading && (
-            <div className="space-y-2" role="status" aria-label="Loading comments">
-              {[1, 2].map((i) => (
+        {/* "View X more comments" link at top */}
+        {!isLoading && !showAll && hiddenCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowAll(true)}
+            className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors font-medium"
+          >
+            View {hiddenCount} more comment{hiddenCount !== 1 ? "s" : ""}
+          </button>
+        )}
+
+        {/* Comments List */}
+        {!isLoading && visibleComments.length > 0 && (
+          <div className="space-y-2" role="list" aria-label="Comment list" data-comments-list>
+            {visibleComments.map((comment) => {
+              const isOwnComment = comment.user_identifier === userIdentifier;
+              const isMenuOpen = activeMenu === comment.id;
+              const isReporting = reportingComment === comment.id;
+
+              return (
                 <div
-                  key={`skeleton-${i}`}
-                  className="h-16 bg-slate-700/30 rounded-lg animate-pulse"
-                  aria-hidden="true"
-                />
-              ))}
-              <span className="sr-only">Loading comments...</span>
-            </div>
-          )}
+                  key={comment.id}
+                  className="bg-slate-800/50 rounded-lg px-3 py-2 border border-slate-700/30 relative group"
+                  role="listitem"
+                >
+                  <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-cyan-400">{comment.user_identifier}</span>
+                      <span aria-hidden="true">•</span>
+                      <time dateTime={comment.created_at} className="text-slate-500">
+                        {formatRelativeTime(comment.created_at)}
+                      </time>
+                    </div>
 
-          {/* Comments List */}
-          {!isLoading && comments.length > 0 && (
-            <div className="space-y-2" role="list" aria-label="Comment list" data-comments-list>
-              {comments.map((comment) => {
-                const isOwnComment = comment.user_identifier === userIdentifier;
-                const isMenuOpen = activeMenu === comment.id;
-                const isReporting = reportingComment === comment.id;
+                    {/* Action Menu Button */}
+                    <div className="relative" ref={isMenuOpen || reportingComment === comment.id ? menuRef : undefined}>
+                      <button
+                        type="button"
+                        onClick={() => setActiveMenu(isMenuOpen ? null : comment.id)}
+                        className="p-1 text-slate-500 hover:text-slate-300 transition-opacity"
+                        aria-label="Comment actions"
+                      >
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                        </svg>
+                      </button>
 
-                return (
-                  <div
-                    key={comment.id}
-                    className="bg-slate-800/50 rounded-lg px-3 py-2 border border-slate-700/30 relative group"
-                    role="listitem"
-                  >
-                    <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-cyan-400">{comment.user_identifier}</span>
-                        <span aria-hidden="true">•</span>
-                        <time dateTime={comment.created_at} className="text-slate-500">
-                          {formatRelativeTime(comment.created_at)}
-                        </time>
-                      </div>
-
-                      {/* Action Menu Button */}
-                      <div className="relative" ref={isMenuOpen || reportingComment === comment.id ? menuRef : undefined}>
-                        <button
-                          type="button"
-                          onClick={() => setActiveMenu(isMenuOpen ? null : comment.id)}
-                          className="p-1 text-slate-500 hover:text-slate-300 transition-opacity"
-                          aria-label="Comment actions"
-                        >
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                          </svg>
-                        </button>
-
-                        {/* Dropdown Menu */}
-                        {isMenuOpen && !isReporting && (
-                          <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-lg py-1 z-10 min-w-[120px]">
-                            {isOwnComment && (
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteComment(comment.id)}
-                                className="w-full px-3 py-1.5 text-left text-xs text-red-400 hover:bg-slate-700/50 flex items-center gap-2"
-                              >
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                                </svg>
-                                Delete
-                              </button>
-                            )}
+                      {/* Dropdown Menu */}
+                      {isMenuOpen && !isReporting && (
+                        <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-lg py-1 z-10 min-w-[120px]">
+                          {isOwnComment && (
                             <button
                               type="button"
-                              onClick={() => {
-                                setReportingComment(comment.id);
-                              }}
-                              className="w-full px-3 py-1.5 text-left text-xs text-amber-400 hover:bg-slate-700/50 flex items-center gap-2"
+                              onClick={() => handleDeleteComment(comment.id)}
+                              className="w-full px-3 py-1.5 text-left text-xs text-red-400 hover:bg-slate-700/50 flex items-center gap-2"
                             >
                               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v1.5M3 21v-6m0 0l2.77-.693a9 9 0 016.208.682l.108.054a9 9 0 006.086.71l3.114-.732a48.524 48.524 0 01-.005-10.499l-3.11.732a9 9 0 01-6.085-.711l-.108-.054a9 9 0 00-6.208-.682L3 4.5M3 15V4.5" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                               </svg>
-                              Report
+                              Delete
                             </button>
-                          </div>
-                        )}
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReportingComment(comment.id);
+                            }}
+                            className="w-full px-3 py-1.5 text-left text-xs text-amber-400 hover:bg-slate-700/50 flex items-center gap-2"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v1.5M3 21v-6m0 0l2.77-.693a9 9 0 016.208.682l.108.054a9 9 0 006.086.71l3.114-.732a48.524 48.524 0 01-.005-10.499l-3.11.732a9 9 0 01-6.085-.711l-.108-.054a9 9 0 00-6.208-.682L3 4.5M3 15V4.5" />
+                            </svg>
+                            Report
+                          </button>
+                        </div>
+                      )}
 
-                        {/* Report Reason Selector */}
-                        {isReporting && (
-                          <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-lg py-1 z-10 min-w-[150px]">
-                            <div className="px-3 py-1 text-xs text-slate-400 border-b border-slate-700">
-                              Why report?
-                            </div>
-                            {["spam", "harassment", "inappropriate", "misinformation"].map((reason) => (
-                              <button
-                                key={reason}
-                                type="button"
-                                onClick={() => handleReportComment(comment.id, reason)}
-                                className="w-full px-3 py-1.5 text-left text-xs text-slate-300 hover:bg-slate-700/50 capitalize"
-                              >
-                                {reason}
-                              </button>
-                            ))}
+                      {/* Report Reason Selector */}
+                      {isReporting && (
+                        <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-lg py-1 z-10 min-w-[150px]">
+                          <div className="px-3 py-1 text-xs text-slate-400 border-b border-slate-700">
+                            Why report?
+                          </div>
+                          {["spam", "harassment", "inappropriate", "misinformation"].map((reason) => (
                             <button
+                              key={reason}
                               type="button"
-                              onClick={() => {
-                                setReportingComment(null);
-                                setActiveMenu(null);
-                              }}
-                              className="w-full px-3 py-1.5 text-left text-xs text-slate-500 hover:bg-slate-700/50 border-t border-slate-700"
+                              onClick={() => handleReportComment(comment.id, reason)}
+                              className="w-full px-3 py-1.5 text-left text-xs text-slate-300 hover:bg-slate-700/50 capitalize"
                             >
-                              Cancel
+                              {reason}
                             </button>
-                          </div>
-                        )}
-                      </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReportingComment(null);
+                              setActiveMenu(null);
+                            }}
+                            className="w-full px-3 py-1.5 text-left text-xs text-slate-500 hover:bg-slate-700/50 border-t border-slate-700"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-sm text-slate-200 leading-snug">
-                      {comment.message}
-                    </p>
                   </div>
-                );
-              })}
-            </div>
-          )}
+                  <p className="text-sm text-slate-200 leading-snug">
+                    {comment.message}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
-          {/* Empty State */}
-          {!isLoading && comments.length === 0 && hasFetched && (
-            <p className="text-sm text-slate-500 text-center py-2">
-              No comments yet. Be the first!
-            </p>
-          )}
+        {/* Empty State */}
+        {!isLoading && comments.length === 0 && hasFetched && (
+          <p className="text-sm text-slate-500 text-center py-2">
+            No comments yet. Be the first!
+          </p>
+        )}
 
-          {/* Error Message */}
-          {error && (
-            <p className="text-xs text-red-400 text-center" role="alert">
-              {error}
-            </p>
-          )}
+        {/* Error Message */}
+        {error && (
+          <p className="text-xs text-red-400 text-center" role="alert">
+            {error}
+          </p>
+        )}
 
-          {/* Sign In Prompt - clickable to trigger sign-in */}
-          {showSignInPrompt && (
-            <button
-              type="button"
-              onClick={() => {
-                setShowSignInPrompt(false);
-                // Dispatch custom event to trigger sign-in modal
-                window.dispatchEvent(new CustomEvent("showSignInModal"));
-              }}
-              className="w-full flex items-center justify-center gap-2 text-xs text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg px-3 py-2 transition-colors cursor-pointer"
-              role="alert"
-            >
-              <span>Sign in to comment</span>
-              <span className="text-amber-300 font-medium">Sign in</span>
-              <svg className="w-3.5 h-3.5 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-              </svg>
-            </button>
-          )}
+        {/* Sign In Prompt - clickable to trigger sign-in */}
+        {showSignInPrompt && (
+          <button
+            type="button"
+            onClick={() => {
+              setShowSignInPrompt(false);
+              // Dispatch custom event to trigger sign-in modal
+              window.dispatchEvent(new CustomEvent("showSignInModal"));
+            }}
+            className="w-full flex items-center justify-center gap-2 text-xs text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg px-3 py-2 transition-colors cursor-pointer"
+            role="alert"
+          >
+            <span>Sign in to comment</span>
+            <span className="text-amber-300 font-medium">Sign in</span>
+            <svg className="w-3.5 h-3.5 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+            </svg>
+          </button>
+        )}
 
-          {/* Add Comment Form */}
-          <form onSubmit={handleSubmit} className="flex gap-2">
-            <div className="flex-1 relative">
-              <input
-                ref={inputRef}
-                type="text"
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Add a comment..."
-                maxLength={550} // Allow a bit over to show error
-                disabled={isSubmitting}
-                className={`
-                  w-full bg-slate-800/50 border rounded-lg pl-3 pr-16 py-2 text-sm text-slate-200
-                  placeholder:text-slate-500
-                  focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                  ${isOverLimit ? "border-red-500" : "border-slate-600"}
-                `}
-                aria-label="Write a comment"
-                aria-invalid={isOverLimit}
-              />
-              {/* Character count (only show when typing) */}
-              {charCount > 0 && (
-                <span
-                  className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs ${isOverLimit ? "text-red-400" : "text-slate-500"
-                    }`}
-                  aria-live="polite"
-                >
-                  {charCount}/500
-                </span>
-              )}
-            </div>
-            <button
-              type="submit"
-              disabled={isSubmitting || !newComment.trim() || isOverLimit}
+        {/* Add Comment Form — always visible */}
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <div className="flex-1 relative">
+            <input
+              ref={inputRef}
+              type="text"
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="Add a comment..."
+              maxLength={550} // Allow a bit over to show error
+              disabled={isSubmitting}
               className={`
-                px-4 py-2 rounded-lg text-sm font-medium transition-colors
-                focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900
-                ${isSubmitting || !newComment.trim() || isOverLimit
-                  ? "bg-slate-700 text-slate-500 cursor-not-allowed"
-                  : "bg-emerald-600 text-white hover:bg-emerald-500"
-                }
+                w-full bg-slate-800/50 border rounded-lg pl-3 pr-16 py-2 text-sm text-slate-200
+                placeholder:text-slate-500
+                focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent
+                disabled:opacity-50 disabled:cursor-not-allowed
+                ${isOverLimit ? "border-red-500" : "border-slate-600"}
               `}
-              aria-label="Send comment"
-            >
-              {isSubmitting ? (
-                <svg
-                  className="w-5 h-5 animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-              ) : (
-                "Send"
-              )}
-            </button>
-          </form>
-        </div>
-      )}
+              aria-label="Write a comment"
+              aria-invalid={isOverLimit}
+            />
+            {/* Character count (only show when typing) */}
+            {charCount > 0 && (
+              <span
+                className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs ${isOverLimit ? "text-red-400" : "text-slate-500"
+                  }`}
+                aria-live="polite"
+              >
+                {charCount}/500
+              </span>
+            )}
+          </div>
+          <button
+            type="submit"
+            disabled={isSubmitting || !newComment.trim() || isOverLimit}
+            className={`
+              px-4 py-2 rounded-lg text-sm font-medium transition-colors
+              focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900
+              ${isSubmitting || !newComment.trim() || isOverLimit
+                ? "bg-slate-700 text-slate-500 cursor-not-allowed"
+                : "bg-emerald-600 text-white hover:bg-emerald-500"
+              }
+            `}
+            aria-label="Send comment"
+          >
+            {isSubmitting ? (
+              <svg
+                className="w-5 h-5 animate-spin"
+                fill="none"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+            ) : (
+              "Send"
+            )}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

@@ -122,7 +122,7 @@ export async function GET(
 
   const { searchParams } = new URL(request.url);
   const cursor = searchParams.get("cursor"); // For pagination
-  const limit = Math.min(parseInt(searchParams.get("limit") || String(PAGE_SIZE), 10), 50);
+  const limit = Math.min(parseInt(searchParams.get("limit") || String(PAGE_SIZE), 10), 200);
 
   if (!supabaseUrl || !supabaseServiceKey) {
     return NextResponse.json({ error: "Database not configured" }, { status: 500 });
