@@ -330,6 +330,8 @@ export async function POST(req: NextRequest) {
       // Round to 2 decimal places (~1.1km precision) to protect user privacy
       lat: typeof lat === "number" && isFinite(lat) ? Math.round(lat * 100) / 100 : null,
       lon: typeof lon === "number" && isFinite(lon) ? Math.round(lon * 100) / 100 : null,
+      // User posts always get 24h lifespan regardless of tag (bot posts set their own)
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     };
 
     // Log moderation flags for review (column doesn't exist yet, just log)
