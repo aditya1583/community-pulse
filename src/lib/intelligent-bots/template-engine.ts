@@ -31,32 +31,32 @@ import {
 
 const TRAFFIC_TEMPLATES = {
   "rushHour.morning": [
-    "🚗 Morning rush: {road} at {congestion}% congestion near {landmark}.",
-    "🚗 {road} slow near {landmark}. Alt: {altRoute}.",
-    "🚗 Rush hour: {road} congested near {school}.",
+    "🚗 {city} morning rush: roads running at {speed} mph, {congestion}% congestion (normally {freeFlowSpeed} mph).",
+    "🚗 Morning rush in {city}: {congestion}% congestion, avg {speed} mph.",
+    "🚗 {city} commute: {trafficDesc} this morning. Avg speed {speed} mph.",
   ],
   "rushHour.evening": [
-    "🚗 Evening rush: {road} at {congestion}% near {landmark}.",
-    "🚗 {road} congested. Alt: {altRoute}.",
-    "🚗 Evening traffic: {road} slow near {landmark}.",
+    "🚗 Evening traffic in {city}: {congestion}% congestion, avg {speed} mph (normally {freeFlowSpeed} mph).",
+    "🚗 {city} evening commute: roads at {speed} mph, {congestion}% congestion.",
+    "🚗 Traffic in {city}: currently {trafficDesc}. Avg speed {speed} mph.",
   ],
   schoolZone: [
-    "🏫 School zone: {road} near {school} — expect delays.",
-    "🚸 School dismissal: {road} near {school}.",
-    "🏫 {school} zone active on {road}.",
+    "🏫 School zone active in {city} — expect slower speeds. Currently {speed} mph avg.",
+    "🚸 School dismissal time in {city}. Roads at {speed} mph, {congestion}% congestion.",
+    "🏫 School hours in {city}: congestion at {congestion}%, avg {speed} mph.",
   ],
   event: [
-    "🚗 Post-event traffic expected near {venue} on {road}.",
-    "🚗 {event} at {venue} ending soon. Expect {road} delays.",
+    "🚗 Post-event traffic in {city}: {congestion}% congestion near {venue}.",
+    "🚗 {event} at {venue} wrapping up — {city} roads at {congestion}% congestion.",
   ],
   incident: [
-    "⚠️ {road} partially blocked near {landmark}. Alt: {altRoute}.",
-    "⚠️ Delays on {road} near {landmark}. {description}",
+    "⚠️ Incident reported in {city}: {incidentRoad} — {description}",
+    "⚠️ {city} traffic alert: {incidentRoad}. Avg speed {speed} mph.",
   ],
   general: [
-    "🚗 {road} at {congestion}% congestion near {landmark}.",
-    "🚗 {road}: {speed} mph near {landmark}.",
-    "🚗 Traffic update: {road} near {landmark}.",
+    "🚗 {city} traffic: {congestion}% congestion, avg {speed} mph (normally {freeFlowSpeed} mph).",
+    "🚗 Traffic in {city}: currently {trafficDesc}. Avg speed {speed} mph.",
+    "🚗 {city} roads: {speed} mph avg, {congestion}% congestion.",
   ],
 };
 
@@ -375,6 +375,10 @@ interface TemplateVariables {
   eventDistanceCallout: string;
   eventDate: string;
   venueCity: string;
+  // Traffic area-based variables
+  freeFlowSpeed: string;
+  trafficDesc: string;
+  incidentRoad: string;
   // New variables
   forecastHigh: string;
   forecastLow: string;
@@ -439,6 +443,9 @@ function buildVariables(ctx: SituationContext, eventIndex: number = 0): Template
     bridge: `${primaryRoad} overpass`, // Generic bridge reference
     congestion: String(congestionPct),
     speed: String(Math.round(traffic.currentSpeed)),
+    freeFlowSpeed: String(Math.round(traffic.freeFlowSpeed)),
+    trafficDesc: congestionPct > 30 ? "heavy traffic" : congestionPct > 15 ? "moderate traffic" : "light traffic",
+    incidentRoad: traffic.incidents[0]?.road || traffic.incidents[0]?.description?.split(" ")[0] || "a local road",
     temp: String(weather.temperature),
     feelsLike: String(weather.feelsLike),
     uvIndex: String(weather.uvIndex),
@@ -506,6 +513,16 @@ export async function generatePost(
   }
 
   // FALLBACK: Template-based posts
+
+  // Skip traffic posts when congestion is < 10% and no incidents (nothing to report)
+  if (decision.postType === "Traffic") {
+    const congestionPct = Math.round(ctx.traffic.congestionLevel * 100);
+    if (congestionPct < 10 && ctx.traffic.incidents.length === 0) {
+      console.log(`[TemplateEngine] Skipping traffic post — congestion only ${congestionPct}% with no incidents`);
+      return null;
+    }
+  }
+
   const variables = buildVariables(ctx);
   let message: string;
   const mood: string = getMood(decision.templateCategory);
@@ -582,9 +599,11 @@ export async function generateSeedPosts(
   // Categories to try, in priority order - avoid redundancy
   // Rule: Only ONE post per type (except Events can have 2 if different events)
   // Events are now sorted by distance, so events[0] is always the closest/most local
+  const congestionPct = Math.round(ctx.traffic.congestionLevel * 100);
+  const hasInterestingTraffic = congestionPct >= 10 || ctx.traffic.incidents.length > 0;
   const categoryOptions: Array<{ type: PostType; category: string; eventIndex?: number }> = [
-    // Traffic - only one
-    { type: "Traffic", category: ctx.time.isRushHour ? `rushHour.${ctx.time.rushHourType}` : "general" },
+    // Traffic - only one, and only if congestion >= 10% or there are real incidents
+    ...(hasInterestingTraffic ? [{ type: "Traffic" as PostType, category: ctx.time.isRushHour ? `rushHour.${ctx.time.rushHourType}` : (ctx.traffic.incidents.length > 0 ? "incident" : "general") }] : []),
     // Weather - only one, skip if conditions are unremarkable
     ...(getWeatherCategory(ctx) ? [{ type: "Weather" as PostType, category: getWeatherCategory(ctx) }] : []),
     // Events: LOCAL event first (events[0] is closest due to distance sorting)
