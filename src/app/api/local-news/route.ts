@@ -170,6 +170,16 @@ function scoreItem(item: NewsItem, cityLower: string, countyName: string, stateN
     }
   }
 
+  // Freshness bonus
+  if (item.pubDate) {
+    const pubTs = new Date(item.pubDate).getTime();
+    if (!isNaN(pubTs)) {
+      const ageMs = Date.now() - pubTs;
+      if (ageMs <= 24 * 60 * 60 * 1000) score += 2;       // within 24h
+      else if (ageMs <= 3 * 24 * 60 * 60 * 1000) score += 1; // within 3 days
+    }
+  }
+
   // Name-only title detection (likely obituary)
   // Pattern: 2-4 words, all capitalized, no common news verbs/nouns
   const words = item.title.trim().split(/\s+/);
@@ -233,7 +243,8 @@ async function fetchNewsDataIO(city: string, apiKey: string): Promise<NewsItem[]
 // ============================================================================
 
 async function fetchGoogleNewsRSS(city: string, state: string): Promise<NewsItem[]> {
-  const query = state.trim() ? `${city} ${state}` : city;
+  const baseQuery = state.trim() ? `${city} ${state}` : city;
+  const query = `${baseQuery} when:7d`;
   const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
 
   try {
@@ -252,7 +263,16 @@ async function fetchGoogleNewsRSS(city: string, state: string): Promise<NewsItem
 
     if (!res.ok) return [];
     const xml = await res.text();
-    return xml ? parseNewsItems(xml) : [];
+    if (!xml) return [];
+
+    const items = parseNewsItems(xml);
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    return items.filter((item) => {
+      if (!item.pubDate) return true; // keep articles with no date
+      const ts = new Date(item.pubDate).getTime();
+      if (isNaN(ts)) return true; // keep articles with unparseable date
+      return ts >= sevenDaysAgo; // filter out if older than 7 days
+    });
   } catch {
     return [];
   }
