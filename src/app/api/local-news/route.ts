@@ -298,17 +298,22 @@ export async function GET(req: NextRequest) {
     r.status === "fulfilled" ? r.value : []
   );
 
-  // 2. NewsData.io + Google News RSS (parallel)
-  const newsDataKey = process.env.NEWSDATA_API_KEY ?? "";
-  const [apiItems, googleItems] = await Promise.all([
-    newsDataKey ? fetchNewsDataIO(city.trim(), newsDataKey) : Promise.resolve([] as NewsItem[]),
-    fetchGoogleNewsRSS(city.trim(), state.trim()),
-  ]);
+  // 2. Google News RSS (primary, free, no key) + NewsData.io (fallback)
+  const googleItems = await fetchGoogleNewsRSS(city.trim(), state.trim());
 
-  // 3. Merge + deduplicate by exact title (priority: curated RSS → NewsData.io → Google News RSS)
+  // Only hit NewsData.io if Google News returned fewer than 3 items
+  let apiItems: NewsItem[] = [];
+  if (googleItems.length < 3) {
+    const newsDataKey = process.env.NEWSDATA_API_KEY ?? "";
+    if (newsDataKey) {
+      apiItems = await fetchNewsDataIO(city.trim(), newsDataKey);
+    }
+  }
+
+  // 3. Merge + deduplicate by exact title (priority: curated RSS → Google News → NewsData.io)
   const seen = new Set<string>();
   const merged: NewsItem[] = [];
-  for (const item of [...rssItems, ...apiItems, ...googleItems]) {
+  for (const item of [...rssItems, ...googleItems, ...apiItems]) {
     if (!seen.has(item.title)) {
       seen.add(item.title);
       merged.push(item);
