@@ -41,6 +41,7 @@ import { useSummary } from "@/hooks/useSummary";
 import { useCityMood } from "@/hooks/useCityMood";
 import { useUniversalData } from "@/hooks/useUniversalData";
 import NWSAlertBanner from "@/components/NWSAlertBanner";
+import BreakingNewsBanner from "@/components/BreakingNewsBanner";
 import NewsCard from "@/components/NewsCard";
 import { useStreak } from "@/hooks/useStreak";
 import { useUsername } from "@/hooks/useUsername";
@@ -2092,6 +2093,13 @@ export default function Home() {
                   {nwsAlerts.length > 0 && (
                     <div className="mb-4">
                       <NWSAlertBanner alerts={nwsAlerts} />
+                    </div>
+                  )}
+
+                  {/* Breaking News Banner */}
+                  {localNews.length > 0 && (
+                    <div className="mb-4">
+                      <BreakingNewsBanner newsItems={localNews} />
                     </div>
                   )}
 
