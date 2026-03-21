@@ -143,7 +143,7 @@ interface ScoredItem extends NewsItem {
   score: number;
 }
 
-function scoreItem(item: NewsItem, cityLower: string, countyName: string): number {
+function scoreItem(item: NewsItem, cityLower: string, countyName: string, stateName?: string): number {
   let score = 0;
   const titleLower = item.title.toLowerCase();
   const sourceLower = (item.source ?? "").toLowerCase();
@@ -152,6 +152,7 @@ function scoreItem(item: NewsItem, cityLower: string, countyName: string): numbe
   if (titleLower.includes(cityLower)) score += 3;
   if (countyName && titleLower.includes(countyName.toLowerCase())) score += 2;
   if (titleLower.includes("texas") || titleLower.includes(" tx ") || titleLower.endsWith(" tx")) score += 1;
+  if (stateName && stateName.length > 0 && titleLower.includes(stateName.toLowerCase())) score += 1;
 
   // Source blacklist (-10)
   for (const blocked of BLACKLISTED_SOURCES) {
@@ -228,12 +229,43 @@ async function fetchNewsDataIO(city: string, apiKey: string): Promise<NewsItem[]
 }
 
 // ============================================================================
+// Google News RSS fallback
+// ============================================================================
+
+async function fetchGoogleNewsRSS(city: string, state: string): Promise<NewsItem[]> {
+  const query = state.trim() ? `${city} ${state}` : city;
+  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; Voxlo/1.0; +https://voxlo.app)",
+        Accept: "application/rss+xml, application/xml, text/xml",
+      },
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) return [];
+    const xml = await res.text();
+    return xml ? parseNewsItems(xml) : [];
+  } catch {
+    return [];
+  }
+}
+
+// ============================================================================
 // Route handler
 // ============================================================================
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const city = searchParams.get("city") ?? "";
+  const state = searchParams.get("state") ?? "";
 
   const cacheHeaders = {
     "Cache-Control": "public, s-maxage=21600, stale-while-revalidate=43200",
@@ -266,16 +298,17 @@ export async function GET(req: NextRequest) {
     r.status === "fulfilled" ? r.value : []
   );
 
-  // 2. NewsData.io (if API key present)
+  // 2. NewsData.io + Google News RSS (parallel)
   const newsDataKey = process.env.NEWSDATA_API_KEY ?? "";
-  const apiItems: NewsItem[] = newsDataKey
-    ? await fetchNewsDataIO(city.trim(), newsDataKey)
-    : [];
+  const [apiItems, googleItems] = await Promise.all([
+    newsDataKey ? fetchNewsDataIO(city.trim(), newsDataKey) : Promise.resolve([] as NewsItem[]),
+    fetchGoogleNewsRSS(city.trim(), state.trim()),
+  ]);
 
-  // 3. Merge + deduplicate by exact title
+  // 3. Merge + deduplicate by exact title (priority: curated RSS → NewsData.io → Google News RSS)
   const seen = new Set<string>();
   const merged: NewsItem[] = [];
-  for (const item of [...rssItems, ...apiItems]) {
+  for (const item of [...rssItems, ...apiItems, ...googleItems]) {
     if (!seen.has(item.title)) {
       seen.add(item.title);
       merged.push(item);
@@ -283,9 +316,10 @@ export async function GET(req: NextRequest) {
   }
 
   // 4. Score, filter, sort
+  const stateLower = state.trim().toLowerCase();
   const scored: ScoredItem[] = merged.map((item) => ({
     ...item,
-    score: scoreItem(item, cityLower, countyName),
+    score: scoreItem(item, cityLower, countyName, stateLower || undefined),
   }));
 
   const filtered = scored.filter((item) => item.score > -4);
